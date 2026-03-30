@@ -1,36 +1,72 @@
 # godotussy
 
-A deterministic roguelike engine built for Godot 4.4 with a pure C# simulation core.
+A deterministic roguelike foundation for Godot 4.4 with a pure C# simulation core, Godot-facing presentation scripts, data-driven content, and a custom .NET test harness.
 
-## What’s Here
+## Quick Start
 
-This repository contains a grid-based roguelike foundation with:
-- Deterministic world state and persistence
-- Energy-based turn scheduling
-- Action-driven simulation for movement, combat, items, doors, and stairs
-- BSP dungeon generation with connectivity validation
-- Utility-driven enemy AI and A* pathfinding
-- Godot-side world rendering, FOV, UI, and editor/debug tooling
-- A custom .NET test harness covering simulation, generation, content, rendering, persistence, and UI behaviors
+1. Install .NET 8 SDK.
+2. Install Godot 4.4 with C# support if you want to open or run the game inside the editor.
+3. Build the solution:
 
-## Project Layout
+   ```powershell
+   dotnet build godotussy.sln
+   ```
 
-- `Core/`
-  Pure C# engine code: contracts, simulation, AI, generation, content, and persistence.
-- `Scripts/`
-  Godot-facing autoloads, world rendering, UI, and tools.
-- `Scenes/`
-  Scene definitions for the main world, UI, and tools.
-- `Content/`
-  Data-driven JSON content for items, enemies, loot, abilities, room prefabs, and status effects.
-- `Tests/`
-  Custom test runner plus subsystem suites and stubs.
-- `Compat/Godot/`
-  Build-time Godot stubs used so the solution can compile and test without a local Godot editor runtime.
+4. Run the automated test suite:
 
-## Build And Test
+   ```powershell
+   dotnet run --project Tests/godotussy.Tests.csproj
+   ```
 
-Build the full solution:
+5. Open `project.godot` in Godot 4.4 to inspect scenes, autoloads, and editor tools.
+
+## What This Project Contains
+
+- A pure C# simulation layer for entities, actions, combat, inventory, AI, generation, and persistence.
+- Godot-side autoloads and presentation scripts for UI, rendering, and debug/editor tooling.
+- JSON-driven content for items, enemies, abilities, status effects, loot tables, and room prefabs.
+- Save/load infrastructure with validation and migration support.
+- A custom test runner covering simulation, generation, content, persistence, rendering, UI, and integration flows.
+
+## Repository Layout
+
+- `Core/` - engine code with no Godot runtime dependency.
+- `Scripts/` - Godot-facing autoloads, UI, world rendering, and tools.
+- `Scenes/` - scene resources for the game shell, UI, and editor/debug tools.
+- `Content/` - authoritative JSON content files loaded by `ContentLoader`.
+- `Compat/Godot/` - compile-time stubs so the solution can build and test without a local Godot editor runtime.
+- `Tests/` - custom test runner, subsystem suites, and test doubles.
+- `Addons/roguelike_tools/` - Godot editor plugin that exposes project tools.
+
+## Runtime Entry Points
+
+- Main scene: `Scenes/Main.tscn`
+- Project autoloads:
+  - `GameManager` - simulation/session coordinator.
+  - `EventBus` - cross-system event hub.
+  - `ContentDatabase` - bridge from Godot autoload space to the loaded content database.
+
+## Documentation Index
+
+- [docs/SETUP.md](docs/SETUP.md) - prerequisites, first-time setup, build/test commands, and opening the project in Godot.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - system boundaries, runtime flow, and where new code belongs.
+- [docs/SYSTEMS.md](docs/SYSTEMS.md) - turn loop, AI, generation, rendering, and persistence behavior.
+- [docs/CONTENT.md](docs/CONTENT.md) - content file inventory, schema expectations, and authoring rules.
+- [docs/TOOLS.md](docs/TOOLS.md) - editor plugin, debug tools, and in-project utility surfaces.
+- [docs/TESTING.md](docs/TESTING.md) - custom test harness usage and subsystem coverage.
+- [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) - code placement rules, workflow expectations, and review checklist.
+
+## Core Development Rules
+
+- Keep deterministic gameplay state and mutations inside `Core/`.
+- Keep Godot-specific code in `Scripts/`, `Scenes/`, or `Addons/`.
+- Add or update `IAction` implementations when introducing new gameplay actions.
+- Emit cross-system notifications through `Scripts/Autoloads/EventBus.cs` instead of wiring presentation code directly into simulation logic.
+- Extend tests whenever you touch simulation, persistence, generation, or content-loading behavior.
+
+## Common Commands
+
+Build the solution:
 
 ```powershell
 dotnet build godotussy.sln
@@ -42,23 +78,17 @@ Run the full test suite:
 dotnet run --project Tests/godotussy.Tests.csproj
 ```
 
-## Current Validation Status
+Run the rendering-focused compile profile:
 
-Latest validation completed during this update:
-- `dotnet build godotussy.sln`
-- `dotnet run --project Tests/godotussy.Tests.csproj`
+```powershell
+dotnet run --project Tests/godotussy.Tests.csproj -p:RenderingValidation=true
+```
 
-Both succeeded, with `92` passing tests.
+## Notes For Contributors
 
-## Notable Engine Details
+- The simulation layer intentionally avoids Godot imports so it remains testable and deterministic.
+- Save data is versioned and migrated on load; do not change persistence shapes casually.
+- Content IDs are expected to be stable lowercase snake_case keys.
+- Temporary root-level `.cs` scratch files are included by the SDK globbing rules and can break builds.
 
-- Simulation code stays under `Core/` and does not depend on Godot types.
-- Save files now use packed visibility/exploration flags and include migration from older formats.
-- The rendering layer listens to `EventBus` rather than mutating simulation state directly.
-- `Core/Simulation/GameLoop.cs` now exists as a pure orchestration surface for round execution.
-
-## Working In The Repo
-
-- Keep gameplay mutations inside `IAction.Execute()` implementations.
-- Keep cross-system notifications flowing through `Scripts/Autoloads/EventBus.cs`.
-- Prefer adding coverage in `Tests/` when changing simulation, persistence, or generation logic.
+Start with [docs/SETUP.md](docs/SETUP.md) if you are new to the repository, then use [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) before making structural changes.
