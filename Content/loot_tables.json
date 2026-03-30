@@ -1,0 +1,265 @@
+{
+  "$schema": "roguelike-loot-tables-v1",
+  "version": 1,
+  "loot_tables": [
+    {
+      "id": "rat_loot",
+      "description": "Loot dropped by Giant Rats.",
+      "rolls": 1,
+      "entries": [
+        {
+          "item_id": "potion_health",
+          "weight": 15,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": null,
+          "weight": 85,
+          "count_min": 0,
+          "count_max": 0
+        }
+      ]
+    },
+    {
+      "id": "skeleton_loot",
+      "description": "Loot dropped by Skeleton Warriors.",
+      "rolls": 1,
+      "entries": [
+        {
+          "item_id": "sword_iron",
+          "weight": 10,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "helm_iron",
+          "weight": 8,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "potion_health",
+          "weight": 25,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": null,
+          "weight": 57,
+          "count_min": 0,
+          "count_max": 0
+        }
+      ]
+    },
+    {
+      "id": "goblin_loot",
+      "description": "Loot dropped by Goblin Archers.",
+      "rolls": 1,
+      "entries": [
+        {
+          "item_id": "potion_health",
+          "weight": 20,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "dagger_venom",
+          "weight": 5,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "potion_haste",
+          "weight": 8,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": null,
+          "weight": 67,
+          "count_min": 0,
+          "count_max": 0
+        }
+      ]
+    },
+    {
+      "id": "orc_loot",
+      "description": "Loot dropped by Orc Brutes.",
+      "rolls": 2,
+      "entries": [
+        {
+          "item_id": "armor_chainmail",
+          "weight": 12,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "potion_health",
+          "weight": 30,
+          "count_min": 1,
+          "count_max": 2
+        },
+        {
+          "item_id": "shield_wooden",
+          "weight": 10,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "scroll_fireball",
+          "weight": 5,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": null,
+          "weight": 43,
+          "count_min": 0,
+          "count_max": 0
+        }
+      ]
+    },
+    {
+      "id": "wraith_loot",
+      "description": "Loot dropped by Spectral Wraiths.",
+      "rolls": 1,
+      "entries": [
+        {
+          "item_id": "ring_regen",
+          "weight": 5,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "scroll_blink",
+          "weight": 15,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "amulet_farsight",
+          "weight": 8,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": null,
+          "weight": 72,
+          "count_min": 0,
+          "count_max": 0
+        }
+      ]
+    },
+    {
+      "id": "slime_loot",
+      "description": "Loot dropped by Acid Slimes.",
+      "rolls": 1,
+      "entries": [
+        {
+          "item_id": "potion_health",
+          "weight": 10,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "scroll_blink",
+          "weight": 5,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": null,
+          "weight": 85,
+          "count_min": 0,
+          "count_max": 0
+        }
+      ]
+    },
+    {
+      "id": "floor_loot",
+      "description": "Random items found on dungeon floor tiles.",
+      "rolls": 1,
+      "entries": [
+        {
+          "item_id": "potion_health",
+          "weight": 25,
+          "count_min": 1,
+          "count_max": 2
+        },
+        {
+          "item_id": "potion_haste",
+          "weight": 10,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "scroll_fireball",
+          "weight": 8,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "scroll_blink",
+          "weight": 12,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "sword_iron",
+          "weight": 6,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "shield_wooden",
+          "weight": 6,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "helm_iron",
+          "weight": 5,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "dagger_venom",
+          "weight": 4,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "armor_chainmail",
+          "weight": 3,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "sword_flame",
+          "weight": 2,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "ring_regen",
+          "weight": 2,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "amulet_farsight",
+          "weight": 3,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": null,
+          "weight": 14,
+          "count_min": 0,
+          "count_max": 0
+        }
+      ]
+    }
+  ]
+}

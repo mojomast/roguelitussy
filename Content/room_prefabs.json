@@ -1,0 +1,297 @@
+{
+  "$schema": "roguelike-room-prefabs-v1",
+  "version": 1,
+  "tile_legend": {
+    "#": "wall",
+    ".": "floor",
+    "+": "door",
+    ">": "stairs_down",
+    "<": "stairs_up",
+    "~": "water",
+    "^": "trap",
+    "S": "spawn_enemy",
+    "I": "spawn_item",
+    "P": "spawn_player",
+    "C": "chest",
+    " ": "void"
+  },
+  "rooms": [
+    {
+      "id": "start_room",
+      "name": "Starting Chamber",
+      "tags": ["start", "guaranteed"],
+      "width": 9,
+      "height": 9,
+      "min_depth": 1,
+      "max_depth": 1,
+      "layout": [
+        "#########",
+        "#.......#",
+        "#.......#",
+        "#...P...#",
+        "#.......#",
+        "#.......#",
+        "#.......#",
+        "#.......#",
+        "####+####"
+      ],
+      "doors": [
+        {
+          "x": 4,
+          "y": 8,
+          "direction": "south"
+        }
+      ],
+      "spawn_points": [
+        {
+          "x": 4,
+          "y": 3,
+          "type": "player"
+        }
+      ],
+      "fixed_entities": []
+    },
+    {
+      "id": "corridor_h",
+      "name": "Horizontal Corridor",
+      "tags": ["corridor"],
+      "width": 7,
+      "height": 3,
+      "min_depth": 1,
+      "max_depth": 99,
+      "layout": [
+        "#######",
+        "+.....+",
+        "#######"
+      ],
+      "doors": [
+        {
+          "x": 0,
+          "y": 1,
+          "direction": "west"
+        },
+        {
+          "x": 6,
+          "y": 1,
+          "direction": "east"
+        }
+      ],
+      "spawn_points": [],
+      "fixed_entities": []
+    },
+    {
+      "id": "treasure_room",
+      "name": "Treasure Vault",
+      "tags": ["loot", "rare"],
+      "width": 7,
+      "height": 7,
+      "min_depth": 2,
+      "max_depth": 99,
+      "layout": [
+        "#######",
+        "#..I..#",
+        "#.....#",
+        "+..C..+",
+        "#.....#",
+        "#..I..#",
+        "#######"
+      ],
+      "doors": [
+        {
+          "x": 0,
+          "y": 3,
+          "direction": "west"
+        },
+        {
+          "x": 6,
+          "y": 3,
+          "direction": "east"
+        }
+      ],
+      "spawn_points": [
+        {
+          "x": 3,
+          "y": 1,
+          "type": "item"
+        },
+        {
+          "x": 3,
+          "y": 5,
+          "type": "item"
+        },
+        {
+          "x": 3,
+          "y": 3,
+          "type": "chest"
+        }
+      ],
+      "fixed_entities": [],
+      "item_quality_bonus": 2
+    },
+    {
+      "id": "ambush_room",
+      "name": "Shadowed Hall",
+      "tags": ["combat", "ambush"],
+      "width": 11,
+      "height": 9,
+      "min_depth": 2,
+      "max_depth": 99,
+      "layout": [
+        "###########",
+        "#....S....#",
+        "#.#.....#.#",
+        "#.#.....#.#",
+        "+....I....+",
+        "#.#.....#.#",
+        "#.#.....#.#",
+        "#....S....#",
+        "###########"
+      ],
+      "doors": [
+        {
+          "x": 0,
+          "y": 4,
+          "direction": "west"
+        },
+        {
+          "x": 10,
+          "y": 4,
+          "direction": "east"
+        }
+      ],
+      "spawn_points": [
+        {
+          "x": 5,
+          "y": 1,
+          "type": "enemy"
+        },
+        {
+          "x": 5,
+          "y": 7,
+          "type": "enemy"
+        },
+        {
+          "x": 5,
+          "y": 4,
+          "type": "item"
+        }
+      ],
+      "fixed_entities": [],
+      "enemy_count_bonus": 1
+    },
+    {
+      "id": "boss_arena",
+      "name": "Boss Arena",
+      "tags": ["boss", "guaranteed"],
+      "width": 15,
+      "height": 13,
+      "min_depth": 5,
+      "max_depth": 99,
+      "layout": [
+        "###############",
+        "#.............#",
+        "#.###.....###.#",
+        "#.#.........#.#",
+        "#.#.........#.#",
+        "#.....S.S.....#",
+        "+......S......+",
+        "#.....S.S.....#",
+        "#.#.........#.#",
+        "#.#.........#.#",
+        "#.###.....###.#",
+        "#......>......#",
+        "###############"
+      ],
+      "doors": [
+        {
+          "x": 0,
+          "y": 6,
+          "direction": "west"
+        },
+        {
+          "x": 14,
+          "y": 6,
+          "direction": "east"
+        }
+      ],
+      "spawn_points": [
+        {
+          "x": 6,
+          "y": 5,
+          "type": "enemy"
+        },
+        {
+          "x": 8,
+          "y": 5,
+          "type": "enemy"
+        },
+        {
+          "x": 7,
+          "y": 6,
+          "type": "enemy_boss"
+        },
+        {
+          "x": 6,
+          "y": 7,
+          "type": "enemy"
+        },
+        {
+          "x": 8,
+          "y": 7,
+          "type": "enemy"
+        },
+        {
+          "x": 7,
+          "y": 11,
+          "type": "stairs_down"
+        }
+      ],
+      "fixed_entities": [],
+      "lock_doors_on_enter": true
+    },
+    {
+      "id": "flooded_passage",
+      "name": "Flooded Passage",
+      "tags": ["hazard", "mid_game"],
+      "width": 9,
+      "height": 7,
+      "min_depth": 3,
+      "max_depth": 99,
+      "layout": [
+        "#########",
+        "#...#...#",
+        "#.~.+.~.#",
+        "+.~...~.+",
+        "#.~.^.~.#",
+        "#...#...#",
+        "#########"
+      ],
+      "doors": [
+        {
+          "x": 0,
+          "y": 3,
+          "direction": "west"
+        },
+        {
+          "x": 8,
+          "y": 3,
+          "direction": "east"
+        },
+        {
+          "x": 4,
+          "y": 2,
+          "direction": "internal"
+        }
+      ],
+      "spawn_points": [
+        {
+          "x": 4,
+          "y": 4,
+          "type": "trap",
+          "trap_id": "spike_trap"
+        }
+      ],
+      "fixed_entities": []
+    }
+  ]
+}

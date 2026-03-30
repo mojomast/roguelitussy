@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>12</LangVersion>
+    <RootNamespace>Godotussy</RootNamespace>
+    <AssemblyName>godotussy</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Tests\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(RenderingValidation)' == 'true'">
+    <Compile Remove="Core\Persistence\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="project.godot" />
+    <None Include="Scenes\**\*" />
+    <None Include="Assets\**\*" />
+    <None Include="Content\**\*" />
+    <None Include="Addons\**\*" />
+  </ItemGroup>
+</Project>

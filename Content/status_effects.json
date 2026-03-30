@@ -1,0 +1,217 @@
+{
+  "$schema": "roguelike-status-effects-v1",
+  "version": 1,
+  "status_effects": [
+    {
+      "id": "poisoned",
+      "name": "Poisoned",
+      "description": "Taking damage each turn from toxins.",
+      "icon_path": "res://Assets/Sprites/ui/status_poison.png",
+      "duration_type": "turns",
+      "default_duration": 5,
+      "stackable": false,
+      "refreshable": true,
+      "tick_timing": "start_of_turn",
+      "tick_effects": [
+        {
+          "type": "damage",
+          "damage_type": "poison",
+          "value": 2
+        }
+      ],
+      "stat_modifiers": [],
+      "flags": [],
+      "on_apply_effects": [],
+      "on_expire_effects": [],
+      "color_tint": "#44FF4488"
+    },
+    {
+      "id": "burning",
+      "name": "Burning",
+      "description": "On fire. Taking fire damage each turn.",
+      "icon_path": "res://Assets/Sprites/ui/status_burn.png",
+      "duration_type": "turns",
+      "default_duration": 3,
+      "stackable": false,
+      "refreshable": true,
+      "tick_timing": "end_of_turn",
+      "tick_effects": [
+        {
+          "type": "damage",
+          "damage_type": "fire",
+          "value": 3
+        }
+      ],
+      "stat_modifiers": [],
+      "flags": [],
+      "on_apply_effects": [
+        {
+          "type": "remove_status",
+          "status_id": "frozen"
+        }
+      ],
+      "on_expire_effects": [],
+      "color_tint": "#FF660088"
+    },
+    {
+      "id": "stunned",
+      "name": "Stunned",
+      "description": "Cannot act this turn.",
+      "icon_path": "res://Assets/Sprites/ui/status_stun.png",
+      "duration_type": "turns",
+      "default_duration": 1,
+      "stackable": false,
+      "refreshable": false,
+      "tick_timing": "none",
+      "tick_effects": [],
+      "stat_modifiers": [],
+      "flags": ["skip_turn"],
+      "on_apply_effects": [],
+      "on_expire_effects": [],
+      "color_tint": "#FFFF0088"
+    },
+    {
+      "id": "haste",
+      "name": "Haste",
+      "description": "Moving faster. Plus fifty percent speed.",
+      "icon_path": "res://Assets/Sprites/ui/status_haste.png",
+      "duration_type": "turns",
+      "default_duration": 10,
+      "stackable": false,
+      "refreshable": true,
+      "tick_timing": "none",
+      "tick_effects": [],
+      "stat_modifiers": [
+        {
+          "stat": "speed",
+          "operation": "multiply",
+          "value": 1.5
+        }
+      ],
+      "flags": [],
+      "on_apply_effects": [],
+      "on_expire_effects": [],
+      "color_tint": "#00CCFF88"
+    },
+    {
+      "id": "weakened",
+      "name": "Weakened",
+      "description": "Attack power reduced by 30 percent.",
+      "icon_path": "res://Assets/Sprites/ui/status_weak.png",
+      "duration_type": "turns",
+      "default_duration": 3,
+      "stackable": false,
+      "refreshable": true,
+      "tick_timing": "none",
+      "tick_effects": [],
+      "stat_modifiers": [
+        {
+          "stat": "attack",
+          "operation": "multiply",
+          "value": 0.7
+        }
+      ],
+      "flags": [],
+      "on_apply_effects": [],
+      "on_expire_effects": [],
+      "color_tint": "#88444488"
+    },
+    {
+      "id": "empowered",
+      "name": "Empowered",
+      "description": "Attack power increased by 30 percent.",
+      "icon_path": "res://Assets/Sprites/ui/status_empower.png",
+      "duration_type": "turns",
+      "default_duration": 3,
+      "stackable": false,
+      "refreshable": true,
+      "tick_timing": "none",
+      "tick_effects": [],
+      "stat_modifiers": [
+        {
+          "stat": "attack",
+          "operation": "multiply",
+          "value": 1.3
+        }
+      ],
+      "flags": [],
+      "on_apply_effects": [],
+      "on_expire_effects": [],
+      "color_tint": "#FFAA0088"
+    },
+    {
+      "id": "corroded",
+      "name": "Corroded",
+      "description": "Armor integrity compromised. Defense reduced.",
+      "icon_path": "res://Assets/Sprites/ui/status_corrode.png",
+      "duration_type": "turns",
+      "default_duration": 5,
+      "stackable": true,
+      "max_stacks": 3,
+      "refreshable": true,
+      "tick_timing": "none",
+      "tick_effects": [],
+      "stat_modifiers": [
+        {
+          "stat": "defense",
+          "operation": "add",
+          "value": -2
+        }
+      ],
+      "flags": [],
+      "on_apply_effects": [],
+      "on_expire_effects": [],
+      "color_tint": "#66CC0088"
+    },
+    {
+      "id": "frozen",
+      "name": "Frozen",
+      "description": "Encased in ice. Cannot move but defense is boosted.",
+      "icon_path": "res://Assets/Sprites/ui/status_frozen.png",
+      "duration_type": "turns",
+      "default_duration": 2,
+      "stackable": false,
+      "refreshable": false,
+      "tick_timing": "none",
+      "tick_effects": [],
+      "stat_modifiers": [
+        {
+          "stat": "defense",
+          "operation": "add",
+          "value": 5
+        },
+        {
+          "stat": "speed",
+          "operation": "set",
+          "value": 0
+        }
+      ],
+      "flags": ["skip_turn"],
+      "on_apply_effects": [
+        {
+          "type": "remove_status",
+          "status_id": "burning"
+        }
+      ],
+      "on_expire_effects": [],
+      "color_tint": "#88CCFF88"
+    },
+    {
+      "id": "phased",
+      "name": "Phased",
+      "description": "Incorporeal. Can move through walls.",
+      "icon_path": "res://Assets/Sprites/ui/status_phased.png",
+      "duration_type": "turns",
+      "default_duration": 2,
+      "stackable": false,
+      "refreshable": false,
+      "tick_timing": "none",
+      "tick_effects": [],
+      "stat_modifiers": [],
+      "flags": ["phase_through_walls", "immune_physical"],
+      "on_apply_effects": [],
+      "on_expire_effects": [],
+      "color_tint": "#AAAAFF44"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+.godot/
+.mono/
+bin/
+obj/
+.vs/
+TestResults/
+*.tmp

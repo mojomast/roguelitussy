@@ -1,0 +1,223 @@
+{
+  "$schema": "roguelike-enemies-v1",
+  "version": 1,
+  "enemies": [
+    {
+      "id": "rat",
+      "name": "Giant Rat",
+      "description": "Mangy and desperate. Attacks in packs.",
+      "stats": {
+        "hp": 8,
+        "attack": 2,
+        "defense": 0,
+        "accuracy": 70,
+        "evasion": 15,
+        "speed": 120,
+        "fov_range": 6,
+        "xp_value": 5
+      },
+      "ai_type": "melee_rush",
+      "ai_params": {
+        "flee_hp_pct": 0,
+        "aggro_range": 6,
+        "wander_when_idle": true
+      },
+      "faction": "Enemy",
+      "min_depth": 0,
+      "max_depth": 3,
+      "spawn_weight": 15,
+      "abilities": [],
+      "loot_table_id": "rat_loot",
+      "tags": ["beast", "early_game"],
+      "sprite_path": "res://Assets/Sprites/enemies/rat.png",
+      "sprite_atlas_coords": [0, 0]
+    },
+    {
+      "id": "skeleton",
+      "name": "Skeleton Warrior",
+      "description": "Bones held together by malice alone.",
+      "stats": {
+        "hp": 20,
+        "attack": 5,
+        "defense": 2,
+        "accuracy": 75,
+        "evasion": 5,
+        "speed": 100,
+        "fov_range": 8,
+        "xp_value": 15
+      },
+      "ai_type": "melee_rush",
+      "ai_params": {
+        "flee_hp_pct": 0,
+        "aggro_range": 8,
+        "wander_when_idle": true
+      },
+      "faction": "Enemy",
+      "min_depth": 1,
+      "max_depth": 6,
+      "spawn_weight": 10,
+      "abilities": [],
+      "loot_table_id": "skeleton_loot",
+      "tags": ["undead", "mid_game"],
+      "sprite_path": "res://Assets/Sprites/enemies/skeleton.png",
+      "sprite_atlas_coords": [1, 0]
+    },
+    {
+      "id": "goblin_archer",
+      "name": "Goblin Archer",
+      "description": "Small, green, and worryingly accurate.",
+      "stats": {
+        "hp": 12,
+        "attack": 4,
+        "defense": 1,
+        "accuracy": 85,
+        "evasion": 20,
+        "speed": 110,
+        "fov_range": 10,
+        "xp_value": 12
+      },
+      "ai_type": "ranged_kite",
+      "ai_params": {
+        "preferred_range": 5,
+        "flee_hp_pct": 20,
+        "min_range": 3,
+        "aggro_range": 10,
+        "wander_when_idle": true
+      },
+      "faction": "Enemy",
+      "min_depth": 1,
+      "max_depth": 5,
+      "spawn_weight": 8,
+      "abilities": [
+        {
+          "ability_id": "arrow_shot",
+          "cooldown": 0,
+          "priority": 1
+        }
+      ],
+      "loot_table_id": "goblin_loot",
+      "tags": ["goblinoid", "ranged", "early_game"],
+      "sprite_path": "res://Assets/Sprites/enemies/goblin_archer.png",
+      "sprite_atlas_coords": [2, 0]
+    },
+    {
+      "id": "orc_brute",
+      "name": "Orc Brute",
+      "description": "Walls of muscle and fury. Slow but devastating.",
+      "stats": {
+        "hp": 35,
+        "attack": 8,
+        "defense": 4,
+        "accuracy": 65,
+        "evasion": 0,
+        "speed": 80,
+        "fov_range": 7,
+        "xp_value": 25
+      },
+      "ai_type": "melee_rush",
+      "ai_params": {
+        "flee_hp_pct": 0,
+        "aggro_range": 7,
+        "wander_when_idle": false
+      },
+      "faction": "Enemy",
+      "min_depth": 3,
+      "max_depth": 8,
+      "spawn_weight": 6,
+      "abilities": [
+        {
+          "ability_id": "war_cry",
+          "cooldown": 5,
+          "priority": 2
+        },
+        {
+          "ability_id": "heavy_slam",
+          "cooldown": 3,
+          "priority": 1
+        }
+      ],
+      "loot_table_id": "orc_loot",
+      "tags": ["orc", "mid_game", "tank"],
+      "sprite_path": "res://Assets/Sprites/enemies/orc_brute.png",
+      "sprite_atlas_coords": [3, 0]
+    },
+    {
+      "id": "wraith",
+      "name": "Spectral Wraith",
+      "description": "Passes through stone. Drains life with a touch.",
+      "stats": {
+        "hp": 25,
+        "attack": 6,
+        "defense": 1,
+        "accuracy": 80,
+        "evasion": 30,
+        "speed": 125,
+        "fov_range": 12,
+        "xp_value": 30
+      },
+      "ai_type": "ambush",
+      "ai_params": {
+        "flee_hp_pct": 30,
+        "aggro_range": 12,
+        "phase_through_walls": true,
+        "wander_when_idle": true
+      },
+      "faction": "Enemy",
+      "min_depth": 4,
+      "max_depth": 99,
+      "spawn_weight": 4,
+      "abilities": [
+        {
+          "ability_id": "life_drain",
+          "cooldown": 2,
+          "priority": 1
+        },
+        {
+          "ability_id": "phase_shift",
+          "cooldown": 4,
+          "priority": 2
+        }
+      ],
+      "loot_table_id": "wraith_loot",
+      "tags": ["undead", "incorporeal", "late_game"],
+      "sprite_path": "res://Assets/Sprites/enemies/wraith.png",
+      "sprite_atlas_coords": [4, 0]
+    },
+    {
+      "id": "slime_acid",
+      "name": "Acid Slime",
+      "description": "Dissolves gear on contact. Splashes acid when cornered.",
+      "stats": {
+        "hp": 15,
+        "attack": 3,
+        "defense": 0,
+        "accuracy": 60,
+        "evasion": 0,
+        "speed": 70,
+        "fov_range": 4,
+        "xp_value": 10
+      },
+      "ai_type": "melee_rush",
+      "ai_params": {
+        "flee_hp_pct": 0,
+        "aggro_range": 4,
+        "wander_when_idle": true
+      },
+      "faction": "Enemy",
+      "min_depth": 2,
+      "max_depth": 7,
+      "spawn_weight": 7,
+      "abilities": [
+        {
+          "ability_id": "acid_splash",
+          "cooldown": 3,
+          "priority": 1
+        }
+      ],
+      "loot_table_id": "slime_loot",
+      "tags": ["slime", "early_game"],
+      "sprite_path": "res://Assets/Sprites/enemies/slime_acid.png",
+      "sprite_atlas_coords": [5, 0]
+    }
+  ]
+}

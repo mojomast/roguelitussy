@@ -1,0 +1,243 @@
+{
+  "$schema": "roguelike-abilities-v1",
+  "version": 1,
+  "abilities": [
+    {
+      "id": "arrow_shot",
+      "name": "Arrow Shot",
+      "description": "Fire an arrow at a target within range.",
+      "targeting": {
+        "type": "single",
+        "range": 8,
+        "requires_los": true
+      },
+      "costs": {
+        "energy": 1000
+      },
+      "effects": [
+        {
+          "type": "damage",
+          "damage_type": "physical",
+          "base_value": 4,
+          "stat_scaling": {
+            "stat": "attack",
+            "factor": 0.8
+          }
+        }
+      ],
+      "animation": "projectile_arrow",
+      "sfx": "arrow_fire"
+    },
+    {
+      "id": "fireball",
+      "name": "Fireball",
+      "description": "Hurl a ball of fire that explodes in a 3-tile radius.",
+      "targeting": {
+        "type": "aoe_circle",
+        "range": 8,
+        "radius": 3,
+        "requires_los": true,
+        "hits_allies": true
+      },
+      "costs": {
+        "energy": 1200,
+        "mp": 8
+      },
+      "effects": [
+        {
+          "type": "damage",
+          "damage_type": "fire",
+          "base_value": 12,
+          "stat_scaling": {
+            "stat": "attack",
+            "factor": 0.5
+          }
+        },
+        {
+          "type": "apply_status",
+          "status_effect": "burning",
+          "chance": 40,
+          "duration": 3
+        }
+      ],
+      "animation": "explosion_fire",
+      "sfx": "fireball_explode"
+    },
+    {
+      "id": "heavy_slam",
+      "name": "Heavy Slam",
+      "description": "A brutal overhead strike that stuns.",
+      "targeting": {
+        "type": "single",
+        "range": 1,
+        "requires_los": true
+      },
+      "costs": {
+        "energy": 1500
+      },
+      "effects": [
+        {
+          "type": "damage",
+          "damage_type": "physical",
+          "base_value": 10,
+          "stat_scaling": {
+            "stat": "attack",
+            "factor": 1.2
+          }
+        },
+        {
+          "type": "apply_status",
+          "status_effect": "stunned",
+          "chance": 60,
+          "duration": 1
+        }
+      ],
+      "animation": "melee_slam",
+      "sfx": "heavy_impact"
+    },
+    {
+      "id": "war_cry",
+      "name": "War Cry",
+      "description": "Bolster nearby allies, weakening nearby enemies.",
+      "targeting": {
+        "type": "aoe_circle",
+        "range": 0,
+        "radius": 4,
+        "requires_los": false,
+        "hits_allies": false,
+        "center": "self"
+      },
+      "costs": {
+        "energy": 800
+      },
+      "effects": [
+        {
+          "type": "apply_status",
+          "status_effect": "weakened",
+          "chance": 100,
+          "duration": 3,
+          "filter": "enemies"
+        },
+        {
+          "type": "apply_status",
+          "status_effect": "empowered",
+          "chance": 100,
+          "duration": 3,
+          "filter": "allies"
+        }
+      ],
+      "animation": "shout_ring",
+      "sfx": "war_cry"
+    },
+    {
+      "id": "life_drain",
+      "name": "Life Drain",
+      "description": "Siphon life from a target, healing self.",
+      "targeting": {
+        "type": "single",
+        "range": 1,
+        "requires_los": true
+      },
+      "costs": {
+        "energy": 1100
+      },
+      "effects": [
+        {
+          "type": "damage",
+          "damage_type": "dark",
+          "base_value": 6,
+          "stat_scaling": {
+            "stat": "attack",
+            "factor": 0.6
+          }
+        },
+        {
+          "type": "heal_self",
+          "value_source": "damage_dealt",
+          "factor": 0.5
+        }
+      ],
+      "animation": "drain_dark",
+      "sfx": "life_drain"
+    },
+    {
+      "id": "blink",
+      "name": "Blink",
+      "description": "Teleport to a visible tile within range.",
+      "targeting": {
+        "type": "tile",
+        "range": 8,
+        "requires_los": true,
+        "requires_walkable": true
+      },
+      "costs": {
+        "energy": 800
+      },
+      "effects": [
+        {
+          "type": "teleport",
+          "destination": "target_tile"
+        }
+      ],
+      "animation": "teleport_flash",
+      "sfx": "blink_pop"
+    },
+    {
+      "id": "phase_shift",
+      "name": "Phase Shift",
+      "description": "Become incorporeal for 2 turns, phasing through walls.",
+      "targeting": {
+        "type": "self",
+        "range": 0,
+        "requires_los": false
+      },
+      "costs": {
+        "energy": 600
+      },
+      "effects": [
+        {
+          "type": "apply_status",
+          "status_effect": "phased",
+          "chance": 100,
+          "duration": 2
+        }
+      ],
+      "animation": "ghost_shimmer",
+      "sfx": "phase_shift"
+    },
+    {
+      "id": "acid_splash",
+      "name": "Acid Splash",
+      "description": "Splash acid on adjacent tiles, corroding armor.",
+      "targeting": {
+        "type": "aoe_circle",
+        "range": 0,
+        "radius": 1,
+        "requires_los": false,
+        "center": "self"
+      },
+      "costs": {
+        "energy": 1000
+      },
+      "effects": [
+        {
+          "type": "damage",
+          "damage_type": "poison",
+          "base_value": 3,
+          "stat_scaling": {
+            "stat": "attack",
+            "factor": 0.4
+          }
+        },
+        {
+          "type": "apply_status",
+          "status_effect": "corroded",
+          "chance": 50,
+          "duration": 5
+        }
+      ],
+      "animation": "acid_burst",
+      "sfx": "acid_sizzle"
+    }
+  ]
+}

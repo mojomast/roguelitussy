@@ -1,0 +1,306 @@
+{
+  "$schema": "roguelike-items-v1",
+  "version": 1,
+  "items": [
+    {
+      "id": "sword_iron",
+      "name": "Iron Sword",
+      "description": "A sturdy iron blade. Reliable if unexciting.",
+      "type": "weapon",
+      "slot": "main_hand",
+      "stats": {
+        "damage_min": 3,
+        "damage_max": 7,
+        "accuracy": 85,
+        "speed_modifier": 0,
+        "crit_chance": 5
+      },
+      "effects": [],
+      "rarity": "common",
+      "value": 50,
+      "weight": 3.0,
+      "requirements": {
+        "level": 1,
+        "strength": 3
+      },
+      "sprite_path": "res://Assets/Sprites/items/sword_iron.png",
+      "sprite_atlas_coords": [0, 0]
+    },
+    {
+      "id": "sword_flame",
+      "name": "Flamebrand",
+      "description": "Fire licks along the blade's edge, eager for flesh.",
+      "type": "weapon",
+      "slot": "main_hand",
+      "stats": {
+        "damage_min": 5,
+        "damage_max": 12,
+        "accuracy": 80,
+        "speed_modifier": -10,
+        "crit_chance": 8
+      },
+      "effects": [
+        {
+          "type": "on_hit",
+          "status_effect": "burning",
+          "chance": 30,
+          "duration": 3
+        }
+      ],
+      "rarity": "rare",
+      "value": 350,
+      "weight": 3.5,
+      "requirements": {
+        "level": 5,
+        "strength": 5
+      },
+      "sprite_path": "res://Assets/Sprites/items/sword_flame.png",
+      "sprite_atlas_coords": [1, 0]
+    },
+    {
+      "id": "dagger_venom",
+      "name": "Viper Fang",
+      "description": "A curved dagger dripping with paralytic venom.",
+      "type": "weapon",
+      "slot": "main_hand",
+      "stats": {
+        "damage_min": 2,
+        "damage_max": 5,
+        "accuracy": 95,
+        "speed_modifier": 20,
+        "crit_chance": 15
+      },
+      "effects": [
+        {
+          "type": "on_hit",
+          "status_effect": "poisoned",
+          "chance": 40,
+          "duration": 5
+        }
+      ],
+      "rarity": "uncommon",
+      "value": 200,
+      "weight": 1.0,
+      "requirements": {
+        "level": 3,
+        "dexterity": 5
+      },
+      "sprite_path": "res://Assets/Sprites/items/dagger_venom.png",
+      "sprite_atlas_coords": [2, 0]
+    },
+    {
+      "id": "shield_wooden",
+      "name": "Wooden Shield",
+      "description": "Splinters easily, but better than bare skin.",
+      "type": "armor",
+      "slot": "off_hand",
+      "stats": {
+        "defense": 3,
+        "block_chance": 15,
+        "speed_modifier": -5
+      },
+      "effects": [],
+      "rarity": "common",
+      "value": 30,
+      "weight": 4.0,
+      "requirements": {
+        "level": 1,
+        "strength": 2
+      },
+      "sprite_path": "res://Assets/Sprites/items/shield_wooden.png",
+      "sprite_atlas_coords": [0, 1]
+    },
+    {
+      "id": "armor_chainmail",
+      "name": "Chainmail",
+      "description": "Interlocking iron rings ward off slashing blows.",
+      "type": "armor",
+      "slot": "body",
+      "stats": {
+        "defense": 6,
+        "speed_modifier": -20,
+        "magic_resist": 0
+      },
+      "effects": [],
+      "rarity": "uncommon",
+      "value": 180,
+      "weight": 12.0,
+      "requirements": {
+        "level": 3,
+        "strength": 6
+      },
+      "sprite_path": "res://Assets/Sprites/items/armor_chainmail.png",
+      "sprite_atlas_coords": [1, 1]
+    },
+    {
+      "id": "helm_iron",
+      "name": "Iron Helm",
+      "description": "Protects the skull at the cost of peripheral vision.",
+      "type": "armor",
+      "slot": "head",
+      "stats": {
+        "defense": 2,
+        "speed_modifier": -5
+      },
+      "effects": [],
+      "rarity": "common",
+      "value": 60,
+      "weight": 3.0,
+      "requirements": {
+        "level": 2,
+        "strength": 3
+      },
+      "sprite_path": "res://Assets/Sprites/items/helm_iron.png",
+      "sprite_atlas_coords": [2, 1]
+    },
+    {
+      "id": "potion_health",
+      "name": "Health Potion",
+      "description": "A crimson draught. Restores 25 HP.",
+      "type": "consumable",
+      "slot": "none",
+      "stats": {},
+      "effects": [
+        {
+          "type": "on_use",
+          "action": "heal",
+          "value": 25,
+          "target": "self"
+        }
+      ],
+      "rarity": "common",
+      "value": 25,
+      "weight": 0.5,
+      "requirements": {},
+      "stackable": true,
+      "max_stack": 10,
+      "sprite_path": "res://Assets/Sprites/items/potion_health.png",
+      "sprite_atlas_coords": [0, 2]
+    },
+    {
+      "id": "potion_haste",
+      "name": "Haste Potion",
+      "description": "Time slows around you. Plus fifty percent speed for 10 turns.",
+      "type": "consumable",
+      "slot": "none",
+      "stats": {},
+      "effects": [
+        {
+          "type": "on_use",
+          "action": "apply_status",
+          "status_effect": "haste",
+          "duration": 10,
+          "target": "self"
+        }
+      ],
+      "rarity": "uncommon",
+      "value": 75,
+      "weight": 0.5,
+      "requirements": {},
+      "stackable": true,
+      "max_stack": 5,
+      "sprite_path": "res://Assets/Sprites/items/potion_haste.png",
+      "sprite_atlas_coords": [1, 2]
+    },
+    {
+      "id": "scroll_fireball",
+      "name": "Scroll of Fireball",
+      "description": "Unfurl to unleash a ball of flame in a 3-tile radius.",
+      "type": "consumable",
+      "slot": "none",
+      "stats": {},
+      "effects": [
+        {
+          "type": "on_use",
+          "action": "cast_ability",
+          "ability_id": "fireball",
+          "target": "aimed"
+        }
+      ],
+      "rarity": "rare",
+      "value": 150,
+      "weight": 0.1,
+      "requirements": {},
+      "stackable": true,
+      "max_stack": 3,
+      "sprite_path": "res://Assets/Sprites/items/scroll_fireball.png",
+      "sprite_atlas_coords": [2, 2]
+    },
+    {
+      "id": "scroll_blink",
+      "name": "Scroll of Blink",
+      "description": "Teleport to a visible tile within 8 spaces.",
+      "type": "consumable",
+      "slot": "none",
+      "stats": {},
+      "effects": [
+        {
+          "type": "on_use",
+          "action": "cast_ability",
+          "ability_id": "blink",
+          "target": "aimed"
+        }
+      ],
+      "rarity": "uncommon",
+      "value": 100,
+      "weight": 0.1,
+      "requirements": {},
+      "stackable": true,
+      "max_stack": 5,
+      "sprite_path": "res://Assets/Sprites/items/scroll_blink.png",
+      "sprite_atlas_coords": [3, 2]
+    },
+    {
+      "id": "ring_regen",
+      "name": "Ring of Regeneration",
+      "description": "Flesh knits shut between heartbeats.",
+      "type": "accessory",
+      "slot": "ring",
+      "stats": {
+        "hp_regen_per_turn": 1
+      },
+      "effects": [
+        {
+          "type": "passive",
+          "action": "regen_hp",
+          "value": 1,
+          "per": "turn"
+        }
+      ],
+      "rarity": "rare",
+      "value": 400,
+      "weight": 0.1,
+      "requirements": {
+        "level": 4
+      },
+      "sprite_path": "res://Assets/Sprites/items/ring_regen.png",
+      "sprite_atlas_coords": [0, 3]
+    },
+    {
+      "id": "amulet_farsight",
+      "name": "Amulet of Farsight",
+      "description": "The darkness pulls back at your approach.",
+      "type": "accessory",
+      "slot": "amulet",
+      "stats": {
+        "fov_bonus": 3
+      },
+      "effects": [
+        {
+          "type": "passive",
+          "action": "modify_stat",
+          "stat": "fov_range",
+          "value": 3
+        }
+      ],
+      "rarity": "uncommon",
+      "value": 200,
+      "weight": 0.2,
+      "requirements": {
+        "level": 2
+      },
+      "sprite_path": "res://Assets/Sprites/items/amulet_farsight.png",
+      "sprite_atlas_coords": [1, 3]
+    }
+  ]
+}

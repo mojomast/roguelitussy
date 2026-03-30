@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/UI/UIRoot.cs" id="1_uiroot"]
+
+[node name="Main" type="Node"]
+
+[node name="WorldRoot" type="Node2D" parent="."]
+
+[node name="UiRoot" type="CanvasLayer" parent="."]
+script = ExtResource("1_uiroot")

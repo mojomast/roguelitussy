@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/UI/InventoryUI.cs" id="1_inventory"]
+
+[node name="InventoryUI" type="Control"]
+script = ExtResource("1_inventory")
