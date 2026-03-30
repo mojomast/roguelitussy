@@ -1,0 +1,59 @@
+[gd_scene load_steps=2 format=3 uid="uid://charactersheet"]
+
+[ext_resource type="Script" path="res://Scripts/UI/CharacterSheet.cs" id="1"]
+
+[node name="CharacterSheet" type="CanvasLayer"]
+script = ExtResource("1")
+
+[node name="CenterContainer" type="CenterContainer" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="CharacterPanel" type="PanelContainer" parent="CenterContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(300, 350)
+
+[node name="VBox" type="VBoxContainer" parent="CenterContainer/CharacterPanel"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="CenterContainer/CharacterPanel/VBox"]
+layout_mode = 2
+text = "Character Sheet"
+horizontal_alignment = 1
+
+[node name="Separator" type="HSeparator" parent="CenterContainer/CharacterPanel/VBox"]
+layout_mode = 2
+
+[node name="HPStat" type="Label" parent="CenterContainer/CharacterPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "HP: 0 / 0"
+
+[node name="AttackStat" type="Label" parent="CenterContainer/CharacterPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Attack: 0"
+
+[node name="DefenseStat" type="Label" parent="CenterContainer/CharacterPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Defense: 0"
+
+[node name="AccuracyStat" type="Label" parent="CenterContainer/CharacterPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Accuracy: 0"
+
+[node name="EvasionStat" type="Label" parent="CenterContainer/CharacterPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Evasion: 0"
+
+[node name="SpeedStat" type="Label" parent="CenterContainer/CharacterPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Speed: 0"

@@ -1,0 +1,22 @@
+[gd_scene load_steps=4 format=3 uid="uid://worldview"]
+
+[ext_resource type="Script" path="res://Scripts/World/WorldView.cs" id="1"]
+[ext_resource type="Script" path="res://Scripts/World/EntityRenderer.cs" id="2"]
+[ext_resource type="Script" path="res://Scripts/World/CameraController.cs" id="3"]
+
+[node name="WorldView" type="Node2D"]
+script = ExtResource("1")
+
+[node name="FloorLayer" type="TileMapLayer" parent="."]
+
+[node name="WallLayer" type="TileMapLayer" parent="."]
+
+[node name="ObjectLayer" type="TileMapLayer" parent="."]
+
+[node name="EntityLayer" type="Node2D" parent="."]
+script = ExtResource("2")
+
+[node name="FogLayer" type="TileMapLayer" parent="."]
+
+[node name="Camera" type="Camera2D" parent="."]
+script = ExtResource("3")

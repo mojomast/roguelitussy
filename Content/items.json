@@ -1,0 +1,145 @@
+[
+  {
+    "templateId": "sword_iron",
+    "displayName": "Iron Sword",
+    "description": "A sturdy iron blade, reliable in close combat.",
+    "category": "Weapon",
+    "slot": "MainHand",
+    "statModifiers": { "Attack": 5 },
+    "useEffect": null,
+    "maxCharges": 0,
+    "maxStack": 1
+  },
+  {
+    "templateId": "sword_flame",
+    "displayName": "Flame Sword",
+    "description": "A blade wreathed in arcane fire.",
+    "category": "Weapon",
+    "slot": "MainHand",
+    "statModifiers": { "Attack": 8 },
+    "useEffect": "burn",
+    "maxCharges": 0,
+    "maxStack": 1
+  },
+  {
+    "templateId": "dagger_venom",
+    "displayName": "Venom Dagger",
+    "description": "A quick dagger coated in deadly poison.",
+    "category": "Weapon",
+    "slot": "MainHand",
+    "statModifiers": { "Attack": 3, "Speed": 20 },
+    "useEffect": "poison",
+    "maxCharges": 0,
+    "maxStack": 1
+  },
+  {
+    "templateId": "bow_short",
+    "displayName": "Short Bow",
+    "description": "A compact bow suited for dungeon corridors.",
+    "category": "Weapon",
+    "slot": "MainHand",
+    "statModifiers": { "Attack": 4, "Accuracy": 10 },
+    "useEffect": null,
+    "maxCharges": 0,
+    "maxStack": 1
+  },
+  {
+    "templateId": "shield_wooden",
+    "displayName": "Wooden Shield",
+    "description": "A battered but functional wooden shield.",
+    "category": "Armor",
+    "slot": "OffHand",
+    "statModifiers": { "Defense": 3 },
+    "useEffect": null,
+    "maxCharges": 0,
+    "maxStack": 1
+  },
+  {
+    "templateId": "armor_chainmail",
+    "displayName": "Chainmail Armor",
+    "description": "Interlocking metal rings provide solid protection.",
+    "category": "Armor",
+    "slot": "Body",
+    "statModifiers": { "Defense": 5, "Speed": -10 },
+    "useEffect": null,
+    "maxCharges": 0,
+    "maxStack": 1
+  },
+  {
+    "templateId": "helm_iron",
+    "displayName": "Iron Helm",
+    "description": "A heavy iron helmet that guards the skull.",
+    "category": "Armor",
+    "slot": "Head",
+    "statModifiers": { "Defense": 2 },
+    "useEffect": null,
+    "maxCharges": 0,
+    "maxStack": 1
+  },
+  {
+    "templateId": "potion_health",
+    "displayName": "Health Potion",
+    "description": "A bubbling red liquid that restores vitality.",
+    "category": "Consumable",
+    "slot": "None",
+    "statModifiers": {},
+    "useEffect": "heal",
+    "maxCharges": 1,
+    "maxStack": 5
+  },
+  {
+    "templateId": "potion_haste",
+    "displayName": "Haste Potion",
+    "description": "Golden elixir that quickens the body.",
+    "category": "Consumable",
+    "slot": "None",
+    "statModifiers": {},
+    "useEffect": "haste",
+    "maxCharges": 1,
+    "maxStack": 3
+  },
+  {
+    "templateId": "scroll_fireball",
+    "displayName": "Scroll of Fireball",
+    "description": "Ancient parchment inscribed with a fire invocation.",
+    "category": "Scroll",
+    "slot": "None",
+    "statModifiers": {},
+    "useEffect": "fireball",
+    "maxCharges": 1,
+    "maxStack": 3
+  },
+  {
+    "templateId": "scroll_blink",
+    "displayName": "Scroll of Blink",
+    "description": "Teleports the reader a short distance.",
+    "category": "Scroll",
+    "slot": "None",
+    "statModifiers": {},
+    "useEffect": "blink",
+    "maxCharges": 1,
+    "maxStack": 3
+  },
+  {
+    "templateId": "ring_regen",
+    "displayName": "Ring of Regeneration",
+    "description": "A warm band that slowly mends wounds.",
+    "category": "Misc",
+    "slot": "Ring",
+    "statModifiers": {},
+    "useEffect": "regenerating",
+    "maxCharges": 0,
+    "maxStack": 1
+  },
+  {
+    "templateId": "amulet_farsight",
+    "displayName": "Amulet of Farsight",
+    "description": "Grants the wearer extended vision in darkness.",
+    "category": "Misc",
+    "slot": "Amulet",
+    "statModifiers": { "ViewRadius": 4 },
+    "useEffect": null,
+    "maxCharges": 0,
+    "maxStack": 1
+  }
+]

@@ -1,0 +1,60 @@
+[gd_scene load_steps=2 format=3 uid="uid://gameoverscreen"]
+
+[ext_resource type="Script" path="res://Scripts/UI/GameOverScreen.cs" id="1"]
+
+[node name="GameOverScreen" type="CanvasLayer"]
+layer = 10
+script = ExtResource("1")
+
+[node name="CenterContainer" type="CenterContainer" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="GameOverPanel" type="PanelContainer" parent="CenterContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(300, 250)
+visible = false
+
+[node name="VBox" type="VBoxContainer" parent="CenterContainer/GameOverPanel"]
+layout_mode = 2
+
+[node name="GameOverTitle" type="Label" parent="CenterContainer/GameOverPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "GAME OVER"
+horizontal_alignment = 1
+
+[node name="Separator" type="HSeparator" parent="CenterContainer/GameOverPanel/VBox"]
+layout_mode = 2
+
+[node name="FinalDepthLabel" type="Label" parent="CenterContainer/GameOverPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Final Depth: 0"
+horizontal_alignment = 1
+
+[node name="TurnsSurvivedLabel" type="Label" parent="CenterContainer/GameOverPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Turns Survived: 0"
+horizontal_alignment = 1
+
+[node name="Spacer" type="Control" parent="CenterContainer/GameOverPanel/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 20)
+
+[node name="MainMenuButton" type="Button" parent="CenterContainer/GameOverPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(200, 40)
+text = "Main Menu"
+
+[node name="QuitButton" type="Button" parent="CenterContainer/GameOverPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(200, 40)
+text = "Quit"

@@ -1,0 +1,83 @@
+[
+  {
+    "type": "Poisoned",
+    "displayName": "Poisoned",
+    "description": "Taking poison damage each turn.",
+    "damagePerTurn": 3,
+    "statModifier": null,
+    "defaultDuration": 5,
+    "defaultMagnitude": 3
+  },
+  {
+    "type": "Burning",
+    "displayName": "Burning",
+    "description": "Engulfed in flames, taking fire damage each turn.",
+    "damagePerTurn": 5,
+    "statModifier": null,
+    "defaultDuration": 3,
+    "defaultMagnitude": 5
+  },
+  {
+    "type": "Frozen",
+    "displayName": "Frozen",
+    "description": "Encased in ice, movement is slowed.",
+    "damagePerTurn": 0,
+    "statModifier": { "Speed": -50 },
+    "defaultDuration": 3,
+    "defaultMagnitude": 1
+  },
+  {
+    "type": "Stunned",
+    "displayName": "Stunned",
+    "description": "Unable to act.",
+    "damagePerTurn": 0,
+    "statModifier": null,
+    "defaultDuration": 2,
+    "defaultMagnitude": 1
+  },
+  {
+    "type": "Hasted",
+    "displayName": "Hasted",
+    "description": "Moving at incredible speed.",
+    "damagePerTurn": 0,
+    "statModifier": { "Speed": 50 },
+    "defaultDuration": 5,
+    "defaultMagnitude": 1
+  },
+  {
+    "type": "Invisible",
+    "displayName": "Invisible",
+    "description": "Cannot be seen by enemies.",
+    "damagePerTurn": 0,
+    "statModifier": { "Evasion": 50 },
+    "defaultDuration": 8,
+    "defaultMagnitude": 1
+  },
+  {
+    "type": "Regenerating",
+    "displayName": "Regenerating",
+    "description": "Healing a small amount each turn.",
+    "damagePerTurn": -2,
+    "statModifier": null,
+    "defaultDuration": 10,
+    "defaultMagnitude": 2
+  },
+  {
+    "type": "Weakened",
+    "displayName": "Weakened",
+    "description": "Attack power is reduced.",
+    "damagePerTurn": 0,
+    "statModifier": { "Attack": -3 },
+    "defaultDuration": 5,
+    "defaultMagnitude": 3
+  },
+  {
+    "type": "Shielded",
+    "displayName": "Shielded",
+    "description": "A magical barrier absorbs incoming damage.",
+    "damagePerTurn": 0,
+    "statModifier": { "Defense": 5 },
+    "defaultDuration": 6,
+    "defaultMagnitude": 5
+  }
+]

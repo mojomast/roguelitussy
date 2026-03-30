@@ -1,0 +1,122 @@
+[
+  {
+    "templateId": "goblin",
+    "displayName": "Goblin",
+    "description": "A scrawny green-skinned creature with a crude knife.",
+    "baseStats": { "HP": 10, "MaxHP": 10, "Attack": 3, "Defense": 1, "Accuracy": 70, "Evasion": 15, "Speed": 110, "ViewRadius": 6 },
+    "brainType": "melee_rusher",
+    "faction": "Enemy",
+    "minDepth": 0,
+    "maxDepth": 5,
+    "spawnWeight": 100,
+    "lootTableId": "common_drop"
+  },
+  {
+    "templateId": "skeleton",
+    "displayName": "Skeleton",
+    "description": "Animated bones held together by dark magic.",
+    "baseStats": { "HP": 15, "MaxHP": 15, "Attack": 5, "Defense": 3, "Accuracy": 65, "Evasion": 5, "Speed": 90, "ViewRadius": 7 },
+    "brainType": "patrol_guard",
+    "faction": "Enemy",
+    "minDepth": 1,
+    "maxDepth": 8,
+    "spawnWeight": 80,
+    "lootTableId": "common_drop"
+  },
+  {
+    "templateId": "orc",
+    "displayName": "Orc",
+    "description": "A hulking brute wielding a heavy axe.",
+    "baseStats": { "HP": 25, "MaxHP": 25, "Attack": 8, "Defense": 4, "Accuracy": 60, "Evasion": 5, "Speed": 80, "ViewRadius": 6 },
+    "brainType": "melee_rusher",
+    "faction": "Enemy",
+    "minDepth": 2,
+    "maxDepth": 7,
+    "spawnWeight": 60,
+    "lootTableId": "common_drop"
+  },
+  {
+    "templateId": "slime",
+    "displayName": "Slime",
+    "description": "A quivering blob of acidic jelly.",
+    "baseStats": { "HP": 8, "MaxHP": 8, "Attack": 2, "Defense": 0, "Accuracy": 80, "Evasion": 5, "Speed": 60, "ViewRadius": 4 },
+    "brainType": "melee_rusher",
+    "faction": "Enemy",
+    "minDepth": 0,
+    "maxDepth": 3,
+    "spawnWeight": 90,
+    "lootTableId": null
+  },
+  {
+    "templateId": "bat",
+    "displayName": "Bat",
+    "description": "A screeching cave bat with sharp fangs.",
+    "baseStats": { "HP": 5, "MaxHP": 5, "Attack": 2, "Defense": 0, "Accuracy": 75, "Evasion": 30, "Speed": 130, "ViewRadius": 5 },
+    "brainType": "fleeing",
+    "faction": "Enemy",
+    "minDepth": 0,
+    "maxDepth": 4,
+    "spawnWeight": 85,
+    "lootTableId": null
+  },
+  {
+    "templateId": "spider",
+    "displayName": "Giant Spider",
+    "description": "A hairy arachnid the size of a dog.",
+    "baseStats": { "HP": 12, "MaxHP": 12, "Attack": 4, "Defense": 1, "Accuracy": 75, "Evasion": 20, "Speed": 120, "ViewRadius": 6 },
+    "brainType": "melee_rusher",
+    "faction": "Enemy",
+    "minDepth": 1,
+    "maxDepth": 6,
+    "spawnWeight": 70,
+    "lootTableId": "common_drop"
+  },
+  {
+    "templateId": "wraith",
+    "displayName": "Wraith",
+    "description": "A spectral horror that drains the life of the living.",
+    "baseStats": { "HP": 20, "MaxHP": 20, "Attack": 7, "Defense": 2, "Accuracy": 80, "Evasion": 25, "Speed": 100, "ViewRadius": 8 },
+    "brainType": "ranged_kiter",
+    "faction": "Enemy",
+    "minDepth": 4,
+    "maxDepth": 9,
+    "spawnWeight": 40,
+    "lootTableId": "rare_drop"
+  },
+  {
+    "templateId": "troll",
+    "displayName": "Troll",
+    "description": "A massive regenerating brute with thick hide.",
+    "baseStats": { "HP": 40, "MaxHP": 40, "Attack": 10, "Defense": 6, "Accuracy": 55, "Evasion": 5, "Speed": 70, "ViewRadius": 6 },
+    "brainType": "melee_rusher",
+    "faction": "Enemy",
+    "minDepth": 5,
+    "maxDepth": 10,
+    "spawnWeight": 30,
+    "lootTableId": "rare_drop"
+  },
+  {
+    "templateId": "necromancer",
+    "displayName": "Necromancer",
+    "description": "A robed sorcerer who commands the dead.",
+    "baseStats": { "HP": 18, "MaxHP": 18, "Attack": 6, "Defense": 2, "Accuracy": 85, "Evasion": 10, "Speed": 90, "ViewRadius": 9 },
+    "brainType": "ranged_kiter",
+    "faction": "Enemy",
+    "minDepth": 6,
+    "maxDepth": 10,
+    "spawnWeight": 20,
+    "lootTableId": "rare_drop"
+  },
+  {
+    "templateId": "dragon",
+    "displayName": "Dragon",
+    "description": "An ancient wyrm of terrible power.",
+    "baseStats": { "HP": 80, "MaxHP": 80, "Attack": 18, "Defense": 12, "Accuracy": 90, "Evasion": 10, "Speed": 100, "ViewRadius": 10 },
+    "brainType": "melee_rusher",
+    "faction": "Enemy",
+    "minDepth": 8,
+    "maxDepth": 10,
+    "spawnWeight": 5,
+    "lootTableId": "boss_drop"
+  }
+]

@@ -1,0 +1,19 @@
+# Godot
+.godot/
+*.tmp
+*.translation
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+
+# IDE
+.vs/
+.vscode/
+*.sln.docstates
+
+# OS
+Thumbs.db
+.DS_Store

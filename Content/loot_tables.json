@@ -1,0 +1,27 @@
+{
+  "common_drop": [
+    { "item_id": "potion_health", "weight": 40 },
+    { "item_id": "dagger_venom", "weight": 5 },
+    { "item_id": "shield_wooden", "weight": 10 },
+    { "item_id": "scroll_blink", "weight": 8 },
+    { "item_id": "helm_iron", "weight": 8 }
+  ],
+  "rare_drop": [
+    { "item_id": "potion_health", "weight": 20 },
+    { "item_id": "potion_haste", "weight": 15 },
+    { "item_id": "scroll_fireball", "weight": 15 },
+    { "item_id": "sword_iron", "weight": 10 },
+    { "item_id": "armor_chainmail", "weight": 10 },
+    { "item_id": "ring_regen", "weight": 5 },
+    { "item_id": "amulet_farsight", "weight": 5 }
+  ],
+  "boss_drop": [
+    { "item_id": "sword_flame", "weight": 25 },
+    { "item_id": "armor_chainmail", "weight": 20 },
+    { "item_id": "ring_regen", "weight": 15 },
+    { "item_id": "amulet_farsight", "weight": 15 },
+    { "item_id": "potion_haste", "weight": 10 },
+    { "item_id": "scroll_fireball", "weight": 10 },
+    { "item_id": "potion_health", "weight": 5 }
+  ]
+}
