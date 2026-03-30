@@ -17,6 +17,7 @@ public static class SaveMigrator
         return version switch
         {
             1 => MigrateV1(root),
+            2 => MigrateV2(root),
             SaveSerializer.CurrentVersion => JsonSerializer.Deserialize<SaveFileData>(json, SaveSerializer.JsonOptions)
                 ?? throw new InvalidOperationException("Unable to deserialize save data."),
             _ => throw new InvalidOperationException($"Unsupported save version {version}.")
@@ -49,8 +50,8 @@ public static class SaveMigrator
             Width = width,
             Height = height,
             Tiles = GetRequiredString(root, "tiles"),
-            Explored = GetRequiredString(root, "explored"),
-            Visible = Convert.ToBase64String(new byte[checked(width * height)]),
+            Explored = ReencodeFlagsV2ToV3(GetRequiredString(root, "explored"), width, height),
+            Visible = Convert.ToBase64String(new byte[checked(((width * height) + 7) / 8)]),
         };
 
         var entities = new List<EntitySaveData>();
@@ -73,6 +74,17 @@ public static class SaveMigrator
 
         data.Entities = entities;
         data.GroundItems = ReadLegacyGroundItems(root);
+        return data;
+    }
+
+    private static SaveFileData MigrateV2(JsonElement root)
+    {
+        var data = JsonSerializer.Deserialize<SaveFileData>(root.GetRawText(), SaveSerializer.JsonOptions)
+            ?? throw new InvalidOperationException("Unable to deserialize version 2 save data.");
+
+        data.Explored = ReencodeFlagsV2ToV3(data.Explored, data.Width, data.Height);
+        data.Visible = ReencodeFlagsV2ToV3(data.Visible, data.Width, data.Height);
+        data.Version = SaveSerializer.CurrentVersion;
         return data;
     }
 
@@ -256,6 +268,27 @@ public static class SaveMigrator
 
     private static int ResolveLegacyEnergy(IReadOnlyDictionary<string, int> schedulerEnergy, string entityId) =>
         schedulerEnergy.TryGetValue(entityId, out var value) ? value : 0;
+
+    private static string ReencodeFlagsV2ToV3(string base64, int width, int height)
+    {
+        var bytes = Convert.FromBase64String(base64);
+        var expectedLength = checked(width * height);
+        if (bytes.Length != expectedLength)
+        {
+            throw new InvalidOperationException($"Version 2 flag data size mismatch: expected {expectedLength}, got {bytes.Length}.");
+        }
+
+        var packed = new byte[(bytes.Length + 7) / 8];
+        for (var index = 0; index < bytes.Length; index++)
+        {
+            if (bytes[index] == 1)
+            {
+                packed[index / 8] |= (byte)(1 << (index % 8));
+            }
+        }
+
+        return Convert.ToBase64String(packed);
+    }
 
     private static string ReadLegacyId(JsonElement idElement) => idElement.ValueKind switch
     {

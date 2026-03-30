@@ -11,7 +11,19 @@ public readonly struct EntityId : IEquatable<EntityId>
 
     public Guid Value { get; }
 
+    /// <summary>
+    /// Creates a non-deterministic EntityId. Do not use in simulation paths.
+    /// Use <see cref="NewSeeded"/> for gameplay entity creation.
+    /// </summary>
     public static EntityId New() => new(Guid.NewGuid());
+
+    public static EntityId NewSeeded(Random rng)
+    {
+        ArgumentNullException.ThrowIfNull(rng);
+        Span<byte> bytes = stackalloc byte[16];
+        rng.NextBytes(bytes);
+        return new EntityId(new Guid(bytes));
+    }
 
     public static EntityId From(string value) => new(Guid.Parse(value));
 

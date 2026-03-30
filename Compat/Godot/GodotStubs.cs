@@ -163,6 +163,8 @@ public class Control : Node
 
     public Color Modulate { get; set; } = Colors.White;
 
+    public int ZIndex { get; set; }
+
     public virtual void _GuiInput(InputEvent @event)
     {
     }

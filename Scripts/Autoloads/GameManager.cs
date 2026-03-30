@@ -6,6 +6,52 @@ namespace Godotussy;
 
 public partial class GameManager : Node
 {
+    private sealed class OneShotScheduler : ITurnScheduler
+    {
+        private readonly ITurnScheduler _inner;
+        private readonly EntityId _actorId;
+        private WorldState? _world;
+        private bool _consumed;
+
+        public OneShotScheduler(ITurnScheduler inner, EntityId actorId)
+        {
+            _inner = inner;
+            _actorId = actorId;
+        }
+
+        public int EnergyThreshold => _inner.EnergyThreshold;
+
+        public void BeginRound(WorldState world)
+        {
+            _world = world;
+            _consumed = false;
+            _inner.BeginRound(world);
+        }
+
+        public bool HasNextActor() => !_consumed && _world?.GetEntity(_actorId) is { IsAlive: true };
+
+        public IEntity? GetNextActor() => _consumed || _world is null ? null : _world.GetEntity(_actorId);
+
+        public void ConsumeEnergy(EntityId actorId, int cost)
+        {
+            _consumed = true;
+            _inner.ConsumeEnergy(actorId, cost);
+        }
+
+        public void EndRound(WorldState world)
+        {
+            _inner.EndRound(world);
+            _world = null;
+        }
+
+        public void Register(IEntity entity) => _inner.Register(entity);
+
+        public void Unregister(EntityId id) => _inner.Unregister(id);
+    }
+
+    private readonly GameLoop _gameLoop = new();
+    private readonly IPathfinder _pathfinder = new Pathfinder();
+
     public enum GameState
     {
         MainMenu,
@@ -71,6 +117,7 @@ public partial class GameManager : Node
         World = world;
         CurrentFloor = world.Depth;
         CurrentState = GameState.Playing;
+        Bus?.EmitLevelGenerated(world.Depth, world.Width, world.Height);
         EmitWorldSnapshot(world);
     }
 
@@ -81,19 +128,37 @@ public partial class GameManager : Node
             return ActionOutcome.Fail(ActionResult.Invalid);
         }
 
-        var actorBefore = World.GetEntity(action.ActorId);
-        var actorPositionBefore = actorBefore?.Position ?? Position.Invalid;
-        var playerId = World.Player.Id;
-        var inventoryBefore = SnapshotInventory(actorBefore?.GetComponent<InventoryComponent>());
-
         var validation = action.Validate(World);
         if (validation != ActionResult.Success)
         {
             return ActionOutcome.Fail(validation);
         }
 
-        var outcome = action.Execute(World);
-        Scheduler.ConsumeEnergy(action.ActorId, action.GetEnergyCost());
+        var actorBefore = World.GetEntity(action.ActorId);
+        var actorPositionBefore = actorBefore?.Position ?? Position.Invalid;
+        var playerId = World.Player.Id;
+        var inventoryBefore = SnapshotInventory(actorBefore?.GetComponent<InventoryComponent>());
+        var equipmentBefore = SnapshotEquipment(actorBefore?.GetComponent<InventoryComponent>());
+
+        Bus?.EmitTurnStarted(World.TurnNumber + 1);
+
+        var playerActionConsumed = false;
+        var outcome = _gameLoop.ProcessRound(
+            World,
+            new OneShotScheduler(Scheduler, action.ActorId),
+            actor =>
+            {
+                Bus?.EmitEntityTurnStarted(actor.Id);
+                if (!playerActionConsumed && actor.Id == action.ActorId)
+                {
+                    playerActionConsumed = true;
+                    return action;
+                }
+
+                var brain = actor.GetComponent<IBrain>();
+                return brain?.DecideAction(actor, World, _pathfinder) ?? new WaitAction(actor.Id);
+            });
+
         foreach (var combatEvent in outcome.CombatEvents)
         {
             foreach (var damage in combatEvent.DamageResults)
@@ -108,6 +173,11 @@ public partial class GameManager : Node
                 if (damage.IsKill)
                 {
                     Bus?.EmitEntityDied(damage.DefenderId);
+                    if (damage.DefenderId == playerId)
+                    {
+                        CurrentState = GameState.GameOver;
+                        Bus?.EmitGameOver(CurrentFloor, World.TurnNumber);
+                    }
                 }
             }
 
@@ -117,7 +187,7 @@ public partial class GameManager : Node
             }
         }
 
-        EmitStateDelta(action, actorPositionBefore, inventoryBefore, playerId);
+        EmitStateDelta(action, actorPositionBefore, inventoryBefore, equipmentBefore, playerId);
 
         foreach (var message in outcome.LogMessages)
         {
@@ -130,7 +200,9 @@ public partial class GameManager : Node
 
     public void TransitionFloor(int newFloor)
     {
+        var previousFloor = CurrentFloor;
         CurrentFloor = newFloor;
+        Bus?.EmitLevelTransition(previousFloor, newFloor);
         Bus?.EmitFloorChanged(newFloor);
     }
 
@@ -208,7 +280,12 @@ public partial class GameManager : Node
         Bus?.EmitInventoryChanged(world.Player.Id);
     }
 
-    private void EmitStateDelta(IAction action, Position actorPositionBefore, HashSet<EntityId> inventoryBefore, EntityId playerId)
+    private void EmitStateDelta(
+        IAction action,
+        Position actorPositionBefore,
+        HashSet<EntityId> inventoryBefore,
+        Dictionary<EquipSlot, EntityId> equipmentBefore,
+        EntityId playerId)
     {
         if (World is null)
         {
@@ -240,6 +317,22 @@ public partial class GameManager : Node
                 {
                     Bus?.EmitInventoryChanged(actorAfter.Id);
                 }
+
+                foreach (var pair in inventoryAfter.EquippedItems)
+                {
+                    if (!equipmentBefore.TryGetValue(pair.Key, out var previousItemId) || previousItemId != pair.Value.Item.InstanceId)
+                    {
+                        Bus?.EmitEquipmentChanged(actorAfter.Id, pair.Key, pair.Value.Item);
+                    }
+                }
+
+                foreach (var pair in equipmentBefore)
+                {
+                    if (!inventoryAfter.EquippedItems.ContainsKey(pair.Key))
+                    {
+                        Bus?.EmitEquipmentChanged(actorAfter.Id, pair.Key, null);
+                    }
+                }
             }
         }
         else if (actorPositionBefore != Position.Invalid)
@@ -264,6 +357,22 @@ public partial class GameManager : Node
         foreach (var item in inventory.Items)
         {
             snapshot.Add(item.InstanceId);
+        }
+
+        return snapshot;
+    }
+
+    private static Dictionary<EquipSlot, EntityId> SnapshotEquipment(InventoryComponent? inventory)
+    {
+        var snapshot = new Dictionary<EquipSlot, EntityId>();
+        if (inventory is null)
+        {
+            return snapshot;
+        }
+
+        foreach (var pair in inventory.EquippedItems)
+        {
+            snapshot[pair.Key] = pair.Value.Item.InstanceId;
         }
 
         return snapshot;

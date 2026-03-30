@@ -279,6 +279,17 @@ public partial class WorldView : Node2D
         }
 
         _entityRenderer.AnimateDamage(damage.DefenderId);
+        if (defenderPosition != Roguelike.Core.Position.Invalid)
+        {
+            _animationController.SpawnDamagePopup(
+                _entityLayer,
+                ToCanvasPosition(defenderPosition),
+                damage.FinalDamage,
+                damage.IsCritical,
+                isHeal: false,
+                damage.IsMiss);
+        }
+
         if (damage.IsKill)
         {
             _entityRenderer.RemoveEntity(damage.DefenderId, animateDeath: true);

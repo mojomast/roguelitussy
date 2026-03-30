@@ -6,7 +6,9 @@ namespace Godotussy;
 
 public partial class EventBus : Node
 {
+    public event Action<int>? TurnStarted;
     public event Action? TurnCompleted;
+    public event Action<EntityId>? EntityTurnStarted;
     public event Action<IAction>? PlayerActionSubmitted;
     public event Action<DamageResult>? DamageDealt;
     public event Action<EntityId>? EntityDied;
@@ -26,8 +28,16 @@ public partial class EventBus : Node
     public event Action<bool>? SaveCompleted;
     public event Action<bool>? LoadCompleted;
     public event Action? FovRecalculated;
+    public event Action<int, int, int>? LevelGenerated;
+    public event Action<int, int>? LevelTransition;
+    public event Action<EntityId, EquipSlot, ItemInstance?>? EquipmentChanged;
+    public event Action<int, int>? GameOver;
+
+    public void EmitTurnStarted(int turnNumber) => TurnStarted?.Invoke(turnNumber);
 
     public void EmitTurnCompleted() => TurnCompleted?.Invoke();
+
+    public void EmitEntityTurnStarted(EntityId entityId) => EntityTurnStarted?.Invoke(entityId);
 
     public void EmitPlayerActionSubmitted(IAction action) => PlayerActionSubmitted?.Invoke(action);
 
@@ -71,4 +81,13 @@ public partial class EventBus : Node
     public void EmitLoadCompleted(bool success) => LoadCompleted?.Invoke(success);
 
     public void EmitFovRecalculated() => FovRecalculated?.Invoke();
+
+    public void EmitLevelGenerated(int depth, int width, int height) => LevelGenerated?.Invoke(depth, width, height);
+
+    public void EmitLevelTransition(int fromDepth, int toDepth) => LevelTransition?.Invoke(fromDepth, toDepth);
+
+    public void EmitEquipmentChanged(EntityId entityId, EquipSlot slot, ItemInstance? item) =>
+        EquipmentChanged?.Invoke(entityId, slot, item);
+
+    public void EmitGameOver(int finalDepth, int turnsSurvived) => GameOver?.Invoke(finalDepth, turnsSurvived);
 }

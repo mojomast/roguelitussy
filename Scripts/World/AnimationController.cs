@@ -49,6 +49,14 @@ public sealed class AnimationController
         _history.Add(new AnimationRecord(AnimationType.Death, entityId, sprite.Position, sprite.Position));
     }
 
+    public void SpawnDamagePopup(Node parent, Vector2 position, int amount, bool isCrit, bool isHeal, bool isMiss = false)
+    {
+        var popup = new DamagePopup();
+        popup.Position = position;
+        popup.Setup(amount, isCrit, isHeal, isMiss);
+        parent.AddChild(popup);
+    }
+
     public void ClearHistory()
     {
         _history.Clear();

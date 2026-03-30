@@ -140,7 +140,7 @@ internal sealed class PositionSaveData
 
 public static class SaveSerializer
 {
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 3;
 
     internal static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -254,7 +254,7 @@ public static class SaveSerializer
     internal static byte[] DecodeFlagBytes(string base64, int width, int height)
     {
         var bytes = Convert.FromBase64String(base64);
-        var expectedLength = checked(width * height);
+        var expectedLength = checked(((width * height) + 7) / 8);
         if (bytes.Length != expectedLength)
         {
             throw new InvalidDataException($"Flag data size mismatch: expected {expectedLength}, got {bytes.Length}.");
@@ -394,10 +394,13 @@ public static class SaveSerializer
 
     private static string EncodeFlags(IReadOnlyList<bool> flags)
     {
-        var bytes = new byte[flags.Count];
+        var bytes = new byte[(flags.Count + 7) / 8];
         for (var index = 0; index < flags.Count; index++)
         {
-            bytes[index] = flags[index] ? (byte)1 : (byte)0;
+            if (flags[index])
+            {
+                bytes[index / 8] |= (byte)(1 << (index % 8));
+            }
         }
 
         return Convert.ToBase64String(bytes);
@@ -418,10 +421,11 @@ public static class SaveSerializer
     private static bool[] DecodeFlags(string base64, int width, int height)
     {
         var bytes = DecodeFlagBytes(base64, width, height);
-        var flags = new bool[bytes.Length];
-        for (var index = 0; index < bytes.Length; index++)
+        var totalCells = checked(width * height);
+        var flags = new bool[totalCells];
+        for (var index = 0; index < totalCells; index++)
         {
-            flags[index] = bytes[index] == 1;
+            flags[index] = (bytes[index / 8] & (1 << (index % 8))) != 0;
         }
 
         return flags;

@@ -10,6 +10,7 @@ public sealed class MigrationTests : ITestSuite
     public void Register(TestRegistry registry)
     {
         registry.Add("Persistence.SaveMigrator migrates v1 saves into current world state", MigratesLegacyV1Save);
+      registry.Add("Persistence.SaveMigrator migrates v2 saves into bit-packed version 3", MigratesV2SaveToV3);
     }
 
     private static void MigratesLegacyV1Save()
@@ -84,6 +85,61 @@ public sealed class MigrationTests : ITestSuite
     "1": 300,
     "2": 50
   }
+}
+""";
+
+    private static void MigratesV2SaveToV3()
+    {
+        using var sandbox = MigrationSandbox.Create();
+        var manager = new SaveManager(sandbox.DirectoryPath);
+        File.WriteAllText(Path.Combine(sandbox.DirectoryPath, SaveSlots.GetFileName(SaveSlots.Slot1)), Version2SaveJson());
+
+        var world = manager.LoadGame(SaveSlots.Slot1).GetAwaiter().GetResult();
+        Expect.NotNull(world, "Version 2 save should migrate and load successfully");
+        Expect.True(world!.IsExplored(new Position(0, 0)), "Migrated explored data should survive conversion");
+        Expect.True(world.IsVisible(new Position(1, 1)), "Migrated visible data should survive conversion");
+
+        var metadata = manager.GetSaveMetadata(SaveSlots.Slot1);
+        Expect.NotNull(metadata, "Migrated save should expose metadata");
+        Expect.Equal(3, metadata!.Version, "Migrated save should report the new version");
+    }
+
+    private static string Version2SaveJson() => """
+{
+  "version": 2,
+  "savedAt": "2026-03-30T10:15:00Z",
+  "seed": 17,
+  "depth": 2,
+  "turnNumber": 41,
+  "width": 4,
+  "height": 4,
+  "tiles": "AgICAgIDAgICAgICAgICBA==",
+  "explored": "AQABAAABAAAAAQAAAAEBAA==",
+  "visible": "AAAAAAABAAAAAAAAAAAAAA==",
+  "playerId": "11111111111111111111111111111111",
+  "entities": [
+    {
+      "id": "11111111111111111111111111111111",
+      "name": "Legacy Hero",
+      "position": { "x": 0, "y": 0 },
+      "faction": 0,
+      "blocksMovement": true,
+      "blocksSight": false,
+      "stats": {
+        "hp": 12,
+        "maxHp": 14,
+        "attack": 5,
+        "accuracy": 0,
+        "defense": 2,
+        "evasion": 0,
+        "speed": 100,
+        "viewRadius": 8,
+        "energy": 300
+      }
+    }
+  ],
+  "groundItems": [],
+  "openDoors": []
 }
 """;
 

@@ -63,14 +63,7 @@ public static class SaveValidator
 
     private static void ValidateFlags(string payload, int width, int height, string label, List<string> errors)
     {
-        var flagBytes = SaveSerializer.DecodeFlagBytes(payload, width, height);
-        for (var index = 0; index < flagBytes.Length; index++)
-        {
-            if (flagBytes[index] is not 0 and not 1)
-            {
-                errors.Add($"{label} payload contains invalid flag value {flagBytes[index]} at index {index}.");
-            }
-        }
+        SaveSerializer.DecodeFlagBytes(payload, width, height);
     }
 
     private static void ValidateEntities(SaveFileData data, List<string> errors)
