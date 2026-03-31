@@ -45,6 +45,8 @@ At runtime the project starts from `Scenes/Main.tscn`.
 5. `UiRoot` binds itself to the active `GameManager`, `EventBus`, and content services.
 6. `UiRoot` also owns the in-app developer workshop and debug surfaces so runtime authoring flows stay outside the simulation core.
 
+`GameManager` also seeds the runtime-only bridge state that the simulation now depends on at action time: player progression and identity components, enemy XP values, enemy ability slots, and the world's loaded content database reference.
+
 ## Runtime Flow
 
 The intended direction of dependencies is:
@@ -67,9 +69,10 @@ Key responsibilities:
 
 - Start and load sessions
 - Route player actions into the simulation loop
-- Bridge combat and state changes into `EventBus`
+- Bridge combat, progression, equipment, and state changes into `EventBus`
 - Handle save/load requests through `ISaveManager`
 - Emit world snapshots and floor transitions
+- Attach runtime components such as `ProgressionComponent`, `IdentityComponent`, `XpValueComponent`, `AbilitiesComponent`, and `CooldownComponent`
 
 ### EventBus
 
@@ -83,6 +86,8 @@ Key responsibilities:
 - save/load requested and completed
 - level generated/transitioned
 - equipment changed
+- experience gained
+- leveled up
 - game over
 
 If a presentation system needs to react to a simulation change, prefer adding or using an event here rather than introducing direct references into `Core/`.
@@ -109,6 +114,7 @@ This keeps authoring utilities on the Godot side while still allowing non-editor
 - New AI decision rule: `Core/AI/`
 - New procedural-generation step: `Core/Generation/`
 - New persistence shape or migration: `Core/Persistence/`
+- New reusable entity state: a focused component under `Core/Simulation/`
 - New HUD, menu, overlay, or input behavior: `Scripts/UI/`
 - New world animation or renderer: `Scripts/World/`
 - New editor/debug/runtime-authoring utility: `Scripts/Tools/` plus a scene, plugin hook, or `UiRoot` integration if needed

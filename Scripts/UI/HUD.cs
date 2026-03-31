@@ -17,6 +17,8 @@ public partial class HUD : Control
 
     public string TurnText { get; private set; } = "Turn: --";
 
+    public string LevelText { get; private set; } = string.Empty;
+
     public string StatusEffectsText { get; private set; } = string.Empty;
 
     public string MinimapText { get; private set; } = "Map hidden";
@@ -66,6 +68,11 @@ public partial class HUD : Control
         builder.AppendLine(EnergyText);
         builder.AppendLine(FloorText);
         builder.AppendLine(TurnText);
+        if (!string.IsNullOrWhiteSpace(LevelText))
+        {
+            builder.AppendLine(LevelText);
+        }
+
         if (!string.IsNullOrWhiteSpace(StatusEffectsText))
         {
             builder.AppendLine(StatusEffectsText);
@@ -136,6 +143,13 @@ public partial class HUD : Control
         EnergyText = $"Energy: {energy}";
         FloorText = $"Floor: {world.Depth}";
         TurnText = $"Turn: {world.TurnNumber}";
+
+        var progression = player.GetComponent<ProgressionComponent>();
+        LevelText = progression is not null
+            ? (progression.UnspentStatPoints > 0
+                ? $"Lv: {progression.Level}  XP: {progression.Experience}/{progression.ExperienceToNextLevel}  LV UP!"
+                : $"Lv: {progression.Level}  XP: {progression.Experience}/{progression.ExperienceToNextLevel}")
+            : string.Empty;
 
         var effects = StatusEffectProcessor.GetEffects(player);
         StatusEffectsText = effects.Count == 0

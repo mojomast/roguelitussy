@@ -63,8 +63,67 @@ public class AIBrain : IBrain
             }
         }
 
+        GenerateAbilityCandidates(self, world, target, actions);
+
         actions.Add(new WaitAction(self.Id));
         return actions;
+    }
+
+    private static void GenerateAbilityCandidates(IEntity self, IWorldState world, IEntity? target, List<IAction> actions)
+    {
+        var abilities = self.GetComponent<AbilitiesComponent>();
+        if (abilities is null)
+        {
+            return;
+        }
+
+        var cooldowns = self.GetComponent<CooldownComponent>();
+        var contentDb = (world as WorldState)?.ContentDatabase;
+        if (contentDb is null)
+        {
+            return;
+        }
+
+        foreach (var slot in abilities.Slots)
+        {
+            if (cooldowns is not null && cooldowns.IsOnCooldown(slot.AbilityId))
+            {
+                continue;
+            }
+
+            if (!contentDb.TryGetAbilityTemplate(slot.AbilityId, out var template))
+            {
+                continue;
+            }
+
+            switch (template.Targeting.Type)
+            {
+                case "self":
+                    actions.Add(new CastAbilityAction(self.Id, template, self.Position));
+                    break;
+
+                case "single":
+                    if (target is not null && target.IsAlive)
+                    {
+                        var range = self.Position.ChebyshevTo(target.Position);
+                        if (range <= template.Targeting.Range)
+                        {
+                            actions.Add(new CastAbilityAction(self.Id, template, target.Position));
+                        }
+                    }
+                    break;
+
+                case "aoe_circle":
+                    var aoeCenter = string.Equals(template.Targeting.Center, "self", StringComparison.OrdinalIgnoreCase)
+                        ? self.Position
+                        : (target?.Position ?? self.Position);
+                    if (self.Position.ChebyshevTo(aoeCenter) <= template.Targeting.Range || template.Targeting.Range == 0)
+                    {
+                        actions.Add(new CastAbilityAction(self.Id, template, aoeCenter));
+                    }
+                    break;
+            }
+        }
     }
 
     private Position GetObjective(IEntity self, IWorldState world, IPathfinder pathfinder, IEntity? target, AIStateComponent memory)

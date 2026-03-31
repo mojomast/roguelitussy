@@ -77,6 +77,36 @@ public static class AIProfiles
         CanFlee: true,
         PatrolsWhenIdle: true);
 
+    public static AIProfile Ambush { get; } = new(
+        "ambush",
+        1.20f,
+        0.60f,
+        0.50f,
+        0.30f,
+        0.90f,
+        0.20f,
+        5,
+        6,
+        6,
+        1,
+        CanFlee: false,
+        PatrolsWhenIdle: false);
+
+    public static AIProfile Support { get; } = new(
+        "support",
+        0.30f,
+        0.40f,
+        0.30f,
+        0.80f,
+        0.40f,
+        0.40f,
+        3,
+        8,
+        8,
+        4,
+        CanFlee: true,
+        PatrolsWhenIdle: true);
+
     public static AIProfile Get(string brainType)
     {
         return brainType switch
@@ -85,6 +115,8 @@ public static class AIProfiles
             "ranged_kiter" => RangedKiter,
             "patrol_guard" => PatrolGuard,
             "fleeing" => Fleeing,
+            "ambush" => Ambush,
+            "support" => Support,
             _ => MeleeRusher,
         };
     }

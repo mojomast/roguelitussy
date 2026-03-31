@@ -35,7 +35,8 @@ public partial class Tooltip : Control
         RefreshVisualState();
     }
 
-    public void ShowItemTooltip(ItemTemplate template, ItemInstance instance, Vector2 screenPos)
+    public void ShowItemTooltip(ItemTemplate template, ItemInstance instance, Vector2 screenPos,
+        string? comparisonText = null)
     {
         TitleText = template.DisplayName;
         TitleMarkup = ItemRarityPresentation.WrapWithColor(template.DisplayName, template.Rarity);
@@ -62,6 +63,12 @@ public partial class Tooltip : Control
         }
 
         lines.Add($"Category: {template.Category}");
+
+        if (!string.IsNullOrEmpty(comparisonText))
+        {
+            lines.Add(comparisonText);
+        }
+
         BodyText = string.Join("\n", lines);
         BodyMarkup = BuildItemBodyMarkup(template, lines);
         ScreenPosition = ClampToScreen(screenPos);

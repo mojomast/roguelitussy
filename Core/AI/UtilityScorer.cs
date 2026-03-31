@@ -18,6 +18,7 @@ public static class UtilityScorer
         {
             AttackAction attack => ScoreAttack(attack, self, target, memory, profile),
             MoveAction move => ScoreMove(move, self, target, objective, world, memory, profile, pathfinder),
+            CastAbilityAction cast => ScoreCast(cast, self, target, memory, profile),
             WaitAction => ScoreWait(self, target, memory, profile),
             _ => 0f,
         };
@@ -154,6 +155,15 @@ public static class UtilityScorer
             return profile.WaitWeight;
         }
 
+        if (target is not null && profile.WaitWeight >= 0.80f)
+        {
+            var dist = self.Position.ChebyshevTo(target.Position);
+            if (dist > profile.PreferredRange + 1)
+            {
+                return profile.WaitWeight + 1.50f;
+            }
+        }
+
         if (target is not null && profile.PreferredRange > 1)
         {
             var distance = self.Position.DistanceTo(target.Position);
@@ -164,6 +174,48 @@ public static class UtilityScorer
         }
 
         return memory.State == AIState.Patrol ? 0.05f : 0.01f;
+    }
+
+    private static float ScoreCast(CastAbilityAction cast, IEntity self, IEntity? target, AIStateComponent memory, AIProfile profile)
+    {
+        if (memory.State == AIState.Flee)
+        {
+            return 0.05f;
+        }
+
+        var abilities = self.GetComponent<AbilitiesComponent>();
+        var slot = abilities?.Slots.Find(s => s.AbilityId == cast.Ability.AbilityId);
+        var priority = slot?.Priority ?? 50;
+        var score = priority / 50f;
+
+        score += profile.AggressionWeight * 0.30f;
+
+        if (target is not null && cast.Ability.Targeting.Type != "self")
+        {
+            var range = self.Position.ChebyshevTo(target.Position);
+            var abilityRange = cast.Ability.Targeting.Range;
+            if (range <= abilityRange && range > 1)
+            {
+                score += 0.50f;
+            }
+        }
+
+        if (cast.Ability.Targeting.Type == "self" || string.Equals(cast.Ability.Targeting.Center, "self", StringComparison.OrdinalIgnoreCase))
+        {
+            score += 0.30f;
+        }
+
+        if (cast.Ability.Targeting.Type == "aoe_circle")
+        {
+            score += 0.20f;
+        }
+
+        if (memory.State == AIState.Attack)
+        {
+            score += 0.25f;
+        }
+
+        return score;
     }
 
     private static int GetPathDistance(Position from, Position to, IWorldState world, IPathfinder pathfinder)

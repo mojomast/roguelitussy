@@ -101,7 +101,7 @@ public sealed class MigrationTests : ITestSuite
 
         var metadata = manager.GetSaveMetadata(SaveSlots.Slot1);
         Expect.NotNull(metadata, "Migrated save should expose metadata");
-        Expect.Equal(3, metadata!.Version, "Migrated save should report the new version");
+        Expect.Equal(SaveSerializer.CurrentVersion, metadata!.Version, "Migrated save should report the new version");
     }
 
     private static string Version2SaveJson() => """

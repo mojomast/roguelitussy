@@ -260,6 +260,356 @@
           "count_max": 0
         }
       ]
+    },
+    {
+      "id": "cave_spider_loot",
+      "description": "Loot dropped by Cave Spiders.",
+      "rolls": 1,
+      "entries": [
+        {
+          "item_id": "potion_health",
+          "weight": 12,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": null,
+          "weight": 88,
+          "count_min": 0,
+          "count_max": 0
+        }
+      ]
+    },
+    {
+      "id": "skeleton_knight_loot",
+      "description": "Loot dropped by Skeleton Knights.",
+      "rolls": 1,
+      "entries": [
+        {
+          "item_id": "sword_iron",
+          "weight": 10,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "helm_iron",
+          "weight": 10,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "shield_wooden",
+          "weight": 8,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "potion_health",
+          "weight": 20,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": null,
+          "weight": 52,
+          "count_min": 0,
+          "count_max": 0
+        }
+      ]
+    },
+    {
+      "id": "goblin_shaman_loot",
+      "description": "Loot dropped by Goblin Shamans.",
+      "rolls": 1,
+      "entries": [
+        {
+          "item_id": "scroll_fireball",
+          "weight": 10,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "potion_might",
+          "weight": 8,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "potion_health",
+          "weight": 15,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": null,
+          "weight": 67,
+          "count_min": 0,
+          "count_max": 0
+        }
+      ]
+    },
+    {
+      "id": "dark_mage_loot",
+      "description": "Loot dropped by Dark Mages.",
+      "rolls": 1,
+      "entries": [
+        {
+          "item_id": "staff_embers",
+          "weight": 8,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "scroll_fireball",
+          "weight": 15,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "scroll_phase",
+          "weight": 10,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "potion_health",
+          "weight": 15,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": null,
+          "weight": 52,
+          "count_min": 0,
+          "count_max": 0
+        }
+      ]
+    },
+    {
+      "id": "shadow_stalker_loot",
+      "description": "Loot dropped by Shadow Stalkers.",
+      "rolls": 1,
+      "entries": [
+        {
+          "item_id": "dagger_venom",
+          "weight": 10,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "scroll_blink",
+          "weight": 12,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "scroll_phase",
+          "weight": 10,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "boots_leather",
+          "weight": 6,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": null,
+          "weight": 62,
+          "count_min": 0,
+          "count_max": 0
+        }
+      ]
+    },
+    {
+      "id": "bone_lord_loot",
+      "description": "Loot dropped by Bone Lords. Elite-tier drops.",
+      "rolls": 2,
+      "entries": [
+        {
+          "item_id": "armor_plate",
+          "weight": 10,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "mace_disruption",
+          "weight": 10,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "battleaxe",
+          "weight": 12,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "amulet_regen",
+          "weight": 5,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "potion_health",
+          "weight": 25,
+          "count_min": 1,
+          "count_max": 2
+        },
+        {
+          "item_id": "potion_might",
+          "weight": 10,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": null,
+          "weight": 28,
+          "count_min": 0,
+          "count_max": 0
+        }
+      ]
+    },
+    {
+      "id": "flame_elemental_loot",
+      "description": "Loot dropped by Flame Elementals. Elite-tier drops.",
+      "rolls": 2,
+      "entries": [
+        {
+          "item_id": "staff_embers",
+          "weight": 12,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "sword_flame",
+          "weight": 8,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "scroll_fireball",
+          "weight": 15,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "ring_warding",
+          "weight": 6,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "potion_health",
+          "weight": 20,
+          "count_min": 1,
+          "count_max": 2
+        },
+        {
+          "item_id": null,
+          "weight": 39,
+          "count_min": 0,
+          "count_max": 0
+        }
+      ]
+    },
+    {
+      "id": "deep_floor_loot",
+      "description": "Random items found on deeper dungeon floors (depth 4+).",
+      "rolls": 1,
+      "entries": [
+        {
+          "item_id": "potion_health",
+          "weight": 18,
+          "count_min": 1,
+          "count_max": 2
+        },
+        {
+          "item_id": "potion_might",
+          "weight": 10,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "potion_haste",
+          "weight": 8,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "scroll_fireball",
+          "weight": 8,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "scroll_phase",
+          "weight": 6,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "scroll_blink",
+          "weight": 6,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "battleaxe",
+          "weight": 5,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "longbow",
+          "weight": 5,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "armor_plate",
+          "weight": 3,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "mace_disruption",
+          "weight": 4,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "staff_embers",
+          "weight": 4,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "ring_warding",
+          "weight": 3,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "amulet_regen",
+          "weight": 2,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "boots_leather",
+          "weight": 4,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": null,
+          "weight": 14,
+          "count_min": 0,
+          "count_max": 0
+        }
+      ]
     }
   ]
 }

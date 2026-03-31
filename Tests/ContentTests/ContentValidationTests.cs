@@ -19,12 +19,12 @@ public sealed class ContentValidationTests : ITestSuite
         var content = LoadContent();
 
         Expect.True(content.IsValid, FormatErrors(content));
-        Expect.Equal(12, content.ItemDefinitions.Count, "Expected the full item set to load");
-        Expect.Equal(6, content.EnemyDefinitions.Count, "Expected the full enemy set to load");
+        Expect.Equal(22, content.ItemDefinitions.Count, "Expected the full item set to load");
+        Expect.Equal(13, content.EnemyDefinitions.Count, "Expected the full enemy set to load");
         Expect.Equal(8, content.AbilityDefinitions.Count, "Expected the full ability set to load");
         Expect.Equal(9, content.StatusEffects.Count, "Expected the full status effect set to load");
-        Expect.Equal(6, content.RoomPrefabs.Count, "Expected the full room prefab set to load");
-        Expect.Equal(7, content.LootTables.Count, "Expected the full loot table set to load");
+        Expect.Equal(10, content.RoomPrefabs.Count, "Expected the full room prefab set to load");
+        Expect.Equal(15, content.LootTables.Count, "Expected the full loot table set to load");
     }
 
     private static void ProjectsContractTemplates()

@@ -292,6 +292,219 @@
         }
       ],
       "fixed_entities": []
+    },
+    {
+      "id": "chokepoint",
+      "name": "Chokepoint Passage",
+      "tags": ["combat", "ambush", "narrow"],
+      "width": 11,
+      "height": 7,
+      "min_depth": 2,
+      "max_depth": 99,
+      "layout": [
+        "###########",
+        "#....S....#",
+        "###.....###",
+        "+....I....+",
+        "###.....###",
+        "#....S....#",
+        "###########"
+      ],
+      "doors": [
+        {
+          "x": 0,
+          "y": 3,
+          "direction": "west"
+        },
+        {
+          "x": 10,
+          "y": 3,
+          "direction": "east"
+        }
+      ],
+      "spawn_points": [
+        {
+          "x": 5,
+          "y": 1,
+          "type": "enemy"
+        },
+        {
+          "x": 5,
+          "y": 5,
+          "type": "enemy"
+        },
+        {
+          "x": 5,
+          "y": 3,
+          "type": "item"
+        }
+      ],
+      "fixed_entities": [],
+      "enemy_count_bonus": 1
+    },
+    {
+      "id": "arena_room",
+      "name": "Battleground Arena",
+      "tags": ["combat", "elite", "open"],
+      "width": 13,
+      "height": 11,
+      "min_depth": 4,
+      "max_depth": 99,
+      "layout": [
+        "#############",
+        "#...........#",
+        "#.#.......#.#",
+        "#...........#",
+        "#...........#",
+        "+.....S.....+",
+        "#...........#",
+        "#...........#",
+        "#.#.......#.#",
+        "#...........#",
+        "#############"
+      ],
+      "doors": [
+        {
+          "x": 0,
+          "y": 5,
+          "direction": "west"
+        },
+        {
+          "x": 12,
+          "y": 5,
+          "direction": "east"
+        }
+      ],
+      "spawn_points": [
+        {
+          "x": 6,
+          "y": 5,
+          "type": "enemy_boss"
+        }
+      ],
+      "fixed_entities": [],
+      "lock_doors_on_enter": true
+    },
+    {
+      "id": "vault_room",
+      "name": "Guarded Vault",
+      "tags": ["loot", "combat", "dead_end"],
+      "width": 9,
+      "height": 9,
+      "min_depth": 3,
+      "max_depth": 99,
+      "layout": [
+        "#########",
+        "#..I.I..#",
+        "#.......#",
+        "#..C.C..#",
+        "#.......#",
+        "#..S.S..#",
+        "#.......#",
+        "#.......#",
+        "####+####"
+      ],
+      "doors": [
+        {
+          "x": 4,
+          "y": 8,
+          "direction": "south"
+        }
+      ],
+      "spawn_points": [
+        {
+          "x": 3,
+          "y": 1,
+          "type": "item"
+        },
+        {
+          "x": 5,
+          "y": 1,
+          "type": "item"
+        },
+        {
+          "x": 3,
+          "y": 3,
+          "type": "chest"
+        },
+        {
+          "x": 5,
+          "y": 3,
+          "type": "chest"
+        },
+        {
+          "x": 3,
+          "y": 5,
+          "type": "enemy"
+        },
+        {
+          "x": 5,
+          "y": 5,
+          "type": "enemy"
+        }
+      ],
+      "fixed_entities": [],
+      "item_quality_bonus": 3
+    },
+    {
+      "id": "library_room",
+      "name": "Forgotten Library",
+      "tags": ["loot", "caster", "mid_game"],
+      "width": 11,
+      "height": 9,
+      "min_depth": 3,
+      "max_depth": 99,
+      "layout": [
+        "###########",
+        "#.I.....I.#",
+        "#.#.#.#.#.#",
+        "#.........#",
+        "+....S....+",
+        "#.........#",
+        "#.#.#.#.#.#",
+        "#.I.....I.#",
+        "###########"
+      ],
+      "doors": [
+        {
+          "x": 0,
+          "y": 4,
+          "direction": "west"
+        },
+        {
+          "x": 10,
+          "y": 4,
+          "direction": "east"
+        }
+      ],
+      "spawn_points": [
+        {
+          "x": 2,
+          "y": 1,
+          "type": "item"
+        },
+        {
+          "x": 8,
+          "y": 1,
+          "type": "item"
+        },
+        {
+          "x": 5,
+          "y": 4,
+          "type": "enemy"
+        },
+        {
+          "x": 2,
+          "y": 7,
+          "type": "item"
+        },
+        {
+          "x": 8,
+          "y": 7,
+          "type": "item"
+        }
+      ],
+      "fixed_entities": []
     }
   ]
 }

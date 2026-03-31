@@ -218,6 +218,278 @@
       "tags": ["slime", "early_game"],
       "sprite_path": "res://Assets/Sprites/enemies/slime_acid.png",
       "sprite_atlas_coords": [5, 0]
+    },
+    {
+      "id": "cave_spider",
+      "name": "Cave Spider",
+      "description": "Skitters from the shadows, fangs dripping acid.",
+      "stats": {
+        "hp": 10,
+        "attack": 3,
+        "defense": 0,
+        "accuracy": 75,
+        "evasion": 25,
+        "speed": 130,
+        "fov_range": 5,
+        "xp_value": 8
+      },
+      "ai_type": "ambush",
+      "ai_params": {
+        "flee_hp_pct": 0,
+        "aggro_range": 5,
+        "wander_when_idle": false
+      },
+      "faction": "Enemy",
+      "min_depth": 1,
+      "max_depth": 4,
+      "spawn_weight": 10,
+      "abilities": [
+        {
+          "ability_id": "acid_splash",
+          "cooldown": 4,
+          "priority": 1
+        }
+      ],
+      "loot_table_id": "cave_spider_loot",
+      "tags": ["beast", "ambush", "early_game"],
+      "sprite_path": "res://Assets/Sprites/enemies/cave_spider.png",
+      "sprite_atlas_coords": [6, 0]
+    },
+    {
+      "id": "skeleton_knight",
+      "name": "Skeleton Knight",
+      "description": "Hollow armor marches endlessly through the halls.",
+      "stats": {
+        "hp": 25,
+        "attack": 6,
+        "defense": 4,
+        "accuracy": 75,
+        "evasion": 5,
+        "speed": 90,
+        "fov_range": 8,
+        "xp_value": 20
+      },
+      "ai_type": "patrol",
+      "ai_params": {
+        "flee_hp_pct": 0,
+        "aggro_range": 8,
+        "patrol_radius": 6,
+        "wander_when_idle": true
+      },
+      "faction": "Enemy",
+      "min_depth": 2,
+      "max_depth": 5,
+      "spawn_weight": 8,
+      "abilities": [
+        {
+          "ability_id": "heavy_slam",
+          "cooldown": 4,
+          "priority": 1
+        }
+      ],
+      "loot_table_id": "skeleton_knight_loot",
+      "tags": ["undead", "patrol", "mid_game"],
+      "sprite_path": "res://Assets/Sprites/enemies/skeleton_knight.png",
+      "sprite_atlas_coords": [7, 0]
+    },
+    {
+      "id": "goblin_shaman",
+      "name": "Goblin Shaman",
+      "description": "Chants foul war-songs that embolden its kin.",
+      "stats": {
+        "hp": 14,
+        "attack": 3,
+        "defense": 1,
+        "accuracy": 70,
+        "evasion": 15,
+        "speed": 100,
+        "fov_range": 9,
+        "xp_value": 18
+      },
+      "ai_type": "support",
+      "ai_params": {
+        "flee_hp_pct": 30,
+        "aggro_range": 9,
+        "support_range": 6,
+        "wander_when_idle": true
+      },
+      "faction": "Enemy",
+      "min_depth": 2,
+      "max_depth": 5,
+      "spawn_weight": 6,
+      "abilities": [
+        {
+          "ability_id": "war_cry",
+          "cooldown": 4,
+          "priority": 1
+        }
+      ],
+      "loot_table_id": "goblin_shaman_loot",
+      "tags": ["goblinoid", "support", "mid_game"],
+      "sprite_path": "res://Assets/Sprites/enemies/goblin_shaman.png",
+      "sprite_atlas_coords": [8, 0]
+    },
+    {
+      "id": "dark_mage",
+      "name": "Dark Mage",
+      "description": "Robed in shadow, hurling fire from afar.",
+      "stats": {
+        "hp": 16,
+        "attack": 7,
+        "defense": 1,
+        "accuracy": 85,
+        "evasion": 10,
+        "speed": 95,
+        "fov_range": 10,
+        "xp_value": 22
+      },
+      "ai_type": "ranged_kite",
+      "ai_params": {
+        "preferred_range": 6,
+        "flee_hp_pct": 25,
+        "min_range": 4,
+        "aggro_range": 10,
+        "wander_when_idle": true
+      },
+      "faction": "Enemy",
+      "min_depth": 3,
+      "max_depth": 6,
+      "spawn_weight": 5,
+      "abilities": [
+        {
+          "ability_id": "fireball",
+          "cooldown": 3,
+          "priority": 1
+        }
+      ],
+      "loot_table_id": "dark_mage_loot",
+      "tags": ["humanoid", "ranged", "caster", "mid_game"],
+      "sprite_path": "res://Assets/Sprites/enemies/dark_mage.png",
+      "sprite_atlas_coords": [9, 0]
+    },
+    {
+      "id": "shadow_stalker",
+      "name": "Shadow Stalker",
+      "description": "A blur of claws that strikes from impossible angles.",
+      "stats": {
+        "hp": 20,
+        "attack": 7,
+        "defense": 2,
+        "accuracy": 90,
+        "evasion": 35,
+        "speed": 140,
+        "fov_range": 10,
+        "xp_value": 30
+      },
+      "ai_type": "ambush",
+      "ai_params": {
+        "flee_hp_pct": 20,
+        "aggro_range": 10,
+        "wander_when_idle": false
+      },
+      "faction": "Enemy",
+      "min_depth": 4,
+      "max_depth": 7,
+      "spawn_weight": 4,
+      "abilities": [
+        {
+          "ability_id": "phase_shift",
+          "cooldown": 5,
+          "priority": 2
+        },
+        {
+          "ability_id": "life_drain",
+          "cooldown": 3,
+          "priority": 1
+        }
+      ],
+      "loot_table_id": "shadow_stalker_loot",
+      "tags": ["shadow", "ambush", "late_game"],
+      "sprite_path": "res://Assets/Sprites/enemies/shadow_stalker.png",
+      "sprite_atlas_coords": [10, 0]
+    },
+    {
+      "id": "bone_lord",
+      "name": "Bone Lord",
+      "description": "An ancient commander of the dead. Its war cry rallies the fallen.",
+      "stats": {
+        "hp": 50,
+        "attack": 10,
+        "defense": 6,
+        "accuracy": 80,
+        "evasion": 5,
+        "speed": 85,
+        "fov_range": 10,
+        "xp_value": 55
+      },
+      "ai_type": "patrol",
+      "ai_params": {
+        "flee_hp_pct": 0,
+        "aggro_range": 10,
+        "patrol_radius": 8,
+        "wander_when_idle": true
+      },
+      "faction": "Enemy",
+      "min_depth": 5,
+      "max_depth": 8,
+      "spawn_weight": 2,
+      "abilities": [
+        {
+          "ability_id": "heavy_slam",
+          "cooldown": 3,
+          "priority": 1
+        },
+        {
+          "ability_id": "war_cry",
+          "cooldown": 5,
+          "priority": 2
+        }
+      ],
+      "loot_table_id": "bone_lord_loot",
+      "tags": ["undead", "elite", "late_game"],
+      "sprite_path": "res://Assets/Sprites/enemies/bone_lord.png",
+      "sprite_atlas_coords": [11, 0]
+    },
+    {
+      "id": "flame_elemental",
+      "name": "Flame Elemental",
+      "description": "Living fire. Its very presence scorches the stone.",
+      "stats": {
+        "hp": 40,
+        "attack": 9,
+        "defense": 3,
+        "accuracy": 75,
+        "evasion": 10,
+        "speed": 100,
+        "fov_range": 8,
+        "xp_value": 45
+      },
+      "ai_type": "melee_rush",
+      "ai_params": {
+        "flee_hp_pct": 0,
+        "aggro_range": 8,
+        "wander_when_idle": false
+      },
+      "faction": "Enemy",
+      "min_depth": 6,
+      "max_depth": 9,
+      "spawn_weight": 3,
+      "abilities": [
+        {
+          "ability_id": "heavy_slam",
+          "cooldown": 3,
+          "priority": 1
+        },
+        {
+          "ability_id": "fireball",
+          "cooldown": 4,
+          "priority": 2
+        }
+      ],
+      "loot_table_id": "flame_elemental_loot",
+      "tags": ["elemental", "elite", "late_game", "fire"],
+      "sprite_path": "res://Assets/Sprites/enemies/flame_elemental.png",
+      "sprite_atlas_coords": [12, 0]
     }
   ]
 }

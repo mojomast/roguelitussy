@@ -18,6 +18,7 @@ public static class SaveMigrator
         {
             1 => MigrateV1(root),
             2 => MigrateV2(root),
+            3 => MigrateV3(root),
             SaveSerializer.CurrentVersion => JsonSerializer.Deserialize<SaveFileData>(json, SaveSerializer.JsonOptions)
                 ?? throw new InvalidOperationException("Unable to deserialize save data."),
             _ => throw new InvalidOperationException($"Unsupported save version {version}.")
@@ -84,6 +85,15 @@ public static class SaveMigrator
 
         data.Explored = ReencodeFlagsV2ToV3(data.Explored, data.Width, data.Height);
         data.Visible = ReencodeFlagsV2ToV3(data.Visible, data.Width, data.Height);
+        data.Version = SaveSerializer.CurrentVersion;
+        return data;
+    }
+
+    private static SaveFileData MigrateV3(JsonElement root)
+    {
+        var data = JsonSerializer.Deserialize<SaveFileData>(root.GetRawText(), SaveSerializer.JsonOptions)
+            ?? throw new InvalidOperationException("Unable to deserialize version 3 save data.");
+
         data.Version = SaveSerializer.CurrentVersion;
         return data;
     }

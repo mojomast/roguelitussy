@@ -2,6 +2,8 @@
 
 A deterministic roguelike foundation for Godot 4.4 with a pure C# simulation core, Godot-facing presentation scripts, data-driven content, and a custom .NET test harness.
 
+The current build includes character identity and progression, ability casting, gear-driven combat, role-specific AI, equipment requirements, and expanded content for mid- and late-floor play.
+
 ## Quick Start
 
 1. Install .NET 8 SDK.
@@ -24,12 +26,12 @@ A deterministic roguelike foundation for Godot 4.4 with a pure C# simulation cor
 
 ## What This Project Contains
 
-- A pure C# simulation layer for entities, actions, combat, inventory, AI, generation, and persistence.
+- A pure C# simulation layer for entities, actions, combat, abilities, inventory, AI, generation, and persistence.
 - Godot-side autoloads and presentation scripts for UI, rendering, and debug/editor tooling.
 - An in-app developer workshop for creating room drafts and scaffolding item/enemy content directly from the runtime shell.
 - JSON-driven content for items, enemies, abilities, status effects, loot tables, and room prefabs.
-- Save/load infrastructure with validation and migration support.
-- A custom test runner covering simulation, generation, content, persistence, rendering, UI, and integration flows.
+- Save/load infrastructure with validation and migration support for progression and identity state.
+- A custom test runner covering simulation, AI, generation, content, persistence, rendering, UI, and integration flows.
 
 ## Repository Layout
 
@@ -99,6 +101,7 @@ Godot_v4.4.1-stable_mono_win64_console.exe --headless --path . --quit
 - Save data is versioned and migrated on load; do not change persistence shapes casually.
 - Content IDs are expected to be stable lowercase snake_case keys.
 - The runtime shell now exposes a developer workshop for room and content authoring, so editor plugin usage is optional for common content-building tasks.
+- The repository currently validates 161 deterministic tests; keep new gameplay and content changes covered in the same style.
 - Temporary root-level `.cs` scratch files are included by the SDK globbing rules and can break builds.
 
 Start with [docs/SETUP.md](docs/SETUP.md) if you are new to the repository, then use [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) before making structural changes.

@@ -8,9 +8,13 @@ public interface IContentDatabase
 
     IReadOnlyDictionary<string, EnemyTemplate> EnemyTemplates { get; }
 
+    IReadOnlyDictionary<string, AbilityTemplate> AbilityTemplates { get; }
+
     bool TryGetItemTemplate(string templateId, out ItemTemplate template);
 
     bool TryGetEnemyTemplate(string templateId, out EnemyTemplate template);
+
+    bool TryGetAbilityTemplate(string abilityId, out AbilityTemplate template);
 
     IReadOnlyList<ItemTemplate> GetAvailableItems(int depth);
 

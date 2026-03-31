@@ -40,6 +40,8 @@ public sealed class WorldState : IWorldState
 
     public CombatResolver? CombatResolver { get; set; }
 
+    public IContentDatabase? ContentDatabase { get; set; }
+
     public void InitGrid(int width, int height)
     {
         Width = width;

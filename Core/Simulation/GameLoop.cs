@@ -41,6 +41,12 @@ public sealed class GameLoop
         }
 
         scheduler.EndRound(world);
+
+        foreach (var entity in world.Entities)
+        {
+            entity.GetComponent<CooldownComponent>()?.TickAll();
+        }
+
         return outcome;
     }
 }

@@ -26,6 +26,8 @@ public sealed class ContentLoader : IContentDatabase
 
     public IReadOnlyDictionary<string, EnemyTemplate> EnemyTemplates { get; }
 
+    public IReadOnlyDictionary<string, AbilityTemplate> AbilityTemplates { get; }
+
     public IReadOnlyDictionary<string, ItemDefinition> ItemDefinitions { get; }
 
     public IReadOnlyDictionary<string, EnemyDefinition> EnemyDefinitions { get; }
@@ -55,6 +57,7 @@ public sealed class ContentLoader : IContentDatabase
         SortedDictionary<string, string> tileLegend,
         SortedDictionary<string, ItemTemplate> itemTemplates,
         SortedDictionary<string, EnemyTemplate> enemyTemplates,
+        SortedDictionary<string, AbilityTemplate> abilityTemplates,
         IReadOnlyList<string> validationErrors)
     {
         ContentDirectory = contentDirectory;
@@ -67,6 +70,7 @@ public sealed class ContentLoader : IContentDatabase
         TileLegend = new ReadOnlyDictionary<string, string>(tileLegend);
         ItemTemplates = new ReadOnlyDictionary<string, ItemTemplate>(itemTemplates);
         EnemyTemplates = new ReadOnlyDictionary<string, EnemyTemplate>(enemyTemplates);
+        AbilityTemplates = new ReadOnlyDictionary<string, AbilityTemplate>(abilityTemplates);
         ValidationErrors = validationErrors;
     }
 
@@ -105,6 +109,12 @@ public sealed class ContentLoader : IContentDatabase
             enemyTemplates[definition.Id] = BuildEnemyTemplate(definition);
         }
 
+        var abilityTemplates = new SortedDictionary<string, AbilityTemplate>(StringComparer.Ordinal);
+        foreach (var definition in abilityDefinitions.Values)
+        {
+            abilityTemplates[definition.Id] = BuildAbilityTemplate(definition);
+        }
+
         var validationErrors = Validate(
             items,
             enemies,
@@ -133,6 +143,7 @@ public sealed class ContentLoader : IContentDatabase
             tileLegend,
             itemTemplates,
             enemyTemplates,
+            abilityTemplates,
             validationErrors.AsReadOnly());
 
         if (throwOnValidationErrors)
@@ -181,6 +192,13 @@ public sealed class ContentLoader : IContentDatabase
     {
         var found = EnemyTemplates.TryGetValue(templateId, out var enemyTemplate);
         template = enemyTemplate!;
+        return found;
+    }
+
+    public bool TryGetAbilityTemplate(string abilityId, out AbilityTemplate template)
+    {
+        var found = AbilityTemplates.TryGetValue(abilityId, out var abilityTemplate);
+        template = abilityTemplate!;
         return found;
     }
 
@@ -264,6 +282,18 @@ public sealed class ContentLoader : IContentDatabase
         var maxStack = item.Stackable ? Math.Max(item.MaxStack ?? 1, 1) : 1;
         var maxCharges = string.Equals(item.Type, "consumable", StringComparison.Ordinal) ? -1 : 0;
 
+        item.Stats.TryGetValue("damage_min", out var damageMin);
+        item.Stats.TryGetValue("damage_max", out var damageMax);
+        item.Stats.TryGetValue("crit_chance", out var critChance);
+        item.Stats.TryGetValue("accuracy", out var weaponAccuracy);
+        item.Stats.TryGetValue("speed_modifier", out var speedModifier);
+
+        var onHitEffects = BuildOnHitEffects(item.Effects);
+
+        var requirements = item.Requirements.Count > 0
+            ? (IReadOnlyDictionary<string, int>)new System.Collections.ObjectModel.ReadOnlyDictionary<string, int>(new SortedDictionary<string, int>(item.Requirements, StringComparer.OrdinalIgnoreCase))
+            : null;
+
         return new ItemTemplate(
             item.Id,
             item.Name,
@@ -274,7 +304,36 @@ public sealed class ContentLoader : IContentDatabase
             useEffect,
             maxCharges,
             maxStack,
-            item.Rarity);
+            item.Rarity,
+            damageMin,
+            damageMax,
+            critChance,
+            weaponAccuracy,
+            speedModifier,
+            onHitEffects,
+            requirements);
+    }
+
+    private static IReadOnlyList<WeaponOnHitEffect>? BuildOnHitEffects(List<ItemEffectDefinition> effects)
+    {
+        List<WeaponOnHitEffect>? onHit = null;
+        foreach (var effect in effects)
+        {
+            if (!string.Equals(effect.Type, "on_hit", StringComparison.Ordinal) || effect.StatusEffect is null)
+            {
+                continue;
+            }
+
+            if (!StatusEffectProcessor.TryParseStatusEffect(effect.StatusEffect, out var statusType))
+            {
+                continue;
+            }
+
+            onHit ??= new List<WeaponOnHitEffect>();
+            onHit.Add(new WeaponOnHitEffect(statusType, effect.Chance ?? 0, effect.Duration ?? 0));
+        }
+
+        return onHit?.AsReadOnly();
     }
 
     private static EnemyTemplate BuildEnemyTemplate(EnemyDefinition enemy)
@@ -301,7 +360,53 @@ public sealed class ContentLoader : IContentDatabase
             enemy.MinDepth,
             enemy.MaxDepth,
             enemy.SpawnWeight,
-            enemy.LootTableId);
+            enemy.LootTableId,
+            enemy.Stats.XpValue);
+    }
+
+    private static AbilityTemplate BuildAbilityTemplate(AbilityDefinition ability)
+    {
+        var targeting = new AbilityTargeting(
+            ability.Targeting.Type,
+            ability.Targeting.Range,
+            ability.Targeting.Radius ?? 0,
+            ability.Targeting.RequiresLos,
+            ability.Targeting.RequiresWalkable,
+            ability.Targeting.HitsAllies ?? false,
+            ability.Targeting.Center);
+
+        var effects = new List<AbilityEffect>();
+        foreach (var effect in ability.Effects)
+        {
+            var damageType = DamageType.Physical;
+            if (!string.IsNullOrEmpty(effect.DamageType) && Enum.TryParse<DamageType>(effect.DamageType, ignoreCase: true, out var parsed))
+            {
+                damageType = parsed;
+            }
+
+            effects.Add(new AbilityEffect(
+                effect.Type,
+                damageType,
+                effect.BaseValue ?? 0,
+                effect.StatScaling?.Stat,
+                effect.StatScaling?.Factor ?? 0.0,
+                effect.StatusEffect,
+                effect.Chance ?? 0,
+                effect.Duration ?? 0,
+                effect.Filter,
+                effect.ValueSource,
+                effect.Factor ?? 0.0,
+                effect.Destination));
+        }
+
+        return new AbilityTemplate(
+            ability.Id,
+            ability.Name,
+            ability.Description,
+            targeting,
+            ability.Costs.Energy,
+            ability.Costs.MP,
+            effects.AsReadOnly());
     }
 
     private static ReadOnlyDictionary<string, int> BuildItemStatModifiers(ItemDefinition item)
@@ -425,7 +530,7 @@ public sealed class ContentLoader : IContentDatabase
         {
             "melee_rush" => "melee_rusher",
             "ranged_kite" => "ranged_kiter",
-            "ambush" => "fleeing",
+            "ambush" => "ambush",
             "patrol" => "patrol_guard",
             "support" => "support",
             _ => aiType,

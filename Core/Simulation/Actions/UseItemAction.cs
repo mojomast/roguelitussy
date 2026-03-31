@@ -5,11 +5,13 @@ namespace Roguelike.Core;
 
 public sealed class UseItemAction : IAction
 {
-    public UseItemAction(EntityId actorId, EntityId itemInstanceId, ItemTemplate template)
+    public UseItemAction(EntityId actorId, EntityId itemInstanceId, ItemTemplate template, AbilityTemplate? castAbility = null, Position? abilityTarget = null)
     {
         ActorId = actorId;
         ItemInstanceId = itemInstanceId;
         Template = template;
+        CastAbility = castAbility;
+        AbilityTarget = abilityTarget ?? default;
     }
 
     public EntityId ActorId { get; }
@@ -17,6 +19,10 @@ public sealed class UseItemAction : IAction
     public EntityId ItemInstanceId { get; }
 
     public ItemTemplate Template { get; }
+
+    public AbilityTemplate? CastAbility { get; }
+
+    public Position AbilityTarget { get; }
 
     public ActionType Type => ActionType.UseItem;
 
@@ -54,7 +60,7 @@ public sealed class UseItemAction : IAction
             DirtyPositions = { actor.Position },
         };
 
-        ApplyEffect(actor, outcome);
+        ApplyEffect(actor, outcome, world);
         ConsumeIfNeeded(inventory, item);
         outcome.LogMessages.Add($"{actor.Name} uses {Template.DisplayName}." );
         return outcome;
@@ -62,8 +68,18 @@ public sealed class UseItemAction : IAction
 
     public int GetEnergyCost() => 500;
 
-    private void ApplyEffect(IEntity actor, ActionOutcome outcome)
+    private void ApplyEffect(IEntity actor, ActionOutcome outcome, WorldState world)
     {
+        if (CastAbility is not null)
+        {
+            var castAction = new CastAbilityAction(ActorId, CastAbility, AbilityTarget);
+            var castOutcome = castAction.Execute(world);
+            outcome.CombatEvents.AddRange(castOutcome.CombatEvents);
+            outcome.LogMessages.AddRange(castOutcome.LogMessages);
+            outcome.DirtyPositions.AddRange(castOutcome.DirtyPositions);
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(Template.UseEffect))
         {
             ApplyStatModifiers(actor.Stats, Template.StatModifiers, 1);

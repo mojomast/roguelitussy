@@ -5,3 +5,6 @@ obj/
 .vs/
 TestResults/
 *.tmp
+godot-*.log
+godot-*.err
+*.csproj.old

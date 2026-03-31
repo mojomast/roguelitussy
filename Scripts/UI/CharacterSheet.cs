@@ -80,6 +80,11 @@ public partial class CharacterSheet : Control
         }
     }
 
+    private int _levelUpCursor;
+    private static readonly string[] LevelUpStats = { "MaxHP", "Attack", "Defense", "Accuracy", "Evasion" };
+
+    public int LevelUpCursor => _levelUpCursor;
+
     public bool HandleKey(Key key)
     {
         if (!Visible)
@@ -93,7 +98,63 @@ public partial class CharacterSheet : Control
             return true;
         }
 
+        var progression = _gameManager?.World?.Player?.GetComponent<ProgressionComponent>();
+        if (progression is not null && progression.UnspentStatPoints > 0)
+        {
+            switch (key)
+            {
+                case Key.Up:
+                    _levelUpCursor = (_levelUpCursor - 1 + LevelUpStats.Length) % LevelUpStats.Length;
+                    Refresh();
+                    return true;
+                case Key.Down:
+                    _levelUpCursor = (_levelUpCursor + 1) % LevelUpStats.Length;
+                    Refresh();
+                    return true;
+                case Key.Enter or Key.Right or Key.Plus:
+                    SpendStatPoint(LevelUpStats[_levelUpCursor]);
+                    return true;
+            }
+        }
+
         return false;
+    }
+
+    private void SpendStatPoint(string statName)
+    {
+        var player = _gameManager?.World?.Player;
+        var progression = player?.GetComponent<ProgressionComponent>();
+        if (player is null || progression is null || progression.UnspentStatPoints <= 0)
+        {
+            return;
+        }
+
+        switch (statName)
+        {
+            case "MaxHP":
+                player.Stats.MaxHP += 3;
+                player.Stats.HP += 3;
+                break;
+            case "Attack":
+                player.Stats.Attack += 1;
+                break;
+            case "Defense":
+                player.Stats.Defense += 1;
+                break;
+            case "Accuracy":
+                player.Stats.Accuracy += 1;
+                break;
+            case "Evasion":
+                player.Stats.Evasion += 1;
+                break;
+            default:
+                return;
+        }
+
+        progression.UnspentStatPoints--;
+        _eventBus?.EmitLogMessage($"Spent a stat point on {statName}.");
+        _eventBus?.EmitHPChanged(player.Id, player.Stats.HP, player.Stats.MaxHP);
+        Refresh();
     }
 
     private void OnTurnCompleted()
@@ -146,8 +207,41 @@ public partial class CharacterSheet : Control
             builder.AppendLine($"Origin: {character.Origin}");
             builder.AppendLine($"Trait: {character.Trait}");
         }
+
+        var identity = player.GetComponent<IdentityComponent>();
+        if (identity is not null)
+        {
+            builder.AppendLine($"Race: {CapitalizeFirst(identity.RaceId)}");
+            builder.AppendLine($"Gender: {CapitalizeFirst(identity.GenderId)}");
+            builder.AppendLine($"Appearance: {CapitalizeFirst(identity.AppearanceId)}");
+        }
+
         builder.AppendLine($"Floor: {world.Depth}");
         builder.AppendLine($"Turn: {world.TurnNumber}");
+
+        var progression = player.GetComponent<ProgressionComponent>();
+        if (progression is not null)
+        {
+            builder.AppendLine($"Level: {progression.Level}");
+            builder.AppendLine($"XP: {progression.Experience} / {progression.ExperienceToNextLevel}");
+            builder.AppendLine($"Unspent Points: {progression.UnspentStatPoints}");
+            builder.AppendLine($"Kills: {progression.Kills}");
+
+            if (progression.UnspentStatPoints > 0)
+            {
+                builder.AppendLine();
+                builder.AppendLine($"=== LEVEL UP! {progression.UnspentStatPoints} point(s) available ===");
+                for (var i = 0; i < LevelUpStats.Length; i++)
+                {
+                    var marker = i == _levelUpCursor ? "> " : "  ";
+                    var bonus = LevelUpStats[i] == "MaxHP" ? "+3" : "+1";
+                    builder.AppendLine($"{marker}{LevelUpStats[i]} ({bonus})");
+                }
+
+                builder.AppendLine("Up/Down: select stat  Enter/Right/+: spend");
+            }
+        }
+
         builder.AppendLine();
         builder.AppendLine($"HP: {player.Stats.HP} / {player.Stats.MaxHP}");
         builder.AppendLine($"Attack: {player.Stats.Attack}{FormatEquipmentBonus(inventory, EquipSlot.MainHand)}");
@@ -214,6 +308,9 @@ public partial class CharacterSheet : Control
         var stat = slot == EquipSlot.MainHand ? "attack" : "defense";
         return equipped.StatModifiers.TryGetValue(stat, out var bonus) ? $" ({bonus:+#;-#;0})" : string.Empty;
     }
+
+    private static string CapitalizeFirst(string value) =>
+        string.IsNullOrEmpty(value) ? value : char.ToUpperInvariant(value[0]) + value[1..];
 
     private void EnsureVisuals()
     {

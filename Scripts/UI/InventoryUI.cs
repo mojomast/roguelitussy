@@ -331,6 +331,28 @@ public partial class InventoryUI : Control
                 lines.Add($"{modifier.Key}: {modifier.Value:+#;-#;0}");
             }
 
+            if (template.Slot != EquipSlot.None && !IsEquipped(item))
+            {
+                var comparison = BuildEquipmentComparison(template);
+                if (!string.IsNullOrEmpty(comparison))
+                {
+                    lines.Add(comparison);
+                }
+            }
+
+            var player = _gameManager?.World?.Player;
+            if (player is not null && template.Requirements is not null && template.Requirements.Count > 0)
+            {
+                var failures = RequirementValidator.GetFailedRequirements(player, template);
+                if (failures.Count > 0)
+                {
+                    foreach (var failure in failures)
+                    {
+                        lines.Add($"[!] {failure}");
+                    }
+                }
+            }
+
             lines.Add(template.Slot == EquipSlot.None
                 ? "U/Enter: use item"
                 : (IsEquipped(item) ? "E/Enter: unequip" : "E/Enter: equip"));
@@ -338,7 +360,9 @@ public partial class InventoryUI : Control
 
             DescriptionText = string.Join("\n", lines);
             DescriptionMarkup = BuildDescriptionMarkup(template, item, lines);
-            _tooltip?.ShowItemTooltip(template, item, new Vector2(840f, 220f));
+            var tooltipComparison = (template.Slot != EquipSlot.None && !IsEquipped(item))
+                ? BuildEquipmentComparison(template) : null;
+            _tooltip?.ShowItemTooltip(template, item, new Vector2(840f, 220f), tooltipComparison);
             RefreshVisualState();
             return;
         }
@@ -474,6 +498,54 @@ public partial class InventoryUI : Control
 
         item = _items[SelectedIndex];
         return true;
+    }
+
+    public static string BuildEquipmentComparisonText(
+        IReadOnlyDictionary<string, int> newModifiers,
+        IReadOnlyDictionary<string, int>? equippedModifiers)
+    {
+        var deltas = new List<string>();
+        var allKeys = new HashSet<string>(newModifiers.Keys);
+        if (equippedModifiers is not null)
+        {
+            foreach (var key in equippedModifiers.Keys)
+            {
+                allKeys.Add(key);
+            }
+        }
+
+        foreach (var key in allKeys)
+        {
+            var newVal = newModifiers.TryGetValue(key, out var nv) ? nv : 0;
+            var oldVal = equippedModifiers is not null && equippedModifiers.TryGetValue(key, out var ov) ? ov : 0;
+            var delta = newVal - oldVal;
+            if (delta != 0)
+            {
+                deltas.Add($"{key}: {delta:+#;-#;0}");
+            }
+        }
+
+        return deltas.Count > 0
+            ? "vs equipped: " + string.Join(", ", deltas)
+            : "vs equipped: same stats";
+    }
+
+    private string BuildEquipmentComparison(ItemTemplate template)
+    {
+        var inventory = _gameManager?.World?.Player?.GetComponent<InventoryComponent>();
+        if (inventory is null || _content is null)
+        {
+            return string.Empty;
+        }
+
+        var equipped = inventory.GetEquipped(template.Slot);
+        IReadOnlyDictionary<string, int>? equippedModifiers = null;
+        if (equipped is not null && _content.TryGetItemTemplate(equipped.Item.TemplateId, out var equippedTemplate))
+        {
+            equippedModifiers = equippedTemplate.StatModifiers;
+        }
+
+        return BuildEquipmentComparisonText(template.StatModifiers, equippedModifiers);
     }
 
     private void EnsureVisuals()

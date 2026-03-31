@@ -1370,9 +1370,9 @@ public partial class DevToolsWorkbench : Control
         {
             "melee_rush" => "melee_rusher",
             "ranged_kite" => "ranged_kiter",
-            "ambush" => "fleeing",
+            "ambush" => "ambush",
             "patrol" => "patrol_guard",
-            "support" => "fleeing",
+            "support" => "support",
             _ => "melee_rusher",
         };
     }

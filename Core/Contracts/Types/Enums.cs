@@ -66,6 +66,9 @@ public enum StatusEffectType : byte
     Regenerating,
     Weakened,
     Shielded,
+    Empowered,
+    Corroded,
+    Phased,
 }
 
 public enum EquipSlot : byte

@@ -22,6 +22,15 @@ The project uses flat JSON documents under `Content/` as the source of truth for
 - `loot_tables.json` defines weighted loot outcomes.
 - `room_prefabs.json` defines prefab rooms and the tile legend used to interpret them.
 
+The current repository content set includes expanded mid- and late-game coverage:
+
+- 22 items
+- 13 enemies
+- 8 abilities
+- 9 status effects
+- 15 loot tables
+- 10 room prefabs
+
 ## Versioning
 
 The current content documents use version `1`.
@@ -46,7 +55,8 @@ This matters because:
 2. Deserializes them with strict casing and no trailing commas.
 3. Builds deterministic lookups for items, enemies, abilities, status effects, room prefabs, and loot tables.
 4. Produces simulation-facing item and enemy templates.
-5. Collects validation errors for malformed or inconsistent content.
+5. Produces simulation-facing ability templates.
+6. Collects validation errors for malformed or inconsistent content.
 
 `LoadFromRepository()` can locate the repository content directory automatically by walking upward from a start directory.
 
@@ -62,6 +72,8 @@ When adding an item, provide at least:
 - `stats` and `effects` that match the intended behavior
 - stack or slot information where appropriate
 
+Weapon items can now drive live combat behavior through fields such as damage range, crit chance, accuracy, speed modifier, and `on_hit` status effects. Equippable items may also include runtime-enforced `requirements`.
+
 ### Enemies
 
 When adding an enemy, define:
@@ -73,11 +85,15 @@ When adding an enemy, define:
 - faction
 - ability and loot references if used
 
+Enemy `ai_type` values currently expected by the loader are `melee_rush`, `ranged_kite`, `ambush`, `patrol`, and `support`.
+
 Enemy speed values should stay on the engine's current 100-based scale.
 
 ### Abilities And Status Effects
 
 When linking abilities or status effects from other content, make sure the referenced IDs already exist and match exactly.
+
+Supported ability targeting types currently in runtime use are `self`, `single`, `tile`, and `aoe_circle`. Supported effect types currently executed by the runtime are `damage`, `apply_status`, `teleport`, and `heal_self`.
 
 ### Room Prefabs
 
@@ -90,6 +106,8 @@ After changing content:
 1. Run the full test suite.
 2. Pay attention to content, integration, and generation failures.
 3. If you changed loader behavior or schema expectations, update documentation and tests in the same change.
+
+Content validation tests assert the expected item, enemy, loot table, room prefab, ability, and status effect counts, so remember to update those expectations when intentionally expanding the catalog.
 
 ## Godot Tooling And Content
 

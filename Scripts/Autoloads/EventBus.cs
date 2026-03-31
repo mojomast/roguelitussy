@@ -32,6 +32,8 @@ public partial class EventBus : Node
     public event Action<int, int>? LevelTransition;
     public event Action<EntityId, EquipSlot, ItemInstance?>? EquipmentChanged;
     public event Action<int, int>? GameOver;
+    public event Action<EntityId, int, int>? ExperienceGained;
+    public event Action<EntityId, int>? LeveledUp;
 
     public void EmitTurnStarted(int turnNumber) => TurnStarted?.Invoke(turnNumber);
 
@@ -90,4 +92,8 @@ public partial class EventBus : Node
         EquipmentChanged?.Invoke(entityId, slot, item);
 
     public void EmitGameOver(int finalDepth, int turnsSurvived) => GameOver?.Invoke(finalDepth, turnsSurvived);
+
+    public void EmitExperienceGained(EntityId entityId, int amount, int total) => ExperienceGained?.Invoke(entityId, amount, total);
+
+    public void EmitLeveledUp(EntityId entityId, int newLevel) => LeveledUp?.Invoke(entityId, newLevel);
 }

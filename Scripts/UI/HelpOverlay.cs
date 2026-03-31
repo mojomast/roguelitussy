@@ -6,6 +6,8 @@ public partial class HelpOverlay : MenuBase
 {
     private string _bodyText = string.Empty;
 
+    public string CurrentBodyText => _bodyText;
+
     public HelpOverlay()
     {
         Name = "HelpOverlay";
@@ -30,6 +32,9 @@ public partial class HelpOverlay : MenuBase
             "Name: cosmetic identity for the run",
             "Archetype: sets your starting combat style and loadout",
             "Origin: adds a small secondary bonus",
+            "Trait: gives a passive perk or bonus",
+            "Training: spend 4 points across VIT/POW/GRD/FIN",
+            "Stat Preview: updates live as you change selections",
             "Seed: controls procedural generation deterministically");
         base.Open();
     }
@@ -53,6 +58,13 @@ public partial class HelpOverlay : MenuBase
             "Debug overlay: Q",
             "Debug console: `",
             "",
+            "Character Sheet / Level Up",
+            "",
+            "C: open/close character sheet",
+            "When stat points available:",
+            "  Up/Down: select stat to increase",
+            "  Enter/Right/+: spend a point",
+            "",
             "Developer Workshop",
             "",
             "Tab: switch between rooms, items, enemies, and commands",
@@ -67,7 +79,8 @@ public partial class HelpOverlay : MenuBase
             "Enter/U/E: use, equip, or unequip",
             "D: drop item",
             "Tab: cycle sort mode",
-            "Esc or I: close inventory");
+            "Esc or I: close inventory",
+            "Equipment comparison shown automatically for equippable items");
         base.Open();
     }
 

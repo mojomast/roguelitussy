@@ -213,6 +213,15 @@ public sealed class UISmokeTests : ITestSuite
         menu.HandleKey(Key.Right);
         menu.HandleKey(Key.Down);
         menu.HandleKey(Key.Right);
+        menu.HandleKey(Key.Down);
+        menu.HandleKey(Key.Right);
+        menu.HandleKey(Key.Down);
+        menu.HandleKey(Key.Right);
+        menu.HandleKey(Key.Down);
+        menu.HandleKey(Key.Right);
+        menu.HandleKey(Key.Up);
+        menu.HandleKey(Key.Up);
+        menu.HandleKey(Key.Up);
         menu.HandleKey(Key.Up);
         menu.HandleKey(Key.Up);
         menu.HandleKey(Key.Up);
@@ -335,7 +344,7 @@ public sealed class UISmokeTests : ITestSuite
             menu.Bind(gameManager, bus);
             menu.Open();
 
-            for (var i = 0; i < 15; i++)
+            for (var i = 0; i < 18; i++)
             {
                 menu.HandleKey(Key.Down);
             }

@@ -26,7 +26,10 @@ public partial class GameManager : Node
             0,
             0,
             new[] { "potion_health", "potion_health" },
-            Array.Empty<string>());
+            Array.Empty<string>(),
+            "human",
+            "neutral",
+            "default");
 
         public CharacterCreationOptions(
             string name,
@@ -42,7 +45,10 @@ public partial class GameManager : Node
             int bonusViewRadius,
             int inventoryCapacityBonus,
             IReadOnlyList<string> startingItemTemplateIds,
-            IReadOnlyList<string> equippedItemTemplateIds)
+            IReadOnlyList<string> equippedItemTemplateIds,
+            string raceId = "human",
+            string genderId = "neutral",
+            string appearanceId = "default")
         {
             Name = string.IsNullOrWhiteSpace(name) ? "Rook" : name;
             Archetype = string.IsNullOrWhiteSpace(archetype) ? "Vanguard" : archetype;
@@ -58,6 +64,9 @@ public partial class GameManager : Node
             InventoryCapacityBonus = inventoryCapacityBonus;
             StartingItemTemplateIds = new List<string>(startingItemTemplateIds ?? Array.Empty<string>());
             EquippedItemTemplateIds = new List<string>(equippedItemTemplateIds ?? Array.Empty<string>());
+            RaceId = string.IsNullOrWhiteSpace(raceId) ? "human" : raceId;
+            GenderId = string.IsNullOrWhiteSpace(genderId) ? "neutral" : genderId;
+            AppearanceId = string.IsNullOrWhiteSpace(appearanceId) ? "default" : appearanceId;
         }
 
         public string Name { get; }
@@ -87,6 +96,12 @@ public partial class GameManager : Node
         public IReadOnlyList<string> StartingItemTemplateIds { get; }
 
         public IReadOnlyList<string> EquippedItemTemplateIds { get; }
+
+        public string RaceId { get; }
+
+        public string GenderId { get; }
+
+        public string AppearanceId { get; }
     }
 
     private sealed class OneShotScheduler : ITurnScheduler
@@ -419,6 +434,7 @@ public partial class GameManager : Node
         var playerId = World.Player.Id;
         var inventoryBefore = SnapshotInventory(actorBefore?.GetComponent<InventoryComponent>());
         var equipmentBefore = SnapshotEquipment(actorBefore?.GetComponent<InventoryComponent>());
+        var progressionBefore = SnapshotProgression(actorBefore);
 
         Bus?.EmitTurnStarted(World.TurnNumber + 1);
 
@@ -482,6 +498,7 @@ public partial class GameManager : Node
         {
             RecalculatePlayerVisibility(World);
             EmitStateDelta(action, actorPositionBefore, inventoryBefore, equipmentBefore, playerId);
+            EmitProgressionChanges(playerId, progressionBefore);
         }
 
         foreach (var message in outcome.LogMessages)
@@ -602,6 +619,8 @@ public partial class GameManager : Node
                 template.Faction,
                 id: EntityId.NewSeeded(rng));
             enemy.SetComponent<IBrain>(BrainFactory.Create(template));
+            enemy.SetComponent(new XpValueComponent { Value = template.XpValue });
+            AttachAbilities(enemy, template, Content);
             world.AddEntity(enemy);
         }
 
@@ -612,6 +631,38 @@ public partial class GameManager : Node
                 world.DropItem(spawn, item);
             }
         }
+    }
+
+    private static void AttachAbilities(Entity enemy, EnemyTemplate template, IContentDatabase content)
+    {
+        if (content is not ContentLoader loader)
+        {
+            return;
+        }
+
+        if (!loader.EnemyDefinitions.TryGetValue(template.TemplateId, out var definition))
+        {
+            return;
+        }
+
+        if (definition.Abilities.Count == 0)
+        {
+            return;
+        }
+
+        var abilitiesComp = new AbilitiesComponent();
+        foreach (var abilityRef in definition.Abilities)
+        {
+            abilitiesComp.Slots.Add(new EnemyAbilitySlot
+            {
+                AbilityId = abilityRef.AbilityId,
+                Cooldown = abilityRef.Cooldown,
+                Priority = abilityRef.Priority,
+            });
+        }
+
+        enemy.SetComponent(abilitiesComp);
+        enemy.SetComponent(new CooldownComponent());
     }
 
     private Entity CreatePlayer(Position spawn, Random rng)
@@ -667,6 +718,14 @@ public partial class GameManager : Node
         }
 
         player.SetComponent(inventory);
+        player.SetComponent(new ProgressionComponent());
+        player.SetComponent(new IdentityComponent
+        {
+            RaceId = character.RaceId,
+            GenderId = character.GenderId,
+            AppearanceId = character.AppearanceId,
+            SpriteVariantId = $"{character.RaceId}_{character.Archetype.ToLowerInvariant()}",
+        });
         EquipStartingLoadout(player, inventory, character);
         return player;
     }
@@ -963,6 +1022,40 @@ public partial class GameManager : Node
         if (playerId != action.ActorId && World.GetEntity(playerId) is { } player)
         {
             Bus?.EmitHPChanged(player.Id, player.Stats.HP, player.Stats.MaxHP);
+        }
+    }
+
+    private static (int Experience, int Level) SnapshotProgression(IEntity? entity)
+    {
+        var progression = entity?.GetComponent<ProgressionComponent>();
+        return progression is null ? (0, 0) : (progression.Experience, progression.Level);
+    }
+
+    private void EmitProgressionChanges(EntityId playerId, (int Experience, int Level) before)
+    {
+        if (World is null || Bus is null)
+        {
+            return;
+        }
+
+        var player = World.GetEntity(playerId);
+        var progression = player?.GetComponent<ProgressionComponent>();
+        if (progression is null)
+        {
+            return;
+        }
+
+        if (progression.Experience != before.Experience)
+        {
+            Bus.EmitExperienceGained(playerId, progression.Experience - before.Experience, progression.Experience);
+        }
+
+        if (progression.Level != before.Level)
+        {
+            for (var level = before.Level + 1; level <= progression.Level; level++)
+            {
+                Bus.EmitLeveledUp(playerId, level);
+            }
         }
     }
 

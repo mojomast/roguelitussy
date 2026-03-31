@@ -174,9 +174,25 @@ public sealed class EntityRenderer
 
     private static Color ResolveTint(IEntity entity)
     {
+        if (entity.Faction == Faction.Player)
+        {
+            var identity = entity.GetComponent<IdentityComponent>();
+            if (identity is not null)
+            {
+                return identity.RaceId switch
+                {
+                    "elf" => new Color(0.35f, 0.90f, 0.55f, 1f),
+                    "dwarf" => new Color(0.80f, 0.65f, 0.30f, 1f),
+                    "orc" => new Color(0.45f, 0.75f, 0.35f, 1f),
+                    _ => new Color(0.25f, 0.85f, 0.35f, 1f),
+                };
+            }
+
+            return new Color(0.25f, 0.85f, 0.35f, 1f);
+        }
+
         return entity.Faction switch
         {
-            Faction.Player => new Color(0.25f, 0.85f, 0.35f, 1f),
             Faction.Enemy => new Color(0.85f, 0.25f, 0.25f, 1f),
             _ => new Color(0.95f, 0.85f, 0.35f, 1f),
         };

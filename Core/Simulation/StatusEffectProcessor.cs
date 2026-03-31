@@ -194,6 +194,18 @@ public static class StatusEffectProcessor
             case "shielded":
                 type = StatusEffectType.Shielded;
                 return true;
+            case "empower":
+            case "empowered":
+                type = StatusEffectType.Empowered;
+                return true;
+            case "corrode":
+            case "corroded":
+                type = StatusEffectType.Corroded;
+                return true;
+            case "phase":
+            case "phased":
+                type = StatusEffectType.Phased;
+                return true;
             default:
                 type = StatusEffectType.None;
                 return false;

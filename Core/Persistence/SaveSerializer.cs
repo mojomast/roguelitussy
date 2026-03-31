@@ -56,6 +56,34 @@ internal sealed class EntitySaveData
     public InventorySaveData? Inventory { get; set; }
 
     public StatusEffectsSaveData? StatusEffects { get; set; }
+
+    public ProgressionSaveData? Progression { get; set; }
+
+    public IdentitySaveData? Identity { get; set; }
+}
+
+internal sealed class ProgressionSaveData
+{
+    public int Level { get; set; }
+
+    public int Experience { get; set; }
+
+    public int ExperienceToNextLevel { get; set; }
+
+    public int UnspentStatPoints { get; set; }
+
+    public int Kills { get; set; }
+}
+
+internal sealed class IdentitySaveData
+{
+    public string RaceId { get; set; } = string.Empty;
+
+    public string GenderId { get; set; } = string.Empty;
+
+    public string AppearanceId { get; set; } = string.Empty;
+
+    public string SpriteVariantId { get; set; } = string.Empty;
 }
 
 internal sealed class StatsSaveData
@@ -140,7 +168,7 @@ internal sealed class PositionSaveData
 
 public static class SaveSerializer
 {
-    public const int CurrentVersion = 3;
+    public const int CurrentVersion = 4;
 
     internal static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -267,6 +295,8 @@ public static class SaveSerializer
     {
         var inventory = entity.GetComponent<InventoryComponent>();
         var statusEffects = entity.GetComponent<StatusEffectsComponent>();
+        var progression = entity.GetComponent<ProgressionComponent>();
+        var identity = entity.GetComponent<IdentityComponent>();
 
         return new EntitySaveData
         {
@@ -290,6 +320,21 @@ public static class SaveSerializer
             },
             Inventory = inventory is null ? null : ToSaveData(inventory),
             StatusEffects = statusEffects is null ? null : ToSaveData(statusEffects),
+            Progression = progression is null ? null : new ProgressionSaveData
+            {
+                Level = progression.Level,
+                Experience = progression.Experience,
+                ExperienceToNextLevel = progression.ExperienceToNextLevel,
+                UnspentStatPoints = progression.UnspentStatPoints,
+                Kills = progression.Kills,
+            },
+            Identity = identity is null ? null : new IdentitySaveData
+            {
+                RaceId = identity.RaceId,
+                GenderId = identity.GenderId,
+                AppearanceId = identity.AppearanceId,
+                SpriteVariantId = identity.SpriteVariantId,
+            },
         };
     }
 
@@ -483,6 +528,29 @@ public static class SaveSerializer
             }
 
             entity.SetComponent(statusEffects);
+        }
+
+        if (data.Progression is not null)
+        {
+            entity.SetComponent(new ProgressionComponent
+            {
+                Level = data.Progression.Level,
+                Experience = data.Progression.Experience,
+                ExperienceToNextLevel = data.Progression.ExperienceToNextLevel,
+                UnspentStatPoints = data.Progression.UnspentStatPoints,
+                Kills = data.Progression.Kills,
+            });
+        }
+
+        if (data.Identity is not null)
+        {
+            entity.SetComponent(new IdentityComponent
+            {
+                RaceId = data.Identity.RaceId,
+                GenderId = data.Identity.GenderId,
+                AppearanceId = data.Identity.AppearanceId,
+                SpriteVariantId = data.Identity.SpriteVariantId,
+            });
         }
 
         return entity;

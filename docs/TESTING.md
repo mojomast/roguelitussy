@@ -16,6 +16,8 @@ Run the full suite:
 dotnet run --project Tests/godotussy.Tests.csproj
 ```
 
+At the time of writing, the full suite executes 161 tests.
+
 Build everything before a larger change set:
 
 ```powershell
@@ -33,13 +35,16 @@ dotnet run --project Tests/godotussy.Tests.csproj -p:RenderingValidation=true
 The repository contains targeted suites for:
 
 - AI
+- ability casting and cooldown behavior
 - content loading and validation
 - generation
 - integration flows
 - persistence
+- progression and save migration
 - rendering
 - simulation
 - UI
+- character creation and equipment UX
 - architecture smoke coverage
 
 ## Writing New Tests
@@ -57,6 +62,7 @@ When changing simulation, persistence, generation, or content loading, add or up
 - Save-format or migration changes: add persistence serialization and migration coverage.
 - Content loader changes: add content tests and at least one failure-path case when practical.
 - Rendering or UI changes: add rendering or UI tests where the behavior is covered by the stubbed environment.
+- AI behavior changes: add deterministic brain or scorer coverage instead of relying on manual playtesting.
 
 ## Determinism Expectations
 

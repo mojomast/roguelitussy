@@ -52,6 +52,10 @@ public partial class MainMenu : MenuBase
         "Orin",
     };
 
+    private static readonly string[] RaceOptions = { "Human", "Elf", "Dwarf", "Orc" };
+    private static readonly string[] GenderOptions = { "Neutral", "Masculine", "Feminine" };
+    private static readonly string[] AppearanceOptions = { "Default", "Scarred", "Youthful", "Weathered" };
+
     private static readonly ArchetypeOption[] Archetypes =
     {
         new(
@@ -173,17 +177,20 @@ public partial class MainMenu : MenuBase
     private const int ArchetypeIndex = 2;
     private const int OriginIndex = 3;
     private const int TraitIndex = 4;
-    private const int VitalityIndex = 5;
-    private const int PowerIndex = 6;
-    private const int GuardIndex = 7;
-    private const int FinesseIndex = 8;
-    private const int SeedIndex = 9;
-    private const int DevToolsIndex = 10;
-    private const int HelpIndex = 11;
-    private const int LoadSlot1Index = 12;
-    private const int LoadSlot2Index = 13;
-    private const int LoadSlot3Index = 14;
-    private const int QuitIndex = 15;
+    private const int RaceIndex = 5;
+    private const int GenderIndex = 6;
+    private const int AppearanceIndex = 7;
+    private const int VitalityIndex = 8;
+    private const int PowerIndex = 9;
+    private const int GuardIndex = 10;
+    private const int FinesseIndex = 11;
+    private const int SeedIndex = 12;
+    private const int DevToolsIndex = 13;
+    private const int HelpIndex = 14;
+    private const int LoadSlot1Index = 15;
+    private const int LoadSlot2Index = 16;
+    private const int LoadSlot3Index = 17;
+    private const int QuitIndex = 18;
 
     private EventBus? _eventBus;
     private GameManager? _gameManager;
@@ -195,6 +202,9 @@ public partial class MainMenu : MenuBase
     private int _powerPoints;
     private int _guardPoints;
     private int _finessePoints;
+    private int _raceIndex;
+    private int _genderIndex;
+    private int _appearanceIndex;
 
     public int PendingSeed { get; private set; } = 1337;
 
@@ -251,6 +261,9 @@ public partial class MainMenu : MenuBase
             $"Archetype: {archetype.DisplayName}",
             $"Origin: {origin.DisplayName}",
             $"Trait: {trait.DisplayName}",
+            $"Race: {RaceOptions[_raceIndex]}",
+            $"Gender: {GenderOptions[_genderIndex]}",
+            $"Appearance: {AppearanceOptions[_appearanceIndex]}",
             $"Training: VIT {_vitalityPoints}  POW {_powerPoints}  GRD {_guardPoints}  FIN {_finessePoints}",
             $"Points Remaining: {RemainingPoints}",
             string.Empty,
@@ -258,9 +271,40 @@ public partial class MainMenu : MenuBase
             origin.Summary,
             trait.Summary,
             string.Empty,
+            BuildStatPreview(),
+            string.Empty,
                 "Use Left/Right or +/- to edit the highlighted field.",
                 "Training raises max HP, attack, defense, and finesse.");
     }
+
+    public string BuildStatPreview()
+    {
+        var archetype = Archetypes[_archetypeIndex];
+        var origin = Origins[_originIndex];
+        var trait = Traits[_traitIndex];
+
+        var hp = BaseMaxHp + archetype.BonusMaxHp + origin.BonusMaxHp + trait.BonusMaxHp + (_vitalityPoints * 3);
+        var atk = BaseAttack + archetype.BonusAttack + origin.BonusAttack + trait.BonusAttack + _powerPoints;
+        var def = BaseDefense + archetype.BonusDefense + origin.BonusDefense + trait.BonusDefense + _guardPoints;
+        var acc = BaseAccuracy + trait.BonusAccuracy + _finessePoints;
+        var eva = BaseEvasion + archetype.BonusEvasion + origin.BonusEvasion + trait.BonusEvasion + _finessePoints;
+        var spd = BaseSpeed + archetype.BonusSpeed + origin.BonusSpeed + trait.BonusSpeed;
+        var vr = BaseViewRadius + archetype.BonusViewRadius + origin.BonusViewRadius + trait.BonusViewRadius;
+
+        return string.Join(
+            "\n",
+            "--- Stat Preview ---",
+            $"HP: {hp}  ATK: {atk}  DEF: {def}",
+            $"ACC: {acc}  EVA: {eva}  SPD: {spd}  VR: {vr}");
+    }
+
+    internal const int BaseMaxHp = 40;
+    internal const int BaseAttack = 8;
+    internal const int BaseDefense = 3;
+    internal const int BaseAccuracy = 80;
+    internal const int BaseEvasion = 10;
+    internal const int BaseSpeed = 100;
+    internal const int BaseViewRadius = 8;
 
     protected override bool HandleCustomKey(Key key)
     {
@@ -305,6 +349,15 @@ public partial class MainMenu : MenuBase
                 break;
             case TraitIndex:
                 CycleTrait(1);
+                break;
+            case RaceIndex:
+                CycleRace(1);
+                break;
+            case GenderIndex:
+                CycleGender(1);
+                break;
+            case AppearanceIndex:
+                CycleAppearance(1);
                 break;
             case VitalityIndex:
             case PowerIndex:
@@ -365,6 +418,15 @@ public partial class MainMenu : MenuBase
             case TraitIndex:
                 CycleTrait(delta);
                 return true;
+            case RaceIndex:
+                CycleRace(delta);
+                return true;
+            case GenderIndex:
+                CycleGender(delta);
+                return true;
+            case AppearanceIndex:
+                CycleAppearance(delta);
+                return true;
             case VitalityIndex:
             case PowerIndex:
             case GuardIndex:
@@ -400,6 +462,24 @@ public partial class MainMenu : MenuBase
     private void CycleTrait(int delta)
     {
         _traitIndex = WrapIndex(_traitIndex + delta, Traits.Length);
+        RebuildOptions();
+    }
+
+    private void CycleRace(int delta)
+    {
+        _raceIndex = WrapIndex(_raceIndex + delta, RaceOptions.Length);
+        RebuildOptions();
+    }
+
+    private void CycleGender(int delta)
+    {
+        _genderIndex = WrapIndex(_genderIndex + delta, GenderOptions.Length);
+        RebuildOptions();
+    }
+
+    private void CycleAppearance(int delta)
+    {
+        _appearanceIndex = WrapIndex(_appearanceIndex + delta, AppearanceOptions.Length);
         RebuildOptions();
     }
 
@@ -463,6 +543,9 @@ public partial class MainMenu : MenuBase
             $"Archetype: {Archetypes[_archetypeIndex].DisplayName}",
             $"Origin: {Origins[_originIndex].DisplayName}",
             $"Trait: {Traits[_traitIndex].DisplayName}",
+            $"Race: {RaceOptions[_raceIndex]}",
+            $"Gender: {GenderOptions[_genderIndex]}",
+            $"Appearance: {AppearanceOptions[_appearanceIndex]}",
             $"Vitality (+3 Max HP): {_vitalityPoints}",
             $"Power (+1 Attack): {_powerPoints}",
             $"Guard (+1 Defense): {_guardPoints}",
@@ -500,7 +583,10 @@ public partial class MainMenu : MenuBase
             archetype.BonusViewRadius + origin.BonusViewRadius + trait.BonusViewRadius,
             origin.InventoryCapacityBonus + trait.InventoryCapacityBonus,
             items,
-            archetype.EquippedItems);
+            archetype.EquippedItems,
+            RaceOptions[_raceIndex].ToLowerInvariant(),
+            GenderOptions[_genderIndex].ToLowerInvariant(),
+            AppearanceOptions[_appearanceIndex].ToLowerInvariant());
     }
 
     private int RemainingPoints => AllocationBudget - (_vitalityPoints + _powerPoints + _guardPoints + _finessePoints);

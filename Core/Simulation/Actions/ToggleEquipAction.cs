@@ -65,6 +65,18 @@ public sealed class ToggleEquipAction : IAction
             return outcome;
         }
 
+        if (!RequirementValidator.MeetsRequirements(actor, Template))
+        {
+            var failures = RequirementValidator.GetFailedRequirements(actor, Template);
+            var blocked = new ActionOutcome
+            {
+                Result = ActionResult.Blocked,
+                DirtyPositions = { actor.Position },
+            };
+            blocked.LogMessages.Add($"Cannot equip {Template.DisplayName}: {string.Join(", ", failures)}");
+            return blocked;
+        }
+
         if (inventory.TryEquip(item, Template.Slot, Template.StatModifiers, out var previous))
         {
             if (previous is not null)

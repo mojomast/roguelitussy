@@ -10,6 +10,8 @@ public static class BrainFactory
             "ranged_kiter" => new RangedKiterBrain(),
             "patrol_guard" => new PatrolGuardBrain(),
             "fleeing" => new FleeingBrain(),
+            "ambush" => new AmbushBrain(),
+            "support" => new SupportBrain(),
             _ => new MeleeRusherBrain(),
         };
     }
