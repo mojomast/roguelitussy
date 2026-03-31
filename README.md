@@ -2,7 +2,7 @@
 
 A deterministic roguelike foundation for Godot 4.4 with a pure C# simulation core, Godot-facing presentation scripts, data-driven content, and a custom .NET test harness.
 
-The current build includes character identity and progression, ability casting, gear-driven combat, role-specific AI, equipment requirements, refreshed CC0 0x72 dungeon art, smoothed world-space movement, and expanded content for mid- and late-floor play.
+The current build includes character identity and progression, ability casting, gear-driven combat, role-specific AI, equipment requirements, refreshed CC0 0x72 dungeon art with contextual wall layering, reconciled world-space movement, overlay-aware gameplay chrome, expanded enemy sprite coverage, and broader mid- and late-floor content.
 
 ## Quick Start
 
@@ -28,6 +28,7 @@ The current build includes character identity and progression, ability casting, 
 
 - A pure C# simulation layer for entities, actions, combat, abilities, inventory, AI, generation, and persistence.
 - Godot-side autoloads and presentation scripts for UI, rendering, and debug/editor tooling.
+- Layered 0x72 world rendering with contextual wall caps, trims, and sprite-backed entity presentation for the current enemy roster.
 - An in-app developer workshop for creating room drafts and scaffolding item/enemy content directly from the runtime shell.
 - JSON-driven content for items, enemies, abilities, status effects, loot tables, and room prefabs.
 - Save/load infrastructure with validation and migration support for progression and identity state.
@@ -101,7 +102,7 @@ Godot_v4.4.1-stable_mono_win64_console.exe --headless --path . --quit
 - Save data is versioned and migrated on load; do not change persistence shapes casually.
 - Content IDs are expected to be stable lowercase snake_case keys.
 - The runtime shell now exposes a developer workshop for room and content authoring, so editor plugin usage is optional for common content-building tasks.
-- The repository currently validates 172 deterministic tests; keep new gameplay and content changes covered in the same style.
+- The repository currently validates 176 deterministic tests; keep new gameplay, rendering, and content changes covered in the same style.
 - Temporary root-level `.cs` scratch files are included by the SDK globbing rules and can break builds.
 
 Start with [docs/SETUP.md](docs/SETUP.md) if you are new to the repository, then use [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) before making structural changes.

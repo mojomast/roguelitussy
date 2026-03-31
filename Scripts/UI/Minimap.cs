@@ -12,6 +12,7 @@ public partial class Minimap : Control
 
     private EventBus? _eventBus;
     private GameManager? _gameManager;
+    private bool _suppressedByOverlay;
 
     public Minimap()
     {
@@ -31,6 +32,8 @@ public partial class Minimap : Control
     public Roguelike.Core.Position PlayerWorldPosition { get; private set; } = Roguelike.Core.Position.Invalid;
 
     public string SummaryText { get; private set; } = "Minimap unavailable";
+
+    public bool IsSuppressed => _suppressedByOverlay;
 
     public override void _Ready()
     {
@@ -66,12 +69,26 @@ public partial class Minimap : Control
         Refresh();
     }
 
+    public void SetSuppressed(bool suppressed)
+    {
+        if (_suppressedByOverlay == suppressed)
+        {
+            return;
+        }
+
+        _suppressedByOverlay = suppressed;
+        Refresh();
+    }
+
     public void Refresh()
     {
         UpdatePlacement();
 
         var world = _gameManager?.World;
-        var active = MinimapEnabled && world is not null && _gameManager?.CurrentState != GameManager.GameState.MainMenu;
+        var active = MinimapEnabled
+            && !_suppressedByOverlay
+            && world is not null
+            && _gameManager?.CurrentState != GameManager.GameState.MainMenu;
         Visible = active;
 
         VisibleTileCount = 0;

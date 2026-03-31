@@ -39,6 +39,9 @@ public sealed class AnimationController
 
     public bool IsMoveAnimating(EntityId entityId) => _activeMoves.ContainsKey(entityId);
 
+    public Vector2? GetMoveTarget(EntityId entityId) =>
+        _activeMoves.TryGetValue(entityId, out var state) ? state.To : null;
+
     public void AnimateMove(EntityId entityId, Node2D sprite, Vector2 targetPosition)
     {
         var startPosition = sprite.Position;
@@ -127,6 +130,17 @@ public sealed class AnimationController
         }
 
         _activeMoves.Clear();
+    }
+
+    public void CompleteMove(EntityId entityId)
+    {
+        if (!_activeMoves.TryGetValue(entityId, out var state))
+        {
+            return;
+        }
+
+        state.Sprite.Position = state.To;
+        _activeMoves.Remove(entityId);
     }
 
     private static float EaseOutCubic(float progress)

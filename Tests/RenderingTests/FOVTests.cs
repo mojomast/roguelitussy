@@ -15,8 +15,12 @@ public sealed class FOVTests : ITestSuite
         registry.Add("Rendering.WorldView renders map and fog from world state", WorldViewRendersMapAndFog);
         registry.Add("Rendering.WorldView applies the default zoomed-out camera framing", WorldViewAppliesDefaultCameraZoom);
         registry.Add("Rendering.WorldArtCatalog uses the 0x72 wall tile", WorldArtCatalogUses0x72WallArt);
+        registry.Add("Rendering.WorldArtCatalog selects contextual wall art for exposed edges", WorldArtCatalogSelectsContextualWallArt);
+        registry.Add("Rendering.WorldArtCatalog caps top-left room corners clearly", WorldArtCatalogCapsTopLeftRoomCornersClearly);
+        registry.Add("Rendering.WorldArtCatalog resolves sprites for the current enemy roster", WorldArtCatalogResolvesSpritesForCurrentEnemyRoster);
         registry.Add("Rendering.WorldView marks interactive tiles clearly", WorldViewMarksInteractiveTilesClearly);
         registry.Add("Rendering.WorldView animates movement and attacks via events", WorldViewAnimatesMovementAndAttacks);
+        registry.Add("Rendering.WorldView snaps severely desynced actors back to their logical tiles", WorldViewSnapsSeverelyDesyncedActorsBackToTheirLogicalTiles);
     }
 
     private static void FovBlocksTilesBehindWalls()
@@ -111,6 +115,57 @@ public sealed class FOVTests : ITestSuite
             "Wall art should come from the imported 0x72 tileset instead of the regressed Kenney crop.");
     }
 
+    private static void WorldArtCatalogSelectsContextualWallArt()
+    {
+        var world = CreateRoomWorld();
+
+        var topWallLayers = WorldArtCatalog.GetTileArtLayers(world, new Position(3, 0), TileType.Wall);
+
+        Expect.True(topWallLayers.Count >= 2, "Exposed wall tiles should render as layered floor-plus-wall art.");
+        Expect.Equal("res://Assets/Tilesets/0x72/Wall_Top_Mid.png", topWallLayers[^1].ResourcePath,
+            "Top-edge walls should use the dedicated top wall sprite instead of the generic mid block.");
+    }
+
+    private static void WorldArtCatalogCapsTopLeftRoomCornersClearly()
+    {
+        var world = CreateRoomWorld();
+
+        var topLeftTopWallLayers = WorldArtCatalog.GetTileArtLayers(world, new Position(1, 0), TileType.Wall);
+        var topLeftSideWallLayers = WorldArtCatalog.GetTileArtLayers(world, new Position(0, 1), TileType.Wall);
+
+        Expect.Equal("res://Assets/Tilesets/0x72/Wall_Corner_Top_Left.png", topLeftTopWallLayers[^1].ResourcePath,
+            "Top walls beside the left room boundary should use an explicit corner cap so the tile does not read like an opening.");
+        Expect.Equal("res://Assets/Tilesets/0x72/Wall_Corner_Left.png", topLeftSideWallLayers[^1].ResourcePath,
+            "Left walls beneath the top room boundary should use an explicit corner cap so the top-left corner reads as blocked.");
+    }
+
+    private static void WorldArtCatalogResolvesSpritesForCurrentEnemyRoster()
+    {
+        var enemyNames = new[]
+        {
+            "Giant Rat",
+            "Skeleton Warrior",
+            "Goblin Archer",
+            "Orc Brute",
+            "Spectral Wraith",
+            "Acid Slime",
+            "Cave Spider",
+            "Skeleton Knight",
+            "Goblin Shaman",
+            "Dark Mage",
+            "Shadow Stalker",
+            "Bone Lord",
+            "Flame Elemental",
+        };
+
+        foreach (var enemyName in enemyNames)
+        {
+            var enemy = new StubEntity(enemyName, new Position(1, 1), Faction.Enemy);
+            Expect.NotNull(WorldArtCatalog.GetEntityTexture(enemy),
+                $"Enemy '{enemyName}' should resolve to an imported texture instead of falling back to a placeholder square.");
+        }
+    }
+
     private static void WorldViewMarksInteractiveTilesClearly()
     {
         var world = CreateRoomWorld();
@@ -123,6 +178,19 @@ public sealed class FOVTests : ITestSuite
         Expect.Equal("[]", view.GetTileMarkerText(new Position(3, 2)), "Closed doors should expose an explicit door marker.");
         Expect.Equal("DN", view.GetTileMarkerText(new Position(4, 2)), "Down stairs should expose an explicit down marker.");
         Expect.Equal("UP", view.GetTileMarkerText(new Position(2, 3)), "Up stairs should expose an explicit up marker.");
+    }
+
+    private static void WorldViewSnapsSeverelyDesyncedActorsBackToTheirLogicalTiles()
+    {
+        var bus = new EventBus();
+        var world = CreateRoomWorld();
+        var view = CreateWorldView(world, bus);
+
+        world.MoveEntity(world.Player.Id, new Position(5, 2));
+        bus.EmitTurnCompleted();
+
+        Expect.Equal(WorldView.ToCanvasPosition(new Position(5, 2)), view.EntityRenderer.GetSprite(world.Player.Id)!.Position,
+            "If the logical player position outruns the active move animation by multiple tiles, the renderer should resync the sprite instead of leaving it stranded behind the camera.");
     }
 
     private static WorldState CreateRoomWorld(int width = 7, int height = 7, Position? playerPosition = null)

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
@@ -8,6 +9,7 @@ namespace Godotussy;
 public sealed class EntityRenderer
 {
     private static readonly Vector2 EntitySpriteScale = new(WorldView.TileSize / 16f, WorldView.TileSize / 16f);
+    private const float MaxAnimatedDriftPixels = WorldView.TileSize * 1.25f;
     private readonly Dictionary<EntityId, Node2D> _sprites = new();
     private readonly Dictionary<EntityId, Position> _lastKnownPositions = new();
     private readonly AnimationController _animationController;
@@ -65,13 +67,14 @@ public sealed class EntityRenderer
             _layer.AddChild(spriteRoot);
         }
 
-        ApplyAppearance(entity, spriteRoot);
+        var root = spriteRoot!;
+        ApplyAppearance(entity, root);
         if (!isExisting || !_animationController.IsMoveAnimating(entity.Id))
         {
-            spriteRoot.Position = WorldView.ToCanvasPosition(entity.Position);
+            root.Position = WorldView.ToCanvasPosition(entity.Position);
         }
-        spriteRoot.Visible = _visibleTiles.Count == 0 || _visibleTiles.Contains(entity.Position);
-        spriteRoot.Modulate = Colors.White;
+        root.Visible = _visibleTiles.Count == 0 || _visibleTiles.Contains(entity.Position);
+        root.Modulate = Colors.White;
         _lastKnownPositions[entity.Id] = entity.Position;
     }
 
@@ -101,6 +104,35 @@ public sealed class EntityRenderer
         if (_sprites.TryGetValue(entityId, out var spriteRoot))
         {
             _animationController.AnimateDamage(entityId, spriteRoot);
+        }
+    }
+
+    public void ReconcileEntityPositions(IReadOnlyList<IEntity> entities)
+    {
+        foreach (var entity in entities)
+        {
+            if (!_sprites.TryGetValue(entity.Id, out var spriteRoot))
+            {
+                continue;
+            }
+
+            var targetPosition = WorldView.ToCanvasPosition(entity.Position);
+            if (_animationController.GetMoveTarget(entity.Id) is { } moveTarget)
+            {
+                var hasUnexpectedTarget = !NearlyEqual(moveTarget, targetPosition);
+                var driftPixels = GetAxisDrift(spriteRoot.Position, targetPosition);
+                if (hasUnexpectedTarget || driftPixels > MaxAnimatedDriftPixels)
+                {
+                    _animationController.CompleteMove(entity.Id);
+                }
+            }
+
+            if (!_animationController.IsMoveAnimating(entity.Id))
+            {
+                spriteRoot.Position = targetPosition;
+            }
+
+            _lastKnownPositions[entity.Id] = entity.Position;
         }
     }
 
@@ -174,7 +206,7 @@ public sealed class EntityRenderer
             Name = "Body",
             Position = new Vector2(2f, 2f),
             Size = new Vector2(WorldView.TileSize - 4f, WorldView.TileSize - 4f),
-            Color = ResolveTint(entity),
+            Color = ResolveFallbackTint(entity),
         });
 
         ApplyAppearance(entity, spriteRoot);
@@ -184,16 +216,17 @@ public sealed class EntityRenderer
 
     private static void ApplyAppearance(IEntity entity, Node2D spriteRoot)
     {
-        var tint = ResolveTint(entity);
         if (FindChild<Sprite2D>(spriteRoot, "Body") is { } spriteBody)
         {
             spriteBody.Texture = WorldArtCatalog.GetEntityTexture(entity);
-            spriteBody.Modulate = tint;
+            spriteBody.Modulate = entity.Faction == Faction.Player
+                ? PlayerVisualCatalog.Resolve(entity).BodyTint
+                : ResolveTextureTint(entity);
         }
 
         if (FindChild<ColorRect>(spriteRoot, "Body") is { } rectBody)
         {
-            rectBody.Color = tint;
+            rectBody.Color = ResolveFallbackTint(entity);
         }
 
         if (entity.Faction != Faction.Player)
@@ -221,18 +254,95 @@ public sealed class EntityRenderer
         variantDetail.Modulate = profile.DetailTint;
     }
 
-    private static Color ResolveTint(IEntity entity)
+    private static Color ResolveFallbackTint(IEntity entity)
     {
         if (entity.Faction == Faction.Player)
         {
             return PlayerVisualCatalog.Resolve(entity).BodyTint;
         }
 
+        var normalizedName = entity.Name.Trim().ToLowerInvariant();
+        if (normalizedName.Contains("rat", System.StringComparison.Ordinal))
+        {
+            return new Color(0.62f, 0.55f, 0.48f, 1f);
+        }
+
+        if (normalizedName.Contains("spider", System.StringComparison.Ordinal))
+        {
+            return new Color(0.36f, 0.42f, 0.52f, 1f);
+        }
+
+        if (normalizedName.Contains("slime", System.StringComparison.Ordinal))
+        {
+            return new Color(0.34f, 0.72f, 0.42f, 1f);
+        }
+
+        if (normalizedName.Contains("wraith", System.StringComparison.Ordinal)
+            || normalizedName.Contains("shadow", System.StringComparison.Ordinal))
+        {
+            return new Color(0.62f, 0.54f, 0.82f, 1f);
+        }
+
+        if (normalizedName.Contains("flame", System.StringComparison.Ordinal)
+            || normalizedName.Contains("elemental", System.StringComparison.Ordinal)
+            || normalizedName.Contains("demon", System.StringComparison.Ordinal))
+        {
+            return new Color(0.94f, 0.44f, 0.18f, 1f);
+        }
+
         return entity.Faction switch
         {
-            Faction.Enemy => new Color(0.85f, 0.25f, 0.25f, 1f),
+            Faction.Enemy => new Color(0.82f, 0.28f, 0.28f, 1f),
             _ => new Color(0.95f, 0.85f, 0.35f, 1f),
         };
+    }
+
+    private static Color ResolveTextureTint(IEntity entity)
+    {
+        if (entity.Faction != Faction.Enemy)
+        {
+            return Colors.White;
+        }
+
+        var normalizedName = entity.Name.Trim().ToLowerInvariant();
+        if (normalizedName.Contains("slime", StringComparison.Ordinal))
+        {
+            return new Color(0.78f, 1.0f, 0.78f, 1f);
+        }
+
+        if (normalizedName.Contains("wraith", StringComparison.Ordinal)
+            || normalizedName.Contains("shadow", StringComparison.Ordinal))
+        {
+            return new Color(0.86f, 0.82f, 1.0f, 1f);
+        }
+
+        if (normalizedName.Contains("skeleton", StringComparison.Ordinal)
+            || normalizedName.Contains("bone", StringComparison.Ordinal)
+            || normalizedName.Contains("zombie", StringComparison.Ordinal))
+        {
+            return new Color(0.96f, 0.95f, 0.9f, 1f);
+        }
+
+        if (normalizedName.Contains("flame", StringComparison.Ordinal)
+            || normalizedName.Contains("elemental", StringComparison.Ordinal)
+            || normalizedName.Contains("demon", StringComparison.Ordinal))
+        {
+            return new Color(1.0f, 0.9f, 0.78f, 1f);
+        }
+
+        return Colors.White;
+    }
+
+    private static float GetAxisDrift(Vector2 current, Vector2 target)
+    {
+        var delta = current - target;
+        return MathF.Max(MathF.Abs(delta.X), MathF.Abs(delta.Y));
+    }
+
+    private static bool NearlyEqual(Vector2 left, Vector2 right, float tolerance = 0.5f)
+    {
+        var delta = left - right;
+        return MathF.Abs(delta.X) <= tolerance && MathF.Abs(delta.Y) <= tolerance;
     }
 
     private static T? FindChild<T>(Node parent, string name) where T : Node

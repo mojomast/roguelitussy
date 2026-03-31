@@ -17,8 +17,13 @@ public partial class CombatLog : Control
     private RichTextLabel? _textLabel;
     private EventBus? _eventBus;
     private GameManager? _gameManager;
+    private bool _suppressedByOverlay;
 
     public string RenderedText { get; private set; } = string.Empty;
+
+    public bool IsSuppressed => _suppressedByOverlay;
+
+    public bool ConsoleVisible => _panel?.Visible ?? false;
 
     public CombatLog()
     {
@@ -34,6 +39,17 @@ public partial class CombatLog : Control
 
     public void RefreshConsole()
     {
+        RefreshVisualState();
+    }
+
+    public void SetSuppressed(bool suppressed)
+    {
+        if (_suppressedByOverlay == suppressed)
+        {
+            return;
+        }
+
+        _suppressedByOverlay = suppressed;
         RefreshVisualState();
     }
 
@@ -197,7 +213,7 @@ public partial class CombatLog : Control
 
         var viewportSize = ResolveViewportSize();
         var panelSize = ResolvePanelSize(viewportSize);
-        var gameplayVisible = _gameManager?.CurrentState != GameManager.GameState.MainMenu;
+        var gameplayVisible = _gameManager?.CurrentState != GameManager.GameState.MainMenu && !_suppressedByOverlay;
 
         Size = viewportSize;
         _panel.Size = panelSize;

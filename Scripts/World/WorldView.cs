@@ -15,6 +15,10 @@ public partial class WorldView : Node2D
 {
     public const int TileSize = 40;
     private const float SourceArtTileSize = 16f;
+    private static readonly Color BoundaryTrimColor = new(0.79f, 0.71f, 0.63f, 0.95f);
+    private static readonly Color BoundaryShadowColor = new(0.11f, 0.08f, 0.07f, 0.35f);
+    private const float BoundaryThickness = 3f;
+    private const float BoundaryShadowThickness = 2f;
 
     private TileMapLayer _floorLayer = new() { Name = "TileMapLayer_Floor" };
     private TileMapLayer _wallLayer = new() { Name = "TileMapLayer_Walls" };
@@ -90,6 +94,10 @@ public partial class WorldView : Node2D
     public override void _Process(double delta)
     {
         _animationController.Advance(delta);
+        if (_world is not null)
+        {
+            _entityRenderer.ReconcileEntityPositions(_world.Entities);
+        }
     }
 
     public void BindWorld(IWorldState world)
@@ -277,8 +285,8 @@ public partial class WorldView : Node2D
 
     private void RenderTileArt(Position position, TileType tileType)
     {
+        var textures = WorldArtCatalog.GetTileArtLayers(_world, position, tileType);
         var isDoorOpen = tileType == TileType.Door && _world is WorldState world && world.IsDoorOpen(position);
-        var texture = WorldArtCatalog.GetTileTexture(tileType, isDoorOpen);
         var marker = WorldArtCatalog.GetTileMarker(tileType, isDoorOpen);
         var container = new Node2D
         {
@@ -286,16 +294,20 @@ public partial class WorldView : Node2D
             Position = new Vector2(position.X * TileSize, position.Y * TileSize),
         };
 
-        if (texture is not null)
+        if (textures.Count > 0)
         {
-            var sprite = new Sprite2D
+            for (var i = 0; i < textures.Count; i++)
             {
-                Name = "Texture",
-                Position = new Vector2(TileSize * 0.5f, TileSize * 0.5f),
-                Scale = ResolveTextureScale(),
-                Texture = texture,
-            };
-            container.AddChild(sprite);
+                var sprite = new Sprite2D
+                {
+                    Name = i == 0 ? "Texture" : $"Texture_{i}",
+                    Position = new Vector2(TileSize * 0.5f, TileSize * 0.5f),
+                    Scale = ResolveTextureScale(),
+                    Texture = textures[i],
+                    ZIndex = i,
+                };
+                container.AddChild(sprite);
+            }
         }
         else
         {
@@ -321,6 +333,8 @@ public partial class WorldView : Node2D
             container.AddChild(markerLabel);
             _tileMarkers[position] = marker;
         }
+
+        AppendBoundaryTrim(container, WorldArtCatalog.GetWalkableBoundaryMask(_world, position, tileType));
 
         _tileArtLayer.AddChild(container);
         _tileArt[position] = container;
@@ -452,12 +466,58 @@ public partial class WorldView : Node2D
         }
 
         UpdateFogLayer();
+        _entityRenderer.ReconcileEntityPositions(_world.Entities);
         _entityRenderer.UpdateVisibility(_visibleTiles);
 
         if (_world.Player is not null)
         {
             _cameraController.CenterOn(_world.Player.Position, TileSize);
         }
+    }
+
+    private static void AppendBoundaryTrim(Node2D container, WorldArtCatalog.TileBoundaryMask boundaryMask)
+    {
+        if (!boundaryMask.HasAny)
+        {
+            return;
+        }
+
+        if (boundaryMask.North)
+        {
+            AddTrimRect(container, "NorthShadow", new Vector2(0f, BoundaryThickness), new Vector2(TileSize, BoundaryShadowThickness), BoundaryShadowColor, 7);
+            AddTrimRect(container, "NorthTrim", Vector2.Zero, new Vector2(TileSize, BoundaryThickness), BoundaryTrimColor, 8);
+        }
+
+        if (boundaryMask.East)
+        {
+            AddTrimRect(container, "EastShadow", new Vector2(TileSize - BoundaryThickness - BoundaryShadowThickness, 0f), new Vector2(BoundaryShadowThickness, TileSize), BoundaryShadowColor, 7);
+            AddTrimRect(container, "EastTrim", new Vector2(TileSize - BoundaryThickness, 0f), new Vector2(BoundaryThickness, TileSize), BoundaryTrimColor, 8);
+        }
+
+        if (boundaryMask.South)
+        {
+            AddTrimRect(container, "SouthShadow", new Vector2(0f, TileSize - BoundaryThickness - BoundaryShadowThickness), new Vector2(TileSize, BoundaryShadowThickness), BoundaryShadowColor, 7);
+            AddTrimRect(container, "SouthTrim", new Vector2(0f, TileSize - BoundaryThickness), new Vector2(TileSize, BoundaryThickness), BoundaryTrimColor, 8);
+        }
+
+        if (boundaryMask.West)
+        {
+            AddTrimRect(container, "WestShadow", new Vector2(BoundaryThickness, 0f), new Vector2(BoundaryShadowThickness, TileSize), BoundaryShadowColor, 7);
+            AddTrimRect(container, "WestTrim", Vector2.Zero, new Vector2(BoundaryThickness, TileSize), BoundaryTrimColor, 8);
+        }
+    }
+
+    private static void AddTrimRect(Node2D container, string name, Vector2 position, Vector2 size, Color color, int zIndex)
+    {
+        var trim = new ColorRect
+        {
+            Name = name,
+            Position = position,
+            Size = size,
+            Color = color,
+            ZIndex = zIndex,
+        };
+        container.AddChild(trim);
     }
 
     private void OnDamageDealt(DamageResult damage)

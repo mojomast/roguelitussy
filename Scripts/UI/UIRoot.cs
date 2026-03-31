@@ -580,6 +580,7 @@ public partial class UIRoot : CanvasLayer
 
     private void RefreshInputGate()
     {
+        RefreshGameplayChromeVisibility();
         InputHandler.SetInputEnabled(
             !MainMenu.Visible
             && !PauseMenu.Visible
@@ -589,5 +590,20 @@ public partial class UIRoot : CanvasLayer
             && !HelpOverlay.Visible
             && !DevToolsWorkbench.Visible
             && !DebugConsole.Visible);
+    }
+
+    private void RefreshGameplayChromeVisibility()
+    {
+        var suppressGameplayChrome = MainMenu.Visible
+            || PauseMenu.Visible
+            || Inventory.Visible
+            || CharacterSheet.Visible
+            || GameOverScreen.Visible
+            || HelpOverlay.Visible
+            || DevToolsWorkbench.Visible
+            || DebugConsole.Visible;
+
+        Minimap.SetSuppressed(suppressGameplayChrome);
+        CombatLog.SetSuppressed(suppressGameplayChrome);
     }
 }

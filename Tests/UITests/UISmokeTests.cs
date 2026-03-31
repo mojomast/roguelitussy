@@ -431,6 +431,7 @@ public sealed class UISmokeTests : ITestSuite
         root.BindServices(context.GameManager, context.Bus, context.Content);
 
         Expect.True(root.MainMenu.Visible, "Main menu should start visible while the game manager is in MainMenu state");
+        Expect.False(root.CombatLog.ConsoleVisible, "Main menu overlays should suppress gameplay log chrome.");
 
         root._UnhandledInput(new InputEventKey { Pressed = true, PhysicalKeycode = Key.Enter });
 
@@ -452,9 +453,13 @@ public sealed class UISmokeTests : ITestSuite
 
         root._UnhandledInput(new InputEventKey { Pressed = true, PhysicalKeycode = Key.Escape });
         Expect.True(root.PauseMenu.Visible, "Escape from gameplay should open the pause menu");
+        Expect.False(root.Minimap.Visible, "Pause overlays should suppress the gameplay minimap.");
+        Expect.False(root.CombatLog.ConsoleVisible, "Pause overlays should suppress the gameplay combat log.");
 
         root._UnhandledInput(new InputEventKey { Pressed = true, PhysicalKeycode = Key.Escape });
         Expect.False(root.PauseMenu.Visible, "Escape from the pause menu should close the overlay");
+        Expect.True(root.Minimap.Visible, "Closing pause should restore the gameplay minimap.");
+        Expect.True(root.CombatLog.ConsoleVisible, "Closing pause should restore the gameplay combat log.");
 
         context.GameManager.World!.Player.Stats.HP = 0;
         context.Bus.EmitTurnCompleted();
