@@ -5,7 +5,7 @@ namespace Godotussy;
 
 public sealed class CameraController
 {
-    public const float DefaultZoom = 3f;
+    public const float DefaultZoom = 2f;
     private Camera2D? _camera;
 
     public Camera2D? Camera => _camera;

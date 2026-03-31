@@ -15,6 +15,7 @@ public sealed class CharacterUXTests : ITestSuite
         registry.Add("UX.Stat preview matches expected base plus bonuses", StatPreviewMatchesExpected);
         registry.Add("UX.Identity preview tile updates with character choices", IdentityPreviewTileUpdates);
         registry.Add("UX.Graphical identity preview updates with character choices", GraphicalIdentityPreviewUpdates);
+        registry.Add("UX.Main menu body stays compact when graphical preview is present", MainMenuBodyStaysCompact);
         registry.Add("UX.Level-up spend reduces points and increases stat", LevelUpSpendReducesPointsAndIncreasesStat);
         registry.Add("UX.Level-up UI shows prompt when points available", LevelUpUIShowsPrompt);
         registry.Add("UX.Equipment comparison generates correct delta text", EquipmentComparisonGeneratesCorrectDelta);
@@ -147,6 +148,20 @@ public sealed class CharacterUXTests : ITestSuite
         Expect.True(previewVariant.Text.Contains("elf_masculine_scarred"), "Graphical preview should display the updated identity variant id.");
         Expect.True(beforeTint.R != previewBody.Modulate.R || beforeTint.G != previewBody.Modulate.G || beforeTint.B != previewBody.Modulate.B,
             "Graphical preview tint should change when race changes.");
+    }
+
+    private static void MainMenuBodyStaysCompact()
+    {
+        var gameManager = new GameManager();
+        var bus = new EventBus();
+        gameManager.AttachServices(new WorldState(), new TurnScheduler(), new StubGenerator(), new FOVCalculator(), new StubContentDatabase(), new StubSaveManager(), bus);
+
+        var menu = new MainMenu();
+        menu.Bind(gameManager, bus);
+
+        Expect.False(menu.MenuText.Contains("--- Identity Preview ---"), "Main menu body should not duplicate the graphical identity preview block.");
+        Expect.True(menu.MenuText.Contains("Build:"), "Main menu body should keep the compact build summary.");
+        Expect.True(menu.MenuText.Contains("Identity:"), "Main menu body should keep the compact identity summary.");
     }
 
     private static void LevelUpSpendReducesPointsAndIncreasesStat()

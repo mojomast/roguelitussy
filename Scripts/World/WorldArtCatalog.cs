@@ -4,20 +4,22 @@ using Roguelike.Core;
 
 namespace Godotussy;
 
-internal static class WorldArtCatalog
+public static class WorldArtCatalog
 {
     private static readonly Dictionary<string, Texture2D?> TextureCache = new();
+    private const string TileBasePath = "res://Assets/Tilesets/0x72/";
+    private const string SpriteBasePath = "res://Assets/Sprites/0x72/";
 
     public static Texture2D? GetTileTexture(TileType tileType, bool isDoorOpen)
     {
         return tileType switch
         {
-            TileType.Floor => Load("res://Assets/Tilesets/kenney_floor.png"),
-            TileType.Wall => Load("res://Assets/Tilesets/kenney_wall.png"),
-            TileType.Door when isDoorOpen => Load("res://Assets/Tilesets/kenney_floor.png"),
-            TileType.Door => Load("res://Assets/Tilesets/kenney_door_closed.png"),
-            TileType.StairsUp => Load("res://Assets/Tilesets/kenney_stairs_up.png"),
-            TileType.StairsDown => Load("res://Assets/Tilesets/kenney_stairs_down.png"),
+            TileType.Floor => Load(TileBasePath + "Floor_Clean.png"),
+            TileType.Wall => Load(TileBasePath + "Wall_Mid.png"),
+            TileType.Door when isDoorOpen => Load(TileBasePath + "Door_Open.png"),
+            TileType.Door => Load(TileBasePath + "Door_Closed.png"),
+            TileType.StairsUp => Load(TileBasePath + "Floor_Ladder.png"),
+            TileType.StairsDown => Load(TileBasePath + "Floor_Ladder.png"),
             _ => null,
         };
     }
@@ -38,8 +40,8 @@ internal static class WorldArtCatalog
     {
         return entity.Faction switch
         {
-            Faction.Player => PlayerVisualCatalog.GetBaseTexture(),
-            Faction.Enemy => Load("res://Assets/Sprites/enemies/enemy_tiny_dungeon.png"),
+            Faction.Player => PlayerVisualCatalog.GetBaseTexture(entity),
+            Faction.Enemy => Load(SpriteBasePath + "Goblin_Idle_1.png"),
             _ => null,
         };
     }

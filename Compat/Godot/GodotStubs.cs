@@ -85,6 +85,10 @@ public class Node : GodotObject
     {
     }
 
+    public virtual void _Process(double delta)
+    {
+    }
+
     public virtual void AddChild(Node child)
     {
         child.Parent = this;
@@ -147,6 +151,8 @@ public class Node : GodotObject
 public class Node2D : Node
 {
     public Vector2 Position { get; set; }
+
+    public Vector2 Scale { get; set; } = new(1f, 1f);
 
     public bool Visible { get; set; } = true;
 
@@ -365,6 +371,13 @@ public class TextureButton : Control
 public class Texture2D : GodotObject
 {
     public string ResourcePath { get; set; } = string.Empty;
+}
+
+public class AtlasTexture : Texture2D
+{
+    public Texture2D? Atlas { get; set; }
+
+    public Rect2 Region { get; set; }
 }
 
 public class InputEvent : GodotObject

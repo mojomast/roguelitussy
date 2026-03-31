@@ -98,6 +98,14 @@ The rendering layer is event-driven.
 - `Scripts/World/AnimationController.cs` owns lightweight world-side effects such as the damage popup.
 - `Scripts/UI/UIRoot.cs` binds the HUD, menus, overlays, combat log, tooltip, debug console, and input handler to the current runtime services.
 
+Current presentation-specific behavior worth knowing:
+
+- `WorldArtCatalog` now resolves world and entity art from the imported CC0 0x72 tileset subset under `Assets/Tilesets/0x72/` and `Assets/Sprites/0x72/`.
+- `WorldView` hides the legacy tilemap visuals and scales the imported 16x16 art up to the runtime 40x40 cell size.
+- `AnimationController` now advances short eased move animations over multiple `_Process(...)` frames instead of snapping movement immediately.
+- `CameraController.DefaultZoom` is `2f`, which is the baseline zoomed-out framing used by `WorldView`.
+- `MenuBase` now renders menus as separate title, summary, options, and footer regions, and the title-screen-to-workshop handoff temporarily dismisses the main menu so overlays do not stack visually.
+
 The important constraint is that rendering code mirrors simulation state; it should not become the source of truth.
 
 ## Persistence

@@ -13,6 +13,8 @@ public sealed class FOVTests : ITestSuite
         registry.Add("Rendering.FOV blocks tiles behind walls", FovBlocksTilesBehindWalls);
         registry.Add("Rendering.FOV remains symmetric in open space", FovRemainsSymmetric);
         registry.Add("Rendering.WorldView renders map and fog from world state", WorldViewRendersMapAndFog);
+        registry.Add("Rendering.WorldView applies the default zoomed-out camera framing", WorldViewAppliesDefaultCameraZoom);
+        registry.Add("Rendering.WorldArtCatalog uses the 0x72 wall tile", WorldArtCatalogUses0x72WallArt);
         registry.Add("Rendering.WorldView marks interactive tiles clearly", WorldViewMarksInteractiveTilesClearly);
         registry.Add("Rendering.WorldView animates movement and attacks via events", WorldViewAnimatesMovementAndAttacks);
     }
@@ -67,11 +69,20 @@ public sealed class FOVTests : ITestSuite
         var view = CreateWorldView(world, bus);
         view.Animations.ClearHistory();
 
+        var startingPosition = view.EntityRenderer.GetSprite(world.Player.Id)!.Position;
         world.MoveEntity(world.Player.Id, new Position(3, 2));
         bus.EmitTurnCompleted();
 
         Expect.Equal(1, view.Animations.History.Count, "Movement diffing should record one move animation.");
         Expect.Equal(AnimationType.Move, view.Animations.History[0].Type, "First animation should be a move.");
+        Expect.Equal(startingPosition, view.EntityRenderer.GetSprite(world.Player.Id)!.Position, "Move animation should start from the previous tile instead of snapping immediately.");
+
+        view._Process(0.06d);
+        var midMovePosition = view.EntityRenderer.GetSprite(world.Player.Id)!.Position;
+        Expect.True(midMovePosition.X > startingPosition.X, "Move animation should interpolate forward during the frame updates.");
+        Expect.True(midMovePosition.X < WorldView.ToCanvasPosition(new Position(3, 2)).X, "Move animation should still be in-flight halfway through the smoothing window.");
+
+        view._Process(0.10d);
         Expect.Equal(WorldView.ToCanvasPosition(new Position(3, 2)), view.EntityRenderer.GetSprite(world.Player.Id)!.Position, "Player sprite should land on the moved tile.");
 
         view.Animations.ClearHistory();
@@ -80,6 +91,24 @@ public sealed class FOVTests : ITestSuite
         Expect.Equal(2, view.Animations.History.Count, "Damage event should queue attack and damage animations.");
         Expect.Equal(AnimationType.Attack, view.Animations.History[0].Type, "Attack animation should play first.");
         Expect.Equal(AnimationType.Damage, view.Animations.History[1].Type, "Damage flash should play second.");
+    }
+
+    private static void WorldViewAppliesDefaultCameraZoom()
+    {
+        var world = CreateRoomWorld();
+        var view = CreateWorldView(world);
+
+        Expect.Equal(new Vector2(CameraController.DefaultZoom, CameraController.DefaultZoom), view.Camera.Zoom,
+            "World view should apply the default zoomed-out camera framing.");
+    }
+
+    private static void WorldArtCatalogUses0x72WallArt()
+    {
+        var wallTexture = WorldArtCatalog.GetTileTexture(TileType.Wall, false);
+
+        Expect.NotNull(wallTexture, "Wall art should resolve to a texture.");
+        Expect.Equal("res://Assets/Tilesets/0x72/Wall_Mid.png", wallTexture!.ResourcePath,
+            "Wall art should come from the imported 0x72 tileset instead of the regressed Kenney crop.");
     }
 
     private static void WorldViewMarksInteractiveTilesClearly()

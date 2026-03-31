@@ -27,7 +27,17 @@ public partial class DevToolsWorkbench : Control
     private readonly MapEditor _mapEditor = new();
     private readonly ItemEditor _itemEditor = new();
     private Panel? _panel;
+    private ColorRect? _backdrop;
+    private ColorRect? _headerBand;
+    private ColorRect? _bodyCard;
+    private ColorRect? _optionsCard;
+    private ColorRect? _statusCard;
     private Label? _label;
+    private Label? _titleLabel;
+    private Label? _modeLabel;
+    private Label? _optionsLabel;
+    private Label? _statusLabel;
+    private Label? _controlsLabel;
     private GameManager? _gameManager;
     private EventBus? _eventBus;
     private IContentDatabase? _content;
@@ -43,6 +53,8 @@ public partial class DevToolsWorkbench : Control
     private int _pendingTeleportX;
     private int _pendingTeleportY;
     private IReadOnlyList<string> _roomIds = Array.Empty<string>();
+    private string _bodyText = string.Empty;
+    private string _optionsText = string.Empty;
 
     public DevToolsWorkbench()
     {
@@ -881,15 +893,73 @@ public partial class DevToolsWorkbench : Control
             Name = "Panel",
             Size = panelSize,
         };
+        _backdrop = new ColorRect
+        {
+            Name = "Backdrop",
+            Color = new Color(0.04f, 0.06f, 0.08f, 0.98f),
+        };
+        _headerBand = new ColorRect
+        {
+            Name = "HeaderBand",
+            Color = new Color(0.22f, 0.11f, 0.05f, 0.98f),
+        };
+        _bodyCard = new ColorRect
+        {
+            Name = "BodyCard",
+            Color = new Color(0.11f, 0.14f, 0.18f, 0.98f),
+        };
+        _optionsCard = new ColorRect
+        {
+            Name = "OptionsCard",
+            Color = new Color(0.08f, 0.09f, 0.12f, 0.99f),
+        };
+        _statusCard = new ColorRect
+        {
+            Name = "StatusCard",
+            Color = new Color(0.09f, 0.11f, 0.14f, 0.99f),
+        };
         _label = new Label
         {
             Name = "Label",
-            Position = new Vector2(PanelPadding, PanelPadding),
-            Size = new Vector2(
-                Math.Max(0f, panelSize.X - (PanelPadding * 2f)),
-                Math.Max(0f, panelSize.Y - (PanelPadding * 2f))),
+            Modulate = new Color(0.95f, 0.97f, 0.99f, 1f),
         };
-        _panel.AddChild(_label);
+        _titleLabel = new Label
+        {
+            Name = "TitleLabel",
+            Modulate = new Color(1f, 0.93f, 0.82f, 1f),
+        };
+        _modeLabel = new Label
+        {
+            Name = "ModeLabel",
+            Modulate = new Color(0.99f, 0.86f, 0.69f, 1f),
+        };
+        _optionsLabel = new Label
+        {
+            Name = "OptionsLabel",
+            Modulate = new Color(0.98f, 0.92f, 0.85f, 1f),
+        };
+        _statusLabel = new Label
+        {
+            Name = "StatusLabel",
+            Modulate = new Color(0.93f, 0.95f, 0.98f, 1f),
+        };
+        _controlsLabel = new Label
+        {
+            Name = "ControlsLabel",
+            Modulate = new Color(0.73f, 0.78f, 0.84f, 1f),
+        };
+
+        _bodyCard.AddChild(_label);
+        _optionsCard.AddChild(_optionsLabel);
+        _statusCard.AddChild(_statusLabel);
+        _statusCard.AddChild(_controlsLabel);
+        _panel.AddChild(_backdrop);
+        _panel.AddChild(_headerBand);
+        _panel.AddChild(_bodyCard);
+        _panel.AddChild(_optionsCard);
+        _panel.AddChild(_statusCard);
+        _panel.AddChild(_titleLabel);
+        _panel.AddChild(_modeLabel);
         AddChild(_panel);
     }
 
@@ -897,14 +967,17 @@ public partial class DevToolsWorkbench : Control
     {
         EnsureVisuals();
 
+        _bodyText = BuildBodyText();
+        var options = BuildOptions();
+        _optionsText = BuildOptionsText(options);
+
         var builder = new StringBuilder();
         builder.AppendLine("DEVELOPER WORKSHOP");
         builder.AppendLine(BuildModeHeader());
         builder.AppendLine();
-        builder.AppendLine(BuildBodyText());
+        builder.AppendLine(_bodyText);
         builder.AppendLine();
 
-        var options = BuildOptions();
         for (var index = 0; index < options.Count; index++)
         {
             builder.Append(index == _selectedIndex ? "> " : "  ");
@@ -916,6 +989,18 @@ public partial class DevToolsWorkbench : Control
         builder.Append("Controls: Tab mode  Up/Down select  Left/Right or +/- adjust  Enter apply  Esc/T close");
         SummaryText = builder.ToString().TrimEnd();
         RefreshVisualState();
+    }
+
+    private string BuildOptionsText(IReadOnlyList<string> options)
+    {
+        var builder = new StringBuilder();
+        for (var index = 0; index < options.Count; index++)
+        {
+            builder.Append(index == _selectedIndex ? "> " : "  ");
+            builder.AppendLine(options[index]);
+        }
+
+        return builder.ToString().TrimEnd();
     }
 
     private string BuildModeHeader()
@@ -1177,7 +1262,18 @@ public partial class DevToolsWorkbench : Control
     private void RefreshVisualState()
     {
         EnsureVisuals();
-        if (_panel is null || _label is null)
+        if (_panel is null
+            || _label is null
+            || _backdrop is null
+            || _headerBand is null
+            || _bodyCard is null
+            || _optionsCard is null
+            || _statusCard is null
+            || _titleLabel is null
+            || _modeLabel is null
+            || _optionsLabel is null
+            || _statusLabel is null
+            || _controlsLabel is null)
         {
             return;
         }
@@ -1188,13 +1284,88 @@ public partial class DevToolsWorkbench : Control
         Size = viewportSize;
         _panel.Size = panelSize;
         _panel.Position = OverlayLayoutHelper.CenterInViewport(viewportSize, panelSize);
-        _label.Position = new Vector2(PanelPadding, PanelPadding);
+
+        _backdrop.Position = Vector2.Zero;
+        _backdrop.Size = panelSize;
+        _headerBand.Position = Vector2.Zero;
+        _headerBand.Size = new Vector2(panelSize.X, 56f);
+
+        _titleLabel.Position = new Vector2(PanelPadding, 12f);
+        _titleLabel.Size = new Vector2(Math.Max(0f, panelSize.X - (PanelPadding * 2f)), 24f);
+        _titleLabel.Text = "DEVELOPER WORKSHOP";
+
+        _modeLabel.Position = new Vector2(PanelPadding, 32f);
+        _modeLabel.Size = new Vector2(Math.Max(0f, panelSize.X - (PanelPadding * 2f)), 20f);
+        _modeLabel.Text = BuildModeHeader();
+
+        var contentTop = 68f;
+        var statusHeight = 72f;
+        var compactLayout = panelSize.X < 720f || panelSize.Y < 420f;
+        var statusTop = panelSize.Y - PanelPadding - statusHeight;
+        var contentHeight = Math.Max(0f, statusTop - contentTop - 12f);
+
+        if (compactLayout)
+        {
+            var bodyHeight = Math.Max(80f, (contentHeight * 0.54f));
+            var optionsTop = contentTop + bodyHeight + 12f;
+
+            _bodyCard.Position = new Vector2(PanelPadding, contentTop);
+            _bodyCard.Size = new Vector2(Math.Max(0f, panelSize.X - (PanelPadding * 2f)), Math.Max(0f, bodyHeight));
+
+            _optionsCard.Position = new Vector2(PanelPadding, optionsTop);
+            _optionsCard.Size = new Vector2(
+                Math.Max(0f, panelSize.X - (PanelPadding * 2f)),
+                Math.Max(0f, statusTop - optionsTop - 8f));
+        }
+        else
+        {
+            var bodyWidth = Math.Max(320f, (panelSize.X - (PanelPadding * 3f)) * 0.60f);
+            var optionsWidth = Math.Max(180f, panelSize.X - bodyWidth - (PanelPadding * 3f));
+
+            _bodyCard.Position = new Vector2(PanelPadding, contentTop);
+            _bodyCard.Size = new Vector2(bodyWidth, contentHeight);
+
+            _optionsCard.Position = new Vector2(_bodyCard.Position.X + _bodyCard.Size.X + PanelPadding, contentTop);
+            _optionsCard.Size = new Vector2(optionsWidth, contentHeight);
+        }
+
+        _label.Position = new Vector2(14f, 12f);
         _label.Size = new Vector2(
-            Math.Max(0f, panelSize.X - (PanelPadding * 2f)),
-            Math.Max(0f, panelSize.Y - (PanelPadding * 2f)));
+            Math.Max(0f, _bodyCard.Size.X - 28f),
+            Math.Max(0f, _bodyCard.Size.Y - 24f));
+        _label.Text = $"MODE SUMMARY\n\n{_bodyText}";
+
+        _optionsLabel.Position = new Vector2(14f, 12f);
+        _optionsLabel.Size = new Vector2(
+            Math.Max(0f, _optionsCard.Size.X - 28f),
+            Math.Max(0f, _optionsCard.Size.Y - 24f));
+        _optionsLabel.Text = string.IsNullOrWhiteSpace(_optionsText)
+            ? string.Empty
+            : $"ACTIONS\n\n{_optionsText}";
+
+        _statusCard.Position = new Vector2(PanelPadding, statusTop);
+        _statusCard.Size = new Vector2(Math.Max(0f, panelSize.X - (PanelPadding * 2f)), statusHeight);
+
+        _statusLabel.Position = new Vector2(14f, 10f);
+        _statusLabel.Size = new Vector2(Math.Max(0f, _statusCard.Size.X - 28f), 22f);
+        _statusLabel.Text = $"Status  {_statusText}";
+
+        _controlsLabel.Position = new Vector2(14f, 34f);
+        _controlsLabel.Size = new Vector2(Math.Max(0f, _statusCard.Size.X - 28f), 28f);
+        _controlsLabel.Text = "Tab mode  Up/Down select  Left/Right or +/- adjust  Enter apply  Esc/T close";
+
         _panel.Visible = Visible;
+        _backdrop.Visible = Visible;
+        _headerBand.Visible = Visible;
+        _bodyCard.Visible = Visible;
+        _optionsCard.Visible = Visible;
+        _statusCard.Visible = Visible;
         _label.Visible = Visible;
-        _label.Text = SummaryText;
+        _titleLabel.Visible = Visible;
+        _modeLabel.Visible = Visible;
+        _optionsLabel.Visible = Visible;
+        _statusLabel.Visible = Visible;
+        _controlsLabel.Visible = Visible;
     }
 
     private Vector2 ResolvePanelSize(Vector2 viewportSize)

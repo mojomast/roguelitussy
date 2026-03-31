@@ -12,13 +12,33 @@ internal sealed record PlayerVisualProfile(
     string AppearanceMark,
     string Title,
     string Subtitle,
-    string VariantId);
+    string VariantId,
+    string TextureKey);
 
 internal static class PlayerVisualCatalog
 {
-    private const string PlayerTexturePath = "res://Assets/Sprites/player_tiny_dungeon.png";
+    private const string SpriteBasePath = "res://Assets/Sprites/0x72/";
+    private static readonly System.Collections.Generic.Dictionary<string, Texture2D?> TextureCache = new();
 
-    public static Texture2D? GetBaseTexture() => GD.Load<Texture2D>(PlayerTexturePath);
+    public static Texture2D? GetBaseTexture(IEntity entity)
+    {
+        return GetBaseTexture(Resolve(entity));
+    }
+
+    public static Texture2D? GetBaseTexture(PlayerVisualProfile profile)
+    {
+        return profile.TextureKey switch
+        {
+            "vanguard_stalwart" => Load(SpriteBasePath + "Knight_Male_Idle_1.png"),
+            "vanguard_knight" => Load(SpriteBasePath + "Knight_Female_Idle_1.png"),
+            "skirmisher_quickblade" => Load(SpriteBasePath + "Elf_Male_Idle_1.png"),
+            "skirmisher_ranger" => Load(SpriteBasePath + "Elf_Female_Idle_1.png"),
+            "mystic_apprentice" => Load(SpriteBasePath + "Wizzard_Male_Idle_1.png"),
+            "orc_raider" => Load(SpriteBasePath + "Orc_Warrior_Idle_1.png"),
+            "orc_shaman" => Load(SpriteBasePath + "Orc_Shaman_Idle_1.png"),
+            _ => Load(SpriteBasePath + "Wizzard_Female_Idle_1.png"),
+        };
+    }
 
     public static PlayerVisualProfile Resolve(IEntity entity)
     {
@@ -51,8 +71,9 @@ internal static class PlayerVisualCatalog
             ResolveRaceSigil(race),
             ResolveAppearanceMark(appearance),
             $"{DisplayIdentity(race)} {DisplayIdentity(gender)}",
-            $"{DisplayIdentity(appearance)} variant",
-            variantId);
+            ResolveSpriteLabel(race, archetypeId),
+            variantId,
+            ResolveTextureKey(race, gender, archetypeId));
     }
 
     public static string ComposeVariantId(
@@ -70,6 +91,66 @@ internal static class PlayerVisualCatalog
     }
 
     public static string BuildPreviewToken(PlayerVisualProfile profile) => $"[{profile.RaceSigil}{profile.AppearanceMark}]";
+
+    private static string ResolveTextureKey(string raceId, string genderId, string? archetypeId)
+    {
+        var archetype = NormalizeArchetypeId(archetypeId);
+        if (raceId == "dwarf")
+        {
+            return archetype == "mystic"
+                ? genderId == "feminine" ? "mystic_wizard" : "mystic_apprentice"
+                : genderId == "feminine" ? "vanguard_knight" : "vanguard_stalwart";
+        }
+
+        if (raceId == "elf")
+        {
+            return archetype switch
+            {
+                "vanguard" => "vanguard_knight",
+                "mystic" => genderId == "feminine" ? "mystic_wizard" : "mystic_apprentice",
+                _ => genderId == "feminine" ? "skirmisher_ranger" : "skirmisher_quickblade",
+            };
+        }
+
+        if (raceId == "orc")
+        {
+            return archetype == "mystic" ? "orc_shaman" : "orc_raider";
+        }
+
+        return archetype switch
+        {
+            "vanguard" => genderId == "feminine" ? "vanguard_knight" : "vanguard_stalwart",
+            "skirmisher" => genderId == "feminine" ? "skirmisher_ranger" : "skirmisher_quickblade",
+            "mystic" => genderId == "feminine" ? "mystic_wizard" : "mystic_apprentice",
+            _ => "mystic_apprentice",
+        };
+    }
+
+    private static string ResolveSpriteLabel(string raceId, string? archetypeId)
+    {
+        var archetype = NormalizeArchetypeId(archetypeId);
+        return archetype switch
+        {
+            "vanguard" when raceId == "dwarf" => "Stoneguard portrait",
+            "vanguard" => "Knight portrait",
+            "skirmisher" when raceId == "orc" => "Raider portrait",
+            "skirmisher" => "Ranger portrait",
+            "mystic" when raceId == "orc" => "Shaman portrait",
+            "mystic" => "Mystic portrait",
+            _ => "Adventurer portrait",
+        };
+    }
+
+    private static Texture2D? Load(string path)
+    {
+        if (!TextureCache.TryGetValue(path, out var texture))
+        {
+            texture = GD.Load<Texture2D>(path);
+            TextureCache[path] = texture;
+        }
+
+        return texture;
+    }
 
     private static Color ResolveRaceTint(string raceId)
     {

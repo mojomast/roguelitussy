@@ -12,6 +12,7 @@ public sealed class EntityVisualTests : ITestSuite
     {
         registry.Add("UI.EntityRenderer applies identity-driven player sprite overlays", EntityRendererAppliesIdentityDrivenPlayerSpriteOverlays);
         registry.Add("UI.EntityRenderer refreshes player sprite variant when identity changes", EntityRendererRefreshesPlayerSpriteVariant);
+        registry.Add("UI.EntityRenderer uses different 0x72 portraits for different builds", EntityRendererUsesDifferent0x72Portraits);
     }
 
     private static void EntityRendererAppliesIdentityDrivenPlayerSpriteOverlays()
@@ -83,6 +84,43 @@ public sealed class EntityVisualTests : ITestSuite
         Expect.False(initialDetail == updatedDetail, "Updating the identity component should refresh the appearance overlay.");
         Expect.True(initialAccent.R != updatedAccent.R || initialAccent.G != updatedAccent.G || initialAccent.B != updatedAccent.B,
             "Updating the identity component should refresh the accent color.");
+    }
+
+    private static void EntityRendererUsesDifferent0x72Portraits()
+    {
+        var renderer = new EntityRenderer(new Node2D(), new AnimationController());
+
+        var vanguard = new StubEntity("Vanguard", new Position(1, 1), Faction.Player);
+        vanguard.SetComponent(new IdentityComponent
+        {
+            RaceId = "dwarf",
+            GenderId = "masculine",
+            AppearanceId = "default",
+            SpriteVariantId = "dwarf_masculine_default_vanguard",
+        });
+
+        var skirmisher = new StubEntity("Skirmisher", new Position(2, 1), Faction.Player);
+        skirmisher.SetComponent(new IdentityComponent
+        {
+            RaceId = "elf",
+            GenderId = "feminine",
+            AppearanceId = "default",
+            SpriteVariantId = "elf_feminine_default_skirmisher",
+        });
+
+        renderer.UpsertEntity(vanguard);
+        renderer.UpsertEntity(skirmisher);
+
+        var vanguardTexture = FindChild<Sprite2D>(renderer.GetSprite(vanguard.Id)!, "Body")!.Texture;
+        var skirmisherTexture = FindChild<Sprite2D>(renderer.GetSprite(skirmisher.Id)!, "Body")!.Texture;
+
+        Expect.True(vanguardTexture is Texture2D, "Player portraits should resolve to imported 0x72 textures.");
+        Expect.True(skirmisherTexture is Texture2D, "Player portraits should resolve to imported 0x72 textures.");
+
+        var vanguardSprite = (Texture2D)vanguardTexture!;
+        var skirmisherSprite = (Texture2D)skirmisherTexture!;
+        Expect.False(vanguardSprite.ResourcePath == skirmisherSprite.ResourcePath,
+            "Different builds should no longer share the same base portrait file.");
     }
 
     private static T? FindChild<T>(Node parent, string name) where T : Node

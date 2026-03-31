@@ -9,6 +9,7 @@ public partial class UIRoot : CanvasLayer
     private GameManager? _gameManager;
     private IContentDatabase? _content;
     private int _enemiesKilled;
+    private bool _restoreMainMenuAfterDevTools;
 
     public UIRoot()
     {
@@ -201,6 +202,7 @@ public partial class UIRoot : CanvasLayer
             var handledByWorkshop = DevToolsWorkbench.HandleKey(key);
             if (handledByWorkshop)
             {
+                RestoreMainMenuAfterDevToolsIfNeeded();
                 RefreshInputGate();
             }
 
@@ -447,6 +449,7 @@ public partial class UIRoot : CanvasLayer
         if (DevToolsWorkbench.Visible)
         {
             DevToolsWorkbench.Close();
+            RestoreMainMenuAfterDevToolsIfNeeded();
         }
         else
         {
@@ -459,10 +462,13 @@ public partial class UIRoot : CanvasLayer
 
     private void OpenDevTools()
     {
+        _restoreMainMenuAfterDevTools = MainMenu.Visible;
         HelpOverlay.Close();
+        PauseMenu.Close();
         Inventory.Close();
         CharacterSheet.Close();
         Tooltip.Hide();
+        MainMenu.Close();
         DevToolsWorkbench.Open();
         RefreshInputGate();
     }
@@ -482,6 +488,7 @@ public partial class UIRoot : CanvasLayer
 
     private void OnDevToolsPlaytestStarted()
     {
+        _restoreMainMenuAfterDevTools = false;
         MainMenu.Close();
         PauseMenu.Close();
         HelpOverlay.Close();
@@ -491,6 +498,7 @@ public partial class UIRoot : CanvasLayer
 
     private void OnDevToolsRuntimeSessionActivated()
     {
+        _restoreMainMenuAfterDevTools = false;
         MainMenu.Close();
         PauseMenu.Close();
         HelpOverlay.Close();
@@ -510,6 +518,7 @@ public partial class UIRoot : CanvasLayer
 
     private void OpenMainMenu()
     {
+        _restoreMainMenuAfterDevTools = false;
         PauseMenu.Close();
         Inventory.Close();
         CharacterSheet.Close();
@@ -520,6 +529,20 @@ public partial class UIRoot : CanvasLayer
         MainMenu.Open();
         CombatLog.RefreshConsole();
         RefreshInputGate();
+    }
+
+    private void RestoreMainMenuAfterDevToolsIfNeeded()
+    {
+        if (!_restoreMainMenuAfterDevTools)
+        {
+            return;
+        }
+
+        _restoreMainMenuAfterDevTools = false;
+        if (_gameManager?.CurrentState == GameManager.GameState.MainMenu)
+        {
+            MainMenu.Open();
+        }
     }
 
     private void RetryCurrentSeed()

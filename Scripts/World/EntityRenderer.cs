@@ -7,6 +7,7 @@ namespace Godotussy;
 
 public sealed class EntityRenderer
 {
+    private static readonly Vector2 EntitySpriteScale = new(WorldView.TileSize / 16f, WorldView.TileSize / 16f);
     private readonly Dictionary<EntityId, Node2D> _sprites = new();
     private readonly Dictionary<EntityId, Position> _lastKnownPositions = new();
     private readonly AnimationController _animationController;
@@ -56,7 +57,8 @@ public sealed class EntityRenderer
 
     public void UpsertEntity(IEntity entity)
     {
-        if (!_sprites.TryGetValue(entity.Id, out var spriteRoot))
+        var isExisting = _sprites.TryGetValue(entity.Id, out var spriteRoot);
+        if (!isExisting)
         {
             spriteRoot = CreateSpriteRoot(entity);
             _sprites[entity.Id] = spriteRoot;
@@ -64,7 +66,10 @@ public sealed class EntityRenderer
         }
 
         ApplyAppearance(entity, spriteRoot);
-        spriteRoot.Position = WorldView.ToCanvasPosition(entity.Position);
+        if (!isExisting || !_animationController.IsMoveAnimating(entity.Id))
+        {
+            spriteRoot.Position = WorldView.ToCanvasPosition(entity.Position);
+        }
         spriteRoot.Visible = _visibleTiles.Count == 0 || _visibleTiles.Contains(entity.Position);
         spriteRoot.Modulate = Colors.White;
         _lastKnownPositions[entity.Id] = entity.Position;
@@ -157,6 +162,7 @@ public sealed class EntityRenderer
             {
                 Name = "Body",
                 Position = new Vector2(0f, 0f),
+                Scale = EntitySpriteScale,
                 Texture = texture,
             });
             ApplyAppearance(entity, spriteRoot);

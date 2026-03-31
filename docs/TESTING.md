@@ -16,7 +16,7 @@ Run the full suite:
 dotnet run --project Tests/godotussy.Tests.csproj
 ```
 
-At the time of writing, the full suite executes 161 tests.
+At the time of writing, the full suite executes 172 tests.
 
 Build everything before a larger change set:
 

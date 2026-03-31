@@ -15,6 +15,8 @@ The runtime path is the default recommendation when you just want to build conte
 - the pause menu via `Dev Tools`
 - gameplay via `T`
 
+When opened from the title flow, the workshop temporarily dismisses the main menu and restores it on close so the workshop remains the only active full-screen overlay.
+
 The workshop is a menu-driven runtime shell around the lower-level tool backends:
 
 - `Rooms` uses `Scripts/Tools/MapEditor.cs` to create, load, preview, validate, save, and immediately playtest room prefab drafts

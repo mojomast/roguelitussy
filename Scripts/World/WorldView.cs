@@ -14,6 +14,7 @@ public enum FogTileState
 public partial class WorldView : Node2D
 {
     public const int TileSize = 40;
+    private const float SourceArtTileSize = 16f;
 
     private TileMapLayer _floorLayer = new() { Name = "TileMapLayer_Floor" };
     private TileMapLayer _wallLayer = new() { Name = "TileMapLayer_Walls" };
@@ -40,6 +41,7 @@ public partial class WorldView : Node2D
     {
         _entityRenderer = new EntityRenderer(_entityLayer, _animationController);
         _cameraController.Bind(_camera);
+        HideLegacyTilemapVisuals();
     }
 
     public TileMapLayer FloorLayer => _floorLayer;
@@ -74,6 +76,7 @@ public partial class WorldView : Node2D
 
         _entityRenderer.BindLayer(_entityLayer);
         _cameraController.Bind(_camera);
+        HideLegacyTilemapVisuals();
 
         _gameManager = GetNodeOrNull<GameManager>("/root/GameManager");
         BindEventBus(GetNodeOrNull<EventBus>("/root/EventBus"));
@@ -82,6 +85,11 @@ public partial class WorldView : Node2D
         {
             BindWorld(_gameManager.World);
         }
+    }
+
+    public override void _Process(double delta)
+    {
+        _animationController.Advance(delta);
     }
 
     public void BindWorld(IWorldState world)
@@ -284,6 +292,7 @@ public partial class WorldView : Node2D
             {
                 Name = "Texture",
                 Position = new Vector2(TileSize * 0.5f, TileSize * 0.5f),
+                Scale = ResolveTextureScale(),
                 Texture = texture,
             };
             container.AddChild(sprite);
@@ -315,6 +324,19 @@ public partial class WorldView : Node2D
 
         _tileArtLayer.AddChild(container);
         _tileArt[position] = container;
+    }
+
+    private void HideLegacyTilemapVisuals()
+    {
+        _floorLayer.Visible = false;
+        _wallLayer.Visible = false;
+        _objectLayer.Visible = false;
+    }
+
+    private static Vector2 ResolveTextureScale()
+    {
+        var scale = TileSize / SourceArtTileSize;
+        return new Vector2(scale, scale);
     }
 
     private static Color ResolveTileColor(TileType tileType)
