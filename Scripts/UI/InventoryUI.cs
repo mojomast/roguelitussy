@@ -29,6 +29,7 @@ public partial class InventoryUI : Control
     private const float PanelWidth = 960f;
     private const float PanelHeight = 420f;
     private const float PanelPadding = 18f;
+    private const float OuterMargin = 24f;
 
     public int SelectedIndex { get; private set; }
 
@@ -463,24 +464,25 @@ public partial class InventoryUI : Control
             return;
         }
 
-        Size = ResolveViewportSize();
+        var viewportSize = ResolveViewportSize();
+        var panelSize = ResolvePanelSize(viewportSize);
+
+        Size = viewportSize;
         ZIndex = 95;
         _panel = new Panel
         {
             Name = "Panel",
-            Size = new Vector2(PanelWidth, PanelHeight),
+            Size = panelSize,
         };
         _gridLabel = new Label
         {
             Name = "GridLabel",
             Position = new Vector2(PanelPadding, PanelPadding),
-            Size = new Vector2(420f, PanelHeight - (PanelPadding * 2f)),
         };
         _descriptionLabel = new Label
         {
             Name = "DescriptionLabel",
-            Position = new Vector2(460f, PanelPadding),
-            Size = new Vector2(PanelWidth - 478f, PanelHeight - (PanelPadding * 2f)),
+            Position = new Vector2(PanelPadding, PanelPadding),
         };
         _panel.AddChild(_gridLabel);
         _panel.AddChild(_descriptionLabel);
@@ -496,13 +498,32 @@ public partial class InventoryUI : Control
             return;
         }
 
-        Size = ResolveViewportSize();
-        _panel.Position = new Vector2((Size.X - _panel.Size.X) * 0.5f, (Size.Y - _panel.Size.Y) * 0.5f);
+        var viewportSize = ResolveViewportSize();
+        var panelSize = ResolvePanelSize(viewportSize);
+        var contentHeight = Math.Max(0f, panelSize.Y - (PanelPadding * 2f));
+        var availableWidth = Math.Max(0f, panelSize.X - (PanelPadding * 2f));
+        var gutter = Math.Min(20f, Math.Max(12f, availableWidth * 0.04f));
+        var gridWidth = Math.Min(420f, Math.Max(160f, (availableWidth - gutter) * 0.46f));
+        var descriptionX = PanelPadding + gridWidth + gutter;
+        var descriptionWidth = Math.Max(0f, panelSize.X - descriptionX - PanelPadding);
+
+        Size = viewportSize;
+        _panel.Size = panelSize;
+        _panel.Position = OverlayLayoutHelper.CenterInViewport(viewportSize, panelSize);
+        _gridLabel.Position = new Vector2(PanelPadding, PanelPadding);
+        _gridLabel.Size = new Vector2(gridWidth, contentHeight);
+        _descriptionLabel.Position = new Vector2(descriptionX, PanelPadding);
+        _descriptionLabel.Size = new Vector2(descriptionWidth, contentHeight);
         _panel.Visible = Visible;
         _gridLabel.Visible = Visible;
         _descriptionLabel.Visible = Visible;
         _gridLabel.Text = GridText;
         _descriptionLabel.Text = DescriptionText;
+    }
+
+    private Vector2 ResolvePanelSize(Vector2 viewportSize)
+    {
+        return OverlayLayoutHelper.FitPanelSize(viewportSize, new Vector2(PanelWidth, PanelHeight), OuterMargin);
     }
 
     private Vector2 ResolveViewportSize()

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text;
 using Godot;
@@ -12,6 +13,7 @@ public abstract partial class MenuBase : Control
     private const float PanelWidth = 420f;
     private const float PanelHeight = 300f;
     private const float PanelPadding = 20f;
+    private const float OuterMargin = 24f;
 
     protected int SelectedIndex { get; private set; }
 
@@ -143,23 +145,26 @@ public abstract partial class MenuBase : Control
             return;
         }
 
-        Size = ResolveViewportSize();
+        var viewportSize = ResolveViewportSize();
+        var panelSize = ResolvePanelSize(viewportSize);
+
+        Size = viewportSize;
         ZIndex = 100;
 
         _panel = new Panel
         {
             Name = "Panel",
-            Size = new Vector2(PanelWidth, PanelHeight),
-            Position = new Vector2(
-                (Size.X - PanelWidth) * 0.5f,
-                (Size.Y - PanelHeight) * 0.5f),
+            Size = panelSize,
+            Position = OverlayLayoutHelper.CenterInViewport(viewportSize, panelSize),
         };
 
         _label = new Label
         {
             Name = "Label",
             Position = new Vector2(PanelPadding, PanelPadding),
-            Size = new Vector2(PanelWidth - (PanelPadding * 2f), PanelHeight - (PanelPadding * 2f)),
+            Size = new Vector2(
+                Math.Max(0f, panelSize.X - (PanelPadding * 2f)),
+                Math.Max(0f, panelSize.Y - (PanelPadding * 2f))),
         };
 
         _panel.AddChild(_label);
@@ -175,13 +180,30 @@ public abstract partial class MenuBase : Control
             return;
         }
 
-        Size = ResolveViewportSize();
-        _panel.Position = new Vector2(
-            (Size.X - _panel.Size.X) * 0.5f,
-            (Size.Y - _panel.Size.Y) * 0.5f);
+        var viewportSize = ResolveViewportSize();
+        var panelSize = ResolvePanelSize(viewportSize);
+
+        Size = viewportSize;
+        _panel.Size = panelSize;
+        _panel.Position = OverlayLayoutHelper.CenterInViewport(viewportSize, panelSize);
+        _label.Position = new Vector2(PanelPadding, PanelPadding);
+        _label.Size = new Vector2(
+            Math.Max(0f, panelSize.X - (PanelPadding * 2f)),
+            Math.Max(0f, panelSize.Y - (PanelPadding * 2f)));
         _panel.Visible = Visible;
         _label.Visible = Visible;
         _label.Text = MenuText;
+    }
+
+    protected virtual Vector2 ResolveDesiredPanelSize(Vector2 viewportSize)
+    {
+        var maxWidth = Math.Max(0f, viewportSize.X - (OuterMargin * 2f));
+        return OverlayLayoutHelper.MeasureMonospaceBlock(MenuText, PanelWidth, PanelHeight, PanelPadding, maxWidth);
+    }
+
+    private Vector2 ResolvePanelSize(Vector2 viewportSize)
+    {
+        return OverlayLayoutHelper.FitPanelSize(viewportSize, ResolveDesiredPanelSize(viewportSize), OuterMargin);
     }
 
     private Vector2 ResolveViewportSize()

@@ -17,6 +17,7 @@ public partial class CharacterSheet : Control
     private const float PanelWidth = 520f;
     private const float PanelHeight = 520f;
     private const float PanelPadding = 18f;
+    private const float OuterMargin = 24f;
 
     public string SummaryText { get; private set; } = string.Empty;
 
@@ -221,18 +222,23 @@ public partial class CharacterSheet : Control
             return;
         }
 
-        Size = ResolveViewportSize();
+        var viewportSize = ResolveViewportSize();
+        var panelSize = ResolvePanelSize(viewportSize);
+
+        Size = viewportSize;
         ZIndex = 90;
         _panel = new Panel
         {
             Name = "Panel",
-            Size = new Vector2(PanelWidth, PanelHeight),
+            Size = panelSize,
         };
         _label = new Label
         {
             Name = "Label",
             Position = new Vector2(PanelPadding, PanelPadding),
-            Size = new Vector2(PanelWidth - (PanelPadding * 2f), PanelHeight - (PanelPadding * 2f)),
+            Size = new Vector2(
+                Math.Max(0f, panelSize.X - (PanelPadding * 2f)),
+                Math.Max(0f, panelSize.Y - (PanelPadding * 2f))),
         };
         _panel.AddChild(_label);
         AddChild(_panel);
@@ -247,11 +253,24 @@ public partial class CharacterSheet : Control
             return;
         }
 
-        Size = ResolveViewportSize();
-        _panel.Position = new Vector2((Size.X - _panel.Size.X) * 0.5f, (Size.Y - _panel.Size.Y) * 0.5f);
+        var viewportSize = ResolveViewportSize();
+        var panelSize = ResolvePanelSize(viewportSize);
+
+        Size = viewportSize;
+        _panel.Size = panelSize;
+        _panel.Position = OverlayLayoutHelper.CenterInViewport(viewportSize, panelSize);
+        _label.Position = new Vector2(PanelPadding, PanelPadding);
+        _label.Size = new Vector2(
+            Math.Max(0f, panelSize.X - (PanelPadding * 2f)),
+            Math.Max(0f, panelSize.Y - (PanelPadding * 2f)));
         _panel.Visible = Visible;
         _label.Visible = Visible;
         _label.Text = SummaryText;
+    }
+
+    private Vector2 ResolvePanelSize(Vector2 viewportSize)
+    {
+        return OverlayLayoutHelper.FitPanelSize(viewportSize, new Vector2(PanelWidth, PanelHeight), OuterMargin);
     }
 
     private Vector2 ResolveViewportSize()

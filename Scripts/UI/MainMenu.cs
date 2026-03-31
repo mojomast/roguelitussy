@@ -258,7 +258,8 @@ public partial class MainMenu : MenuBase
             origin.Summary,
             trait.Summary,
             string.Empty,
-            "Use Left/Right or +/- to edit the highlighted field. Training raises max HP, attack, defense, and finesse.");
+                "Use Left/Right or +/- to edit the highlighted field.",
+                "Training raises max HP, attack, defense, and finesse.");
     }
 
     protected override bool HandleCustomKey(Key key)

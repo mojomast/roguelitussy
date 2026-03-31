@@ -18,6 +18,7 @@ public sealed class UISmokeTests : ITestSuite
         registry.Add("UI.Inventory keyboard navigation emits concrete actions", InventoryEmitsConcreteActions);
         registry.Add("UI.Help overlay opens from menu and gameplay", HelpOverlayOpensFromMenuAndGameplay);
         registry.Add("UI.CombatLog escapes BBCode and reacts to combat events", CombatLogReactsToEvents);
+        registry.Add("UI.Overlays clamp to the viewport", OverlaysClampToViewport);
         registry.Add("UI.UIRoot routes keyboard between title, overlays, and gameplay", UIRootRoutesKeyboard);
     }
 
@@ -249,6 +250,39 @@ public sealed class UISmokeTests : ITestSuite
         Expect.True(log.RenderedText.Contains("hits Skeleton for 4 damage"), "Combat log should append derived combat messages");
     }
 
+    private static void OverlaysClampToViewport()
+    {
+        WithViewportSize(new Vector2(640f, 360f), viewportSize =>
+        {
+            var context = CreateContext();
+            var root = new Control();
+
+            var menu = new MainMenu();
+            root.AddChild(menu);
+            menu.Bind(context.GameManager, context.Bus);
+            menu.Open();
+            AssertOverlayFits(menu, viewportSize, "Main menu");
+
+            var inventory = new InventoryUI();
+            root.AddChild(inventory);
+            inventory.Bind(context.GameManager, context.Bus, context.Content, new Tooltip());
+            inventory.Open();
+            AssertOverlayFits(inventory, viewportSize, "Inventory");
+
+            var sheet = new CharacterSheet();
+            root.AddChild(sheet);
+            sheet.Bind(context.GameManager, context.Bus, context.Content);
+            sheet.Open();
+            AssertOverlayFits(sheet, viewportSize, "Character sheet");
+
+            var workbench = new DevToolsWorkbench();
+            root.AddChild(workbench);
+            workbench.Bind(context.GameManager, context.Bus, context.Content);
+            workbench.Open();
+            AssertOverlayFits(workbench, viewportSize, "Developer workshop");
+        });
+    }
+
     private static void UIRootRoutesKeyboard()
     {
         var context = CreateContext();
@@ -349,6 +383,44 @@ public sealed class UISmokeTests : ITestSuite
     }
 
     private sealed record UIContext(WorldState World, StubEntity Player, EventBus Bus, GameManager GameManager, StubContentDatabase Content);
+
+    private static void WithViewportSize(Vector2 viewportSize, System.Action<Vector2> action)
+    {
+        var viewport = new Control().GetViewport();
+        var originalSize = viewport.Size;
+        viewport.Size = viewportSize;
+
+        try
+        {
+            action(viewportSize);
+        }
+        finally
+        {
+            viewport.Size = originalSize;
+        }
+    }
+
+    private static void AssertOverlayFits(Control overlay, Vector2 viewportSize, string overlayName)
+    {
+        Expect.True(overlay.Children.Count > 0 && overlay.Children[0] is Control, $"{overlayName} should create a root panel.");
+        var panel = (Control)overlay.Children[0];
+
+        Expect.True(panel.Position.X >= 0f && panel.Position.Y >= 0f, $"{overlayName} panel should stay within the viewport origin.");
+        Expect.True(panel.Position.X + panel.Size.X <= viewportSize.X + 0.1f, $"{overlayName} panel should fit horizontally within the viewport.");
+        Expect.True(panel.Position.Y + panel.Size.Y <= viewportSize.Y + 0.1f, $"{overlayName} panel should fit vertically within the viewport.");
+
+        for (var i = 0; i < panel.Children.Count; i++)
+        {
+            if (panel.Children[i] is not Control child)
+            {
+                continue;
+            }
+
+            Expect.True(child.Position.X >= 0f && child.Position.Y >= 0f, $"{overlayName} child controls should remain inside the panel origin.");
+            Expect.True(child.Position.X + child.Size.X <= panel.Size.X + 0.1f, $"{overlayName} child controls should fit horizontally within the panel.");
+            Expect.True(child.Position.Y + child.Size.Y <= panel.Size.Y + 0.1f, $"{overlayName} child controls should fit vertically within the panel.");
+        }
+    }
 
     private static int CountVisibleTiles(IWorldState world)
     {

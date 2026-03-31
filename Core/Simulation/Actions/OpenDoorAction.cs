@@ -27,7 +27,9 @@ public sealed class OpenDoorAction : IAction
             return ActionResult.Invalid;
         }
 
-        return world.GetTile(DoorPosition) == TileType.Door && !mutableWorld.IsDoorOpen(DoorPosition)
+        return world.GetTile(DoorPosition) == TileType.Door
+            && !mutableWorld.IsDoorOpen(DoorPosition)
+            && world.GetEntityAt(DoorPosition) is null
             ? ActionResult.Success
             : ActionResult.Blocked;
     }
@@ -40,14 +42,23 @@ public sealed class OpenDoorAction : IAction
             return ActionOutcome.Fail(validation);
         }
 
+        var actor = world.GetEntity(ActorId)!;
+        var from = actor.Position;
+
         world.SetDoorOpen(DoorPosition, true);
+        if (!world.MoveEntity(ActorId, DoorPosition))
+        {
+            world.SetDoorOpen(DoorPosition, false);
+            return ActionOutcome.Fail(ActionResult.Blocked);
+        }
+
         return new ActionOutcome
         {
             Result = ActionResult.Success,
-            DirtyPositions = { DoorPosition },
-            LogMessages = { "Door opened." },
+            DirtyPositions = { from, DoorPosition },
+            LogMessages = { $"{actor.Name} opens the door and moves through." },
         };
     }
 
-    public int GetEnergyCost() => 500;
+    public int GetEnergyCost() => 1000;
 }

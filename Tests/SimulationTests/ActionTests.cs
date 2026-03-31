@@ -284,7 +284,11 @@ public sealed class ActionTests : ITestSuite
         var openOutcome = open.Execute(world);
 
         Expect.Equal(ActionResult.Success, openOutcome.Result, "Opening a nearby closed door should succeed");
-        Expect.True(world.IsWalkable(new Position(2, 1)), "Opened door should become walkable");
+        Expect.True(world.IsDoorOpen(new Position(2, 1)), "Opening a door should mark the doorway as open");
+        Expect.Equal(new Position(2, 1), actor.Position, "Opening a door by moving into it should place the actor in the doorway");
+
+        world.MoveEntity(actor.Id, new Position(1, 1));
+        Expect.True(world.IsWalkable(new Position(2, 1)), "Opened door should become walkable once the doorway is clear");
 
         var close = new CloseDoorAction(actor.Id, new Position(2, 1));
         var closeOutcome = close.Execute(world);
