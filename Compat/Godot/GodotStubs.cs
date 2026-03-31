@@ -75,6 +75,8 @@ public class Node : GodotObject
 
     public IReadOnlyList<Node> Children => _children;
 
+    public IReadOnlyList<Node> GetChildren() => _children;
+
     public virtual void _Ready()
     {
     }

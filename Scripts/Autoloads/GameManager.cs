@@ -147,6 +147,55 @@ public partial class GameManager : Node
         public void Unregister(EntityId id) => _inner.Unregister(id);
     }
 
+    private sealed class NextActorScheduler : ITurnScheduler
+    {
+        private readonly ITurnScheduler _inner;
+        private readonly Predicate<IEntity> _predicate;
+        private IEntity? _nextActor;
+        private bool _consumed;
+
+        public NextActorScheduler(ITurnScheduler inner, Predicate<IEntity> predicate)
+        {
+            _inner = inner;
+            _predicate = predicate;
+        }
+
+        public int EnergyThreshold => _inner.EnergyThreshold;
+
+        public void BeginRound(WorldState world)
+        {
+            _consumed = false;
+            _nextActor = null;
+            _inner.BeginRound(world);
+
+            var candidate = _inner.GetNextActor();
+            if (candidate is not null && candidate.IsAlive && _predicate(candidate))
+            {
+                _nextActor = candidate;
+            }
+        }
+
+        public bool HasNextActor() => !_consumed && _nextActor is not null;
+
+        public IEntity? GetNextActor() => _consumed ? null : _nextActor;
+
+        public void ConsumeEnergy(EntityId actorId, int cost)
+        {
+            _consumed = true;
+            _inner.ConsumeEnergy(actorId, cost);
+        }
+
+        public void EndRound(WorldState world)
+        {
+            _inner.EndRound(world);
+            _nextActor = null;
+        }
+
+        public void Register(IEntity entity) => _inner.Register(entity);
+
+        public void Unregister(EntityId id) => _inner.Unregister(id);
+    }
+
     private readonly GameLoop _gameLoop = new();
     private readonly IPathfinder _pathfinder = new Pathfinder();
 
@@ -201,6 +250,7 @@ public partial class GameManager : Node
         Generator = generator;
         Fov = fov;
         Content = content;
+        World.ContentDatabase = content;
         SaveManager = saveManager;
         BindBus(bus ?? Bus);
     }
@@ -407,9 +457,11 @@ public partial class GameManager : Node
 
     public void LoadWorld(WorldState world)
     {
+        world.ContentDatabase = Content;
         World = world;
         CurrentFloor = world.Depth;
         CurrentState = GameState.Playing;
+        RegisterWorldEntities(world);
         RecalculatePlayerVisibility(world);
         Bus?.EmitLevelGenerated(world.Depth, world.Width, world.Height);
         Bus?.EmitFloorChanged(CurrentFloor);
@@ -454,6 +506,13 @@ public partial class GameManager : Node
                 var brain = actor.GetComponent<IBrain>();
                 return brain?.DecideAction(actor, World, _pathfinder) ?? new WaitAction(actor.Id);
             });
+
+        if (outcome.Result == ActionResult.Success
+            && action.ActorId == playerId
+            && action.Type is not ActionType.Descend and not ActionType.Ascend)
+        {
+            ProcessEnemyResponses(playerId, outcome);
+        }
 
         foreach (var combatEvent in outcome.CombatEvents)
         {
@@ -588,6 +647,7 @@ public partial class GameManager : Node
 
         var world = new WorldState();
         var level = Generator.GenerateLevel(world, seed, depth);
+        world.ContentDatabase = Content;
         var previousTurnNumber = World?.TurnNumber ?? 0;
         var rng = new Random(MixSeed(seed, depth));
 
@@ -724,7 +784,11 @@ public partial class GameManager : Node
             RaceId = character.RaceId,
             GenderId = character.GenderId,
             AppearanceId = character.AppearanceId,
-            SpriteVariantId = $"{character.RaceId}_{character.Archetype.ToLowerInvariant()}",
+            SpriteVariantId = PlayerVisualCatalog.ComposeVariantId(
+                character.RaceId,
+                character.GenderId,
+                character.AppearanceId,
+                character.Archetype),
         });
         EquipStartingLoadout(player, inventory, character);
         return player;
@@ -908,10 +972,90 @@ public partial class GameManager : Node
             world.RemoveEntity(player.Id);
         }
 
-        player.Position = FindArrivalPosition(world, arrivalTile);
+        player.Position = ResolveArrivalPosition(world, arrivalTile);
         player.Stats.Energy = 0;
         world.Player = player;
         world.AddEntity(player);
+    }
+
+    private static Position ResolveArrivalPosition(WorldState world, TileType arrivalTile)
+    {
+        var arrival = FindArrivalPosition(world, arrivalTile);
+        if (world.GetEntityAt(arrival) is null)
+        {
+            return arrival;
+        }
+
+        foreach (var delta in Position.AllDirections)
+        {
+            var candidate = arrival + delta;
+            if (world.InBounds(candidate) && world.IsWalkable(candidate) && world.GetEntityAt(candidate) is null)
+            {
+                return candidate;
+            }
+        }
+
+        throw new InvalidOperationException($"No free walkable tile exists near arrival tile {arrival}.");
+    }
+
+    private void ProcessEnemyResponses(EntityId playerId, ActionOutcome aggregateOutcome)
+    {
+        if (World is null || Scheduler is null)
+        {
+            return;
+        }
+
+        while (World.GetEntity(playerId) is { IsAlive: true } player
+            && player.Stats.Energy < Scheduler.EnergyThreshold
+            && HasLivingNonPlayerActors(World, playerId))
+        {
+            var enemyOutcome = _gameLoop.ProcessRound(
+                World,
+                new NextActorScheduler(Scheduler, actor => actor.Id != playerId),
+                actor =>
+                {
+                    Bus?.EmitEntityTurnStarted(actor.Id);
+                    var brain = actor.GetComponent<IBrain>();
+                    return brain?.DecideAction(actor, World, _pathfinder) ?? new WaitAction(actor.Id);
+                });
+
+            if (enemyOutcome.CombatEvents.Count == 0
+                && enemyOutcome.LogMessages.Count == 0
+                && enemyOutcome.DirtyPositions.Count == 0)
+            {
+                break;
+            }
+
+            aggregateOutcome.CombatEvents.AddRange(enemyOutcome.CombatEvents);
+            aggregateOutcome.LogMessages.AddRange(enemyOutcome.LogMessages);
+            aggregateOutcome.DirtyPositions.AddRange(enemyOutcome.DirtyPositions);
+        }
+    }
+
+    private void RegisterWorldEntities(WorldState world)
+    {
+        if (Scheduler is null)
+        {
+            return;
+        }
+
+        foreach (var entity in world.Entities)
+        {
+            Scheduler.Register(entity);
+        }
+    }
+
+    private static bool HasLivingNonPlayerActors(WorldState world, EntityId playerId)
+    {
+        foreach (var entity in world.Entities)
+        {
+            if (entity.Id != playerId && entity.IsAlive)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void EmitWorldSnapshot(WorldState world)

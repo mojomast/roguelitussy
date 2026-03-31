@@ -5,6 +5,9 @@ namespace Godotussy;
 
 public partial class MainMenu : MenuBase
 {
+    private const float PreviewPadding = 20f;
+    private const float PreviewFrameHeight = 150f;
+
     private sealed record ArchetypeOption(
         string DisplayName,
         string Summary,
@@ -205,6 +208,15 @@ public partial class MainMenu : MenuBase
     private int _raceIndex;
     private int _genderIndex;
     private int _appearanceIndex;
+    private Panel? _previewPanel;
+    private ColorRect? _previewFrame;
+    private TextureRect? _previewBody;
+    private ColorRect? _previewAccentBand;
+    private Label? _previewSigil;
+    private Label? _previewDetail;
+    private Label? _previewTitle;
+    private Label? _previewSubtitle;
+    private Label? _previewVariantId;
 
     public int PendingSeed { get; private set; } = 1337;
 
@@ -267,6 +279,8 @@ public partial class MainMenu : MenuBase
             $"Training: VIT {_vitalityPoints}  POW {_powerPoints}  GRD {_guardPoints}  FIN {_finessePoints}",
             $"Points Remaining: {RemainingPoints}",
             string.Empty,
+            BuildIdentityPreview(),
+            string.Empty,
             archetype.Summary,
             origin.Summary,
             trait.Summary,
@@ -296,6 +310,50 @@ public partial class MainMenu : MenuBase
             "--- Stat Preview ---",
             $"HP: {hp}  ATK: {atk}  DEF: {def}",
             $"ACC: {acc}  EVA: {eva}  SPD: {spd}  VR: {vr}");
+    }
+
+    public string BuildIdentityPreview()
+    {
+        var profile = ResolveCurrentProfile();
+        return string.Join(
+            "\n",
+            "--- Identity Preview ---",
+            $"Sprite: {profile.Title}",
+            $"Accent: {profile.Subtitle}",
+            $"Token: {BuildPreviewTileToken()}",
+            $"Variant ID: {profile.VariantId}");
+    }
+
+    public string BuildPreviewTileToken()
+    {
+        return PlayerVisualCatalog.BuildPreviewToken(ResolveCurrentProfile());
+    }
+
+    protected override Vector2 ResolveDesiredPanelSize(Vector2 viewportSize)
+    {
+        var baseSize = base.ResolveDesiredPanelSize(viewportSize);
+        return new Vector2(System.Math.Max(baseSize.X, 760f), System.Math.Max(baseSize.Y, 420f));
+    }
+
+    protected override void OnVisualStateRefreshed(Panel panel, Label label, Vector2 viewportSize, Vector2 panelSize)
+    {
+        EnsurePreviewVisuals(panel);
+
+        var previewWidth = System.Math.Clamp(panelSize.X * 0.30f, 170f, 220f);
+        var contentWidth = System.Math.Max(120f, panelSize.X - previewWidth - (PreviewPadding * 3f));
+        label.Position = new Vector2(PreviewPadding, PreviewPadding);
+        label.Size = new Vector2(contentWidth, System.Math.Max(0f, panelSize.Y - (PreviewPadding * 2f)));
+
+        if (_previewPanel is null)
+        {
+            return;
+        }
+
+        _previewPanel.Visible = Visible;
+        _previewPanel.Position = new Vector2(label.Position.X + label.Size.X + PreviewPadding, PreviewPadding);
+        _previewPanel.Size = new Vector2(previewWidth, System.Math.Max(0f, panelSize.Y - (PreviewPadding * 2f)));
+        LayoutPreview(_previewPanel.Size);
+        RefreshPreviewContent();
     }
 
     internal const int BaseMaxHp = 40;
@@ -557,6 +615,155 @@ public partial class MainMenu : MenuBase
             "Load Slot 2",
             "Load Slot 3",
             "Quit");
+    }
+
+    private PlayerVisualProfile ResolveCurrentProfile()
+    {
+        return PlayerVisualCatalog.Resolve(
+            RaceOptions[_raceIndex].ToLowerInvariant(),
+            GenderOptions[_genderIndex].ToLowerInvariant(),
+            AppearanceOptions[_appearanceIndex].ToLowerInvariant(),
+            archetypeId: Archetypes[_archetypeIndex].DisplayName);
+    }
+
+    private void EnsurePreviewVisuals(Panel panel)
+    {
+        if (_previewPanel is not null)
+        {
+            return;
+        }
+
+        _previewPanel = new Panel
+        {
+            Name = "PreviewPanel",
+        };
+        _previewFrame = new ColorRect
+        {
+            Name = "PreviewFrame",
+            Color = new Color(0.10f, 0.12f, 0.18f, 1f),
+        };
+        _previewBody = new TextureRect
+        {
+            Name = "PreviewBody",
+            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+            Texture = PlayerVisualCatalog.GetBaseTexture(),
+        };
+        _previewAccentBand = new ColorRect
+        {
+            Name = "PreviewAccentBand",
+        };
+        _previewSigil = new Label
+        {
+            Name = "PreviewSigil",
+        };
+        _previewDetail = new Label
+        {
+            Name = "PreviewDetail",
+        };
+        _previewTitle = new Label
+        {
+            Name = "PreviewTitle",
+        };
+        _previewSubtitle = new Label
+        {
+            Name = "PreviewSubtitle",
+        };
+        _previewVariantId = new Label
+        {
+            Name = "PreviewVariantId",
+        };
+
+        _previewPanel.AddChild(_previewFrame);
+        _previewPanel.AddChild(_previewBody);
+        _previewPanel.AddChild(_previewAccentBand);
+        _previewPanel.AddChild(_previewSigil);
+        _previewPanel.AddChild(_previewDetail);
+        _previewPanel.AddChild(_previewTitle);
+        _previewPanel.AddChild(_previewSubtitle);
+        _previewPanel.AddChild(_previewVariantId);
+        panel.AddChild(_previewPanel);
+    }
+
+    private void LayoutPreview(Vector2 previewSize)
+    {
+        if (_previewFrame is null
+            || _previewBody is null
+            || _previewAccentBand is null
+            || _previewSigil is null
+            || _previewDetail is null
+            || _previewTitle is null
+            || _previewSubtitle is null
+            || _previewVariantId is null)
+        {
+            return;
+        }
+
+        var frameWidth = System.Math.Max(90f, previewSize.X - 32f);
+        _previewFrame.Position = new Vector2(16f, 16f);
+        _previewFrame.Size = new Vector2(frameWidth, PreviewFrameHeight);
+
+        _previewBody.Position = new Vector2(28f, 28f);
+        _previewBody.Size = new Vector2(System.Math.Max(60f, frameWidth - 24f), PreviewFrameHeight - 32f);
+
+        _previewAccentBand.Position = new Vector2(24f, PreviewFrameHeight + 2f);
+        _previewAccentBand.Size = new Vector2(System.Math.Max(50f, frameWidth - 16f), 6f);
+
+        _previewSigil.Position = new Vector2(20f, 12f);
+        _previewSigil.Size = new Vector2(32f, 24f);
+
+        _previewDetail.Position = new Vector2(frameWidth - 4f, PreviewFrameHeight - 12f);
+        _previewDetail.Size = new Vector2(24f, 24f);
+
+        _previewTitle.Position = new Vector2(16f, PreviewFrameHeight + 24f);
+        _previewTitle.Size = new Vector2(frameWidth, 24f);
+
+        _previewSubtitle.Position = new Vector2(16f, PreviewFrameHeight + 48f);
+        _previewSubtitle.Size = new Vector2(frameWidth, 24f);
+
+        _previewVariantId.Position = new Vector2(16f, PreviewFrameHeight + 78f);
+        _previewVariantId.Size = new Vector2(frameWidth, System.Math.Max(32f, previewSize.Y - (PreviewFrameHeight + 94f)));
+    }
+
+    private void RefreshPreviewContent()
+    {
+        var profile = ResolveCurrentProfile();
+        if (_previewBody is not null)
+        {
+            _previewBody.Texture = PlayerVisualCatalog.GetBaseTexture();
+            _previewBody.Modulate = profile.BodyTint;
+        }
+
+        if (_previewAccentBand is not null)
+        {
+            _previewAccentBand.Color = profile.AccentTint;
+        }
+
+        if (_previewSigil is not null)
+        {
+            _previewSigil.Text = profile.RaceSigil;
+            _previewSigil.Modulate = profile.AccentTint;
+        }
+
+        if (_previewDetail is not null)
+        {
+            _previewDetail.Text = profile.AppearanceMark;
+            _previewDetail.Modulate = profile.DetailTint;
+        }
+
+        if (_previewTitle is not null)
+        {
+            _previewTitle.Text = profile.Title;
+        }
+
+        if (_previewSubtitle is not null)
+        {
+            _previewSubtitle.Text = profile.Subtitle;
+        }
+
+        if (_previewVariantId is not null)
+        {
+            _previewVariantId.Text = $"Variant: {profile.VariantId}";
+        }
     }
 
     private GameManager.CharacterCreationOptions BuildCharacterCreationOptions()

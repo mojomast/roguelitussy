@@ -227,6 +227,11 @@ public abstract partial class MenuBase : Control
         _panel.Visible = Visible;
         _label.Visible = Visible;
         _label.Text = MenuText;
+        OnVisualStateRefreshed(_panel, _label, viewportSize, panelSize);
+    }
+
+    protected virtual void OnVisualStateRefreshed(Panel panel, Label label, Vector2 viewportSize, Vector2 panelSize)
+    {
     }
 
     protected virtual Vector2 ResolveDesiredPanelSize(Vector2 viewportSize)

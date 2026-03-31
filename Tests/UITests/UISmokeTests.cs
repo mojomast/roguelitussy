@@ -12,9 +12,11 @@ public sealed class UISmokeTests : ITestSuite
     {
         registry.Add("UI.GameManager new game generates a populated floor", GameManagerGeneratesPopulatedFloor);
         registry.Add("UI.GameManager floor travel preserves run state", GameManagerPreservesRunStateAcrossFloors);
+        registry.Add("UI.GameManager floor travel succeeds when arrival stair is occupied", GameManagerFloorTravelFindsNearbyArrival);
         registry.Add("UI.HUD updates from bus and exposes keyboard toggles", HudUpdatesFromBus);
         registry.Add("UI.Minimap reflects explored tiles and gameplay toggles", MinimapReflectsExplorationAndToggles);
         registry.Add("UI.MainMenu character creation affects the starting run", MainMenuCharacterCreationAffectsStartingRun);
+        registry.Add("UI.GameManager enemy turns resolve after player action", GameManagerEnemyTurnsResolveAfterPlayerAction);
         registry.Add("UI.Inventory keyboard navigation emits concrete actions", InventoryEmitsConcreteActions);
         registry.Add("UI.Inventory and tooltip surface item rarity", InventorySurfacesItemRarity);
         registry.Add("UI.Help overlay opens from menu and gameplay", HelpOverlayOpensFromMenuAndGameplay);
@@ -103,6 +105,68 @@ public sealed class UISmokeTests : ITestSuite
         var before = hud.MinimapText;
         hud.ToggleMinimap();
         Expect.False(before == hud.MinimapText, "Toggling the minimap should change the HUD summary");
+    }
+
+    private static void GameManagerEnemyTurnsResolveAfterPlayerAction()
+    {
+        var world = new WorldState();
+        world.InitGrid(6, 6);
+        for (var y = 0; y < world.Height; y++)
+        {
+            for (var x = 0; x < world.Width; x++)
+            {
+                world.SetTile(new Position(x, y), TileType.Floor);
+            }
+        }
+
+        var player = new StubEntity("Player", new Position(2, 2), Faction.Player,
+            stats: new Stats { HP = 20, MaxHP = 20, Attack = 5, Defense = 1, Accuracy = 0, Evasion = 0, Speed = 100, ViewRadius = 8 });
+        var enemy = new StubEntity("Goblin", new Position(3, 2), Faction.Enemy,
+            stats: new Stats { HP = 10, MaxHP = 10, Attack = 5, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 100, ViewRadius = 8 });
+        enemy.SetComponent<IBrain>(new MeleeRusherBrain());
+
+        world.Player = player;
+        world.AddEntity(player);
+        world.AddEntity(enemy);
+
+        var gameManager = new GameManager();
+        var bus = new EventBus();
+        gameManager.AttachServices(world, new TurnScheduler(), new StubGenerator(), new FOVCalculator(), new StubContentDatabase(), new StubSaveManager(), bus);
+
+        var outcome = gameManager.ProcessPlayerAction(new WaitAction(player.Id));
+
+        Expect.Equal(ActionResult.Success, outcome.Result, "Waiting should still succeed as the player action.");
+        Expect.True(
+            player.Stats.HP < player.Stats.MaxHP
+            || outcome.LogMessages.Exists(message => message.Contains("Goblin") && (message.Contains("hits Player") || message.Contains("misses Player"))),
+            "Enemy response turns should resolve after the player acts.");
+    }
+
+    private static void GameManagerFloorTravelFindsNearbyArrival()
+    {
+        var gameManager = new GameManager();
+        var bus = new EventBus();
+        gameManager.AttachServices(new WorldState(), new TurnScheduler(), new StubGenerator(), new FOVCalculator(), new StubContentDatabase(), new StubSaveManager(), bus);
+        gameManager.StartNewGame(4040);
+
+        var player = gameManager.World!.Player;
+        gameManager.World.MoveEntity(player.Id, new Position(8, 8));
+        var descend = gameManager.ProcessPlayerAction(new DescendAction(player.Id));
+        Expect.Equal(ActionResult.Success, descend.Result, "Initial descend should succeed.");
+
+        gameManager.World.MoveEntity(gameManager.World.Player.Id, new Position(2, 1));
+        var occupant = new StubEntity("Blocker", new Position(1, 1), Faction.Enemy);
+        gameManager.World.AddEntity(occupant);
+
+        Expect.True(gameManager.TravelToFloor(0), "Returning to the previous floor should succeed.");
+
+        var returnPlayer = gameManager.World!.Player;
+        gameManager.World.MoveEntity(returnPlayer.Id, new Position(8, 8));
+        var descendAgain = gameManager.ProcessPlayerAction(new DescendAction(returnPlayer.Id));
+
+        Expect.Equal(ActionResult.Success, descendAgain.Result, "Descending to a cached floor with an occupied arrival tile should still succeed.");
+        Expect.Equal(1, gameManager.World!.Depth, "Player should arrive back on floor one.");
+        Expect.True(gameManager.World.Player.Position != new Position(1, 1), "Player should be placed on a nearby open tile when the stair tile is occupied.");
     }
 
     private static void MinimapReflectsExplorationAndToggles()
@@ -239,6 +303,12 @@ public sealed class UISmokeTests : ITestSuite
         Expect.Equal("Skirmisher", gameManager.CharacterOptions.Archetype, "Character creation should persist the selected archetype.");
         Expect.Equal("Scout", gameManager.CharacterOptions.Origin, "Character creation should persist the selected origin.");
         Expect.Equal("Quartermaster", gameManager.CharacterOptions.Trait, "Character creation should persist the selected trait.");
+        var identity = player.GetComponent<IdentityComponent>();
+        Expect.NotNull(identity, "Character creation should attach an identity component to the player.");
+        Expect.Equal("elf", identity!.RaceId, "Character creation should persist the selected race.");
+        Expect.Equal("masculine", identity.GenderId, "Character creation should persist the selected gender.");
+        Expect.Equal("scarred", identity.AppearanceId, "Character creation should persist the selected appearance.");
+        Expect.Equal("elf_masculine_scarred_skirmisher", identity.SpriteVariantId, "Character creation should compose the full sprite variant id.");
         Expect.True(player.Stats.Speed > 100, "Archetype and origin bonuses should affect player stats.");
         Expect.True(player.Stats.Accuracy > 80, "Allocated finesse points should affect player accuracy.");
         Expect.True(inventory?.Capacity > 20, "Trait bonuses should be able to expand inventory capacity.");

@@ -63,6 +63,7 @@ public sealed class EntityRenderer
             _layer.AddChild(spriteRoot);
         }
 
+        ApplyAppearance(entity, spriteRoot);
         spriteRoot.Position = WorldView.ToCanvasPosition(entity.Position);
         spriteRoot.Visible = _visibleTiles.Count == 0 || _visibleTiles.Contains(entity.Position);
         spriteRoot.Modulate = Colors.White;
@@ -158,6 +159,7 @@ public sealed class EntityRenderer
                 Position = new Vector2(0f, 0f),
                 Texture = texture,
             });
+            ApplyAppearance(entity, spriteRoot);
             return spriteRoot;
         }
 
@@ -169,26 +171,55 @@ public sealed class EntityRenderer
             Color = ResolveTint(entity),
         });
 
+        ApplyAppearance(entity, spriteRoot);
+
         return spriteRoot;
+    }
+
+    private static void ApplyAppearance(IEntity entity, Node2D spriteRoot)
+    {
+        var tint = ResolveTint(entity);
+        if (FindChild<Sprite2D>(spriteRoot, "Body") is { } spriteBody)
+        {
+            spriteBody.Texture = WorldArtCatalog.GetEntityTexture(entity);
+            spriteBody.Modulate = tint;
+        }
+
+        if (FindChild<ColorRect>(spriteRoot, "Body") is { } rectBody)
+        {
+            rectBody.Color = tint;
+        }
+
+        if (entity.Faction != Faction.Player)
+        {
+            RemoveChild(spriteRoot, "AccentBand");
+            RemoveChild(spriteRoot, "VariantSigil");
+            RemoveChild(spriteRoot, "VariantDetail");
+            return;
+        }
+
+        var profile = PlayerVisualCatalog.Resolve(entity);
+        var accentBand = GetOrCreateChild<ColorRect>(spriteRoot, "AccentBand");
+        accentBand.Position = new Vector2(6f, 28f);
+        accentBand.Size = new Vector2(WorldView.TileSize - 12f, 4f);
+        accentBand.Color = profile.AccentTint;
+
+        var variantSigil = GetOrCreateChild<Label>(spriteRoot, "VariantSigil");
+        variantSigil.Position = new Vector2(4f, -16f);
+        variantSigil.Text = profile.RaceSigil;
+        variantSigil.Modulate = profile.AccentTint;
+
+        var variantDetail = GetOrCreateChild<Label>(spriteRoot, "VariantDetail");
+        variantDetail.Position = new Vector2(18f, 8f);
+        variantDetail.Text = profile.AppearanceMark;
+        variantDetail.Modulate = profile.DetailTint;
     }
 
     private static Color ResolveTint(IEntity entity)
     {
         if (entity.Faction == Faction.Player)
         {
-            var identity = entity.GetComponent<IdentityComponent>();
-            if (identity is not null)
-            {
-                return identity.RaceId switch
-                {
-                    "elf" => new Color(0.35f, 0.90f, 0.55f, 1f),
-                    "dwarf" => new Color(0.80f, 0.65f, 0.30f, 1f),
-                    "orc" => new Color(0.45f, 0.75f, 0.35f, 1f),
-                    _ => new Color(0.25f, 0.85f, 0.35f, 1f),
-                };
-            }
-
-            return new Color(0.25f, 0.85f, 0.35f, 1f);
+            return PlayerVisualCatalog.Resolve(entity).BodyTint;
         }
 
         return entity.Faction switch
@@ -196,5 +227,47 @@ public sealed class EntityRenderer
             Faction.Enemy => new Color(0.85f, 0.25f, 0.25f, 1f),
             _ => new Color(0.95f, 0.85f, 0.35f, 1f),
         };
+    }
+
+    private static T? FindChild<T>(Node parent, string name) where T : Node
+    {
+        foreach (var child in parent.GetChildren())
+        {
+            if (child is T typed && typed.Name == name)
+            {
+                return typed;
+            }
+        }
+
+        return null;
+    }
+
+    private static T GetOrCreateChild<T>(Node parent, string name) where T : Node, new()
+    {
+        if (FindChild<T>(parent, name) is { } existing)
+        {
+            return existing;
+        }
+
+        var child = new T
+        {
+            Name = name,
+        };
+        parent.AddChild(child);
+        return child;
+    }
+
+    private static void RemoveChild(Node parent, string name)
+    {
+        foreach (var child in parent.GetChildren().ToArray())
+        {
+            if (child.Name != name)
+            {
+                continue;
+            }
+
+            parent.RemoveChild(child);
+            child.QueueFree();
+        }
     }
 }

@@ -13,6 +13,8 @@ public sealed class CharacterUXTests : ITestSuite
     {
         registry.Add("UX.Stat preview updates reactively in character creation", StatPreviewUpdatesReactively);
         registry.Add("UX.Stat preview matches expected base plus bonuses", StatPreviewMatchesExpected);
+        registry.Add("UX.Identity preview tile updates with character choices", IdentityPreviewTileUpdates);
+        registry.Add("UX.Graphical identity preview updates with character choices", GraphicalIdentityPreviewUpdates);
         registry.Add("UX.Level-up spend reduces points and increases stat", LevelUpSpendReducesPointsAndIncreasesStat);
         registry.Add("UX.Level-up UI shows prompt when points available", LevelUpUIShowsPrompt);
         registry.Add("UX.Equipment comparison generates correct delta text", EquipmentComparisonGeneratesCorrectDelta);
@@ -67,6 +69,84 @@ public sealed class CharacterUXTests : ITestSuite
         Expect.True(preview.Contains("EVA: 10"), $"Expected EVA 10 in preview. Got: {preview}");
         Expect.True(preview.Contains("SPD: 95"), $"Expected SPD 95 in preview. Got: {preview}");
         Expect.True(preview.Contains("VR: 8"), $"Expected VR 8 in preview. Got: {preview}");
+    }
+
+    private static void IdentityPreviewTileUpdates()
+    {
+        var gameManager = new GameManager();
+        var bus = new EventBus();
+        gameManager.AttachServices(new WorldState(), new TurnScheduler(), new StubGenerator(), new FOVCalculator(), new StubContentDatabase(), new StubSaveManager(), bus);
+
+        var menu = new MainMenu();
+        menu.Bind(gameManager, bus);
+
+        var previewA = menu.BuildIdentityPreview();
+        var tileA = menu.BuildPreviewTileToken();
+
+        menu.HandleKey(Key.Down);
+        menu.HandleKey(Key.Down);
+        menu.HandleKey(Key.Down);
+        menu.HandleKey(Key.Down);
+        menu.HandleKey(Key.Down);
+        menu.HandleKey(Key.Right);
+        menu.HandleKey(Key.Down);
+        menu.HandleKey(Key.Right);
+        menu.HandleKey(Key.Down);
+        menu.HandleKey(Key.Right);
+
+        var previewB = menu.BuildIdentityPreview();
+        var tileB = menu.BuildPreviewTileToken();
+
+        Expect.False(previewA == previewB, "Identity preview should change when race, gender, or appearance changes.");
+        Expect.False(tileA == tileB, "Preview tile token should visibly change when identity choices change.");
+    }
+
+    private static void GraphicalIdentityPreviewUpdates()
+    {
+        var gameManager = new GameManager();
+        var bus = new EventBus();
+        gameManager.AttachServices(new WorldState(), new TurnScheduler(), new StubGenerator(), new FOVCalculator(), new StubContentDatabase(), new StubSaveManager(), bus);
+
+        var root = new Control();
+        var menu = new MainMenu();
+        root.AddChild(menu);
+        menu.Bind(gameManager, bus);
+        menu._Ready();
+        menu.Open();
+
+        var panel = menu.Children[0] as Panel;
+        Expect.NotNull(panel, "Main menu should create a root panel before rendering the preview.");
+
+        var previewPanel = FindChild<Panel>(panel!, "PreviewPanel");
+        var previewBody = FindChild<TextureRect>(previewPanel!, "PreviewBody");
+        var previewTitle = FindChild<Label>(previewPanel!, "PreviewTitle");
+        var previewVariant = FindChild<Label>(previewPanel!, "PreviewVariantId");
+
+        Expect.NotNull(previewPanel, "Main menu should create a dedicated graphical preview panel.");
+        Expect.NotNull(previewBody, "Graphical preview should include a body texture.");
+        Expect.NotNull(previewTitle, "Graphical preview should expose a title label.");
+        Expect.NotNull(previewVariant, "Graphical preview should expose a variant id label.");
+
+        var beforeTitle = previewTitle!.Text;
+        var beforeVariant = previewVariant!.Text;
+        var beforeTint = previewBody!.Modulate;
+
+        menu.HandleKey(Key.Down);
+        menu.HandleKey(Key.Down);
+        menu.HandleKey(Key.Down);
+        menu.HandleKey(Key.Down);
+        menu.HandleKey(Key.Down);
+        menu.HandleKey(Key.Right);
+        menu.HandleKey(Key.Down);
+        menu.HandleKey(Key.Right);
+        menu.HandleKey(Key.Down);
+        menu.HandleKey(Key.Right);
+
+        Expect.False(beforeTitle == previewTitle.Text, "Graphical preview title should change when identity choices change.");
+        Expect.False(beforeVariant == previewVariant.Text, "Graphical preview variant id should change when identity choices change.");
+        Expect.True(previewVariant.Text.Contains("elf_masculine_scarred"), "Graphical preview should display the updated identity variant id.");
+        Expect.True(beforeTint.R != previewBody.Modulate.R || beforeTint.G != previewBody.Modulate.G || beforeTint.B != previewBody.Modulate.B,
+            "Graphical preview tint should change when race changes.");
     }
 
     private static void LevelUpSpendReducesPointsAndIncreasesStat()
@@ -235,4 +315,17 @@ public sealed class CharacterUXTests : ITestSuite
     }
 
     private sealed record UIContext(WorldState World, StubEntity Player, EventBus Bus, GameManager GameManager, StubContentDatabase Content);
+
+    private static T? FindChild<T>(Node parent, string name) where T : Node
+    {
+        for (var i = 0; i < parent.Children.Count; i++)
+        {
+            if (parent.Children[i] is T typed && typed.Name == name)
+            {
+                return typed;
+            }
+        }
+
+        return null;
+    }
 }

@@ -38,7 +38,7 @@ internal static class WorldArtCatalog
     {
         return entity.Faction switch
         {
-            Faction.Player => Load("res://Assets/Sprites/player_tiny_dungeon.png"),
+            Faction.Player => PlayerVisualCatalog.GetBaseTexture(),
             Faction.Enemy => Load("res://Assets/Sprites/enemies/enemy_tiny_dungeon.png"),
             _ => null,
         };

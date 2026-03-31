@@ -22,6 +22,7 @@ public sealed class ActionTests : ITestSuite
         registry.Add("Simulation.Actions drop item places it on the ground", DropItemPlacesGroundItem);
         registry.Add("Simulation.Actions drop item can split a stack", DropItemSplitsStack);
         registry.Add("Simulation.Actions open and close door toggles walkability", OpenAndCloseDoorTogglesWalkability);
+        registry.Add("Simulation.Actions open door moves through when exit tile is clear", OpenDoorMovesThroughWhenExitTileIsClear);
         registry.Add("Simulation.Actions stairs validation requires matching tile", StairsValidationRequiresMatchingTile);
     }
 
@@ -288,7 +289,7 @@ public sealed class ActionTests : ITestSuite
 
         Expect.Equal(ActionResult.Success, openOutcome.Result, "Opening a nearby closed door should succeed");
         Expect.True(world.IsDoorOpen(new Position(2, 1)), "Opening a door should mark the doorway as open");
-        Expect.Equal(new Position(2, 1), actor.Position, "Opening a door by moving into it should place the actor in the doorway");
+        Expect.Equal(new Position(3, 1), actor.Position, "Opening a clear doorway should move the actor through it");
 
         world.MoveEntity(actor.Id, new Position(1, 1));
         Expect.True(world.IsWalkable(new Position(2, 1)), "Opened door should become walkable once the doorway is clear");
@@ -297,6 +298,22 @@ public sealed class ActionTests : ITestSuite
         var closeOutcome = close.Execute(world);
         Expect.Equal(ActionResult.Success, closeOutcome.Result, "Closing an open, empty doorway should succeed");
         Expect.False(world.IsWalkable(new Position(2, 1)), "Closed door should stop being walkable");
+    }
+
+    private static void OpenDoorMovesThroughWhenExitTileIsClear()
+    {
+        var world = CreateWorld();
+        var actor = CreateActor("Player", new Position(1, 1), Faction.Player);
+
+        world.Player = actor;
+        world.AddEntity(actor);
+        world.SetTile(new Position(2, 1), TileType.Door);
+
+        var outcome = new OpenDoorAction(actor.Id, new Position(2, 1)).Execute(world);
+
+        Expect.Equal(ActionResult.Success, outcome.Result, "Opening a clear door should succeed");
+        Expect.Equal(new Position(3, 1), actor.Position, "Actor should move to the tile beyond the opened door when it is available");
+        Expect.True(world.IsDoorOpen(new Position(2, 1)), "Door should remain open after traversal");
     }
 
     private static void StairsValidationRequiresMatchingTile()

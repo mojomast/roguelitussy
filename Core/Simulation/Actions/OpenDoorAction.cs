@@ -44,9 +44,10 @@ public sealed class OpenDoorAction : IAction
 
         var actor = world.GetEntity(ActorId)!;
         var from = actor.Position;
+        var destination = ResolveDestination(world, from, DoorPosition);
 
         world.SetDoorOpen(DoorPosition, true);
-        if (!world.MoveEntity(ActorId, DoorPosition))
+        if (!world.MoveEntity(ActorId, destination))
         {
             world.SetDoorOpen(DoorPosition, false);
             return ActionOutcome.Fail(ActionResult.Blocked);
@@ -55,10 +56,23 @@ public sealed class OpenDoorAction : IAction
         return new ActionOutcome
         {
             Result = ActionResult.Success,
-            DirtyPositions = { from, DoorPosition },
-            LogMessages = { $"{actor.Name} opens the door and moves through." },
+            DirtyPositions = { from, DoorPosition, destination },
+            LogMessages =
+            {
+                destination == DoorPosition
+                    ? $"{actor.Name} opens the door."
+                    : $"{actor.Name} opens the door and moves through."
+            },
         };
     }
 
     public int GetEnergyCost() => 1000;
+
+    private static Position ResolveDestination(WorldState world, Position actorPosition, Position doorPosition)
+    {
+        var through = doorPosition + (doorPosition - actorPosition);
+        return world.InBounds(through) && world.IsWalkable(through) && world.GetEntityAt(through) is null
+            ? through
+            : doorPosition;
+    }
 }
