@@ -11,4 +11,5 @@ public sealed record ItemTemplate(
     IReadOnlyDictionary<string, int> StatModifiers,
     string? UseEffect,
     int MaxCharges,
-    int MaxStack);
+    int MaxStack,
+    string Rarity);

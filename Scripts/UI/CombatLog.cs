@@ -93,6 +93,22 @@ public partial class CombatLog : Control
 
     private void OnItemPickedUp(EntityId entityId, ItemInstance item)
     {
+        var content = _gameManager?.Content;
+        if (content is not null && content.TryGetItemTemplate(item.TemplateId, out var template))
+        {
+            var actorName = ItemRarityPresentation.EscapeBBCode(ResolveName(entityId));
+            var itemName = ItemRarityPresentation.WrapWithColor(template.DisplayName, template.Rarity);
+            if (ItemRarityPresentation.IsHighlighted(template.Rarity))
+            {
+                var callout = ItemRarityPresentation.EscapeBBCode(ItemRarityPresentation.ResolvePickupCallout(template));
+                AddMarkupMessage($"[color=cyan]{actorName} secures {callout}: [/color]{itemName}[color=cyan].[/color]");
+                return;
+            }
+
+            AddMarkupMessage($"[color=cyan]{actorName} picks up [/color]{itemName}[color=cyan].[/color]");
+            return;
+        }
+
         AddMessage("cyan", $"{ResolveName(entityId)} picks up {ResolveItemName(item.TemplateId)}.");
     }
 
@@ -118,7 +134,12 @@ public partial class CombatLog : Control
 
     private void AddMessage(string color, string message)
     {
-        _messages.Enqueue($"[color={color}]{EscapeBBCode(message)}[/color]");
+        AddMarkupMessage($"[color={color}]{ItemRarityPresentation.EscapeBBCode(message)}[/color]");
+    }
+
+    private void AddMarkupMessage(string markup)
+    {
+        _messages.Enqueue(markup);
         while (_messages.Count > MaxMessages)
         {
             _messages.Dequeue();
@@ -215,21 +236,5 @@ public partial class CombatLog : Control
         return content is not null && content.TryGetItemTemplate(templateId, out var template)
             ? template.DisplayName
             : templateId;
-    }
-
-    private static string EscapeBBCode(string text)
-    {
-        var builder = new StringBuilder(text.Length);
-        foreach (var character in text)
-        {
-            builder.Append(character switch
-            {
-                '[' => "[lb]",
-                ']' => "[rb]",
-                _ => character,
-            });
-        }
-
-        return builder.ToString();
     }
 }

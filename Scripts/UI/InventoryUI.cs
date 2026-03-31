@@ -23,8 +23,8 @@ public partial class InventoryUI : Control
     private IContentDatabase? _content;
     private Tooltip? _tooltip;
     private Panel? _panel;
-    private Label? _gridLabel;
-    private Label? _descriptionLabel;
+    private RichTextLabel? _gridLabel;
+    private RichTextLabel? _descriptionLabel;
 
     private const float PanelWidth = 960f;
     private const float PanelHeight = 420f;
@@ -37,7 +37,11 @@ public partial class InventoryUI : Control
 
     public string GridText { get; private set; } = string.Empty;
 
+    public string GridMarkup { get; private set; } = string.Empty;
+
     public string DescriptionText { get; private set; } = string.Empty;
+
+    public string DescriptionMarkup { get; private set; } = string.Empty;
 
     private SortMode CurrentSort { get; set; } = SortMode.Equipped;
 
@@ -302,6 +306,7 @@ public partial class InventoryUI : Control
         if (SelectedIndex >= _items.Count)
         {
             DescriptionText = "Empty slot\n\nCycle sort with Tab to reorganize the bag.";
+            DescriptionMarkup = ItemRarityPresentation.EscapeBBCode(DescriptionText);
             _tooltip?.Hide();
             RefreshVisualState();
             return;
@@ -313,6 +318,7 @@ public partial class InventoryUI : Control
             var lines = new List<string>
             {
                 template.DisplayName,
+                $"Rarity: {ItemRarityPresentation.ResolveDisplayLabel(template.Rarity)}",
                 template.Description,
                 $"Category: {template.Category}",
                 $"Slot: {(template.Slot == EquipSlot.None ? "None" : template.Slot.ToString())}",
@@ -331,12 +337,14 @@ public partial class InventoryUI : Control
             lines.Add(item.StackCount > 1 ? "D: drop one from stack" : "D: drop item");
 
             DescriptionText = string.Join("\n", lines);
+            DescriptionMarkup = BuildDescriptionMarkup(template, item, lines);
             _tooltip?.ShowItemTooltip(template, item, new Vector2(840f, 220f));
             RefreshVisualState();
             return;
         }
 
         DescriptionText = item.TemplateId;
+        DescriptionMarkup = ItemRarityPresentation.EscapeBBCode(DescriptionText);
         _tooltip?.Hide();
         RefreshVisualState();
     }
@@ -422,6 +430,17 @@ public partial class InventoryUI : Control
         return item.TemplateId[..1].ToUpperInvariant();
     }
 
+    private string ResolveSlotTokenMarkup(ItemInstance item)
+    {
+        var token = ResolveSlotToken(item);
+        if (_content is not null && _content.TryGetItemTemplate(item.TemplateId, out var template))
+        {
+            return ItemRarityPresentation.WrapWithColor(token, template.Rarity);
+        }
+
+        return ItemRarityPresentation.EscapeBBCode(token);
+    }
+
     private bool IsEquipped(ItemInstance item)
     {
         var inventory = _gameManager?.World?.Player?.GetComponent<InventoryComponent>();
@@ -474,15 +493,17 @@ public partial class InventoryUI : Control
             Name = "Panel",
             Size = panelSize,
         };
-        _gridLabel = new Label
+        _gridLabel = new RichTextLabel
         {
             Name = "GridLabel",
             Position = new Vector2(PanelPadding, PanelPadding),
+            BbcodeEnabled = true,
         };
-        _descriptionLabel = new Label
+        _descriptionLabel = new RichTextLabel
         {
             Name = "DescriptionLabel",
             Position = new Vector2(PanelPadding, PanelPadding),
+            BbcodeEnabled = true,
         };
         _panel.AddChild(_gridLabel);
         _panel.AddChild(_descriptionLabel);
@@ -517,8 +538,11 @@ public partial class InventoryUI : Control
         _panel.Visible = Visible;
         _gridLabel.Visible = Visible;
         _descriptionLabel.Visible = Visible;
-        _gridLabel.Text = GridText;
-        _descriptionLabel.Text = DescriptionText;
+        GridMarkup = BuildGridMarkup();
+        _gridLabel.Clear();
+        _gridLabel.AppendText(GridMarkup);
+        _descriptionLabel.Clear();
+        _descriptionLabel.AppendText(DescriptionMarkup);
     }
 
     private Vector2 ResolvePanelSize(Vector2 viewportSize)
@@ -529,5 +553,45 @@ public partial class InventoryUI : Control
     private Vector2 ResolveViewportSize()
     {
         return GetParent() is not null && GetTree() is not null ? GetViewportRect().Size : new Vector2(1280f, 720f);
+    }
+
+    private string BuildGridMarkup()
+    {
+        var builder = new StringBuilder();
+        var inventory = _gameManager?.World?.Player?.GetComponent<InventoryComponent>();
+        builder.AppendLine(ItemRarityPresentation.EscapeBBCode($"Inventory  {_items.Count}/{inventory?.Capacity ?? 0}"));
+        builder.AppendLine(ItemRarityPresentation.EscapeBBCode($"Sort: {CurrentSort}"));
+        builder.AppendLine();
+        for (var row = 0; row < Rows; row++)
+        {
+            for (var column = 0; column < Columns; column++)
+            {
+                var slotIndex = (row * Columns) + column;
+                var selected = slotIndex == SelectedIndex;
+                var label = slotIndex < _items.Count ? ResolveSlotTokenMarkup(_items[slotIndex]) : "   ";
+                builder.Append(selected ? ">" : " ");
+                builder.Append("[lb]");
+                builder.Append(label);
+                builder.Append("[rb] ");
+            }
+
+            builder.AppendLine();
+        }
+
+        builder.Append(ItemRarityPresentation.EscapeBBCode("Use: U  Equip: E/Enter  Drop: D  Sort: Tab  Close: I/Esc"));
+        return builder.ToString().TrimEnd();
+    }
+
+    private static string BuildDescriptionMarkup(ItemTemplate template, ItemInstance item, IReadOnlyList<string> lines)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine(ItemRarityPresentation.WrapWithColor(template.DisplayName, template.Rarity));
+        builder.AppendLine(ItemRarityPresentation.WrapWithColor($"Rarity: {ItemRarityPresentation.ResolveDisplayLabel(template.Rarity)}", template.Rarity));
+        for (var i = 2; i < lines.Count; i++)
+        {
+            builder.AppendLine(ItemRarityPresentation.EscapeBBCode(lines[i]));
+        }
+
+        return builder.ToString().TrimEnd();
     }
 }

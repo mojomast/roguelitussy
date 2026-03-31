@@ -155,7 +155,8 @@ public sealed class ActionTests : ITestSuite
             new Dictionary<string, int> { ["heal"] = 5 },
             "heal",
             -1,
-            5);
+            5,
+            "common");
 
         var action = new PickupAction(actor.Id, template);
         Expect.Equal(ActionResult.Success, action.Validate(world), "Pickup should validate when the new item can merge into an existing stack.");
@@ -189,7 +190,8 @@ public sealed class ActionTests : ITestSuite
             new Dictionary<string, int> { ["heal"] = 5 },
             "heal",
             -1,
-            5);
+            5,
+            "common");
 
         var outcome = new UseItemAction(actor.Id, item.InstanceId, template).Execute(world);
 
@@ -218,7 +220,8 @@ public sealed class ActionTests : ITestSuite
             new Dictionary<string, int> { ["attack"] = 2 },
             string.Empty,
             -1,
-            1);
+            1,
+            "common");
 
         var equip = new ToggleEquipAction(actor.Id, sword.InstanceId, template).Execute(world);
 

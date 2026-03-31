@@ -35,6 +35,7 @@ public sealed class ContentValidationTests : ITestSuite
         Expect.Equal(ItemCategory.Consumable, potion.Category, "Health potion should project as a consumable");
         Expect.Equal(10, potion.MaxStack, "Health potion should preserve stack size");
         Expect.Equal("heal", potion.UseEffect ?? string.Empty, "Health potion should preserve the on-use effect");
+        Expect.Equal("common", potion.Rarity, "Health potion should preserve the projected rarity tier");
 
         Expect.True(content.TryGetEnemyTemplate("orc_brute", out var orc), "Orc Brute should project into the contract surface");
         Expect.Equal("melee_rusher", orc.BrainType, "Enemy AI types should map onto the frozen brain identifiers");

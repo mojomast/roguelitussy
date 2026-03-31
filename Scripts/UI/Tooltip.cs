@@ -7,9 +7,18 @@ namespace Godotussy;
 
 public partial class Tooltip : Control
 {
+    private const float PanelPadding = 12f;
+    private Panel? _panel;
+    private RichTextLabel? _titleLabel;
+    private RichTextLabel? _bodyLabel;
+
     public string TitleText { get; private set; } = string.Empty;
 
+    public string TitleMarkup { get; private set; } = string.Empty;
+
     public string BodyText { get; private set; } = string.Empty;
+
+    public string BodyMarkup { get; private set; } = string.Empty;
 
     public Vector2 ScreenPosition { get; private set; }
 
@@ -20,11 +29,22 @@ public partial class Tooltip : Control
         Size = new Vector2(260f, 140f);
     }
 
+    public override void _Ready()
+    {
+        EnsureVisuals();
+        RefreshVisualState();
+    }
+
     public void ShowItemTooltip(ItemTemplate template, ItemInstance instance, Vector2 screenPos)
     {
         TitleText = template.DisplayName;
+        TitleMarkup = ItemRarityPresentation.WrapWithColor(template.DisplayName, template.Rarity);
 
-        var lines = new List<string> { template.Description };
+        var lines = new List<string>
+        {
+            $"Rarity: {ItemRarityPresentation.ResolveDisplayLabel(template.Rarity)}",
+            template.Description,
+        };
         foreach (var modifier in template.StatModifiers)
         {
             lines.Add($"{modifier.Key}: {modifier.Value:+#;-#;0}");
@@ -43,8 +63,10 @@ public partial class Tooltip : Control
 
         lines.Add($"Category: {template.Category}");
         BodyText = string.Join("\n", lines);
+        BodyMarkup = BuildItemBodyMarkup(template, lines);
         ScreenPosition = ClampToScreen(screenPos);
         Visible = true;
+        RefreshVisualState();
     }
 
     public void ShowEnemyTooltip(IEntity enemy, Vector2 screenPos)
@@ -65,16 +87,22 @@ public partial class Tooltip : Control
 
         TitleText = enemy.Name;
         BodyText = builder.ToString().TrimEnd();
+        TitleMarkup = ItemRarityPresentation.EscapeBBCode(TitleText);
+        BodyMarkup = ItemRarityPresentation.EscapeBBCode(BodyText);
         ScreenPosition = ClampToScreen(screenPos);
         Visible = true;
+        RefreshVisualState();
     }
 
     public void ShowShortcutTooltip(string title, string body, Vector2 screenPos)
     {
         TitleText = title;
         BodyText = body;
+        TitleMarkup = ItemRarityPresentation.EscapeBBCode(title);
+        BodyMarkup = ItemRarityPresentation.EscapeBBCode(body);
         ScreenPosition = ClampToScreen(screenPos);
         Visible = true;
+        RefreshVisualState();
     }
 
     public new void Hide()
@@ -82,11 +110,81 @@ public partial class Tooltip : Control
         Visible = false;
         TitleText = string.Empty;
         BodyText = string.Empty;
+        TitleMarkup = string.Empty;
+        BodyMarkup = string.Empty;
+        RefreshVisualState();
+    }
+
+    private void EnsureVisuals()
+    {
+        if (_panel is not null && _titleLabel is not null && _bodyLabel is not null)
+        {
+            return;
+        }
+
+        _panel = new Panel
+        {
+            Name = "Panel",
+            Size = Size,
+        };
+        _titleLabel = new RichTextLabel
+        {
+            Name = "TitleLabel",
+            Position = new Vector2(PanelPadding, PanelPadding),
+            Size = new Vector2(Math.Max(0f, Size.X - (PanelPadding * 2f)), 24f),
+            BbcodeEnabled = true,
+        };
+        _bodyLabel = new RichTextLabel
+        {
+            Name = "BodyLabel",
+            Position = new Vector2(PanelPadding, PanelPadding + 28f),
+            Size = new Vector2(Math.Max(0f, Size.X - (PanelPadding * 2f)), Math.Max(0f, Size.Y - 40f - PanelPadding)),
+            BbcodeEnabled = true,
+        };
+        _panel.AddChild(_titleLabel);
+        _panel.AddChild(_bodyLabel);
+        AddChild(_panel);
+    }
+
+    private void RefreshVisualState()
+    {
+        EnsureVisuals();
+
+        if (_panel is null || _titleLabel is null || _bodyLabel is null)
+        {
+            return;
+        }
+
+        _panel.Visible = Visible;
+        _panel.Position = ScreenPosition;
+        _panel.Size = Size;
+        _titleLabel.Visible = Visible;
+        _titleLabel.Position = new Vector2(PanelPadding, PanelPadding);
+        _titleLabel.Size = new Vector2(Math.Max(0f, Size.X - (PanelPadding * 2f)), 24f);
+        _titleLabel.Clear();
+        _titleLabel.AppendText(TitleMarkup);
+        _bodyLabel.Visible = Visible;
+        _bodyLabel.Position = new Vector2(PanelPadding, PanelPadding + 28f);
+        _bodyLabel.Size = new Vector2(Math.Max(0f, Size.X - (PanelPadding * 2f)), Math.Max(0f, Size.Y - 40f - PanelPadding));
+        _bodyLabel.Clear();
+        _bodyLabel.AppendText(BodyMarkup);
+    }
+
+    private static string BuildItemBodyMarkup(ItemTemplate template, IReadOnlyList<string> lines)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine(ItemRarityPresentation.WrapWithColor(lines[0], template.Rarity));
+        for (var i = 1; i < lines.Count; i++)
+        {
+            builder.AppendLine(ItemRarityPresentation.EscapeBBCode(lines[i]));
+        }
+
+        return builder.ToString().TrimEnd();
     }
 
     private Vector2 ClampToScreen(Vector2 position)
     {
-        var viewport = GetParent() is not null && GetTree() is not null ? GetViewportRect().Size : new Vector2(1280f, 720f);
+        var viewport = GetParent() is not null && GetTree() is not null ? GetViewportRect().Size : new Vector2(1600f, 900f);
         var x = position.X;
         var y = position.Y;
 

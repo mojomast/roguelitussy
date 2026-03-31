@@ -273,7 +273,8 @@ public sealed class ContentLoader : IContentDatabase
             statModifiers,
             useEffect,
             maxCharges,
-            maxStack);
+            maxStack,
+            item.Rarity);
     }
 
     private static EnemyTemplate BuildEnemyTemplate(EnemyDefinition enemy)

@@ -16,6 +16,7 @@ public sealed class UISmokeTests : ITestSuite
         registry.Add("UI.Minimap reflects explored tiles and gameplay toggles", MinimapReflectsExplorationAndToggles);
         registry.Add("UI.MainMenu character creation affects the starting run", MainMenuCharacterCreationAffectsStartingRun);
         registry.Add("UI.Inventory keyboard navigation emits concrete actions", InventoryEmitsConcreteActions);
+        registry.Add("UI.Inventory and tooltip surface item rarity", InventorySurfacesItemRarity);
         registry.Add("UI.Help overlay opens from menu and gameplay", HelpOverlayOpensFromMenuAndGameplay);
         registry.Add("UI.CombatLog escapes BBCode and reacts to combat events", CombatLogReactsToEvents);
         registry.Add("UI.CombatLog exposes a live console panel", CombatLogExposesLiveConsolePanel);
@@ -171,6 +172,21 @@ public sealed class UISmokeTests : ITestSuite
         Expect.Equal(1, (dropped as DropItemAction)?.Quantity ?? 0, "Dropping a stack from the UI should default to a one-item split-drop.");
     }
 
+    private static void InventorySurfacesItemRarity()
+    {
+        var context = CreateContext(new ItemInstance { TemplateId = "scroll_fireball", IsIdentified = true });
+        var tooltip = new Tooltip();
+        var inventory = new InventoryUI();
+
+        inventory.Bind(context.GameManager, context.Bus, context.Content, tooltip);
+        inventory.Open();
+
+        Expect.True(inventory.DescriptionText.Contains("Rarity: Rare"), "Inventory descriptions should expose the selected item's rarity tier.");
+        Expect.True(inventory.GridMarkup.Contains("[color="), "Inventory grid markup should colorize loot by rarity.");
+        Expect.True(tooltip.BodyText.Contains("Rarity: Rare"), "Item tooltips should expose rarity details.");
+        Expect.True(tooltip.TitleMarkup.Contains("[color="), "Item tooltip titles should be colorized by rarity.");
+    }
+
     private static void MainMenuCharacterCreationAffectsStartingRun()
     {
         var gameManager = new GameManager();
@@ -247,9 +263,12 @@ public sealed class UISmokeTests : ITestSuite
 
         context.Bus.EmitLogMessage("A [trap] snaps.");
         context.Bus.EmitDamageDealt(new DamageResult(context.Player.Id, enemy.Id, 5, 4, DamageType.Physical, false, false, false));
+        context.Bus.EmitItemPickedUp(context.Player.Id, new ItemInstance { TemplateId = "scroll_fireball", IsIdentified = true });
 
         Expect.True(log.RenderedText.Contains("[lb]trap[rb]"), "Combat log should escape BBCode brackets");
         Expect.True(log.RenderedText.Contains("hits Skeleton for 4 damage"), "Combat log should append derived combat messages");
+        Expect.True(log.RenderedText.Contains("rare loot"), "Combat log should call out higher-rarity pickups.");
+        Expect.True(log.RenderedText.Contains("Scroll of Fireball"), "Combat log should include the picked-up item name.");
     }
 
     private static void CombatLogExposesLiveConsolePanel()

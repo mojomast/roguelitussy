@@ -19,7 +19,8 @@ public sealed class StubContentDatabase : IContentDatabase
                 new Dictionary<string, int>(),
                 "heal",
                 -1,
-                5),
+                5,
+                "common"),
             ["potion_haste"] = new(
                 "potion_haste",
                 "Haste Potion",
@@ -33,7 +34,8 @@ public sealed class StubContentDatabase : IContentDatabase
                 },
                 "status:hasted",
                 -1,
-                3),
+                3,
+                "uncommon"),
             ["sword_iron"] = new(
                 "sword_iron",
                 "Iron Sword",
@@ -46,7 +48,8 @@ public sealed class StubContentDatabase : IContentDatabase
                 },
                 null,
                 0,
-                1),
+                1,
+                "common"),
             ["shield_wooden"] = new(
                 "shield_wooden",
                 "Wooden Shield",
@@ -59,7 +62,8 @@ public sealed class StubContentDatabase : IContentDatabase
                 },
                 null,
                 0,
-                1),
+                1,
+                "common"),
             ["dagger_venom"] = new(
                 "dagger_venom",
                 "Viper Fang",
@@ -73,7 +77,8 @@ public sealed class StubContentDatabase : IContentDatabase
                 },
                 null,
                 0,
-                1),
+                1,
+                "uncommon"),
             ["scroll_fireball"] = new(
                 "scroll_fireball",
                 "Scroll of Fireball",
@@ -83,7 +88,8 @@ public sealed class StubContentDatabase : IContentDatabase
                 new Dictionary<string, int>(),
                 "heal",
                 -1,
-                1),
+                1,
+                "rare"),
             ["scroll_blink"] = new(
                 "scroll_blink",
                 "Scroll of Blink",
@@ -93,7 +99,8 @@ public sealed class StubContentDatabase : IContentDatabase
                 new Dictionary<string, int>(),
                 "heal",
                 -1,
-                1),
+                1,
+                "uncommon"),
         };
 
         EnemyTemplates = new Dictionary<string, EnemyTemplate>
