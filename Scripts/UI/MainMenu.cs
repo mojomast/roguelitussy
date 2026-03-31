@@ -1,21 +1,214 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace Godotussy;
 
 public partial class MainMenu : MenuBase
 {
+    private sealed record ArchetypeOption(
+        string DisplayName,
+        string Summary,
+        int BonusMaxHp,
+        int BonusAttack,
+        int BonusDefense,
+        int BonusEvasion,
+        int BonusSpeed,
+        int BonusViewRadius,
+        IReadOnlyList<string> StartingItems,
+        IReadOnlyList<string> EquippedItems);
+
+    private sealed record OriginOption(
+        string DisplayName,
+        string Summary,
+        int BonusMaxHp,
+        int BonusAttack,
+        int BonusDefense,
+        int BonusEvasion,
+        int BonusSpeed,
+        int BonusViewRadius,
+        int InventoryCapacityBonus,
+        IReadOnlyList<string> StartingItems);
+
+    private sealed record TraitOption(
+        string DisplayName,
+        string Summary,
+        int BonusMaxHp,
+        int BonusAttack,
+        int BonusDefense,
+        int BonusAccuracy,
+        int BonusEvasion,
+        int BonusSpeed,
+        int BonusViewRadius,
+        int InventoryCapacityBonus,
+        IReadOnlyList<string> StartingItems);
+
+    private static readonly string[] NameOptions =
+    {
+        "Rook",
+        "Iris",
+        "Nyx",
+        "Bram",
+        "Mara",
+        "Orin",
+    };
+
+    private static readonly ArchetypeOption[] Archetypes =
+    {
+        new(
+            "Vanguard",
+            "A tough delver who starts armed and ready for the front line.",
+            8,
+            2,
+            1,
+            0,
+            -5,
+            0,
+            new[] { "sword_iron", "shield_wooden", "potion_health", "potion_health" },
+            new[] { "sword_iron", "shield_wooden" }),
+        new(
+            "Skirmisher",
+            "A fast striker who trades durability for initiative and accuracy.",
+            0,
+            1,
+            0,
+            4,
+            10,
+            0,
+            new[] { "dagger_venom", "potion_haste", "potion_health" },
+            new[] { "dagger_venom" }),
+        new(
+            "Mystic",
+            "A fragile explorer who leans on scrolls, vision, and mobility.",
+            -4,
+            0,
+            -1,
+            0,
+            5,
+            1,
+            new[] { "scroll_fireball", "scroll_blink", "potion_health" },
+            System.Array.Empty<string>()),
+    };
+
+    private static readonly OriginOption[] Origins =
+    {
+        new(
+            "Survivor",
+            "Veteran of too many bad runs. Starts a little tougher.",
+            4,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            new[] { "potion_health" }),
+        new(
+            "Scout",
+            "Maps routes quickly and sees danger earlier.",
+            0,
+            0,
+            0,
+            0,
+            5,
+            1,
+            0,
+            new[] { "potion_haste" }),
+        new(
+            "Scavenger",
+            "Carries more, wastes less, and hoards every edge.",
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            4,
+            new[] { "potion_health", "scroll_blink" }),
+    };
+
+    private static readonly TraitOption[] Traits =
+    {
+        new(
+            "Iron Will",
+            "Push through attrition with a deeper life pool and sturdier posture.",
+            4,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            new[] { "potion_health" }),
+        new(
+            "Quartermaster",
+            "Travel heavier and keep extra supplies close at hand.",
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            2,
+            new[] { "potion_health", "potion_health" }),
+        new(
+            "Pathfinder",
+            "See farther, move quicker, and carry a panic-scroll.",
+            0,
+            0,
+            0,
+            0,
+            0,
+            5,
+            1,
+            0,
+            new[] { "scroll_blink" }),
+    };
+
+    private const int AllocationBudget = 4;
+
+    private const int StartIndex = 0;
+    private const int NameIndex = 1;
+    private const int ArchetypeIndex = 2;
+    private const int OriginIndex = 3;
+    private const int TraitIndex = 4;
+    private const int VitalityIndex = 5;
+    private const int PowerIndex = 6;
+    private const int GuardIndex = 7;
+    private const int FinesseIndex = 8;
+    private const int SeedIndex = 9;
+    private const int DevToolsIndex = 10;
+    private const int HelpIndex = 11;
+    private const int LoadSlot1Index = 12;
+    private const int LoadSlot2Index = 13;
+    private const int LoadSlot3Index = 14;
+    private const int QuitIndex = 15;
+
     private EventBus? _eventBus;
     private GameManager? _gameManager;
+    private int _nameIndex;
+    private int _archetypeIndex;
+    private int _originIndex;
+    private int _traitIndex;
+    private int _vitalityPoints;
+    private int _powerPoints;
+    private int _guardPoints;
+    private int _finessePoints;
 
     public int PendingSeed { get; private set; } = 1337;
 
     public event System.Action? GameStarted;
 
+    public event System.Action? HelpRequested;
+
+    public event System.Action? DevToolsRequested;
+
     public MainMenu()
     {
         Name = "MainMenu";
         Title = "GODOTUSSY ROGUELIKE";
-        ConfigureOptions("New Game", "Load Slot 1", "Load Slot 2", "Load Slot 3", "Quit");
+        RebuildOptions();
         Visible = true;
     }
 
@@ -38,18 +231,34 @@ public partial class MainMenu : MenuBase
             PendingSeed = _gameManager.Seed;
         }
 
-        RebuildMenuText();
+        RebuildOptions();
     }
 
     public void SetSeed(int seed)
     {
-        PendingSeed = seed;
-        RebuildMenuText();
+        PendingSeed = seed <= 0 ? 1 : seed;
+        RebuildOptions();
     }
 
     protected override string BuildBodyText()
     {
-        return $"Seed: {PendingSeed}\nUse Left/Right or +/- to adjust seed.";
+        var archetype = Archetypes[_archetypeIndex];
+        var origin = Origins[_originIndex];
+        var trait = Traits[_traitIndex];
+        return string.Join(
+            "\n",
+            $"Candidate: {NameOptions[_nameIndex]}",
+            $"Archetype: {archetype.DisplayName}",
+            $"Origin: {origin.DisplayName}",
+            $"Trait: {trait.DisplayName}",
+            $"Training: VIT {_vitalityPoints}  POW {_powerPoints}  GRD {_guardPoints}  FIN {_finessePoints}",
+            $"Points Remaining: {RemainingPoints}",
+            string.Empty,
+            archetype.Summary,
+            origin.Summary,
+            trait.Summary,
+            string.Empty,
+            "Use Left/Right or +/- to edit the highlighted field. Training raises max HP, attack, defense, and finesse.");
     }
 
     protected override bool HandleCustomKey(Key key)
@@ -58,13 +267,15 @@ public partial class MainMenu : MenuBase
         {
             case Key.Left:
             case Key.Minus:
-                PendingSeed = PendingSeed <= 1 ? 1 : PendingSeed - 1;
-                RebuildMenuText();
-                return true;
+                return AdjustHighlightedField(-1);
             case Key.Right:
             case Key.Plus:
-                PendingSeed++;
-                RebuildMenuText();
+                return AdjustHighlightedField(1);
+            case Key.H:
+                HelpRequested?.Invoke();
+                return true;
+            case Key.T:
+                DevToolsRequested?.Invoke();
                 return true;
             default:
                 return false;
@@ -75,22 +286,51 @@ public partial class MainMenu : MenuBase
     {
         switch (SelectedIndex)
         {
-            case 0:
+            case StartIndex:
+                _gameManager?.SetCharacterCreationOptions(BuildCharacterCreationOptions());
                 _gameManager?.StartNewGame(PendingSeed);
                 _eventBus?.EmitLogMessage($"Starting new game with seed {PendingSeed}.");
                 Close();
                 GameStarted?.Invoke();
                 break;
-            case 1:
+            case NameIndex:
+                CycleName(1);
+                break;
+            case ArchetypeIndex:
+                CycleArchetype(1);
+                break;
+            case OriginIndex:
+                CycleOrigin(1);
+                break;
+            case TraitIndex:
+                CycleTrait(1);
+                break;
+            case VitalityIndex:
+            case PowerIndex:
+            case GuardIndex:
+            case FinesseIndex:
+                AdjustAllocation(SelectedIndex, 1);
+                break;
+            case SeedIndex:
+                PendingSeed++;
+                RebuildOptions();
+                break;
+            case DevToolsIndex:
+                DevToolsRequested?.Invoke();
+                break;
+            case HelpIndex:
+                HelpRequested?.Invoke();
+                break;
+            case LoadSlot1Index:
                 _eventBus?.EmitLoadRequested(1);
                 break;
-            case 2:
+            case LoadSlot2Index:
                 _eventBus?.EmitLoadRequested(2);
                 break;
-            case 3:
+            case LoadSlot3Index:
                 _eventBus?.EmitLoadRequested(3);
                 break;
-            case 4:
+            case QuitIndex:
                 GetTree().Quit();
                 break;
         }
@@ -106,5 +346,166 @@ public partial class MainMenu : MenuBase
         {
             Close();
         }
+    }
+
+    private bool AdjustHighlightedField(int delta)
+    {
+        switch (SelectedIndex)
+        {
+            case NameIndex:
+                CycleName(delta);
+                return true;
+            case ArchetypeIndex:
+                CycleArchetype(delta);
+                return true;
+            case OriginIndex:
+                CycleOrigin(delta);
+                return true;
+            case TraitIndex:
+                CycleTrait(delta);
+                return true;
+            case VitalityIndex:
+            case PowerIndex:
+            case GuardIndex:
+            case FinesseIndex:
+                return AdjustAllocation(SelectedIndex, delta);
+            case SeedIndex:
+                PendingSeed = System.Math.Max(1, PendingSeed + delta);
+                RebuildOptions();
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private void CycleName(int delta)
+    {
+        _nameIndex = WrapIndex(_nameIndex + delta, NameOptions.Length);
+        RebuildOptions();
+    }
+
+    private void CycleArchetype(int delta)
+    {
+        _archetypeIndex = WrapIndex(_archetypeIndex + delta, Archetypes.Length);
+        RebuildOptions();
+    }
+
+    private void CycleOrigin(int delta)
+    {
+        _originIndex = WrapIndex(_originIndex + delta, Origins.Length);
+        RebuildOptions();
+    }
+
+    private void CycleTrait(int delta)
+    {
+        _traitIndex = WrapIndex(_traitIndex + delta, Traits.Length);
+        RebuildOptions();
+    }
+
+    private bool AdjustAllocation(int selectedIndex, int delta)
+    {
+        return selectedIndex switch
+        {
+            VitalityIndex => AdjustAllocation(ref _vitalityPoints, delta),
+            PowerIndex => AdjustAllocation(ref _powerPoints, delta),
+            GuardIndex => AdjustAllocation(ref _guardPoints, delta),
+            FinesseIndex => AdjustAllocation(ref _finessePoints, delta),
+            _ => false,
+        };
+    }
+
+    private bool AdjustAllocation(ref int field, int delta)
+    {
+        if (delta == 0)
+        {
+            return false;
+        }
+
+        var applied = false;
+        while (delta > 0)
+        {
+            if (RemainingPoints <= 0)
+            {
+                break;
+            }
+
+            field++;
+            delta--;
+            applied = true;
+        }
+
+        while (delta < 0)
+        {
+            if (field <= 0)
+            {
+                break;
+            }
+
+            field--;
+            delta++;
+            applied = true;
+        }
+
+        if (applied)
+        {
+            RebuildOptions();
+        }
+
+        return applied;
+    }
+
+    private void RebuildOptions()
+    {
+        ConfigureOptions(
+            "Start Expedition",
+            $"Name: {NameOptions[_nameIndex]}",
+            $"Archetype: {Archetypes[_archetypeIndex].DisplayName}",
+            $"Origin: {Origins[_originIndex].DisplayName}",
+            $"Trait: {Traits[_traitIndex].DisplayName}",
+            $"Vitality (+3 Max HP): {_vitalityPoints}",
+            $"Power (+1 Attack): {_powerPoints}",
+            $"Guard (+1 Defense): {_guardPoints}",
+            $"Finesse (+1 Accuracy/Evasion): {_finessePoints}",
+            $"Seed: {PendingSeed}",
+            "Dev Tools",
+            "Help",
+            "Load Slot 1",
+            "Load Slot 2",
+            "Load Slot 3",
+            "Quit");
+    }
+
+    private GameManager.CharacterCreationOptions BuildCharacterCreationOptions()
+    {
+        var archetype = Archetypes[_archetypeIndex];
+        var origin = Origins[_originIndex];
+        var trait = Traits[_traitIndex];
+        var items = new List<string>();
+        items.AddRange(archetype.StartingItems);
+        items.AddRange(origin.StartingItems);
+        items.AddRange(trait.StartingItems);
+
+        return new GameManager.CharacterCreationOptions(
+            NameOptions[_nameIndex],
+            archetype.DisplayName,
+            origin.DisplayName,
+            trait.DisplayName,
+            archetype.BonusMaxHp + origin.BonusMaxHp + trait.BonusMaxHp + (_vitalityPoints * 3),
+            archetype.BonusAttack + origin.BonusAttack + trait.BonusAttack + _powerPoints,
+            archetype.BonusDefense + origin.BonusDefense + trait.BonusDefense + _guardPoints,
+            trait.BonusAccuracy + _finessePoints,
+            archetype.BonusEvasion + origin.BonusEvasion + trait.BonusEvasion + _finessePoints,
+            archetype.BonusSpeed + origin.BonusSpeed + trait.BonusSpeed,
+            archetype.BonusViewRadius + origin.BonusViewRadius + trait.BonusViewRadius,
+            origin.InventoryCapacityBonus + trait.InventoryCapacityBonus,
+            items,
+            archetype.EquippedItems);
+    }
+
+    private int RemainingPoints => AllocationBudget - (_vitalityPoints + _powerPoints + _guardPoints + _finessePoints);
+
+    private static int WrapIndex(int index, int count)
+    {
+        return (index % count + count) % count;
     }
 }

@@ -73,7 +73,7 @@ public partial class DebugConsole : Control
     {
         if (!Visible)
         {
-            if (key == Key.Backquote)
+            if (key == Key.Quoteleft)
             {
                 Open();
                 return true;
@@ -84,7 +84,7 @@ public partial class DebugConsole : Control
 
         switch (key)
         {
-            case Key.Backquote:
+            case Key.Quoteleft:
             case Key.Escape:
                 Close();
                 return true;

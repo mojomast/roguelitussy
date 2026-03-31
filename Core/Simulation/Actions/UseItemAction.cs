@@ -24,7 +24,12 @@ public sealed class UseItemAction : IAction
     {
         var actor = world.GetEntity(ActorId);
         var inventory = actor?.GetComponent<InventoryComponent>();
-        return actor is null || inventory is null || !inventory.Contains(ItemInstanceId) ? ActionResult.Invalid : ActionResult.Success;
+        if (actor is null || inventory is null || !inventory.Contains(ItemInstanceId))
+        {
+            return ActionResult.Invalid;
+        }
+
+        return Template.Slot == EquipSlot.None ? ActionResult.Success : ActionResult.Invalid;
     }
 
     public ActionOutcome Execute(WorldState world)
@@ -49,12 +54,6 @@ public sealed class UseItemAction : IAction
             DirtyPositions = { actor.Position },
         };
 
-        if (Template.Slot != EquipSlot.None)
-        {
-            ToggleEquipment(actor, inventory, item, outcome);
-            return outcome;
-        }
-
         ApplyEffect(actor, outcome);
         ConsumeIfNeeded(inventory, item);
         outcome.LogMessages.Add($"{actor.Name} uses {Template.DisplayName}." );
@@ -62,31 +61,6 @@ public sealed class UseItemAction : IAction
     }
 
     public int GetEnergyCost() => 500;
-
-    private void ToggleEquipment(IEntity actor, InventoryComponent inventory, ItemInstance item, ActionOutcome outcome)
-    {
-        if (inventory.GetEquippedSlot(item.InstanceId) == Template.Slot)
-        {
-            if (inventory.TryUnequip(Template.Slot, out var removed) && removed is not null)
-            {
-                ApplyStatModifiers(actor.Stats, removed.StatModifiers, -1);
-                outcome.LogMessages.Add($"{actor.Name} unequips {Template.DisplayName}." );
-            }
-
-            return;
-        }
-
-        if (inventory.TryEquip(item, Template.Slot, Template.StatModifiers, out var previous))
-        {
-            if (previous is not null)
-            {
-                ApplyStatModifiers(actor.Stats, previous.StatModifiers, -1);
-            }
-
-            ApplyStatModifiers(actor.Stats, Template.StatModifiers, 1);
-            outcome.LogMessages.Add($"{actor.Name} equips {Template.DisplayName}." );
-        }
-    }
 
     private void ApplyEffect(IEntity actor, ActionOutcome outcome)
     {

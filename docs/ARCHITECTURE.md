@@ -23,7 +23,7 @@ The repository is split into a deterministic simulation core and a Godot-facing 
 - `Scripts/Autoloads/` for runtime coordination and events
 - `Scripts/World/` for rendering, animation, and FOV presentation
 - `Scripts/UI/` for menus, HUD, inventory, logs, and input routing
-- `Scripts/Tools/` for debug and editor utility scripts
+- `Scripts/Tools/` for debug, editor, and in-app authoring utility scripts
 - `Scenes/` for scene resources consumed by those scripts
 
 ### Content
@@ -43,6 +43,7 @@ At runtime the project starts from `Scenes/Main.tscn`.
 3. `EventBus` exposes the project-wide notification surface used by UI and world scripts.
 4. `ContentDatabase` holds the loaded `IContentDatabase` instance for Godot-side consumers.
 5. `UiRoot` binds itself to the active `GameManager`, `EventBus`, and content services.
+6. `UiRoot` also owns the in-app developer workshop and debug surfaces so runtime authoring flows stay outside the simulation core.
 
 ## Runtime Flow
 
@@ -90,6 +91,17 @@ If a presentation system needs to react to a simulation change, prefer adding or
 
 `Scripts/Autoloads/ContentDatabase.cs` is a thin Godot node that exposes the loaded `IContentDatabase` to scene-side consumers.
 
+## Runtime Tooling
+
+`Scripts/Tools/DevToolsWorkbench.cs` is the runtime authoring overlay exposed from the title screen, pause menu, and gameplay hotkeys. It wraps the lower-level `MapEditor`, `ItemEditor`, and debug-command tooling so the foundation can be extended from inside the actual app.
+
+This keeps authoring utilities on the Godot side while still allowing non-editor workflows:
+
+- `MapEditor` remains the room-prefab backend
+- `ItemEditor` remains the item and enemy document backend
+- `DevToolsWorkbench` is the menu-driven runtime shell around those tools
+- `DebugConsole` remains the freeform escape hatch for direct commands
+
 ## Where New Code Belongs
 
 - New gameplay rule or state mutation: `Core/Simulation/` or another `Core/` subsystem
@@ -99,7 +111,7 @@ If a presentation system needs to react to a simulation change, prefer adding or
 - New persistence shape or migration: `Core/Persistence/`
 - New HUD, menu, overlay, or input behavior: `Scripts/UI/`
 - New world animation or renderer: `Scripts/World/`
-- New editor/debug utility: `Scripts/Tools/` plus a scene or plugin hook if needed
+- New editor/debug/runtime-authoring utility: `Scripts/Tools/` plus a scene, plugin hook, or `UiRoot` integration if needed
 
 ## Determinism Rules
 

@@ -20,6 +20,80 @@ public sealed class StubContentDatabase : IContentDatabase
                 "heal",
                 -1,
                 5),
+            ["potion_haste"] = new(
+                "potion_haste",
+                "Haste Potion",
+                "Boosts speed for a few turns.",
+                ItemCategory.Consumable,
+                EquipSlot.None,
+                new Dictionary<string, int>
+                {
+                    ["duration"] = 5,
+                    ["magnitude"] = 1,
+                },
+                "status:hasted",
+                -1,
+                3),
+            ["sword_iron"] = new(
+                "sword_iron",
+                "Iron Sword",
+                "Reliable melee weapon.",
+                ItemCategory.Weapon,
+                EquipSlot.MainHand,
+                new Dictionary<string, int>
+                {
+                    ["attack"] = 2,
+                },
+                null,
+                0,
+                1),
+            ["shield_wooden"] = new(
+                "shield_wooden",
+                "Wooden Shield",
+                "Basic off-hand protection.",
+                ItemCategory.Armor,
+                EquipSlot.OffHand,
+                new Dictionary<string, int>
+                {
+                    ["defense"] = 2,
+                },
+                null,
+                0,
+                1),
+            ["dagger_venom"] = new(
+                "dagger_venom",
+                "Viper Fang",
+                "Fast, light, and nasty.",
+                ItemCategory.Weapon,
+                EquipSlot.MainHand,
+                new Dictionary<string, int>
+                {
+                    ["attack"] = 1,
+                    ["speed"] = 10,
+                },
+                null,
+                0,
+                1),
+            ["scroll_fireball"] = new(
+                "scroll_fireball",
+                "Scroll of Fireball",
+                "Single-use offensive scroll.",
+                ItemCategory.Scroll,
+                EquipSlot.None,
+                new Dictionary<string, int>(),
+                "heal",
+                -1,
+                1),
+            ["scroll_blink"] = new(
+                "scroll_blink",
+                "Scroll of Blink",
+                "Single-use escape scroll.",
+                ItemCategory.Scroll,
+                EquipSlot.None,
+                new Dictionary<string, int>(),
+                "heal",
+                -1,
+                1),
         };
 
         EnemyTemplates = new Dictionary<string, EnemyTemplate>

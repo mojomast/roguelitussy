@@ -18,6 +18,7 @@ public enum Key
     Period,
     Tab,
     Backquote,
+    Quoteleft = Backquote,
     Plus,
     Minus,
     W,
@@ -25,9 +26,12 @@ public enum Key
     S,
     D,
     Q,
+    T,
     E,
     G,
+    H,
     I,
+    M,
     U,
     C,
     One,
@@ -92,6 +96,8 @@ public class Node : GodotObject
             child.Parent = null;
         }
     }
+
+    public Node? GetParent() => Parent;
 
     public virtual void QueueFree()
     {
@@ -354,6 +360,11 @@ public class TextureButton : Control
     public bool ButtonPressed { get; set; }
 }
 
+public class Texture2D : GodotObject
+{
+    public string ResourcePath { get; set; } = string.Empty;
+}
+
 public class InputEvent : GodotObject
 {
     public virtual bool IsActionPressed(string action) => false;
@@ -397,6 +408,21 @@ public static class Input
         }
 
         PressedButtons.Remove(button);
+    }
+}
+
+public static class GD
+{
+    public static T? Load<T>(string path)
+        where T : class, new()
+    {
+        var resource = new T();
+        if (resource is Texture2D texture)
+        {
+            texture.ResourcePath = path;
+        }
+
+        return resource;
     }
 }
 

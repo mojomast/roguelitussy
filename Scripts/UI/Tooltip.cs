@@ -77,7 +77,7 @@ public partial class Tooltip : Control
         Visible = true;
     }
 
-    public void Hide()
+    public new void Hide()
     {
         Visible = false;
         TitleText = string.Empty;
@@ -86,7 +86,7 @@ public partial class Tooltip : Control
 
     private Vector2 ClampToScreen(Vector2 position)
     {
-        var viewport = GetViewportRect().Size;
+        var viewport = GetParent() is not null && GetTree() is not null ? GetViewportRect().Size : new Vector2(1280f, 720f);
         var x = position.X;
         var y = position.Y;
 

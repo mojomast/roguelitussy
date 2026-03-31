@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Godot.NET.Sdk/4.4.1">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
@@ -6,10 +6,31 @@
     <LangVersion>12</LangVersion>
     <RootNamespace>Godotussy</RootNamespace>
     <AssemblyName>godotussy</AssemblyName>
+    <DisableImplicitGodotGeneratorReferences>true</DisableImplicitGodotGeneratorReferences>
+    <DisableImplicitGodotSharpReferences>true</DisableImplicitGodotSharpReferences>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(UseGodotStubs)' == 'true'">
+    <BaseIntermediateOutputPath>obj\godotstubs\</BaseIntermediateOutputPath>
+    <OutputPath>bin\godotstubs\$(Configuration)\$(TargetFramework)\</OutputPath>
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Addons\roguelike_tools\RoguelikeToolsPlugin.cs" />
     <Compile Remove="Tests\**\*.cs" />
+    <Compile Remove="obj\**\*.cs" />
+    <Compile Remove=".godot\**\*.cs" />
+    <Compile Remove="Compat\Godot\GodotStubs.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(UseGodotStubs)' == 'true'">
+    <Compile Include="Addons\roguelike_tools\RoguelikeToolsPlugin.cs" />
+    <Compile Include="Compat\Godot\GodotStubs.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(UseGodotStubs)' != 'true'">
+    <PackageReference Include="Godot.SourceGenerators" Version="4.4.1" PrivateAssets="all" />
+    <PackageReference Include="GodotSharp" Version="4.4.1" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(RenderingValidation)' == 'true'">

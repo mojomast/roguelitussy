@@ -29,6 +29,12 @@ public partial class UIRoot : CanvasLayer
 
     public GameOverScreen GameOverScreen { get; } = new();
 
+    public Minimap Minimap { get; } = new();
+
+    public DevToolsWorkbench DevToolsWorkbench { get; } = new();
+
+    public HelpOverlay HelpOverlay { get; } = new();
+
     public Tooltip Tooltip { get; } = new();
 
     public DebugConsole DebugConsole { get; } = new();
@@ -62,6 +68,8 @@ public partial class UIRoot : CanvasLayer
         CombatLog.Bind(_gameManager, _eventBus);
         Inventory.Bind(_gameManager, _eventBus, _content, Tooltip);
         CharacterSheet.Bind(_gameManager, _eventBus, _content);
+        Minimap.Bind(_gameManager, _eventBus);
+        DevToolsWorkbench.Bind(_gameManager, _eventBus, _content);
         MainMenu.Bind(_gameManager, _eventBus);
         PauseMenu.Bind(_eventBus);
         DebugConsole.Bind(_gameManager, _eventBus, _content);
@@ -70,11 +78,19 @@ public partial class UIRoot : CanvasLayer
 
         MainMenu.GameStarted -= OnGameStarted;
         MainMenu.GameStarted += OnGameStarted;
+        MainMenu.HelpRequested -= ToggleHelp;
+        MainMenu.HelpRequested += ToggleHelp;
+        MainMenu.DevToolsRequested -= OpenDevTools;
+        MainMenu.DevToolsRequested += OpenDevTools;
 
         PauseMenu.ResumeRequested -= OnResumeRequested;
         PauseMenu.ResumeRequested += OnResumeRequested;
         PauseMenu.CharacterSheetRequested -= OnCharacterSheetRequested;
         PauseMenu.CharacterSheetRequested += OnCharacterSheetRequested;
+        PauseMenu.HelpRequested -= ToggleHelp;
+        PauseMenu.HelpRequested += ToggleHelp;
+        PauseMenu.DevToolsRequested -= OpenDevTools;
+        PauseMenu.DevToolsRequested += OpenDevTools;
         PauseMenu.MainMenuRequested -= OpenMainMenu;
         PauseMenu.MainMenuRequested += OpenMainMenu;
 
@@ -91,6 +107,17 @@ public partial class UIRoot : CanvasLayer
         InputHandler.PauseRequested += TogglePause;
         InputHandler.MinimapToggleRequested -= ToggleMinimap;
         InputHandler.MinimapToggleRequested += ToggleMinimap;
+        InputHandler.HelpRequested -= ToggleHelp;
+        InputHandler.HelpRequested += ToggleHelp;
+        InputHandler.ToolsRequested -= ToggleDevTools;
+        InputHandler.ToolsRequested += ToggleDevTools;
+
+        DevToolsWorkbench.DebugConsoleRequested -= OpenDebugConsoleFromWorkshop;
+        DevToolsWorkbench.DebugConsoleRequested += OpenDebugConsoleFromWorkshop;
+        DevToolsWorkbench.PlaytestStarted -= OnDevToolsPlaytestStarted;
+        DevToolsWorkbench.PlaytestStarted += OnDevToolsPlaytestStarted;
+        DevToolsWorkbench.RuntimeContentReloaded -= OnRuntimeContentReloaded;
+        DevToolsWorkbench.RuntimeContentReloaded += OnRuntimeContentReloaded;
 
         if (_eventBus is not null)
         {
@@ -133,9 +160,12 @@ public partial class UIRoot : CanvasLayer
         AddIfMissing(CombatLog);
         AddIfMissing(Inventory);
         AddIfMissing(CharacterSheet);
+        AddIfMissing(Minimap);
+        AddIfMissing(DevToolsWorkbench);
         AddIfMissing(MainMenu);
         AddIfMissing(PauseMenu);
         AddIfMissing(GameOverScreen);
+        AddIfMissing(HelpOverlay);
         AddIfMissing(Tooltip);
         AddIfMissing(DebugConsole);
         AddIfMissing(DebugOverlay);
@@ -144,7 +174,7 @@ public partial class UIRoot : CanvasLayer
 
     private void AddIfMissing(Node node)
     {
-        if (node.Parent is null)
+        if (node.GetParent() is null)
         {
             AddChild(node);
         }
@@ -163,7 +193,18 @@ public partial class UIRoot : CanvasLayer
             return handledByConsole;
         }
 
-        if (key == Key.Backquote)
+        if (DevToolsWorkbench.Visible)
+        {
+            var handledByWorkshop = DevToolsWorkbench.HandleKey(key);
+            if (handledByWorkshop)
+            {
+                RefreshInputGate();
+            }
+
+            return handledByWorkshop;
+        }
+
+        if (key == Key.Quoteleft)
         {
             ToggleDebugConsole();
             return true;
@@ -178,6 +219,17 @@ public partial class UIRoot : CanvasLayer
         if (GameOverScreen.Visible)
         {
             var handled = GameOverScreen.HandleKey(key);
+            if (handled)
+            {
+                RefreshInputGate();
+            }
+
+            return handled;
+        }
+
+        if (HelpOverlay.Visible)
+        {
+            var handled = HelpOverlay.HandleKey(key);
             if (handled)
             {
                 RefreshInputGate();
@@ -245,7 +297,7 @@ public partial class UIRoot : CanvasLayer
 
     private void OnEntityDied(EntityId entityId)
     {
-        if (_gameManager?.World is null)
+        if (_gameManager?.World?.Player is null)
         {
             return;
         }
@@ -270,6 +322,7 @@ public partial class UIRoot : CanvasLayer
         MainMenu.Close();
         PauseMenu.Close();
         GameOverScreen.Close();
+        HelpOverlay.Close();
         Inventory.Close();
         CharacterSheet.Close();
         Tooltip.Hide();
@@ -289,6 +342,7 @@ public partial class UIRoot : CanvasLayer
         Inventory.Close();
         CharacterSheet.Close();
         GameOverScreen.Close();
+        HelpOverlay.Close();
         Tooltip.Hide();
         RefreshInputGate();
     }
@@ -368,12 +422,70 @@ public partial class UIRoot : CanvasLayer
     private void ToggleMinimap()
     {
         HUD.ToggleMinimap();
+        Minimap.Toggle();
+    }
+
+    private void ToggleHelp()
+    {
+        HelpOverlay.ToggleForContext(MainMenu.Visible);
+        RefreshInputGate();
+    }
+
+    private void ToggleDevTools()
+    {
+        if (GameOverScreen.Visible)
+        {
+            return;
+        }
+
+        if (DevToolsWorkbench.Visible)
+        {
+            DevToolsWorkbench.Close();
+        }
+        else
+        {
+            OpenDevTools();
+            return;
+        }
+
+        RefreshInputGate();
+    }
+
+    private void OpenDevTools()
+    {
+        HelpOverlay.Close();
+        Inventory.Close();
+        CharacterSheet.Close();
+        Tooltip.Hide();
+        DevToolsWorkbench.Open();
+        RefreshInputGate();
     }
 
     private void ToggleDebugConsole()
     {
         DebugConsole.Toggle();
         RefreshInputGate();
+    }
+
+    private void OpenDebugConsoleFromWorkshop()
+    {
+        DevToolsWorkbench.Close();
+        DebugConsole.Open();
+        RefreshInputGate();
+    }
+
+    private void OnDevToolsPlaytestStarted()
+    {
+        MainMenu.Close();
+        PauseMenu.Close();
+        HelpOverlay.Close();
+        Tooltip.Hide();
+        RefreshInputGate();
+    }
+
+    private void OnRuntimeContentReloaded(IContentDatabase content)
+    {
+        BindServices(_gameManager, _eventBus, content);
     }
 
     private void ToggleDebugOverlay()
@@ -387,6 +499,8 @@ public partial class UIRoot : CanvasLayer
         Inventory.Close();
         CharacterSheet.Close();
         GameOverScreen.Close();
+        HelpOverlay.Close();
+        DevToolsWorkbench.Close();
         Tooltip.Hide();
         MainMenu.Open();
         RefreshInputGate();
@@ -403,7 +517,7 @@ public partial class UIRoot : CanvasLayer
 
     private void OpenGameOver()
     {
-        if (GameOverScreen.Visible || _gameManager?.World is null)
+        if (GameOverScreen.Visible || _gameManager?.World?.Player is null)
         {
             return;
         }
@@ -411,6 +525,8 @@ public partial class UIRoot : CanvasLayer
         PauseMenu.Close();
         Inventory.Close();
         CharacterSheet.Close();
+        HelpOverlay.Close();
+        DevToolsWorkbench.Close();
         Tooltip.Hide();
         var world = _gameManager.World;
         GameOverScreen.Open(new GameOverSummary(world.Player.Name, world.Depth, _enemiesKilled, world.TurnNumber));
@@ -419,7 +535,7 @@ public partial class UIRoot : CanvasLayer
 
     private bool IsPlayerDead()
     {
-        return _gameManager?.World?.Player.Stats.HP <= 0;
+        return _gameManager?.World?.Player?.Stats.HP <= 0;
     }
 
     private void RefreshInputGate()
@@ -430,6 +546,8 @@ public partial class UIRoot : CanvasLayer
             && !Inventory.Visible
             && !CharacterSheet.Visible
             && !GameOverScreen.Visible
+            && !HelpOverlay.Visible
+            && !DevToolsWorkbench.Visible
             && !DebugConsole.Visible);
     }
 }

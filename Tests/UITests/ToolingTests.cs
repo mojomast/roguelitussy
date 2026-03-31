@@ -18,6 +18,9 @@ public sealed class ToolingTests : ITestSuite
         registry.Add("UI.Tools.DebugConsole executes runtime commands", DebugConsoleExecutesCommands);
         registry.Add("UI.Tools.Plugin registers editor docks", PluginRegistersDocks);
         registry.Add("UI.Tools.UIRoot toggles debug overlays", UIRootTogglesDebugTools);
+        registry.Add("UI.Tools.Workbench authors content without Godot editor", WorkbenchAuthorsContentWithoutEditor);
+        registry.Add("UI.Tools.Workbench opens from title and gameplay", UIRootOpensWorkbench);
+        registry.Add("UI.Tools.Workbench playtests drafts and reloads runtime content", WorkbenchPlaytestsAndReloadsContent);
     }
 
     private static void MapEditorRoundTripsPrefabs()
@@ -147,6 +150,103 @@ public sealed class ToolingTests : ITestSuite
         root._UnhandledInput(new InputEventKey { Pressed = true, PhysicalKeycode = Key.Q });
 
         Expect.True(root.DebugOverlay.Visible, "Q should toggle the debug overlay");
+    }
+
+    private static void WorkbenchAuthorsContentWithoutEditor()
+    {
+        var contentDirectory = CreateTemporaryContentDirectory();
+        try
+        {
+            var context = CreateContext();
+            var workbench = new DevToolsWorkbench();
+            workbench.Bind(context.GameManager, context.Bus, context.Content, contentDirectory);
+            workbench.Open();
+
+            workbench.CreateRoomDraft();
+            workbench.SaveCurrentRoomDraft();
+            workbench.CreateItemDraft();
+            workbench.SaveItemsDocument();
+            workbench.CreateEnemyDraft();
+            workbench.SaveEnemiesDocument();
+
+            var rooms = ReadDocument<RoomPrefabsDocument>(Path.Combine(contentDirectory, "room_prefabs.json"));
+            var items = ReadDocument<ItemsDocument>(Path.Combine(contentDirectory, "items.json"));
+            var enemies = ReadDocument<EnemiesDocument>(Path.Combine(contentDirectory, "enemies.json"));
+
+            Expect.True(rooms.Rooms.Exists(room => room.Id.StartsWith("custom_room_", StringComparison.Ordinal)), "Workbench should be able to save a new room draft.");
+            Expect.True(items.Items.Exists(item => item.Id.StartsWith("custom_item_", StringComparison.Ordinal)), "Workbench should be able to save a new item draft.");
+            Expect.True(enemies.Enemies.Exists(enemy => enemy.Id.StartsWith("custom_enemy_", StringComparison.Ordinal)), "Workbench should be able to save a new enemy draft.");
+        }
+        finally
+        {
+            DeleteDirectory(contentDirectory);
+        }
+    }
+
+    private static void UIRootOpensWorkbench()
+    {
+        var context = CreateContext();
+        var root = new UIRoot();
+        root.BindServices(context.GameManager, context.Bus, context.Content);
+
+        root._UnhandledInput(new InputEventKey { Pressed = true, PhysicalKeycode = Key.T });
+        Expect.True(root.DevToolsWorkbench.Visible, "The title flow should be able to open the developer workshop.");
+
+        root._UnhandledInput(new InputEventKey { Pressed = true, PhysicalKeycode = Key.Escape });
+        Expect.False(root.DevToolsWorkbench.Visible, "Escape should close the developer workshop.");
+
+        root._UnhandledInput(new InputEventKey { Pressed = true, PhysicalKeycode = Key.Enter });
+        root._UnhandledInput(new InputEventKey { Pressed = true, PhysicalKeycode = Key.T });
+        Expect.True(root.DevToolsWorkbench.Visible, "Gameplay should also be able to open the developer workshop.");
+    }
+
+    private static void WorkbenchPlaytestsAndReloadsContent()
+    {
+        var contentDirectory = CreateTemporaryContentDirectory();
+        try
+        {
+            var context = CreateContext();
+            var workbench = new DevToolsWorkbench();
+            var playtestStarted = false;
+            IContentDatabase? reloaded = null;
+
+            workbench.PlaytestStarted += () => playtestStarted = true;
+            workbench.RuntimeContentReloaded += content => reloaded = content;
+            workbench.Bind(context.GameManager, context.Bus, context.Content, contentDirectory);
+            workbench.Open();
+
+            workbench.CreateRoomDraft();
+            var roomStarted = workbench.PlaytestCurrentRoomDraft();
+
+            Expect.True(roomStarted, "Workbench should be able to load the current room draft into a playable world.");
+            Expect.True(playtestStarted, "Room playtests should notify the UI shell.");
+            Expect.Equal(GameManager.GameState.Playing, context.GameManager.CurrentState, "Playing a room draft should enter gameplay state.");
+            Expect.Equal(20, context.GameManager.World!.Width, "Default room drafts should load with the map editor dimensions.");
+
+            workbench.Open();
+            var errors = workbench.ReloadRuntimeContent();
+            var itemDropped = workbench.DropSelectedItemAtPlayer();
+            var enemySpawned = workbench.SpawnSelectedEnemyNearPlayer();
+
+            Expect.True(errors.Count >= 0, "Reloading runtime content should return a warning list rather than throwing.");
+            Expect.True(itemDropped, "Workbench should be able to drop the selected item into the active run.");
+            Expect.True(enemySpawned, "Workbench should be able to spawn the selected enemy into the active run.");
+            Expect.True(context.GameManager.World.HasGroundItems(context.GameManager.World.Player.Position), "Dropped workshop items should appear on the ground.");
+            Expect.True(context.GameManager.World.Entities.Count >= 2, "Spawned workshop enemies should appear in the active run.");
+
+            var itemEditor = new ItemEditor();
+            itemEditor.Load(contentDirectory);
+            itemEditor.CreateItem("workbench_reload_item");
+            itemEditor.SaveItems(contentDirectory);
+
+            errors = workbench.ReloadRuntimeContent();
+            Expect.NotNull(reloaded, "Workbench should notify listeners after a successful runtime content reload.");
+            Expect.True(context.GameManager.Content!.TryGetItemTemplate("workbench_reload_item", out _), "Runtime content reload should replace the game manager database.");
+        }
+        finally
+        {
+            DeleteDirectory(contentDirectory);
+        }
     }
 
     private static ToolContext CreateContext()

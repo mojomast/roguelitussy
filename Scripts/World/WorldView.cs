@@ -13,12 +13,13 @@ public enum FogTileState
 
 public partial class WorldView : Node2D
 {
-    public const int TileSize = 16;
+    public const int TileSize = 34;
 
     private TileMapLayer _floorLayer = new() { Name = "TileMapLayer_Floor" };
     private TileMapLayer _wallLayer = new() { Name = "TileMapLayer_Walls" };
     private TileMapLayer _objectLayer = new() { Name = "TileMapLayer_Objects" };
     private TileMapLayer _fogLayer = new() { Name = "TileMapLayer_Fog" };
+    private Node2D _tileArtLayer = new() { Name = "TileArtLayer" };
     private Node2D _entityLayer = new() { Name = "EntityLayer" };
     private Camera2D _camera = new() { Name = "Camera2D" };
     private readonly FOVCalculator _fov = new();
@@ -27,6 +28,7 @@ public partial class WorldView : Node2D
     private readonly HashSet<Position> _visibleTiles = new();
     private readonly HashSet<Position> _exploredTiles = new();
     private readonly Dictionary<EntityId, Position> _entitySnapshot = new();
+    private readonly Dictionary<Position, Node> _tileArt = new();
     private readonly EntityRenderer _entityRenderer;
 
     private EventBus? _eventBus;
@@ -65,6 +67,7 @@ public partial class WorldView : Node2D
         _wallLayer = GetNode<TileMapLayer>("TileMapLayer_Walls");
         _objectLayer = GetNode<TileMapLayer>("TileMapLayer_Objects");
         _fogLayer = GetNode<TileMapLayer>("TileMapLayer_Fog");
+        _tileArtLayer = GetNodeOrNull<Node2D>("TileArtLayer") ?? _tileArtLayer;
         _entityLayer = GetNode<Node2D>("EntityLayer");
         _camera = GetNode<Camera2D>("Camera2D");
 
@@ -92,6 +95,7 @@ public partial class WorldView : Node2D
         {
             _eventBus.TurnCompleted -= OnTurnCompleted;
             _eventBus.FloorChanged -= OnFloorChanged;
+            _eventBus.FovRecalculated -= OnFovRecalculated;
             _eventBus.DamageDealt -= OnDamageDealt;
             _eventBus.EntityMoved -= OnEntityMoved;
             _eventBus.EntitySpawned -= OnEntitySpawned;
@@ -106,6 +110,7 @@ public partial class WorldView : Node2D
 
         _eventBus.TurnCompleted += OnTurnCompleted;
         _eventBus.FloorChanged += OnFloorChanged;
+        _eventBus.FovRecalculated += OnFovRecalculated;
         _eventBus.DamageDealt += OnDamageDealt;
         _eventBus.EntityMoved += OnEntityMoved;
         _eventBus.EntitySpawned += OnEntitySpawned;
@@ -122,6 +127,7 @@ public partial class WorldView : Node2D
         _fogLayer.Clear();
         _visibleTiles.Clear();
         _exploredTiles.Clear();
+        ClearTileArt();
 
         for (var y = 0; y < world.Height; y++)
         {
@@ -143,8 +149,19 @@ public partial class WorldView : Node2D
             return;
         }
 
+        if (_world is WorldState mutableWorld)
+        {
+            mutableWorld.ClearVisibility();
+        }
+
         _visibleTiles.Clear();
         var player = _world.Player;
+        if (player is null)
+        {
+            SyncVisibilityFromWorld();
+            return;
+        }
+
         _fov.Compute(
             player.Position,
             player.Stats.ViewRadius,
@@ -153,16 +170,23 @@ public partial class WorldView : Node2D
             {
                 if (_world.InBounds(pos))
                 {
+                    if (_world is WorldState mutable)
+                    {
+                        mutable.SetVisible(pos, true);
+                    }
+
                     _visibleTiles.Add(pos);
                     _exploredTiles.Add(pos);
                 }
             });
 
         _visibleTiles.Add(player.Position);
-        _exploredTiles.Add(player.Position);
-        UpdateFogLayer();
-        _entityRenderer.UpdateVisibility(_visibleTiles);
-        _cameraController.CenterOn(player.Position, TileSize);
+        if (_world is WorldState world)
+        {
+            world.SetVisible(player.Position, true);
+        }
+
+        SyncVisibilityFromWorld();
     }
 
     public FogTileState GetFogState(Position position)
@@ -188,6 +212,7 @@ public partial class WorldView : Node2D
     private void RenderTile(Position position, TileType tileType)
     {
         var cellPosition = new Vector2I(position.X, position.Y);
+        RenderTileArt(position, tileType);
         switch (tileType)
         {
             case TileType.Floor:
@@ -212,6 +237,60 @@ public partial class WorldView : Node2D
                 _wallLayer.SetCell(cellPosition, 0, new Vector2I(4, 0));
                 break;
         }
+    }
+
+    private void ClearTileArt()
+    {
+        foreach (var tile in _tileArt.Values)
+        {
+            _tileArtLayer.RemoveChild(tile);
+            tile.QueueFree();
+        }
+
+        _tileArt.Clear();
+    }
+
+    private void RenderTileArt(Position position, TileType tileType)
+    {
+        var isDoorOpen = tileType == TileType.Door && _world is WorldState world && world.IsDoorOpen(position);
+        var texture = WorldArtCatalog.GetTileTexture(tileType, isDoorOpen);
+        if (texture is not null)
+        {
+            var sprite = new Sprite2D
+            {
+                Name = $"Tile_{position.X}_{position.Y}",
+                Position = ToCanvasPosition(position),
+                Texture = texture,
+            };
+            _tileArtLayer.AddChild(sprite);
+            _tileArt[position] = sprite;
+            return;
+        }
+
+        var tile = new ColorRect
+        {
+            Name = $"Tile_{position.X}_{position.Y}",
+            Position = new Vector2(position.X * TileSize, position.Y * TileSize),
+            Size = new Vector2(TileSize, TileSize),
+            Color = ResolveTileColor(tileType),
+        };
+        _tileArtLayer.AddChild(tile);
+        _tileArt[position] = tile;
+    }
+
+    private static Color ResolveTileColor(TileType tileType)
+    {
+        return tileType switch
+        {
+            TileType.Floor => new Color(0.18f, 0.18f, 0.2f, 1f),
+            TileType.Wall => new Color(0.07f, 0.07f, 0.09f, 1f),
+            TileType.Door => new Color(0.45f, 0.28f, 0.12f, 1f),
+            TileType.StairsDown => new Color(0.18f, 0.3f, 0.5f, 1f),
+            TileType.StairsUp => new Color(0.24f, 0.42f, 0.24f, 1f),
+            TileType.Water => new Color(0.12f, 0.24f, 0.55f, 1f),
+            TileType.Lava => new Color(0.7f, 0.24f, 0.08f, 1f),
+            _ => new Color(0f, 0f, 0f, 1f),
+        };
     }
 
     private void UpdateFogLayer()
@@ -252,6 +331,15 @@ public partial class WorldView : Node2D
         }
 
         AnimateEntityMovesFromSnapshot();
+        ClearTileArt();
+        for (var y = 0; y < _world.Height; y++)
+        {
+            for (var x = 0; x < _world.Width; x++)
+            {
+                RenderTile(new Position(x, y), _world.GetTile(new Position(x, y)));
+            }
+        }
+
         _entityRenderer.SyncEntities(_world.Entities);
         RecalculateFov();
         SnapshotEntities();
@@ -262,6 +350,47 @@ public partial class WorldView : Node2D
         if (_gameManager?.World is not null)
         {
             BindWorld(_gameManager.World);
+        }
+    }
+
+    private void OnFovRecalculated()
+    {
+        SyncVisibilityFromWorld();
+    }
+
+    private void SyncVisibilityFromWorld()
+    {
+        if (_world is null)
+        {
+            return;
+        }
+
+        _visibleTiles.Clear();
+        _exploredTiles.Clear();
+
+        for (var y = 0; y < _world.Height; y++)
+        {
+            for (var x = 0; x < _world.Width; x++)
+            {
+                var position = new Position(x, y);
+                if (_world.IsVisible(position))
+                {
+                    _visibleTiles.Add(position);
+                }
+
+                if (_world.IsExplored(position))
+                {
+                    _exploredTiles.Add(position);
+                }
+            }
+        }
+
+        UpdateFogLayer();
+        _entityRenderer.UpdateVisibility(_visibleTiles);
+
+        if (_world.Player is not null)
+        {
+            _cameraController.CenterOn(_world.Player.Position, TileSize);
         }
     }
 

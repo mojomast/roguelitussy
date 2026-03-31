@@ -6,10 +6,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>12</LangVersion>
     <AssemblyName>godotussy.Tests</AssemblyName>
+    <UseGodotStubs>true</UseGodotStubs>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\godotussy.csproj" />
+    <ProjectReference Include="..\godotussy.csproj">
+      <AdditionalProperties>UseGodotStubs=true</AdditionalProperties>
+    </ProjectReference>
   </ItemGroup>
 
   <ItemGroup Condition="'$(RenderingValidation)' == 'true'">

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.IO;
 using Godot;
 using Roguelike.Core;
 
@@ -58,6 +59,7 @@ public partial class MapEditor : Control
     private char[,] _canvas = new char[DefaultWidth, DefaultHeight];
     private int _canvasWidth = DefaultWidth;
     private int _canvasHeight = DefaultHeight;
+    private bool _isPrimaryButtonDown;
     private Vector2I? _rectAnchor;
 
     public MapEditor()
@@ -99,6 +101,22 @@ public partial class MapEditor : Control
 
     public string CanvasText => string.Join("\n", GetLayoutRows());
 
+    public IReadOnlyList<string> GetRoomIds(string? contentDirectory = null)
+    {
+        var path = ToolPaths.ResolveContentFile("room_prefabs.json", contentDirectory);
+        if (!File.Exists(path))
+        {
+            return Array.Empty<string>();
+        }
+
+        return ToolJson
+            .Read<RoomPrefabsDocument>(path)
+            .Rooms
+            .OrderBy(room => room.Id, StringComparer.Ordinal)
+            .Select(room => room.Id)
+            .ToArray();
+    }
+
     public override void _Ready()
     {
         try
@@ -120,18 +138,18 @@ public partial class MapEditor : Control
     {
         if (@event is InputEventMouseButton button && button.ButtonIndex == MouseButton.Left && button.Pressed)
         {
-            Input.SetMouseButtonPressed(MouseButton.Left, true);
+            _isPrimaryButtonDown = true;
             ApplyToolAt(ScreenToGrid(button.Position));
             return;
         }
 
         if (@event is InputEventMouseButton released && released.ButtonIndex == MouseButton.Left && !released.Pressed)
         {
-            Input.SetMouseButtonPressed(MouseButton.Left, false);
+            _isPrimaryButtonDown = false;
             return;
         }
 
-        if (@event is InputEventMouseMotion motion && Input.IsMouseButtonPressed(MouseButton.Left) && CurrentTool == ToolMode.Pen)
+        if (@event is InputEventMouseMotion motion && _isPrimaryButtonDown && CurrentTool == ToolMode.Pen)
         {
             PaintCell(ScreenToGrid(motion.Position).X, ScreenToGrid(motion.Position).Y);
         }
@@ -178,6 +196,28 @@ public partial class MapEditor : Control
         StatusText = $"Tool set to {mode}.";
     }
 
+    public void CreateDraft(string id, int width = DefaultWidth, int height = DefaultHeight)
+    {
+        ResizeCanvas(Math.Max(4, width), Math.Max(4, height), '#');
+        for (var y = 1; y < _canvasHeight - 1; y++)
+        {
+            for (var x = 1; x < _canvasWidth - 1; x++)
+            {
+                _canvas[x, y] = '.';
+            }
+        }
+
+        var midY = Math.Clamp(_canvasHeight / 2, 1, _canvasHeight - 2);
+        _canvas[0, midY] = '+';
+        _canvas[_canvasWidth - 1, midY] = '+';
+        _canvas[1, 1] = 'P';
+        _canvas[_canvasWidth - 2, _canvasHeight - 2] = '>';
+        SetMetadata(id, ToDisplayName(id), "custom", 1, 99);
+        _rectAnchor = null;
+        QueueRedraw();
+        StatusText = $"Created draft '{id}'.";
+    }
+
     public void ResizeCanvas(int width, int height, char fill = '#')
     {
         if (width <= 0 || height <= 0)
@@ -216,6 +256,18 @@ public partial class MapEditor : Control
 
         _canvas[x, y] = NormalizeBrush(brush ?? SelectedBrush);
         QueueRedraw();
+        return true;
+    }
+
+    public bool ApplyCurrentToolAt(int x, int y)
+    {
+        if (!IsInBounds(x, y))
+        {
+            StatusText = $"Cell {x},{y} is out of bounds.";
+            return false;
+        }
+
+        ApplyToolAt(new Vector2I(x, y));
         return true;
     }
 
@@ -383,6 +435,30 @@ public partial class MapEditor : Control
         document.Rooms = document.Rooms.OrderBy(room => room.Id, StringComparer.Ordinal).ToList();
         ToolJson.Write(path, document);
         StatusText = $"Saved '{prefab.Id}' to room_prefabs.json.";
+    }
+
+    public IReadOnlyList<string> ValidateDraft()
+    {
+        var errors = new List<string>();
+        try
+        {
+            _ = BuildPrefabDefinition();
+        }
+        catch (Exception ex)
+        {
+            errors.Add(ex.Message);
+        }
+
+        if (errors.Count == 0)
+        {
+            StatusText = $"Draft '{RoomId}' is valid.";
+        }
+        else
+        {
+            StatusText = errors[0];
+        }
+
+        return errors;
     }
 
     public IReadOnlyList<string> GetLayoutRows()

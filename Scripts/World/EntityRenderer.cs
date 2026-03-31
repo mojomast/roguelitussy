@@ -65,7 +65,7 @@ public sealed class EntityRenderer
 
         spriteRoot.Position = WorldView.ToCanvasPosition(entity.Position);
         spriteRoot.Visible = _visibleTiles.Count == 0 || _visibleTiles.Contains(entity.Position);
-        spriteRoot.Modulate = ResolveTint(entity);
+        spriteRoot.Modulate = Colors.White;
         _lastKnownPositions[entity.Id] = entity.Position;
     }
 
@@ -146,13 +146,27 @@ public sealed class EntityRenderer
         {
             Name = entity.Id.ToString(),
             Position = WorldView.ToCanvasPosition(entity.Position),
-            Modulate = ResolveTint(entity),
+            Modulate = Colors.White,
         };
 
-        spriteRoot.AddChild(new Sprite2D
+        var texture = WorldArtCatalog.GetEntityTexture(entity);
+        if (texture is not null)
         {
-            Name = "Sprite2D",
-            Modulate = ResolveTint(entity),
+            spriteRoot.AddChild(new Sprite2D
+            {
+                Name = "Body",
+                Position = new Vector2(0f, 0f),
+                Texture = texture,
+            });
+            return spriteRoot;
+        }
+
+        spriteRoot.AddChild(new ColorRect
+        {
+            Name = "Body",
+            Position = new Vector2(2f, 2f),
+            Size = new Vector2(WorldView.TileSize - 4f, WorldView.TileSize - 4f),
+            Color = ResolveTint(entity),
         });
 
         return spriteRoot;

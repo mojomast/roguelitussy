@@ -20,10 +20,13 @@ A deterministic roguelike foundation for Godot 4.4 with a pure C# simulation cor
 
 5. Open `project.godot` in Godot 4.4 to inspect scenes, autoloads, and editor tools.
 
+6. Launch the playable shell and use the built-in developer workshop from the title screen or pause menu if you want to author rooms and content without opening the Godot editor.
+
 ## What This Project Contains
 
 - A pure C# simulation layer for entities, actions, combat, inventory, AI, generation, and persistence.
 - Godot-side autoloads and presentation scripts for UI, rendering, and debug/editor tooling.
+- An in-app developer workshop for creating room drafts and scaffolding item/enemy content directly from the runtime shell.
 - JSON-driven content for items, enemies, abilities, status effects, loot tables, and room prefabs.
 - Save/load infrastructure with validation and migration support.
 - A custom test runner covering simulation, generation, content, persistence, rendering, UI, and integration flows.
@@ -84,11 +87,18 @@ Run the rendering-focused compile profile:
 dotnet run --project Tests/godotussy.Tests.csproj -p:RenderingValidation=true
 ```
 
+Run the game headlessly to validate startup:
+
+```powershell
+Godot_v4.4.1-stable_mono_win64_console.exe --headless --path . --quit
+```
+
 ## Notes For Contributors
 
 - The simulation layer intentionally avoids Godot imports so it remains testable and deterministic.
 - Save data is versioned and migrated on load; do not change persistence shapes casually.
 - Content IDs are expected to be stable lowercase snake_case keys.
+- The runtime shell now exposes a developer workshop for room and content authoring, so editor plugin usage is optional for common content-building tasks.
 - Temporary root-level `.cs` scratch files are included by the SDK globbing rules and can break builds.
 
 Start with [docs/SETUP.md](docs/SETUP.md) if you are new to the repository, then use [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) before making structural changes.

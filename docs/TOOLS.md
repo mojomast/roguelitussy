@@ -1,6 +1,43 @@
 # Tools
 
-The repository includes both editor-time tools and in-game debug surfaces.
+The repository now supports two parallel tooling paths:
+
+- Godot editor tools for scene-oriented workflows
+- Runtime tools inside the playable shell for authoring and validation without opening the editor
+
+The runtime path is the default recommendation when you just want to build content and iterate on the foundation quickly.
+
+## In-App Developer Workshop
+
+`Scripts/Tools/DevToolsWorkbench.cs` is wired into `Scripts/UI/UIRoot.cs` and is available from:
+
+- the title screen via `Dev Tools`
+- the pause menu via `Dev Tools`
+- gameplay via `T`
+
+The workshop is a menu-driven runtime shell around the lower-level tool backends:
+
+- `Rooms` uses `Scripts/Tools/MapEditor.cs` to create, load, preview, validate, save, and immediately playtest room prefab drafts
+- `Items` uses `Scripts/Tools/ItemEditor.cs` to scaffold and tune item templates before saving `items.json`, and can drop the selected runtime item into the current run
+- `Enemies` uses `Scripts/Tools/ItemEditor.cs` to scaffold and tune enemy templates before saving `enemies.json`, and can spawn the selected enemy near the player for iteration
+- `Commands` reloads tool data, reloads runtime content from disk, validates content, and hands off to the debug console when freeform commands are more efficient
+
+Workshop controls:
+
+- `Tab` switches tabs
+- `Up` and `Down` select a field or action
+- `Left` and `Right` or `+` and `-` adjust the selected field
+- `Enter` applies the selected action
+- `Esc` or `T` closes the workshop
+
+Use this workflow when you want to extend the content foundation without touching Godot editor panels.
+
+The intended fast loop is:
+
+1. Author or adjust a room, item, or enemy draft in the workshop.
+2. Save the relevant JSON document.
+3. Use `Reload runtime content from disk` when you want the active game session to pick up the new content definitions.
+4. Use room playtest or the item/enemy spawn actions to validate behavior immediately in the running game.
 
 ## Godot Editor Plugin
 
@@ -17,6 +54,8 @@ These are instantiated from:
 - `Scripts/Tools/ItemEditor.cs`
 
 Use the plugin when editing or validating project content from within Godot.
+
+The plugin and the runtime workshop share the same backend tool scripts. They are different surfaces over the same content-authoring logic, not separate implementations.
 
 ## Tool Scenes
 
@@ -35,8 +74,11 @@ Current built-in shortcuts:
 
 - Backquote toggles the debug console.
 - `Q` toggles the debug overlay.
+- `T` toggles the developer workshop.
 
 The exact command set for the debug console is owned by the tool scripts and their command processor.
+
+The debug console is still the best path for direct mutation commands such as teleporting, forcing floor changes, spawning items, or revealing fog. The workshop is better for repeatable content-authoring tasks.
 
 ## Tool Path Resolution
 
@@ -52,5 +94,7 @@ Add or extend a project tool when the task is editor- or debugging-focused and d
 - map inspection
 - debug commands
 - overlays for runtime diagnostics
+
+If the tool is meant to support building the game out from the foundation without opening Godot, prefer exposing it through the runtime workshop as well as through any editor-facing plugin hooks.
 
 Keep gameplay-facing menus and widgets in `Scripts/UI/`, not in the tools area.

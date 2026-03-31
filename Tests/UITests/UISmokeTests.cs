@@ -10,10 +10,70 @@ public sealed class UISmokeTests : ITestSuite
 {
     public void Register(TestRegistry registry)
     {
+        registry.Add("UI.GameManager new game generates a populated floor", GameManagerGeneratesPopulatedFloor);
+        registry.Add("UI.GameManager floor travel preserves run state", GameManagerPreservesRunStateAcrossFloors);
         registry.Add("UI.HUD updates from bus and exposes keyboard toggles", HudUpdatesFromBus);
+        registry.Add("UI.Minimap reflects explored tiles and gameplay toggles", MinimapReflectsExplorationAndToggles);
+        registry.Add("UI.MainMenu character creation affects the starting run", MainMenuCharacterCreationAffectsStartingRun);
         registry.Add("UI.Inventory keyboard navigation emits concrete actions", InventoryEmitsConcreteActions);
+        registry.Add("UI.Help overlay opens from menu and gameplay", HelpOverlayOpensFromMenuAndGameplay);
         registry.Add("UI.CombatLog escapes BBCode and reacts to combat events", CombatLogReactsToEvents);
         registry.Add("UI.UIRoot routes keyboard between title, overlays, and gameplay", UIRootRoutesKeyboard);
+    }
+
+    private static void GameManagerGeneratesPopulatedFloor()
+    {
+        var gameManager = new GameManager();
+        var bus = new EventBus();
+        gameManager.AttachServices(new WorldState(), new TurnScheduler(), new StubGenerator(), new FOVCalculator(), new StubContentDatabase(), new StubSaveManager(), bus);
+
+        gameManager.StartNewGame(1337);
+
+        Expect.NotNull(gameManager.World, "Starting a new game should create a world.");
+        Expect.Equal(GameManager.GameState.Playing, gameManager.CurrentState, "Starting a new game should enter the playing state.");
+        Expect.NotNull(gameManager.World!.Player, "The generated world should include a player.");
+        Expect.True(gameManager.World.Entities.Count >= 2, "The generated world should include at least one enemy alongside the player.");
+        Expect.True(gameManager.World.GetItemsAt(new Position(4, 4)).Count > 0, "Item spawns should be populated on the generated floor.");
+        Expect.True(CountVisibleTiles(gameManager.World) > 0, "Starting a new game should calculate visible tiles for the active floor.");
+    }
+
+    private static void GameManagerPreservesRunStateAcrossFloors()
+    {
+        var gameManager = new GameManager();
+        var bus = new EventBus();
+        gameManager.AttachServices(new WorldState(), new TurnScheduler(), new StubGenerator(), new FOVCalculator(), new StubContentDatabase(), new StubSaveManager(), bus);
+        gameManager.StartNewGame(7331);
+
+        var player = gameManager.World!.Player;
+        player.Stats.HP = 27;
+
+        EntityId enemyId = EntityId.Invalid;
+        foreach (var entity in gameManager.World.Entities)
+        {
+            if (entity.Id != player.Id)
+            {
+                enemyId = entity.Id;
+                break;
+            }
+        }
+
+        Expect.True(enemyId.IsValid, "The starting floor should contain an enemy to mutate before traveling.");
+        gameManager.World.RemoveEntity(enemyId);
+        gameManager.World.MoveEntity(player.Id, new Position(8, 8));
+
+        var descendOutcome = gameManager.ProcessPlayerAction(new DescendAction(player.Id));
+        Expect.Equal(ActionResult.Success, descendOutcome.Result, "Descending should succeed from the stairs-down tile.");
+        Expect.Equal(1, gameManager.World!.Depth, "Descending should move the player to the next floor.");
+        Expect.Equal(27, gameManager.World.Player.Stats.HP, "Player HP should carry over when traveling downward.");
+
+        var descendedPlayerId = gameManager.World.Player.Id;
+        gameManager.World.MoveEntity(descendedPlayerId, new Position(1, 1));
+
+        var ascendOutcome = gameManager.ProcessPlayerAction(new AscendAction(descendedPlayerId));
+        Expect.Equal(ActionResult.Success, ascendOutcome.Result, "Ascending should succeed from the stairs-up tile.");
+        Expect.Equal(0, gameManager.World!.Depth, "Ascending should return to the original floor.");
+        Expect.Equal(27, gameManager.World.Player.Stats.HP, "Player HP should still match the carried run state after returning.");
+        Expect.True(gameManager.World.GetEntity(enemyId) is null, "Floor-local mutations should persist when revisiting a cached floor.");
     }
 
     private static void HudUpdatesFromBus()
@@ -41,9 +101,29 @@ public sealed class UISmokeTests : ITestSuite
         Expect.False(before == hud.MinimapText, "Toggling the minimap should change the HUD summary");
     }
 
+    private static void MinimapReflectsExplorationAndToggles()
+    {
+        var context = CreateContext();
+        context.GameManager.LoadWorld(context.World);
+
+        var minimap = new Minimap();
+        minimap.Bind(context.GameManager, context.Bus);
+
+        Expect.True(minimap.Visible, "The minimap should be visible during gameplay by default.");
+        Expect.True(minimap.VisibleTileCount > 0, "The minimap should reflect currently visible tiles.");
+        Expect.True(minimap.ExploredTileCount >= minimap.VisibleTileCount, "Explored tiles should include the current visible region.");
+        Expect.True(minimap.PlayerWorldPosition != Position.Invalid, "The minimap should track the player marker.");
+
+        minimap.Toggle();
+        Expect.False(minimap.Visible, "Toggling the minimap should hide the overlay.");
+
+        minimap.Toggle();
+        Expect.True(minimap.Visible, "Toggling the minimap again should restore the overlay.");
+    }
+
     private static void InventoryEmitsConcreteActions()
     {
-        var useContext = CreateContext();
+        var useContext = CreateContext(new ItemInstance { TemplateId = "potion_health", StackCount = 2, IsIdentified = true });
         var tooltip = new Tooltip();
         var inventory = new InventoryUI();
         inventory.Bind(useContext.GameManager, useContext.Bus, useContext.Content, tooltip);
@@ -53,6 +133,10 @@ public sealed class UISmokeTests : ITestSuite
 
         inventory.Open();
         Expect.Equal(0, inventory.SelectedIndex, "Inventory should start on the first slot");
+        Expect.True(inventory.GridText.Contains("Sort: Equipped"), "Inventory should expose the active sort mode in the overlay text");
+        Expect.True(inventory.DescriptionText.Contains("Category:"), "Inventory should provide item-management details for the selected slot");
+        inventory.HandleKey(Key.Tab);
+        Expect.True(inventory.GridText.Contains("Sort: Category"), "Tab should cycle inventory sorting modes");
         inventory.HandleKey(Key.Right);
         Expect.Equal(1, inventory.SelectedIndex, "Right arrow should move selection across the grid");
         inventory.HandleKey(Key.Left);
@@ -60,7 +144,18 @@ public sealed class UISmokeTests : ITestSuite
 
         Expect.True(submitted is UseItemAction, "Using an inventory item should emit a concrete UseItemAction");
 
-        var dropContext = CreateContext();
+    var equipContext = CreateContext(new ItemInstance { TemplateId = "sword_iron", IsIdentified = true });
+    var equipInventory = new InventoryUI();
+    equipInventory.Bind(equipContext.GameManager, equipContext.Bus, equipContext.Content, tooltip);
+    IAction? equipped = null;
+    equipContext.Bus.PlayerActionSubmitted += action => equipped = action;
+
+    equipInventory.Open();
+    equipInventory.HandleKey(Key.E);
+
+    Expect.True(equipped is ToggleEquipAction, "Equipping an inventory item should emit a concrete ToggleEquipAction");
+
+    var dropContext = CreateContext(new ItemInstance { TemplateId = "potion_health", StackCount = 3, IsIdentified = true });
         var dropInventory = new InventoryUI();
         dropInventory.Bind(dropContext.GameManager, dropContext.Bus, dropContext.Content, tooltip);
         IAction? dropped = null;
@@ -70,6 +165,72 @@ public sealed class UISmokeTests : ITestSuite
         dropInventory.HandleKey(Key.D);
 
         Expect.True(dropped is DropItemAction, "Dropping an inventory item should emit a concrete DropItemAction");
+        Expect.Equal(1, (dropped as DropItemAction)?.Quantity ?? 0, "Dropping a stack from the UI should default to a one-item split-drop.");
+    }
+
+    private static void MainMenuCharacterCreationAffectsStartingRun()
+    {
+        var gameManager = new GameManager();
+        var bus = new EventBus();
+        var content = new StubContentDatabase();
+        gameManager.AttachServices(new WorldState(), new TurnScheduler(), new StubGenerator(), new FOVCalculator(), content, new StubSaveManager(), bus);
+
+        var menu = new MainMenu();
+        menu.Bind(gameManager, bus);
+
+        menu.HandleKey(Key.Down);
+        menu.HandleKey(Key.Right);
+        menu.HandleKey(Key.Down);
+        menu.HandleKey(Key.Right);
+        menu.HandleKey(Key.Down);
+        menu.HandleKey(Key.Right);
+        menu.HandleKey(Key.Down);
+        menu.HandleKey(Key.Right);
+        menu.HandleKey(Key.Down);
+        menu.HandleKey(Key.Right);
+        menu.HandleKey(Key.Down);
+        menu.HandleKey(Key.Right);
+        menu.HandleKey(Key.Down);
+        menu.HandleKey(Key.Right);
+        menu.HandleKey(Key.Down);
+        menu.HandleKey(Key.Right);
+        menu.HandleKey(Key.Up);
+        menu.HandleKey(Key.Up);
+        menu.HandleKey(Key.Up);
+        menu.HandleKey(Key.Up);
+        menu.HandleKey(Key.Up);
+        menu.HandleKey(Key.Up);
+        menu.HandleKey(Key.Up);
+        menu.HandleKey(Key.Up);
+        menu.HandleKey(Key.Enter);
+
+        var player = gameManager.World!.Player;
+        var inventory = player.GetComponent<InventoryComponent>();
+
+        Expect.Equal("Iris", player.Name, "Character creation should apply the selected preset name to the starting run.");
+        Expect.Equal("Skirmisher", gameManager.CharacterOptions.Archetype, "Character creation should persist the selected archetype.");
+        Expect.Equal("Scout", gameManager.CharacterOptions.Origin, "Character creation should persist the selected origin.");
+        Expect.Equal("Quartermaster", gameManager.CharacterOptions.Trait, "Character creation should persist the selected trait.");
+        Expect.True(player.Stats.Speed > 100, "Archetype and origin bonuses should affect player stats.");
+        Expect.True(player.Stats.Accuracy > 80, "Allocated finesse points should affect player accuracy.");
+        Expect.True(inventory?.Capacity > 20, "Trait bonuses should be able to expand inventory capacity.");
+        Expect.True(inventory?.GetEquipped(EquipSlot.MainHand) is not null, "A loadout archetype should start with equipment already equipped.");
+    }
+
+    private static void HelpOverlayOpensFromMenuAndGameplay()
+    {
+        var context = CreateContext();
+        var root = new UIRoot();
+        root.BindServices(context.GameManager, context.Bus, context.Content);
+
+        root._UnhandledInput(new InputEventKey { Pressed = true, PhysicalKeycode = Key.H });
+        Expect.True(root.HelpOverlay.Visible, "Help should open from the title flow.");
+        root._UnhandledInput(new InputEventKey { Pressed = true, PhysicalKeycode = Key.Escape });
+        Expect.False(root.HelpOverlay.Visible, "Escape should close the help overlay.");
+
+        root._UnhandledInput(new InputEventKey { Pressed = true, PhysicalKeycode = Key.Enter });
+        root._UnhandledInput(new InputEventKey { Pressed = true, PhysicalKeycode = Key.H });
+        Expect.True(root.HelpOverlay.Visible, "Help should also open during gameplay.");
     }
 
     private static void CombatLogReactsToEvents()
@@ -100,6 +261,13 @@ public sealed class UISmokeTests : ITestSuite
 
         Expect.Equal(GameManager.GameState.Playing, context.GameManager.CurrentState, "Selecting New Game should transition into playing state");
         Expect.False(root.MainMenu.Visible, "Main menu should close once a new game starts");
+        Expect.True(root.Minimap.Visible, "Gameplay should show the minimap by default.");
+
+        root._UnhandledInput(new InputEventKey { Pressed = true, PhysicalKeycode = Key.Tab });
+        Expect.False(root.Minimap.Visible, "The minimap toggle should hide the overlay during gameplay.");
+
+        root._UnhandledInput(new InputEventKey { Pressed = true, PhysicalKeycode = Key.M });
+        Expect.True(root.Minimap.Visible, "The alternate minimap hotkey should restore the overlay.");
 
         root._UnhandledInput(new InputEventKey { Pressed = true, PhysicalKeycode = Key.I });
         Expect.True(root.Inventory.Visible, "Gameplay input should open the inventory overlay");
@@ -113,12 +281,12 @@ public sealed class UISmokeTests : ITestSuite
         root._UnhandledInput(new InputEventKey { Pressed = true, PhysicalKeycode = Key.Escape });
         Expect.False(root.PauseMenu.Visible, "Escape from the pause menu should close the overlay");
 
-        context.Player.Stats.HP = 0;
+        context.GameManager.World!.Player.Stats.HP = 0;
         context.Bus.EmitTurnCompleted();
         Expect.True(root.GameOverScreen.Visible, "A dead player should open the game over overlay on the next turn update");
     }
 
-    private static UIContext CreateContext()
+    private static UIContext CreateContext(params ItemInstance[] items)
     {
         var world = new WorldState();
         world.InitGrid(8, 8);
@@ -144,14 +312,26 @@ public sealed class UISmokeTests : ITestSuite
                 MaxHP = 40,
                 Attack = 8,
                 Defense = 4,
-                Accuracy = 0,
+                Accuracy = 80,
                 Evasion = 0,
                 Speed = 100,
                 ViewRadius = 8,
             });
         var inventory = new InventoryComponent(20);
-        inventory.Add(new ItemInstance { TemplateId = "potion_health" });
-        inventory.Add(new ItemInstance { TemplateId = "potion_health" });
+        if (items.Length == 0)
+        {
+            items = new[]
+            {
+                new ItemInstance { TemplateId = "potion_health", IsIdentified = true },
+                new ItemInstance { TemplateId = "potion_health", IsIdentified = true },
+            };
+        }
+
+        foreach (var item in items)
+        {
+            inventory.Add(item);
+        }
+
         player.SetComponent(inventory);
 
         world.Player = player;
@@ -169,4 +349,21 @@ public sealed class UISmokeTests : ITestSuite
     }
 
     private sealed record UIContext(WorldState World, StubEntity Player, EventBus Bus, GameManager GameManager, StubContentDatabase Content);
+
+    private static int CountVisibleTiles(IWorldState world)
+    {
+        var count = 0;
+        for (var y = 0; y < world.Height; y++)
+        {
+            for (var x = 0; x < world.Width; x++)
+            {
+                if (world.IsVisible(new Position(x, y)))
+                {
+                    count++;
+                }
+            }
+        }
+
+        return count;
+    }
 }

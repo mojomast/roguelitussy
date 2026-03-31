@@ -16,8 +16,11 @@ public sealed class ActionTests : ITestSuite
         registry.Add("Simulation.Actions attack action removes killed enemies", AttackActionRemovesKilledEnemies);
         registry.Add("Simulation.Actions attack action rejects same faction targets", AttackActionRejectsSameFaction);
         registry.Add("Simulation.Actions pickup action rejects full inventory", PickupActionRejectsFullInventory);
+        registry.Add("Simulation.Actions pickup action merges stacks when bag is full", PickupActionMergesStacksWhenFull);
         registry.Add("Simulation.Actions use item heals and consumes potion", UseItemHealsAndConsumes);
+        registry.Add("Simulation.Actions toggle equip action changes equipment state", ToggleEquipActionChangesEquipmentState);
         registry.Add("Simulation.Actions drop item places it on the ground", DropItemPlacesGroundItem);
+        registry.Add("Simulation.Actions drop item can split a stack", DropItemSplitsStack);
         registry.Add("Simulation.Actions open and close door toggles walkability", OpenAndCloseDoorTogglesWalkability);
         registry.Add("Simulation.Actions stairs validation requires matching tile", StairsValidationRequiresMatchingTile);
     }
@@ -131,6 +134,40 @@ public sealed class ActionTests : ITestSuite
         Expect.Equal(ActionResult.Blocked, new PickupAction(actor.Id).Validate(world), "Pickup should fail when the inventory is full");
     }
 
+    private static void PickupActionMergesStacksWhenFull()
+    {
+        var world = CreateWorld();
+        var actor = CreateActor("Player", new Position(1, 1), Faction.Player);
+        var inventory = new InventoryComponent(1);
+        inventory.Add(new ItemInstance { TemplateId = "potion_health", StackCount = 2, IsIdentified = true });
+        actor.SetComponent(inventory);
+
+        world.Player = actor;
+        world.AddEntity(actor);
+        world.DropItem(actor.Position, new ItemInstance { TemplateId = "potion_health", StackCount = 1, IsIdentified = true });
+
+        var template = new ItemTemplate(
+            "potion_health",
+            "Health Potion",
+            "Restores health.",
+            ItemCategory.Consumable,
+            EquipSlot.None,
+            new Dictionary<string, int> { ["heal"] = 5 },
+            "heal",
+            -1,
+            5);
+
+        var action = new PickupAction(actor.Id, template);
+        Expect.Equal(ActionResult.Success, action.Validate(world), "Pickup should validate when the new item can merge into an existing stack.");
+
+        var outcome = action.Execute(world);
+
+        Expect.Equal(ActionResult.Success, outcome.Result, "Pickup should succeed when merging into an existing stack.");
+        Expect.Equal(1, inventory.Items.Count, "Merging a pickup should avoid creating a second stack.");
+        Expect.Equal(3, inventory.Items[0].StackCount, "The carried stack should absorb the picked-up item.");
+        Expect.False(world.HasGroundItems(actor.Position), "Merged pickups should remove the source item from the ground.");
+    }
+
     private static void UseItemHealsAndConsumes()
     {
         var world = CreateWorld();
@@ -161,6 +198,41 @@ public sealed class ActionTests : ITestSuite
         Expect.False(inventory.Contains(item.InstanceId), "Consumed item should be removed from inventory");
     }
 
+    private static void ToggleEquipActionChangesEquipmentState()
+    {
+        var world = CreateWorld();
+        var actor = CreateActor("Player", new Position(1, 1), Faction.Player, new Stats { HP = 10, MaxHP = 10, Attack = 4, Defense = 1, Accuracy = 0, Evasion = 0, Speed = 100 });
+        var inventory = actor.GetComponent<InventoryComponent>()!;
+        var sword = new ItemInstance { TemplateId = "sword_iron", IsIdentified = true };
+        inventory.Add(sword);
+
+        world.Player = actor;
+        world.AddEntity(actor);
+
+        var template = new ItemTemplate(
+            "sword_iron",
+            "Iron Sword",
+            "Reliable steel.",
+            ItemCategory.Weapon,
+            EquipSlot.MainHand,
+            new Dictionary<string, int> { ["attack"] = 2 },
+            string.Empty,
+            -1,
+            1);
+
+        var equip = new ToggleEquipAction(actor.Id, sword.InstanceId, template).Execute(world);
+
+        Expect.Equal(ActionResult.Success, equip.Result, "Equipping an owned item should succeed.");
+        Expect.Equal(sword.InstanceId, inventory.GetEquipped(EquipSlot.MainHand)?.Item.InstanceId ?? EntityId.Invalid, "Equipping should place the item into the matching slot.");
+        Expect.Equal(6, actor.Stats.Attack, "Equipping should apply the weapon stat bonus.");
+
+        var unequip = new ToggleEquipAction(actor.Id, sword.InstanceId, template).Execute(world);
+
+        Expect.Equal(ActionResult.Success, unequip.Result, "Unequipping the same item should also succeed.");
+        Expect.True(inventory.GetEquipped(EquipSlot.MainHand) is null, "Unequipping should clear the slot.");
+        Expect.Equal(4, actor.Stats.Attack, "Unequipping should remove the weapon stat bonus.");
+    }
+
     private static void DropItemPlacesGroundItem()
     {
         var world = CreateWorld();
@@ -178,6 +250,25 @@ public sealed class ActionTests : ITestSuite
         Expect.Equal(ActionResult.Success, outcome.Result, "Drop action should succeed for owned items");
         Expect.False(inventory.Contains(item.InstanceId), "Dropped item should be removed from inventory");
         Expect.True(world.HasGroundItems(actor.Position), "Dropped item should appear on the ground");
+    }
+
+    private static void DropItemSplitsStack()
+    {
+        var world = CreateWorld();
+        var actor = CreateActor("Player", new Position(1, 1), Faction.Player);
+        var inventory = actor.GetComponent<InventoryComponent>()!;
+        var item = new ItemInstance { TemplateId = "rock", StackCount = 3, IsIdentified = true };
+        inventory.Add(item);
+
+        world.Player = actor;
+        world.AddEntity(actor);
+
+        var outcome = new DropItemAction(actor.Id, item.InstanceId, 1).Execute(world);
+
+        Expect.Equal(ActionResult.Success, outcome.Result, "Split-drop should succeed for a stacked item.");
+        Expect.Equal(2, inventory.Get(item.InstanceId)?.StackCount ?? 0, "Split-drop should leave the remaining stack in inventory.");
+        Expect.Equal(1, world.GetItemsAt(actor.Position).Count, "Split-drop should create exactly one ground stack.");
+        Expect.Equal(1, world.GetItemsAt(actor.Position)[0].StackCount, "The dropped stack should contain only the requested quantity.");
     }
 
     private static void OpenAndCloseDoorTogglesWalkability()

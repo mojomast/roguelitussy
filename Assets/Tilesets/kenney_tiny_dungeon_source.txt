@@ -1,0 +1,4 @@
+Source: Kenney Tiny Dungeon
+URL: https://kenney.nl/assets/tiny-dungeon
+License: Creative Commons CC0 1.0
+Notes: Project-local crops derived from the CC0 preview sheet for temporary runtime tile and sprite art.

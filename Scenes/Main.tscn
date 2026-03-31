@@ -1,10 +1,28 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
-[ext_resource type="Script" path="res://Scripts/UI/UIRoot.cs" id="1_uiroot"]
+[ext_resource type="Script" path="res://Scripts/World/WorldView.cs" id="1_worldview"]
+[ext_resource type="Script" path="res://Scripts/UI/UIRoot.cs" id="2_uiroot"]
 
 [node name="Main" type="Node"]
 
 [node name="WorldRoot" type="Node2D" parent="."]
 
+[node name="WorldView" type="Node2D" parent="WorldRoot"]
+script = ExtResource("1_worldview")
+
+[node name="TileMapLayer_Floor" type="TileMapLayer" parent="WorldRoot/WorldView"]
+
+[node name="TileMapLayer_Walls" type="TileMapLayer" parent="WorldRoot/WorldView"]
+
+[node name="TileMapLayer_Objects" type="TileMapLayer" parent="WorldRoot/WorldView"]
+
+[node name="TileMapLayer_Fog" type="TileMapLayer" parent="WorldRoot/WorldView"]
+
+[node name="TileArtLayer" type="Node2D" parent="WorldRoot/WorldView"]
+
+[node name="EntityLayer" type="Node2D" parent="WorldRoot/WorldView"]
+
+[node name="Camera2D" type="Camera2D" parent="WorldRoot/WorldView"]
+
 [node name="UiRoot" type="CanvasLayer" parent="."]
-script = ExtResource("1_uiroot")
+script = ExtResource("2_uiroot")

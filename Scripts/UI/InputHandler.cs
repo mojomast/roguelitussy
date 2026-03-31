@@ -17,6 +17,10 @@ public partial class InputHandler : Node
 
     public event System.Action? MinimapToggleRequested;
 
+    public event System.Action? HelpRequested;
+
+    public event System.Action? ToolsRequested;
+
     public void Bind(GameManager? gameManager, EventBus? eventBus)
     {
         _gameManager = gameManager;
@@ -41,6 +45,11 @@ public partial class InputHandler : Node
             return false;
         }
 
+        if (world.Player is null)
+        {
+            return false;
+        }
+
         var playerId = world.Player.Id;
         return key switch
         {
@@ -49,12 +58,14 @@ public partial class InputHandler : Node
             Key.Left or Key.A => Submit(UIActionFactory.CreateDirectionalAction(world, playerId, new Position(-1, 0))),
             Key.Right or Key.D => Submit(UIActionFactory.CreateDirectionalAction(world, playerId, new Position(1, 0))),
             Key.Space or Key.Period => Submit(UIActionFactory.CreateWaitAction(world, playerId)),
-            Key.G => Submit(UIActionFactory.CreatePickupAction(world, playerId)),
+            Key.G => Submit(UIActionFactory.CreatePickupAction(world, _gameManager?.Content, playerId)),
             Key.Enter => Submit(UIActionFactory.CreateStairsAction(world, playerId)),
             Key.I => Raise(InventoryRequested),
             Key.C => Raise(CharacterSheetRequested),
+            Key.H => Raise(HelpRequested),
+            Key.T => Raise(ToolsRequested),
             Key.Escape => Raise(PauseRequested),
-            Key.Tab => Raise(MinimapToggleRequested),
+            Key.M or Key.Tab => Raise(MinimapToggleRequested),
             _ => false,
         };
     }

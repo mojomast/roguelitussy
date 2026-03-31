@@ -7,6 +7,11 @@ namespace Godotussy;
 public abstract partial class MenuBase : Control
 {
     private readonly List<string> _options = new();
+    private Panel? _panel;
+    private Label? _label;
+    private const float PanelWidth = 420f;
+    private const float PanelHeight = 300f;
+    private const float PanelPadding = 20f;
 
     protected int SelectedIndex { get; private set; }
 
@@ -15,6 +20,12 @@ public abstract partial class MenuBase : Control
     public string MenuText { get; private set; } = string.Empty;
 
     public IReadOnlyList<string> Options => _options;
+
+    public override void _Ready()
+    {
+        EnsureVisuals();
+        RefreshVisualState();
+    }
 
     protected void ConfigureOptions(params string[] options)
     {
@@ -73,11 +84,13 @@ public abstract partial class MenuBase : Control
     {
         Visible = true;
         SetSelection(SelectedIndex);
+        RefreshVisualState();
     }
 
     public virtual void Close()
     {
         Visible = false;
+        RefreshVisualState();
     }
 
     protected virtual bool HandleCustomKey(Key key)
@@ -120,5 +133,59 @@ public abstract partial class MenuBase : Control
         }
 
         MenuText = builder.ToString().TrimEnd();
+        RefreshVisualState();
+    }
+
+    private void EnsureVisuals()
+    {
+        if (_panel is not null && _label is not null)
+        {
+            return;
+        }
+
+        Size = ResolveViewportSize();
+        ZIndex = 100;
+
+        _panel = new Panel
+        {
+            Name = "Panel",
+            Size = new Vector2(PanelWidth, PanelHeight),
+            Position = new Vector2(
+                (Size.X - PanelWidth) * 0.5f,
+                (Size.Y - PanelHeight) * 0.5f),
+        };
+
+        _label = new Label
+        {
+            Name = "Label",
+            Position = new Vector2(PanelPadding, PanelPadding),
+            Size = new Vector2(PanelWidth - (PanelPadding * 2f), PanelHeight - (PanelPadding * 2f)),
+        };
+
+        _panel.AddChild(_label);
+        AddChild(_panel);
+    }
+
+    private void RefreshVisualState()
+    {
+        EnsureVisuals();
+
+        if (_panel is null || _label is null)
+        {
+            return;
+        }
+
+        Size = ResolveViewportSize();
+        _panel.Position = new Vector2(
+            (Size.X - _panel.Size.X) * 0.5f,
+            (Size.Y - _panel.Size.Y) * 0.5f);
+        _panel.Visible = Visible;
+        _label.Visible = Visible;
+        _label.Text = MenuText;
+    }
+
+    private Vector2 ResolveViewportSize()
+    {
+        return GetParent() is not null && GetTree() is not null ? GetViewportRect().Size : new Vector2(1280f, 720f);
     }
 }

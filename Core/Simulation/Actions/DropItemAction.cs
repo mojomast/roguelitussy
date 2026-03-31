@@ -2,15 +2,18 @@ namespace Roguelike.Core;
 
 public sealed class DropItemAction : IAction
 {
-    public DropItemAction(EntityId actorId, EntityId itemInstanceId)
+    public DropItemAction(EntityId actorId, EntityId itemInstanceId, int quantity = int.MaxValue)
     {
         ActorId = actorId;
         ItemInstanceId = itemInstanceId;
+        Quantity = quantity;
     }
 
     public EntityId ActorId { get; }
 
     public EntityId ItemInstanceId { get; }
+
+    public int Quantity { get; }
 
     public ActionType Type => ActionType.DropItem;
 
@@ -37,17 +40,18 @@ public sealed class DropItemAction : IAction
             ApplyStatModifiers(actor.Stats, equipped.StatModifiers, -1);
         }
 
-        if (!inventory.Remove(ItemInstanceId, out var item) || item is null)
+        if (!inventory.RemoveQuantity(ItemInstanceId, Quantity, out var item) || item is null)
         {
             return ActionOutcome.Fail(ActionResult.Invalid);
         }
 
         world.DropItem(actor.Position, item);
+        var droppedCount = item.StackCount > 1 ? $" x{item.StackCount}" : string.Empty;
         return new ActionOutcome
         {
             Result = ActionResult.Success,
             DirtyPositions = { actor.Position },
-            LogMessages = { $"{actor.Name} drops {item.TemplateId}." },
+            LogMessages = { $"{actor.Name} drops {item.TemplateId}{droppedCount}." },
         };
     }
 

@@ -11,6 +11,11 @@ namespace Godotussy;
 public partial class ItemEditor : Control
 {
     private static readonly Regex StableIdPattern = new("^[a-z0-9_]+$", RegexOptions.Compiled);
+    private static readonly string[] DefaultItemTypes = { "weapon", "armor", "consumable", "accessory" };
+    private static readonly string[] DefaultItemSlots = { "none", "main_hand", "off_hand", "body", "head", "feet", "ring", "amulet" };
+    private static readonly string[] DefaultRarities = { "common", "uncommon", "rare", "legendary" };
+    private static readonly string[] DefaultAiTypes = { "melee_rush", "ranged_kite", "ambush" };
+    private static readonly string[] DefaultFactions = { "Enemy", "Neutral" };
     private ItemsDocument _itemsDocument = new() { Schema = "roguelike-items-v1", Version = 1 };
     private EnemiesDocument _enemiesDocument = new() { Schema = "roguelike-enemies-v1", Version = 1 };
     private string? _loadedContentDirectory;
@@ -67,6 +72,58 @@ public partial class ItemEditor : Control
         return SelectedEnemy is not null;
     }
 
+    public bool CycleSelectedItem(int delta)
+    {
+        if (_itemsDocument.Items.Count == 0)
+        {
+            return false;
+        }
+
+        var currentIndex = SelectedItem is null
+            ? 0
+            : _itemsDocument.Items.FindIndex(item => string.Equals(item.Id, SelectedItem.Id, StringComparison.Ordinal));
+        if (currentIndex < 0)
+        {
+            currentIndex = 0;
+        }
+
+        currentIndex = WrapIndex(currentIndex + delta, _itemsDocument.Items.Count);
+        SelectedItem = _itemsDocument.Items[currentIndex];
+        StatusText = $"Selected item '{SelectedItem.Id}'.";
+        return true;
+    }
+
+    public bool CycleSelectedEnemy(int delta)
+    {
+        if (_enemiesDocument.Enemies.Count == 0)
+        {
+            return false;
+        }
+
+        var currentIndex = SelectedEnemy is null
+            ? 0
+            : _enemiesDocument.Enemies.FindIndex(enemy => string.Equals(enemy.Id, SelectedEnemy.Id, StringComparison.Ordinal));
+        if (currentIndex < 0)
+        {
+            currentIndex = 0;
+        }
+
+        currentIndex = WrapIndex(currentIndex + delta, _enemiesDocument.Enemies.Count);
+        SelectedEnemy = _enemiesDocument.Enemies[currentIndex];
+        StatusText = $"Selected enemy '{SelectedEnemy.Id}'.";
+        return true;
+    }
+
+    public ItemDefinition CreateNextItem(string prefix = "custom_item")
+    {
+        return CreateItem(NextStableId(prefix, _itemsDocument.Items.Select(item => item.Id)));
+    }
+
+    public EnemyDefinition CreateNextEnemy(string prefix = "custom_enemy")
+    {
+        return CreateEnemy(NextStableId(prefix, _enemiesDocument.Enemies.Select(enemy => enemy.Id)));
+    }
+
     public ItemDefinition CreateItem(string id)
     {
         var item = new ItemDefinition
@@ -84,7 +141,7 @@ public partial class ItemEditor : Control
             Requirements = new Dictionary<string, int>(),
             Stackable = true,
             MaxStack = 1,
-            SpritePath = "res://Assets/Sprites/items/placeholder.png",
+            SpritePath = "res://Assets/Sprites/items/potion_health.png",
             SpriteAtlasCoords = new List<int> { 0, 0 },
         };
 
@@ -119,7 +176,7 @@ public partial class ItemEditor : Control
             Abilities = new List<EnemyAbilityReference>(),
             LootTableId = null,
             Tags = new List<string>(),
-            SpritePath = "res://Assets/Sprites/enemies/placeholder.png",
+            SpritePath = "res://Assets/Sprites/enemies/rat.png",
             SpriteAtlasCoords = new List<int> { 0, 0 },
         };
 
@@ -173,6 +230,185 @@ public partial class ItemEditor : Control
         }
 
         return errors;
+    }
+
+    public void CycleSelectedItemType(int delta)
+    {
+        if (!TryGetSelectedItem(out var item))
+        {
+            return;
+        }
+
+        item.Type = Rotate(BuildItemTypeOptions(), item.Type, delta);
+        if (item.Type == "consumable")
+        {
+            item.Slot = "none";
+        }
+
+        UpsertItem(item);
+    }
+
+    public void CycleSelectedItemSlot(int delta)
+    {
+        if (!TryGetSelectedItem(out var item))
+        {
+            return;
+        }
+
+        item.Slot = Rotate(BuildItemSlotOptions(), item.Slot, delta);
+        UpsertItem(item);
+    }
+
+    public void CycleSelectedItemRarity(int delta)
+    {
+        if (!TryGetSelectedItem(out var item))
+        {
+            return;
+        }
+
+        item.Rarity = Rotate(BuildItemRarityOptions(), item.Rarity, delta);
+        UpsertItem(item);
+    }
+
+    public void AdjustSelectedItemStat(string stat, int delta)
+    {
+        if (!TryGetSelectedItem(out var item))
+        {
+            return;
+        }
+
+        var current = item.Stats.TryGetValue(stat, out var value) ? value : 0;
+        var next = Math.Max(0, current + delta);
+        if (next == 0)
+        {
+            item.Stats.Remove(stat);
+        }
+        else
+        {
+            item.Stats[stat] = next;
+        }
+
+        UpsertItem(item);
+    }
+
+    public void AdjustSelectedItemValue(int delta)
+    {
+        if (!TryGetSelectedItem(out var item))
+        {
+            return;
+        }
+
+        item.Value = Math.Max(0, item.Value + delta);
+        UpsertItem(item);
+    }
+
+    public void AdjustSelectedItemMaxStack(int delta)
+    {
+        if (!TryGetSelectedItem(out var item))
+        {
+            return;
+        }
+
+        var current = item.MaxStack.GetValueOrDefault(1);
+        item.MaxStack = Math.Max(1, current + delta);
+        item.Stackable = item.MaxStack > 1;
+        UpsertItem(item);
+    }
+
+    public void ToggleSelectedItemStackable()
+    {
+        if (!TryGetSelectedItem(out var item))
+        {
+            return;
+        }
+
+        item.Stackable = !item.Stackable;
+        item.MaxStack = item.Stackable ? Math.Max(2, item.MaxStack.GetValueOrDefault(2)) : 1;
+        UpsertItem(item);
+    }
+
+    public void CycleSelectedEnemyAiType(int delta)
+    {
+        if (!TryGetSelectedEnemy(out var enemy))
+        {
+            return;
+        }
+
+        enemy.AiType = Rotate(BuildEnemyAiOptions(), enemy.AiType, delta);
+        UpsertEnemy(enemy);
+    }
+
+    public void CycleSelectedEnemyFaction(int delta)
+    {
+        if (!TryGetSelectedEnemy(out var enemy))
+        {
+            return;
+        }
+
+        enemy.Faction = Rotate(BuildEnemyFactionOptions(), enemy.Faction, delta);
+        UpsertEnemy(enemy);
+    }
+
+    public void AdjustSelectedEnemyStat(string stat, int delta)
+    {
+        if (!TryGetSelectedEnemy(out var enemy))
+        {
+            return;
+        }
+
+        switch (stat)
+        {
+            case "hp":
+                enemy.Stats.HP = Math.Max(1, enemy.Stats.HP + delta);
+                break;
+            case "attack":
+                enemy.Stats.Attack = Math.Max(0, enemy.Stats.Attack + delta);
+                break;
+            case "defense":
+                enemy.Stats.Defense = Math.Max(0, enemy.Stats.Defense + delta);
+                break;
+            case "speed":
+                enemy.Stats.Speed = Math.Max(1, enemy.Stats.Speed + (delta * 5));
+                break;
+            case "fov":
+                enemy.Stats.FovRange = Math.Max(1, enemy.Stats.FovRange + delta);
+                break;
+            default:
+                return;
+        }
+
+        UpsertEnemy(enemy);
+    }
+
+    public void AdjustSelectedEnemyDepth(bool adjustMaxDepth, int delta)
+    {
+        if (!TryGetSelectedEnemy(out var enemy))
+        {
+            return;
+        }
+
+        if (adjustMaxDepth)
+        {
+            enemy.MaxDepth = Math.Max(enemy.MinDepth, enemy.MaxDepth + delta);
+        }
+        else
+        {
+            enemy.MinDepth = Math.Max(1, enemy.MinDepth + delta);
+            enemy.MaxDepth = Math.Max(enemy.MinDepth, enemy.MaxDepth);
+        }
+
+        UpsertEnemy(enemy);
+    }
+
+    public void AdjustSelectedEnemySpawnWeight(int delta)
+    {
+        if (!TryGetSelectedEnemy(out var enemy))
+        {
+            return;
+        }
+
+        enemy.SpawnWeight = Math.Max(1, enemy.SpawnWeight + delta);
+        UpsertEnemy(enemy);
     }
 
     private void ValidateItems(List<string> errors)
@@ -264,6 +500,18 @@ public partial class ItemEditor : Control
         return ToolPaths.ResolveContentDirectory(contentDirectory ?? _loadedContentDirectory);
     }
 
+    private bool TryGetSelectedItem(out ItemDefinition item)
+    {
+        item = SelectedItem!;
+        return item is not null;
+    }
+
+    private bool TryGetSelectedEnemy(out EnemyDefinition enemy)
+    {
+        enemy = SelectedEnemy!;
+        return enemy is not null;
+    }
+
     private static void ReplaceOrAppend<T>(List<T> entries, T updated, Func<T, string> idSelector)
     {
         var id = idSelector(updated);
@@ -286,5 +534,92 @@ public partial class ItemEditor : Control
 
         var parts = stableId.Split('_', StringSplitOptions.RemoveEmptyEntries);
         return string.Join(" ", parts.Select(part => char.ToUpperInvariant(part[0]) + part[1..]));
+    }
+
+    private IReadOnlyList<string> BuildItemTypeOptions()
+    {
+        return _itemsDocument.Items.Select(item => item.Type)
+            .Concat(DefaultItemTypes)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(value => value, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private IReadOnlyList<string> BuildItemSlotOptions()
+    {
+        return _itemsDocument.Items.Select(item => item.Slot)
+            .Concat(DefaultItemSlots)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(value => value, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private IReadOnlyList<string> BuildItemRarityOptions()
+    {
+        return _itemsDocument.Items.Select(item => item.Rarity)
+            .Concat(DefaultRarities)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(value => value, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private IReadOnlyList<string> BuildEnemyAiOptions()
+    {
+        return _enemiesDocument.Enemies.Select(enemy => enemy.AiType)
+            .Concat(DefaultAiTypes)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(value => value, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private IReadOnlyList<string> BuildEnemyFactionOptions()
+    {
+        return _enemiesDocument.Enemies.Select(enemy => enemy.Faction)
+            .Concat(DefaultFactions)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(value => value, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static string Rotate(IReadOnlyList<string> options, string current, int delta)
+    {
+        if (options.Count == 0)
+        {
+            return current;
+        }
+
+        var index = 0;
+        for (var i = 0; i < options.Count; i++)
+        {
+            if (string.Equals(options[i], current, StringComparison.Ordinal))
+            {
+                index = i;
+                break;
+            }
+        }
+
+        return options[WrapIndex(index + delta, options.Count)];
+    }
+
+    private static int WrapIndex(int index, int count)
+    {
+        return (index % count + count) % count;
+    }
+
+    private static string NextStableId(string prefix, IEnumerable<string> existingIds)
+    {
+        var used = new HashSet<string>(existingIds, StringComparer.Ordinal);
+        var suffix = 1;
+        while (used.Contains($"{prefix}_{suffix}"))
+        {
+            suffix++;
+        }
+
+        return $"{prefix}_{suffix}";
     }
 }

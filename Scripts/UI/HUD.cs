@@ -113,6 +113,20 @@ public partial class HUD : Control
         }
 
         var player = world.Player;
+        if (player is null)
+        {
+            HPText = "HP: --/--";
+            EnergyText = "Energy: --";
+            FloorText = $"Floor: {world.Depth}";
+            TurnText = $"Turn: {world.TurnNumber}";
+            StatusEffectsText = string.Empty;
+            MinimapText = MinimapVisible
+                ? $"Minimap: 0 explored, 0 visible"
+                : "Minimap hidden";
+            HPColor = Colors.White;
+            return;
+        }
+
         HPText = $"HP: {player.Stats.HP}/{player.Stats.MaxHP}";
         UpdateHPColor(player.Stats.HP, player.Stats.MaxHP);
 
@@ -128,9 +142,28 @@ public partial class HUD : Control
             ? string.Empty
             : "Effects: " + string.Join(", ", effects.Select(effect => $"{effect.Type}({effect.RemainingTurns})"));
 
+        var visibleTiles = 0;
+        var exploredTiles = 0;
+        for (var y = 0; y < world.Height; y++)
+        {
+            for (var x = 0; x < world.Width; x++)
+            {
+                var position = new Position(x, y);
+                if (world.IsVisible(position))
+                {
+                    visibleTiles++;
+                }
+
+                if (world.IsExplored(position))
+                {
+                    exploredTiles++;
+                }
+            }
+        }
+
         MinimapText = MinimapVisible
-            ? $"Map: {world.Width}x{world.Height}, visible {world.Entities.Count(entity => world.IsVisible(entity.Position))} entities"
-            : "Map hidden";
+            ? $"Minimap: {exploredTiles} explored, {visibleTiles} visible"
+            : "Minimap hidden";
     }
 
     private void UpdateHPColor(int currentHp, int maxHp)

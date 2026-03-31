@@ -37,9 +37,33 @@ internal static class UIActionFactory
         return world?.GetEntity(actorId) is null ? null : new WaitAction(actorId);
     }
 
-    public static IAction? CreatePickupAction(IWorldState? world, EntityId actorId)
+    public static IAction? CreatePickupAction(IWorldState? world, IContentDatabase? content, EntityId actorId)
     {
-        return world?.GetEntity(actorId) is null ? null : new PickupAction(actorId);
+        if (world is not WorldState mutableWorld || world.GetEntity(actorId) is null)
+        {
+            return null;
+        }
+
+        var actor = world.GetEntity(actorId);
+        if (actor is null)
+        {
+            return null;
+        }
+
+        var groundItems = mutableWorld.GetItemsAt(actor.Position);
+        if (groundItems.Count == 0)
+        {
+            return null;
+        }
+
+        var item = groundItems[0];
+        ItemTemplate? template = null;
+        if (content is not null)
+        {
+            content.TryGetItemTemplate(item.TemplateId, out template);
+        }
+
+        return new PickupAction(actorId, template);
     }
 
     public static IAction? CreateStairsAction(IWorldState? world, EntityId actorId)
@@ -73,11 +97,34 @@ internal static class UIActionFactory
             return null;
         }
 
+        if (template.Slot != EquipSlot.None)
+        {
+            return null;
+        }
+
         return new UseItemAction(actorId, itemInstanceId, template);
     }
 
-    public static IAction? CreateDropItemAction(IWorldState? world, EntityId actorId, EntityId itemInstanceId)
+    public static IAction? CreateToggleEquipAction(IWorldState? world, IContentDatabase? content, EntityId actorId, EntityId itemInstanceId)
     {
-        return world?.GetEntity(actorId) is null ? null : new DropItemAction(actorId, itemInstanceId);
+        if (world is null || content is null)
+        {
+            return null;
+        }
+
+        var actor = world.GetEntity(actorId);
+        var inventory = actor?.GetComponent<InventoryComponent>();
+        var item = inventory?.Get(itemInstanceId);
+        if (item is null || !content.TryGetItemTemplate(item.TemplateId, out var template) || template.Slot == EquipSlot.None)
+        {
+            return null;
+        }
+
+        return new ToggleEquipAction(actorId, itemInstanceId, template);
+    }
+
+    public static IAction? CreateDropItemAction(IWorldState? world, EntityId actorId, EntityId itemInstanceId, int quantity = int.MaxValue)
+    {
+        return world?.GetEntity(actorId) is null ? null : new DropItemAction(actorId, itemInstanceId, quantity);
     }
 }

@@ -19,6 +19,7 @@ public enum ActionType : byte
     MeleeAttack,
     RangedAttack,
     UseItem,
+    ToggleEquip,
     PickupItem,
     DropItem,
     OpenDoor,

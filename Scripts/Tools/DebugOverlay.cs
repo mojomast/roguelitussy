@@ -70,6 +70,12 @@ public partial class DebugOverlay : Control
         }
 
         var player = world.Player;
+        if (player is null)
+        {
+            OverlayText = $"Debug Overlay\nState: {_gameManager?.CurrentState}\nWorld: no active run\nFloor: {world.Depth}\nTurn: {world.TurnNumber}";
+            return;
+        }
+
         var inventoryCount = player.GetComponent<InventoryComponent>()?.Items.Count ?? 0;
         var visibleTiles = 0;
         var exploredTiles = 0;

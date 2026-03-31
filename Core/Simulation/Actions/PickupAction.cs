@@ -2,12 +2,15 @@ namespace Roguelike.Core;
 
 public sealed class PickupAction : IAction
 {
-    public PickupAction(EntityId actorId)
+    public PickupAction(EntityId actorId, ItemTemplate? template = null)
     {
         ActorId = actorId;
+        Template = template;
     }
 
     public EntityId ActorId { get; }
+
+    public ItemTemplate? Template { get; }
 
     public ActionType Type => ActionType.PickupItem;
 
@@ -25,12 +28,18 @@ public sealed class PickupAction : IAction
             return ActionResult.Invalid;
         }
 
-        if (!inventory.HasSpace)
+        var firstGroundItem = mutableWorld.GetItemsAt(actor.Position).Count > 0 ? mutableWorld.GetItemsAt(actor.Position)[0] : null;
+        if (firstGroundItem is null)
+        {
+            return ActionResult.Invalid;
+        }
+
+        if (!CanAccept(inventory, firstGroundItem))
         {
             return ActionResult.Blocked;
         }
 
-        return mutableWorld.HasGroundItems(actor.Position) ? ActionResult.Success : ActionResult.Invalid;
+        return ActionResult.Success;
     }
 
     public ActionOutcome Execute(WorldState world)
@@ -49,7 +58,7 @@ public sealed class PickupAction : IAction
             return ActionOutcome.Fail(ActionResult.Invalid);
         }
 
-        if (!inventory.Add(item))
+        if (!AddItem(inventory, item))
         {
             world.DropItem(actor.Position, item);
             return ActionOutcome.Fail(ActionResult.Blocked);
@@ -64,4 +73,18 @@ public sealed class PickupAction : IAction
     }
 
     public int GetEnergyCost() => 500;
+
+    private bool CanAccept(InventoryComponent inventory, ItemInstance item)
+    {
+        return Template is not null && Template.MaxStack > 1
+            ? inventory.CanAccept(item, Template.MaxStack)
+            : inventory.HasSpace;
+    }
+
+    private bool AddItem(InventoryComponent inventory, ItemInstance item)
+    {
+        return Template is not null && Template.MaxStack > 1
+            ? inventory.AddWithStacking(item, Template.MaxStack)
+            : inventory.Add(item);
+    }
 }
