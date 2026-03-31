@@ -22,6 +22,18 @@ internal static class WorldArtCatalog
         };
     }
 
+    public static string? GetTileMarker(TileType tileType, bool isDoorOpen)
+    {
+        return tileType switch
+        {
+            TileType.StairsUp => "UP",
+            TileType.StairsDown => "DN",
+            TileType.Door when isDoorOpen => "//",
+            TileType.Door => "[]",
+            _ => null,
+        };
+    }
+
     public static Texture2D? GetEntityTexture(IEntity entity)
     {
         return entity.Faction switch

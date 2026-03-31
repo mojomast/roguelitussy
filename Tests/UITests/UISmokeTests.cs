@@ -18,7 +18,9 @@ public sealed class UISmokeTests : ITestSuite
         registry.Add("UI.Inventory keyboard navigation emits concrete actions", InventoryEmitsConcreteActions);
         registry.Add("UI.Help overlay opens from menu and gameplay", HelpOverlayOpensFromMenuAndGameplay);
         registry.Add("UI.CombatLog escapes BBCode and reacts to combat events", CombatLogReactsToEvents);
+        registry.Add("UI.CombatLog exposes a live console panel", CombatLogExposesLiveConsolePanel);
         registry.Add("UI.Overlays clamp to the viewport", OverlaysClampToViewport);
+        registry.Add("UI.MainMenu scrolls option list within the viewport", MainMenuScrollsOptionListWithinViewport);
         registry.Add("UI.UIRoot routes keyboard between title, overlays, and gameplay", UIRootRoutesKeyboard);
     }
 
@@ -250,6 +252,23 @@ public sealed class UISmokeTests : ITestSuite
         Expect.True(log.RenderedText.Contains("hits Skeleton for 4 damage"), "Combat log should append derived combat messages");
     }
 
+    private static void CombatLogExposesLiveConsolePanel()
+    {
+        var context = CreateContext();
+        context.GameManager.LoadWorld(context.World);
+
+        var root = new Control();
+        var log = new CombatLog();
+        root.AddChild(log);
+        log._Ready();
+        log.Bind(context.GameManager, context.Bus);
+
+        context.Bus.EmitLogMessage("Console live.");
+
+        Expect.True(log.Children.Count > 0 && log.Children[0] is Control, "Combat log should create a visible console panel.");
+        Expect.True(log.RenderedText.Contains("Console live."), "Combat log should keep rendering live updates from the event stream.");
+    }
+
     private static void OverlaysClampToViewport()
     {
         WithViewportSize(new Vector2(640f, 360f), viewportSize =>
@@ -280,6 +299,30 @@ public sealed class UISmokeTests : ITestSuite
             workbench.Bind(context.GameManager, context.Bus, context.Content);
             workbench.Open();
             AssertOverlayFits(workbench, viewportSize, "Developer workshop");
+        });
+    }
+
+    private static void MainMenuScrollsOptionListWithinViewport()
+    {
+        WithViewportSize(new Vector2(640f, 360f), _ =>
+        {
+            var gameManager = new GameManager();
+            var bus = new EventBus();
+            gameManager.AttachServices(new WorldState(), new TurnScheduler(), new StubGenerator(), new FOVCalculator(), new StubContentDatabase(), new StubSaveManager(), bus);
+
+            var root = new Control();
+            var menu = new MainMenu();
+            root.AddChild(menu);
+            menu.Bind(gameManager, bus);
+            menu.Open();
+
+            for (var i = 0; i < 15; i++)
+            {
+                menu.HandleKey(Key.Down);
+            }
+
+            Expect.True(menu.MenuText.Contains("> Quit"), "The selected bottom main-menu option should remain visible after scrolling.");
+            Expect.False(menu.MenuText.Contains("Start Expedition\n") || menu.MenuText.Contains("> Start Expedition"), "The rendered menu text should window the option list instead of keeping off-screen top entries visible.");
         });
     }
 

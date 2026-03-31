@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using Godot;
 
@@ -14,6 +15,8 @@ public abstract partial class MenuBase : Control
     private const float PanelHeight = 300f;
     private const float PanelPadding = 20f;
     private const float OuterMargin = 24f;
+    private const float ApproxLineHeight = 18f;
+    private const int MinimumVisibleOptions = 4;
 
     protected int SelectedIndex { get; private set; }
 
@@ -114,21 +117,52 @@ public abstract partial class MenuBase : Control
 
     protected void RebuildMenuText()
     {
+        var viewportSize = ResolveViewportSize();
+        var panelSize = ResolvePanelSize(viewportSize);
+        var contentLineCapacity = Math.Max(1, (int)Math.Floor(Math.Max(0f, panelSize.Y - (PanelPadding * 2f)) / ApproxLineHeight));
+        var bodyLines = SplitLines(BuildBodyText());
+        var titleLines = SplitLines(Title);
+        var minimumOptionLines = Math.Min(_options.Count, MinimumVisibleOptions);
+
+        var titleSectionLines = titleLines.Count == 0 ? 0 : titleLines.Count + 1;
+        var availableBodyLines = Math.Max(0, contentLineCapacity - titleSectionLines - minimumOptionLines);
+        var visibleBodyLines = bodyLines;
+        if (visibleBodyLines.Count > availableBodyLines)
+        {
+            visibleBodyLines = bodyLines.Take(availableBodyLines).ToList();
+            if (visibleBodyLines.Count > 0 && bodyLines.Count > availableBodyLines)
+            {
+                visibleBodyLines[^1] = "...";
+            }
+        }
+
+        var bodySectionLines = visibleBodyLines.Count == 0 ? 0 : visibleBodyLines.Count + 1;
+        var visibleOptionCount = Math.Max(1, contentLineCapacity - titleSectionLines - bodySectionLines);
+        var firstVisibleOption = ResolveFirstVisibleOption(visibleOptionCount);
+
         var builder = new StringBuilder();
-        if (!string.IsNullOrWhiteSpace(Title))
+        if (titleLines.Count > 0)
         {
-            builder.AppendLine(Title);
+            foreach (var line in titleLines)
+            {
+                builder.AppendLine(line);
+            }
+
             builder.AppendLine();
         }
 
-        var body = BuildBodyText();
-        if (!string.IsNullOrWhiteSpace(body))
+        if (visibleBodyLines.Count > 0)
         {
-            builder.AppendLine(body);
+            foreach (var line in visibleBodyLines)
+            {
+                builder.AppendLine(line);
+            }
+
             builder.AppendLine();
         }
 
-        for (var index = 0; index < _options.Count; index++)
+        var lastVisibleOption = Math.Min(_options.Count, firstVisibleOption + visibleOptionCount);
+        for (var index = firstVisibleOption; index < lastVisibleOption; index++)
         {
             builder.Append(index == SelectedIndex ? "> " : "  ");
             builder.AppendLine(_options[index]);
@@ -198,7 +232,28 @@ public abstract partial class MenuBase : Control
     protected virtual Vector2 ResolveDesiredPanelSize(Vector2 viewportSize)
     {
         var maxWidth = Math.Max(0f, viewportSize.X - (OuterMargin * 2f));
-        return OverlayLayoutHelper.MeasureMonospaceBlock(MenuText, PanelWidth, PanelHeight, PanelPadding, maxWidth);
+        var maxHeight = Math.Max(0f, viewportSize.Y - (OuterMargin * 2f));
+        return new Vector2(
+            Math.Min(maxWidth, Math.Max(PanelWidth, viewportSize.X * 0.72f)),
+            Math.Min(maxHeight, Math.Max(PanelHeight, viewportSize.Y * 0.88f)));
+    }
+
+    private static List<string> SplitLines(string text)
+    {
+        return string.IsNullOrWhiteSpace(text)
+            ? new List<string>()
+            : text.Split('\n').Select(line => line.TrimEnd()).ToList();
+    }
+
+    private int ResolveFirstVisibleOption(int visibleOptionCount)
+    {
+        if (_options.Count <= visibleOptionCount)
+        {
+            return 0;
+        }
+
+        var preferred = SelectedIndex - (visibleOptionCount / 2);
+        return Math.Clamp(preferred, 0, _options.Count - visibleOptionCount);
     }
 
     private Vector2 ResolvePanelSize(Vector2 viewportSize)

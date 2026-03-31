@@ -13,7 +13,7 @@ public enum FogTileState
 
 public partial class WorldView : Node2D
 {
-    public const int TileSize = 34;
+    public const int TileSize = 40;
 
     private TileMapLayer _floorLayer = new() { Name = "TileMapLayer_Floor" };
     private TileMapLayer _wallLayer = new() { Name = "TileMapLayer_Walls" };
@@ -29,6 +29,7 @@ public partial class WorldView : Node2D
     private readonly HashSet<Position> _exploredTiles = new();
     private readonly Dictionary<EntityId, Position> _entitySnapshot = new();
     private readonly Dictionary<Position, Node> _tileArt = new();
+    private readonly Dictionary<Position, string> _tileMarkers = new();
     private readonly EntityRenderer _entityRenderer;
 
     private EventBus? _eventBus;
@@ -212,29 +213,44 @@ public partial class WorldView : Node2D
     private void RenderTile(Position position, TileType tileType)
     {
         var cellPosition = new Vector2I(position.X, position.Y);
+        var isDoorOpen = tileType == TileType.Door && _world is WorldState world && world.IsDoorOpen(position);
         RenderTileArt(position, tileType);
         switch (tileType)
         {
             case TileType.Floor:
                 _floorLayer.SetCell(cellPosition, 0, new Vector2I(0, 0));
+                _wallLayer.EraseCell(cellPosition);
                 break;
             case TileType.StairsDown:
                 _floorLayer.SetCell(cellPosition, 0, new Vector2I(2, 0));
+                _wallLayer.EraseCell(cellPosition);
                 break;
             case TileType.StairsUp:
                 _floorLayer.SetCell(cellPosition, 0, new Vector2I(3, 0));
+                _wallLayer.EraseCell(cellPosition);
                 break;
             case TileType.Water:
                 _floorLayer.SetCell(cellPosition, 0, new Vector2I(6, 0));
+                _wallLayer.EraseCell(cellPosition);
                 break;
             case TileType.Lava:
                 _floorLayer.SetCell(cellPosition, 0, new Vector2I(7, 0));
+                _wallLayer.EraseCell(cellPosition);
                 break;
             case TileType.Wall:
+                _floorLayer.EraseCell(cellPosition);
                 _wallLayer.SetCell(cellPosition, 0, new Vector2I(1, 0));
                 break;
             case TileType.Door:
-                _wallLayer.SetCell(cellPosition, 0, new Vector2I(4, 0));
+                _floorLayer.SetCell(cellPosition, 0, new Vector2I(0, 0));
+                if (isDoorOpen)
+                {
+                    _wallLayer.EraseCell(cellPosition);
+                }
+                else
+                {
+                    _wallLayer.SetCell(cellPosition, 0, new Vector2I(4, 0));
+                }
                 break;
         }
     }
@@ -248,34 +264,57 @@ public partial class WorldView : Node2D
         }
 
         _tileArt.Clear();
+        _tileMarkers.Clear();
     }
 
     private void RenderTileArt(Position position, TileType tileType)
     {
         var isDoorOpen = tileType == TileType.Door && _world is WorldState world && world.IsDoorOpen(position);
         var texture = WorldArtCatalog.GetTileTexture(tileType, isDoorOpen);
+        var marker = WorldArtCatalog.GetTileMarker(tileType, isDoorOpen);
+        var container = new Node2D
+        {
+            Name = $"Tile_{position.X}_{position.Y}",
+            Position = new Vector2(position.X * TileSize, position.Y * TileSize),
+        };
+
         if (texture is not null)
         {
             var sprite = new Sprite2D
             {
-                Name = $"Tile_{position.X}_{position.Y}",
-                Position = ToCanvasPosition(position),
+                Name = "Texture",
+                Position = new Vector2(TileSize * 0.5f, TileSize * 0.5f),
                 Texture = texture,
             };
-            _tileArtLayer.AddChild(sprite);
-            _tileArt[position] = sprite;
-            return;
+            container.AddChild(sprite);
+        }
+        else
+        {
+            var tile = new ColorRect
+            {
+                Name = "Fallback",
+                Position = Vector2.Zero,
+                Size = new Vector2(TileSize, TileSize),
+                Color = ResolveTileColor(tileType),
+            };
+            container.AddChild(tile);
         }
 
-        var tile = new ColorRect
+        if (!string.IsNullOrWhiteSpace(marker))
         {
-            Name = $"Tile_{position.X}_{position.Y}",
-            Position = new Vector2(position.X * TileSize, position.Y * TileSize),
-            Size = new Vector2(TileSize, TileSize),
-            Color = ResolveTileColor(tileType),
-        };
-        _tileArtLayer.AddChild(tile);
-        _tileArt[position] = tile;
+            var markerLabel = new Label
+            {
+                Name = "Marker",
+                Position = new Vector2(4f, 9f),
+                Size = new Vector2(TileSize - 8f, TileSize - 12f),
+                Text = marker,
+            };
+            container.AddChild(markerLabel);
+            _tileMarkers[position] = marker;
+        }
+
+        _tileArtLayer.AddChild(container);
+        _tileArt[position] = container;
     }
 
     private static Color ResolveTileColor(TileType tileType)
@@ -284,13 +323,18 @@ public partial class WorldView : Node2D
         {
             TileType.Floor => new Color(0.18f, 0.18f, 0.2f, 1f),
             TileType.Wall => new Color(0.07f, 0.07f, 0.09f, 1f),
-            TileType.Door => new Color(0.45f, 0.28f, 0.12f, 1f),
-            TileType.StairsDown => new Color(0.18f, 0.3f, 0.5f, 1f),
-            TileType.StairsUp => new Color(0.24f, 0.42f, 0.24f, 1f),
+            TileType.Door => new Color(0.58f, 0.36f, 0.12f, 1f),
+            TileType.StairsDown => new Color(0.2f, 0.42f, 0.75f, 1f),
+            TileType.StairsUp => new Color(0.32f, 0.58f, 0.28f, 1f),
             TileType.Water => new Color(0.12f, 0.24f, 0.55f, 1f),
             TileType.Lava => new Color(0.7f, 0.24f, 0.08f, 1f),
             _ => new Color(0f, 0f, 0f, 1f),
         };
+    }
+
+    public string GetTileMarkerText(Position position)
+    {
+        return _tileMarkers.TryGetValue(position, out var marker) ? marker : string.Empty;
     }
 
     private void UpdateFogLayer()

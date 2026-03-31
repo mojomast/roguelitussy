@@ -75,6 +75,7 @@ public partial class UIRoot : CanvasLayer
         DebugConsole.Bind(_gameManager, _eventBus, _content);
         DebugOverlay.Bind(_gameManager, _eventBus);
         InputHandler.Bind(_gameManager, _eventBus);
+        CombatLog.RefreshConsole();
 
         MainMenu.GameStarted -= OnGameStarted;
         MainMenu.GameStarted += OnGameStarted;
@@ -328,12 +329,14 @@ public partial class UIRoot : CanvasLayer
         Inventory.Close();
         CharacterSheet.Close();
         Tooltip.Hide();
+        CombatLog.RefreshConsole();
         RefreshInputGate();
     }
 
     private void OnFloorChanged(int floor)
     {
         GameOverScreen.Close();
+        CombatLog.RefreshConsole();
         RefreshInputGate();
     }
 
@@ -346,6 +349,7 @@ public partial class UIRoot : CanvasLayer
         GameOverScreen.Close();
         HelpOverlay.Close();
         Tooltip.Hide();
+        CombatLog.RefreshConsole();
         RefreshInputGate();
     }
 
@@ -514,6 +518,7 @@ public partial class UIRoot : CanvasLayer
         DevToolsWorkbench.Close();
         Tooltip.Hide();
         MainMenu.Open();
+        CombatLog.RefreshConsole();
         RefreshInputGate();
     }
 
@@ -541,6 +546,7 @@ public partial class UIRoot : CanvasLayer
         Tooltip.Hide();
         var world = _gameManager.World;
         GameOverScreen.Open(new GameOverSummary(world.Player.Name, world.Depth, _enemiesKilled, world.TurnNumber));
+        CombatLog.RefreshConsole();
         RefreshInputGate();
     }
 

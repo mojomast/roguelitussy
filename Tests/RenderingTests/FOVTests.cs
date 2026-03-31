@@ -13,6 +13,7 @@ public sealed class FOVTests : ITestSuite
         registry.Add("Rendering.FOV blocks tiles behind walls", FovBlocksTilesBehindWalls);
         registry.Add("Rendering.FOV remains symmetric in open space", FovRemainsSymmetric);
         registry.Add("Rendering.WorldView renders map and fog from world state", WorldViewRendersMapAndFog);
+        registry.Add("Rendering.WorldView marks interactive tiles clearly", WorldViewMarksInteractiveTilesClearly);
         registry.Add("Rendering.WorldView animates movement and attacks via events", WorldViewAnimatesMovementAndAttacks);
     }
 
@@ -79,6 +80,20 @@ public sealed class FOVTests : ITestSuite
         Expect.Equal(2, view.Animations.History.Count, "Damage event should queue attack and damage animations.");
         Expect.Equal(AnimationType.Attack, view.Animations.History[0].Type, "Attack animation should play first.");
         Expect.Equal(AnimationType.Damage, view.Animations.History[1].Type, "Damage flash should play second.");
+    }
+
+    private static void WorldViewMarksInteractiveTilesClearly()
+    {
+        var world = CreateRoomWorld();
+        world.SetTile(new Position(3, 2), TileType.Door);
+        world.SetTile(new Position(4, 2), TileType.StairsDown);
+        world.SetTile(new Position(2, 3), TileType.StairsUp);
+
+        var view = CreateWorldView(world);
+
+        Expect.Equal("[]", view.GetTileMarkerText(new Position(3, 2)), "Closed doors should expose an explicit door marker.");
+        Expect.Equal("DN", view.GetTileMarkerText(new Position(4, 2)), "Down stairs should expose an explicit down marker.");
+        Expect.Equal("UP", view.GetTileMarkerText(new Position(2, 3)), "Up stairs should expose an explicit up marker.");
     }
 
     private static WorldState CreateRoomWorld(int width = 7, int height = 7, Position? playerPosition = null)

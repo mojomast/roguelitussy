@@ -8,7 +8,13 @@ namespace Godotussy;
 public partial class CombatLog : Control
 {
     private const int MaxMessages = 100;
+    private const float PanelWidth = 500f;
+    private const float PanelHeight = 220f;
+    private const float OuterMargin = 20f;
+    private const float PanelPadding = 12f;
     private readonly Queue<string> _messages = new();
+    private Panel? _panel;
+    private RichTextLabel? _textLabel;
     private EventBus? _eventBus;
     private GameManager? _gameManager;
 
@@ -17,6 +23,18 @@ public partial class CombatLog : Control
     public CombatLog()
     {
         Name = "CombatLog";
+        Visible = true;
+    }
+
+    public override void _Ready()
+    {
+        EnsureVisuals();
+        RefreshVisualState();
+    }
+
+    public void RefreshConsole()
+    {
+        RefreshVisualState();
     }
 
     public void Bind(GameManager? gameManager, EventBus? eventBus)
@@ -48,6 +66,7 @@ public partial class CombatLog : Control
         _eventBus.SaveCompleted += OnSaveCompleted;
         _eventBus.LoadCompleted += OnLoadCompleted;
         _eventBus.FloorChanged += OnFloorChanged;
+        RefreshVisualState();
     }
 
     public IReadOnlyCollection<string> Messages => _messages;
@@ -112,6 +131,77 @@ public partial class CombatLog : Control
         }
 
         RenderedText = builder.ToString().TrimEnd();
+        RefreshVisualState();
+    }
+
+    private void EnsureVisuals()
+    {
+        if (_panel is not null && _textLabel is not null)
+        {
+            return;
+        }
+
+        var viewportSize = ResolveViewportSize();
+        var panelSize = ResolvePanelSize(viewportSize);
+
+        Size = viewportSize;
+        ZIndex = 40;
+        _panel = new Panel
+        {
+            Name = "Panel",
+            Size = panelSize,
+        };
+        _textLabel = new RichTextLabel
+        {
+            Name = "TextConsole",
+            Position = new Vector2(PanelPadding, PanelPadding),
+            Size = new Vector2(
+                System.Math.Max(0f, panelSize.X - (PanelPadding * 2f)),
+                System.Math.Max(0f, panelSize.Y - (PanelPadding * 2f))),
+            BbcodeEnabled = true,
+            ScrollFollowing = true,
+        };
+        _panel.AddChild(_textLabel);
+        AddChild(_panel);
+    }
+
+    private void RefreshVisualState()
+    {
+        EnsureVisuals();
+
+        if (_panel is null || _textLabel is null)
+        {
+            return;
+        }
+
+        var viewportSize = ResolveViewportSize();
+        var panelSize = ResolvePanelSize(viewportSize);
+        var gameplayVisible = _gameManager?.CurrentState != GameManager.GameState.MainMenu;
+
+        Size = viewportSize;
+        _panel.Size = panelSize;
+        _panel.Position = new Vector2(OuterMargin, viewportSize.Y - panelSize.Y - OuterMargin);
+        _textLabel.Position = new Vector2(PanelPadding, PanelPadding);
+        _textLabel.Size = new Vector2(
+            System.Math.Max(0f, panelSize.X - (PanelPadding * 2f)),
+            System.Math.Max(0f, panelSize.Y - (PanelPadding * 2f)));
+        _panel.Visible = gameplayVisible;
+        _textLabel.Visible = gameplayVisible;
+        _textLabel.Clear();
+        if (!string.IsNullOrWhiteSpace(RenderedText))
+        {
+            _textLabel.AppendText(RenderedText);
+        }
+    }
+
+    private static Vector2 ResolvePanelSize(Vector2 viewportSize)
+    {
+        return OverlayLayoutHelper.FitPanelSize(viewportSize, new Vector2(PanelWidth, PanelHeight), OuterMargin);
+    }
+
+    private Vector2 ResolveViewportSize()
+    {
+        return GetParent() is not null && GetTree() is not null ? GetViewportRect().Size : new Vector2(1600f, 900f);
     }
 
     private string ResolveName(EntityId entityId)
