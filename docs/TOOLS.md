@@ -20,7 +20,7 @@ The workshop is a menu-driven runtime shell around the lower-level tool backends
 - `Rooms` uses `Scripts/Tools/MapEditor.cs` to create, load, preview, validate, save, and immediately playtest room prefab drafts
 - `Items` uses `Scripts/Tools/ItemEditor.cs` to scaffold and tune item templates before saving `items.json`, and can drop the selected runtime item into the current run
 - `Enemies` uses `Scripts/Tools/ItemEditor.cs` to scaffold and tune enemy templates before saving `enemies.json`, and can spawn the selected enemy near the player for iteration
-- `Commands` reloads tool data, reloads runtime content from disk, validates content, and hands off to the debug console when freeform commands are more efficient
+- `Commands` starts seeded expeditions, saves and loads slots, heals, reveals, travels floors, teleports the player, reloads tool/runtime data, validates content, and hands off to the debug console when freeform commands are more efficient
 
 Workshop controls:
 
@@ -38,6 +38,7 @@ The intended fast loop is:
 2. Save the relevant JSON document.
 3. Use `Reload runtime content from disk` when you want the active game session to pick up the new content definitions.
 4. Use room playtest or the item/enemy spawn actions to validate behavior immediately in the running game.
+5. Use the `Commands` tab when you need to start a fresh seeded run, save/load a slot, heal quickly, reveal the map, jump floors, or teleport within the active run without dropping to console commands.
 
 ## Godot Editor Plugin
 
@@ -78,7 +79,7 @@ Current built-in shortcuts:
 
 The exact command set for the debug console is owned by the tool scripts and their command processor.
 
-The debug console is still the best path for direct mutation commands such as teleporting, forcing floor changes, spawning items, or revealing fog. The workshop is better for repeatable content-authoring tasks.
+The debug console is still the best path for one-off freeform commands such as door toggles, inventory inspection, or command discovery. The workshop now covers the repeatable runtime iteration actions like run control, teleporting, floor travel, spawning selected content, and visibility management.
 
 ## Tool Path Resolution
 

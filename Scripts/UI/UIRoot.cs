@@ -116,6 +116,8 @@ public partial class UIRoot : CanvasLayer
         DevToolsWorkbench.DebugConsoleRequested += OpenDebugConsoleFromWorkshop;
         DevToolsWorkbench.PlaytestStarted -= OnDevToolsPlaytestStarted;
         DevToolsWorkbench.PlaytestStarted += OnDevToolsPlaytestStarted;
+        DevToolsWorkbench.RuntimeSessionActivated -= OnDevToolsRuntimeSessionActivated;
+        DevToolsWorkbench.RuntimeSessionActivated += OnDevToolsRuntimeSessionActivated;
         DevToolsWorkbench.RuntimeContentReloaded -= OnRuntimeContentReloaded;
         DevToolsWorkbench.RuntimeContentReloaded += OnRuntimeContentReloaded;
 
@@ -475,6 +477,15 @@ public partial class UIRoot : CanvasLayer
     }
 
     private void OnDevToolsPlaytestStarted()
+    {
+        MainMenu.Close();
+        PauseMenu.Close();
+        HelpOverlay.Close();
+        Tooltip.Hide();
+        RefreshInputGate();
+    }
+
+    private void OnDevToolsRuntimeSessionActivated()
     {
         MainMenu.Close();
         PauseMenu.Close();

@@ -48,7 +48,7 @@ The workshop currently supports four runtime tabs:
 - `Rooms` for creating, loading, previewing, editing, validating, saving, and playtesting room prefab drafts
 - `Items` for scaffolding and tuning item templates before saving `items.json`, then dropping the selected runtime item into the current run
 - `Enemies` for scaffolding and tuning enemy templates before saving `enemies.json`, then spawning the selected enemy near the player
-- `Commands` for reloading tool data, reloading runtime content from disk, validating content, and jumping into the debug console
+- `Commands` for seeded run control, save/load slot management, heal/reveal runtime helpers, floor travel, player teleport, reloading tool data, reloading runtime content from disk, validating content, and jumping into the debug console
 
 Core controls inside the workshop:
 
@@ -58,7 +58,7 @@ Core controls inside the workshop:
 - `Enter` applies the selected action
 - `Esc` or `T` closes the workshop
 
-If you are iterating on gameplay content, the usual flow is save the draft, reload runtime content from the `Commands` tab, and then use room playtest or the item/enemy runtime actions to verify the result immediately.
+If you are iterating on gameplay content, the usual flow is save the draft, reload runtime content from the `Commands` tab, and then use room playtest or the item/enemy runtime actions to verify the result immediately. The same tab now also covers quick seeded restart, save/load slot checks, full-heal recovery, floor jumps, teleporting, and map reveal/reset when you want to keep iteration inside the running app.
 
 ## Editor Plugin
 

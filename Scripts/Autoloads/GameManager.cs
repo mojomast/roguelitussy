@@ -222,6 +222,130 @@ public partial class GameManager : Node
         }
     }
 
+    public bool SaveToSlot(int slot)
+    {
+        if (World is null || SaveManager is null)
+        {
+            Bus?.EmitSaveCompleted(false);
+            Bus?.EmitLogMessage($"Save failed for slot {slot}.");
+            return false;
+        }
+
+        var success = SaveManager.SaveGame(World, slot).GetAwaiter().GetResult();
+        Bus?.EmitSaveCompleted(success);
+        Bus?.EmitLogMessage(success ? $"Saved slot {slot}." : $"Save failed for slot {slot}.");
+        return success;
+    }
+
+    public bool LoadFromSlot(int slot)
+    {
+        if (SaveManager is null || !SaveManager.HasSave(slot))
+        {
+            Bus?.EmitLoadCompleted(false);
+            Bus?.EmitLogMessage($"Load failed for slot {slot}.");
+            return false;
+        }
+
+        CurrentState = GameState.Loading;
+        var world = SaveManager.LoadGame(slot).GetAwaiter().GetResult();
+        if (world is null)
+        {
+            CurrentState = GameState.MainMenu;
+            Bus?.EmitLoadCompleted(false);
+            Bus?.EmitLogMessage($"Load failed for slot {slot}.");
+            return false;
+        }
+
+        if (world.Player is not null)
+        {
+            Seed = world.Seed;
+            _cachedFloors.Clear();
+        }
+
+        Scheduler = new TurnScheduler();
+        LoadWorld(world);
+        Bus?.EmitLoadCompleted(true);
+        Bus?.EmitTurnCompleted();
+        Bus?.EmitLogMessage($"Loaded slot {slot}.");
+        return true;
+    }
+
+    public bool SetMapReveal(bool revealAll)
+    {
+        if (World is null)
+        {
+            return false;
+        }
+
+        if (revealAll)
+        {
+            for (var y = 0; y < World.Height; y++)
+            {
+                for (var x = 0; x < World.Width; x++)
+                {
+                    World.SetVisible(new Position(x, y), true);
+                }
+            }
+
+            Bus?.EmitFovRecalculated();
+            return true;
+        }
+
+        RecalculatePlayerVisibility(World);
+        return true;
+    }
+
+    public bool TeleportPlayer(Position target)
+    {
+        if (World?.Player is null)
+        {
+            return false;
+        }
+
+        if (!World.InBounds(target) || !World.IsWalkable(target))
+        {
+            return false;
+        }
+
+        var player = World.Player;
+        if (World.GetEntityAt(target) is not null && target != player.Position)
+        {
+            return false;
+        }
+
+        var origin = player.Position;
+        if (!World.MoveEntity(player.Id, target))
+        {
+            return false;
+        }
+
+        Bus?.EmitEntityMoved(player.Id, origin, target);
+        RecalculatePlayerVisibility(World);
+        Bus?.EmitLogMessage($"Teleported player to {target.X},{target.Y}.");
+        return true;
+    }
+
+    public bool TravelToFloor(int targetFloor)
+    {
+        if (targetFloor < 0)
+        {
+            return false;
+        }
+
+        if (World?.Player is null)
+        {
+            return false;
+        }
+
+        if (targetFloor == CurrentFloor)
+        {
+            Bus?.EmitLogMessage($"Already on floor {targetFloor}.");
+            return true;
+        }
+
+        return TryTravelToFloor(targetFloor);
+    }
+
     public void LoadToolWorld(WorldState world, string? logMessage = null)
     {
         ArgumentNullException.ThrowIfNull(world);
@@ -407,44 +531,9 @@ public partial class GameManager : Node
         ProcessPlayerAction(action);
     }
 
-    private async void OnSaveRequested(int slot)
-    {
-        var success = World is not null && SaveManager is not null && await SaveManager.SaveGame(World, slot).ConfigureAwait(false);
-        Bus?.EmitSaveCompleted(success);
-        Bus?.EmitLogMessage(success ? $"Saved slot {slot}." : $"Save failed for slot {slot}.");
-    }
+    private void OnSaveRequested(int slot) => SaveToSlot(slot);
 
-    private async void OnLoadRequested(int slot)
-    {
-        if (SaveManager is null)
-        {
-            Bus?.EmitLoadCompleted(false);
-            Bus?.EmitLogMessage($"Load failed for slot {slot}.");
-            return;
-        }
-
-        CurrentState = GameState.Loading;
-        var world = await SaveManager.LoadGame(slot).ConfigureAwait(false);
-        if (world is null)
-        {
-            CurrentState = GameState.MainMenu;
-            Bus?.EmitLoadCompleted(false);
-            Bus?.EmitLogMessage($"Load failed for slot {slot}.");
-            return;
-        }
-
-        if (world.Player is not null)
-        {
-            Seed = world.Seed;
-            _cachedFloors.Clear();
-        }
-
-        Scheduler = new TurnScheduler();
-        LoadWorld(world);
-        Bus?.EmitLoadCompleted(true);
-        Bus?.EmitTurnCompleted();
-        Bus?.EmitLogMessage($"Loaded slot {slot}.");
-    }
+    private void OnLoadRequested(int slot) => LoadFromSlot(slot);
 
     private void EnsureRuntimeServices()
     {

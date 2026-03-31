@@ -20,6 +20,8 @@ public partial class DevToolsWorkbench : Control
     private const float PanelWidth = 980f;
     private const float PanelHeight = 660f;
     private const float PanelPadding = 18f;
+    private const int MinSaveSlot = 1;
+    private const int MaxSaveSlot = 3;
 
     private readonly MapEditor _mapEditor = new();
     private readonly ItemEditor _itemEditor = new();
@@ -34,6 +36,11 @@ public partial class DevToolsWorkbench : Control
     private int _roomBrowseIndex;
     private int _cursorX;
     private int _cursorY;
+    private int _pendingSeed = 1337;
+    private int _selectedSaveSlot = MinSaveSlot;
+    private int _pendingFloorDepth;
+    private int _pendingTeleportX;
+    private int _pendingTeleportY;
     private IReadOnlyList<string> _roomIds = Array.Empty<string>();
 
     public DevToolsWorkbench()
@@ -50,6 +57,8 @@ public partial class DevToolsWorkbench : Control
     public event Action? DebugConsoleRequested;
 
     public event Action? PlaytestStarted;
+
+    public event Action? RuntimeSessionActivated;
 
     public event Action<IContentDatabase>? RuntimeContentReloaded;
 
@@ -182,6 +191,161 @@ public partial class DevToolsWorkbench : Control
         Refresh();
     }
 
+    public void SetPendingSeed(int seed)
+    {
+        _pendingSeed = Math.Max(1, seed);
+        Refresh();
+    }
+
+    public void SetSelectedSaveSlot(int slot)
+    {
+        _selectedSaveSlot = Math.Clamp(slot, MinSaveSlot, MaxSaveSlot);
+        Refresh();
+    }
+
+    public void SetPendingFloorDepth(int depth)
+    {
+        _pendingFloorDepth = Math.Max(0, depth);
+        Refresh();
+    }
+
+    public void SetPendingTeleportTarget(int x, int y)
+    {
+        _pendingTeleportX = Math.Max(0, x);
+        _pendingTeleportY = Math.Max(0, y);
+        ClampPendingTeleportTarget();
+        Refresh();
+    }
+
+    public bool StartNewExpeditionFromSeed()
+    {
+        if (_gameManager is null)
+        {
+            _statusText = "Game manager is not available.";
+            Refresh();
+            return false;
+        }
+
+        _gameManager.StartNewGame(_pendingSeed);
+        if (_gameManager.CurrentState != GameManager.GameState.Playing)
+        {
+            _statusText = $"Failed to start a run with seed {_pendingSeed}.";
+            Refresh();
+            return false;
+        }
+
+        _statusText = $"Started a new expedition with seed {_pendingSeed}.";
+        Close();
+        RuntimeSessionActivated?.Invoke();
+        return true;
+    }
+
+    public bool SaveCurrentRunToSlot()
+    {
+        if (_gameManager?.SaveToSlot(_selectedSaveSlot) != true)
+        {
+            _statusText = $"Save failed for slot {_selectedSaveSlot}.";
+            Refresh();
+            return false;
+        }
+
+        _statusText = $"Saved the current run to slot {_selectedSaveSlot}.";
+        Refresh();
+        return true;
+    }
+
+    public bool LoadRunFromSlot()
+    {
+        if (_gameManager?.LoadFromSlot(_selectedSaveSlot) != true)
+        {
+            _statusText = $"Load failed for slot {_selectedSaveSlot}.";
+            Refresh();
+            return false;
+        }
+
+        _pendingSeed = Math.Max(1, _gameManager.Seed);
+        _statusText = $"Loaded slot {_selectedSaveSlot}.";
+        Close();
+        RuntimeSessionActivated?.Invoke();
+        return true;
+    }
+
+    public bool HealPlayerToFull()
+    {
+        var player = _gameManager?.World?.Player;
+        if (player is null)
+        {
+            _statusText = "No active player is available to heal.";
+            Refresh();
+            return false;
+        }
+
+        player.Stats.HP = player.Stats.MaxHP;
+        _eventBus?.EmitHPChanged(player.Id, player.Stats.HP, player.Stats.MaxHP);
+        _statusText = $"Healed {player.Name} to full HP.";
+        Refresh();
+        return true;
+    }
+
+    public bool RevealEntireMap()
+    {
+        if (_gameManager?.SetMapReveal(true) != true)
+        {
+            _statusText = "No active world is available to reveal.";
+            Refresh();
+            return false;
+        }
+
+        _statusText = "Revealed the current map.";
+        Refresh();
+        return true;
+    }
+
+    public bool RestorePlayerFog()
+    {
+        if (_gameManager?.SetMapReveal(false) != true)
+        {
+            _statusText = "No active world is available to refresh.";
+            Refresh();
+            return false;
+        }
+
+        _statusText = "Restored player visibility and fog.";
+        Refresh();
+        return true;
+    }
+
+    public bool TravelToPendingFloor()
+    {
+        if (_gameManager?.TravelToFloor(_pendingFloorDepth) != true)
+        {
+            _statusText = $"Could not travel to floor {_pendingFloorDepth}.";
+            Refresh();
+            return false;
+        }
+
+        SyncRuntimeTargets();
+        _statusText = $"Travelled to floor {_pendingFloorDepth}.";
+        Refresh();
+        return true;
+    }
+
+    public bool TeleportPlayerToPendingTarget()
+    {
+        var target = new Roguelike.Core.Position(_pendingTeleportX, _pendingTeleportY);
+        if (_gameManager?.TeleportPlayer(target) != true)
+        {
+            _statusText = $"Could not teleport to {_pendingTeleportX},{_pendingTeleportY}.";
+            Refresh();
+            return false;
+        }
+
+        SyncRuntimeTargets();
+        _statusText = $"Teleported the player to {_pendingTeleportX},{_pendingTeleportY}.";
+        Refresh();
+        return true;
+    }
+
     public IReadOnlyList<string> ReloadRuntimeContent()
     {
         try
@@ -309,6 +473,13 @@ public partial class DevToolsWorkbench : Control
 
     private void ReloadData()
     {
+        if (_gameManager is not null && _gameManager.Seed > 0)
+        {
+            _pendingSeed = _gameManager.Seed;
+        }
+
+        SyncRuntimeTargets();
+
         try
         {
             _itemEditor.Load(_contentDirectory);
@@ -362,7 +533,7 @@ public partial class DevToolsWorkbench : Control
             WorkshopMode.Rooms => 13,
             WorkshopMode.Items => 13,
             WorkshopMode.Enemies => 15,
-            _ => 5,
+            _ => 18,
         };
     }
 
@@ -378,6 +549,9 @@ public partial class DevToolsWorkbench : Control
                 break;
             case WorkshopMode.Enemies:
                 AdjustEnemy(delta);
+                break;
+            case WorkshopMode.Commands:
+                AdjustCommand(delta);
                 break;
         }
 
@@ -614,24 +788,77 @@ public partial class DevToolsWorkbench : Control
         switch (_selectedIndex)
         {
             case 0:
+                StartNewExpeditionFromSeed();
+                return;
+            case 1:
+                SaveCurrentRunToSlot();
+                return;
+            case 2:
+                LoadRunFromSlot();
+                return;
+            case 3:
+                HealPlayerToFull();
+                return;
+            case 4:
+                RevealEntireMap();
+                return;
+            case 5:
+                RestorePlayerFog();
+                return;
+            case 6:
+                TravelToPendingFloor();
+                return;
+            case 7:
+                TeleportPlayerToPendingTarget();
+                return;
+            case 8:
                 ReloadData();
                 _statusText = "Tool data reloaded from Content/.";
                 break;
-            case 1:
+            case 9:
                 ReloadRuntimeContent();
                 return;
-            case 2:
+            case 10:
                 var errors = _itemEditor.ValidateAll();
                 var roomErrors = _mapEditor.ValidateDraft();
                 var totalErrors = errors.Count + roomErrors.Count;
                 _statusText = totalErrors == 0 ? "All visible tooling validations passed." : $"Validation reported {totalErrors} issue(s).";
                 break;
-            case 3:
+            case 11:
                 DebugConsoleRequested?.Invoke();
                 _statusText = "Debug console opened.";
                 break;
-            case 4:
+            case 12:
                 Close();
+                break;
+        }
+    }
+
+    private void AdjustCommand(int delta)
+    {
+        switch (_selectedIndex)
+        {
+            case 13:
+                _pendingSeed = Math.Max(1, _pendingSeed + delta);
+                _statusText = $"Pending seed set to {_pendingSeed}.";
+                break;
+            case 14:
+                _selectedSaveSlot = WrapSaveSlot(_selectedSaveSlot + delta);
+                _statusText = $"Selected save slot {_selectedSaveSlot}.";
+                break;
+            case 15:
+                _pendingFloorDepth = Math.Max(0, _pendingFloorDepth + delta);
+                _statusText = $"Pending floor set to {_pendingFloorDepth}.";
+                break;
+            case 16:
+                _pendingTeleportX = Math.Max(0, _pendingTeleportX + delta);
+                ClampPendingTeleportTarget();
+                _statusText = $"Teleport X set to {_pendingTeleportX}.";
+                break;
+            case 17:
+                _pendingTeleportY = Math.Max(0, _pendingTeleportY + delta);
+                ClampPendingTeleportTarget();
+                _statusText = $"Teleport Y set to {_pendingTeleportY}.";
                 break;
         }
     }
@@ -712,11 +939,24 @@ public partial class DevToolsWorkbench : Control
             WorkshopMode.Enemies => BuildEnemyOptions(),
             _ => new[]
             {
+                "Start new expedition",
+                "Save current run to selected slot",
+                "Load selected slot",
+                "Heal player to full",
+                "Reveal entire map",
+                "Restore player fog",
+                "Travel to selected floor",
+                "Teleport player to target",
                 "Reload tool data",
                 "Reload runtime content from disk",
                 "Validate room + content documents",
                 "Open debug console",
                 "Close workshop",
+                $"Seed: {_pendingSeed}",
+                $"Save slot: {_selectedSaveSlot}",
+                $"Floor target: {_pendingFloorDepth}",
+                $"Teleport X: {_pendingTeleportX}",
+                $"Teleport Y: {_pendingTeleportY}",
             },
         };
     }
@@ -837,9 +1077,20 @@ public partial class DevToolsWorkbench : Control
     private string BuildCommandsBody()
     {
         var commands = new DebugCommandProcessor().GetCommands();
+        var world = _gameManager?.World;
+        var player = world?.Player;
+        var slotMetadata = _gameManager?.SaveManager?.GetSaveMetadata(_selectedSaveSlot);
         return string.Join(
             "\n",
-            "Use this tab to reload tool data, validate documents, or jump into the debug console.",
+            $"State: {_gameManager?.CurrentState}",
+            player is null
+                ? "Run: no active expedition"
+                : $"Run: {player.Name} on floor {world!.Depth}, turn {world.TurnNumber}, HP {player.Stats.HP}/{player.Stats.MaxHP}, Pos {player.Position.X},{player.Position.Y}",
+            slotMetadata is null
+                ? $"Slot {_selectedSaveSlot}: empty"
+                : $"Slot {_selectedSaveSlot}: {slotMetadata.PlayerName}, floor {slotMetadata.Depth}, turn {slotMetadata.TurnNumber}",
+            $"Targets: floor {_pendingFloorDepth}, teleport {_pendingTeleportX},{_pendingTeleportY}",
+            "Use this tab to manage runs, saves, travel, visibility, and deeper debug handoffs.",
             "Console commands:",
             string.Join(", ", commands));
     }
@@ -963,6 +1214,33 @@ public partial class DevToolsWorkbench : Control
         {
             _itemEditor.SelectEnemy(_itemEditor.EnemyIds[0]);
         }
+    }
+
+    private void SyncRuntimeTargets()
+    {
+        var world = _gameManager?.World;
+        var player = world?.Player;
+        if (world is null || player is null)
+        {
+            return;
+        }
+
+        _pendingFloorDepth = Math.Max(0, world.Depth);
+        _pendingTeleportX = Math.Max(0, player.Position.X);
+        _pendingTeleportY = Math.Max(0, player.Position.Y);
+        ClampPendingTeleportTarget();
+    }
+
+    private void ClampPendingTeleportTarget()
+    {
+        var world = _gameManager?.World;
+        if (world is null)
+        {
+            return;
+        }
+
+        _pendingTeleportX = Math.Clamp(_pendingTeleportX, 0, Math.Max(0, world.Width - 1));
+        _pendingTeleportY = Math.Clamp(_pendingTeleportY, 0, Math.Max(0, world.Height - 1));
     }
 
     private Entity CreatePlaytestPlayer(Position spawn)
@@ -1142,5 +1420,11 @@ public partial class DevToolsWorkbench : Control
         }
 
         return $"{prefix}_{suffix}";
+    }
+
+    private static int WrapSaveSlot(int slot)
+    {
+        var slotCount = MaxSaveSlot - MinSaveSlot + 1;
+        return ((slot - MinSaveSlot) % slotCount + slotCount) % slotCount + MinSaveSlot;
     }
 }

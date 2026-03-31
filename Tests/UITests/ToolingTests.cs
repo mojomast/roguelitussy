@@ -21,6 +21,7 @@ public sealed class ToolingTests : ITestSuite
         registry.Add("UI.Tools.Workbench authors content without Godot editor", WorkbenchAuthorsContentWithoutEditor);
         registry.Add("UI.Tools.Workbench opens from title and gameplay", UIRootOpensWorkbench);
         registry.Add("UI.Tools.Workbench playtests drafts and reloads runtime content", WorkbenchPlaytestsAndReloadsContent);
+        registry.Add("UI.Tools.Workbench manages runtime sessions and saves", WorkbenchManagesRuntimeSessionsAndSaves);
     }
 
     private static void MapEditorRoundTripsPrefabs()
@@ -249,6 +250,60 @@ public sealed class ToolingTests : ITestSuite
         }
     }
 
+    private static void WorkbenchManagesRuntimeSessionsAndSaves()
+    {
+        var context = CreateContext();
+        var root = new UIRoot();
+        root.BindServices(context.GameManager, context.Bus, context.Content);
+
+        root.DevToolsWorkbench.Open();
+        root.DevToolsWorkbench.SetSelectedSaveSlot(2);
+        context.Player.Stats.HP = 17;
+        context.World.Depth = 3;
+
+        var saved = root.DevToolsWorkbench.SaveCurrentRunToSlot();
+        Expect.True(saved, "Workbench should be able to save the active run to the selected slot.");
+
+        root.DevToolsWorkbench.SetPendingSeed(2468);
+        var started = root.DevToolsWorkbench.StartNewExpeditionFromSeed();
+
+        Expect.True(started, "Workbench should be able to launch a new expedition from the selected seed.");
+        Expect.False(root.MainMenu.Visible, "Starting a run from the workshop should dismiss the title shell.");
+        Expect.Equal(2468, context.GameManager.Seed, "Workshop run control should apply the selected seed.");
+
+        var healed = root.DevToolsWorkbench.HealPlayerToFull();
+        var revealed = root.DevToolsWorkbench.RevealEntireMap();
+
+        Expect.True(healed, "Workbench should heal the active player without using the debug console.");
+        Expect.Equal(context.GameManager.World!.Player.Stats.MaxHP, context.GameManager.World.Player.Stats.HP, "Healing should restore the player to full HP.");
+        Expect.True(revealed, "Workbench should reveal the entire active map.");
+        Expect.Equal(context.GameManager.World.Width * context.GameManager.World.Height, CountVisibleTiles(context.GameManager.World), "Reveal should expose every tile in the active world.");
+
+        root.DevToolsWorkbench.SetPendingFloorDepth(4);
+        var travelled = root.DevToolsWorkbench.TravelToPendingFloor();
+
+        Expect.True(travelled, "Workbench should support direct floor travel without the debug console.");
+        Expect.Equal(4, context.GameManager.World.Depth, "Floor travel should move the active run to the selected depth.");
+
+        root.DevToolsWorkbench.SetPendingTeleportTarget(2, 2);
+        var teleported = root.DevToolsWorkbench.TeleportPlayerToPendingTarget();
+
+        Expect.True(teleported, "Workbench should support direct player teleport within the active world.");
+        Expect.Equal(new Position(2, 2), context.GameManager.World.Player.Position, "Teleport should move the player to the selected tile.");
+
+        var restored = root.DevToolsWorkbench.RestorePlayerFog();
+
+        Expect.True(restored, "Workbench should be able to restore normal player visibility after a reveal.");
+        Expect.True(CountVisibleTiles(context.GameManager.World) < context.GameManager.World.Width * context.GameManager.World.Height, "Restoring fog should return to a player-limited visibility set.");
+
+        root.DevToolsWorkbench.Open();
+        var loaded = root.DevToolsWorkbench.LoadRunFromSlot();
+
+        Expect.True(loaded, "Workbench should be able to load the selected save slot.");
+        Expect.Equal(3, context.GameManager.World!.Depth, "Loading from the workshop should restore the saved world depth.");
+        Expect.Equal(17, context.GameManager.World.Player.Stats.HP, "Loading from the workshop should restore the saved player state.");
+    }
+
     private static ToolContext CreateContext()
     {
         var world = new WorldState();
@@ -342,4 +397,21 @@ public sealed class ToolingTests : ITestSuite
     }
 
     private sealed record ToolContext(WorldState World, StubEntity Player, EventBus Bus, GameManager GameManager, StubContentDatabase Content);
+
+    private static int CountVisibleTiles(IWorldState world)
+    {
+        var count = 0;
+        for (var y = 0; y < world.Height; y++)
+        {
+            for (var x = 0; x < world.Width; x++)
+            {
+                if (world.IsVisible(new Position(x, y)))
+                {
+                    count++;
+                }
+            }
+        }
+
+        return count;
+    }
 }
