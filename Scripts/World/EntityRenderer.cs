@@ -8,7 +8,9 @@ namespace Godotussy;
 
 public sealed class EntityRenderer
 {
-    private static readonly Vector2 EntitySpriteScale = new((WorldView.TileSize - 8f) / 16f, (WorldView.TileSize - 8f) / 16f);
+    private const float EntitySpriteMaxWidth = WorldView.TileSize - 8f;
+    private const float EntitySpriteMaxHeight = WorldView.TileSize - 12f;
+    private const float FallbackBodyTopInset = 2f;
     private const float MaxAnimatedDriftPixels = WorldView.TileSize * 1.25f;
     private readonly Dictionary<EntityId, Node2D> _sprites = new();
     private readonly Dictionary<EntityId, Position> _lastKnownPositions = new();
@@ -73,7 +75,7 @@ public sealed class EntityRenderer
         {
             root.Position = WorldView.ToCanvasPosition(entity.Position);
         }
-        root.Visible = _visibleTiles.Count == 0 || _visibleTiles.Contains(entity.Position);
+        root.Visible = IsEntityVisible(entity.Id, entity.Position);
         root.Modulate = Colors.White;
         _lastKnownPositions[entity.Id] = entity.Position;
     }
@@ -131,7 +133,6 @@ public sealed class EntityRenderer
             {
                 spriteRoot.Position = targetPosition;
             }
-
             _lastKnownPositions[entity.Id] = entity.Position;
         }
     }
@@ -166,7 +167,7 @@ public sealed class EntityRenderer
         {
             if (_lastKnownPositions.TryGetValue(entityId, out var position))
             {
-                spriteRoot.Visible = _visibleTiles.Contains(position);
+                spriteRoot.Visible = IsEntityVisible(entityId, position);
             }
         }
     }
@@ -178,6 +179,21 @@ public sealed class EntityRenderer
     public Position? GetLastKnownPosition(EntityId entityId) =>
         _lastKnownPositions.TryGetValue(entityId, out var position) ? position : null;
 
+    private bool IsEntityVisible(EntityId entityId, Position position)
+    {
+        if (_world is null)
+        {
+            return _visibleTiles.Count == 0 || _visibleTiles.Contains(position);
+        }
+
+        if (_world.Player is not null && entityId == _world.Player.Id)
+        {
+            return true;
+        }
+
+        return _world.InBounds(position) && _world.IsVisible(position);
+    }
+
     private static Node2D CreateSpriteRoot(IEntity entity)
     {
         var spriteRoot = new Node2D
@@ -187,38 +203,17 @@ public sealed class EntityRenderer
             Modulate = Colors.White,
         };
 
-        var texture = WorldArtCatalog.GetEntityTexture(entity);
-        if (texture is not null)
-        {
-            spriteRoot.AddChild(new Sprite2D
-            {
-                Name = "Body",
-                Position = new Vector2(0f, 6f),
-                Scale = EntitySpriteScale,
-                Texture = texture,
-            });
-            ApplyAppearance(entity, spriteRoot);
-            return spriteRoot;
-        }
-
-        spriteRoot.AddChild(new ColorRect
-        {
-            Name = "Body",
-            Position = new Vector2(2f, 2f),
-            Size = new Vector2(WorldView.TileSize - 4f, WorldView.TileSize - 4f),
-            Color = ResolveFallbackTint(entity),
-        });
-
+        EnsureBodyVisual(entity, spriteRoot);
         ApplyAppearance(entity, spriteRoot);
-
         return spriteRoot;
     }
 
     private static void ApplyAppearance(IEntity entity, Node2D spriteRoot)
     {
+        EnsureBodyVisual(entity, spriteRoot);
+
         if (FindChild<Sprite2D>(spriteRoot, "Body") is { } spriteBody)
         {
-            spriteBody.Texture = WorldArtCatalog.GetEntityTexture(entity);
             spriteBody.Modulate = entity.Faction is Faction.Player or Faction.Neutral
                 ? PlayerVisualCatalog.Resolve(entity).BodyTint
                 : ResolveTextureTint(entity);
@@ -258,21 +253,120 @@ public sealed class EntityRenderer
             return;
         }
 
-        var profile = PlayerVisualCatalog.Resolve(entity);
-        var accentBand = GetOrCreateChild<ColorRect>(spriteRoot, "AccentBand");
-        accentBand.Position = new Vector2(6f, 28f);
-        accentBand.Size = new Vector2(WorldView.TileSize - 12f, 4f);
-        accentBand.Color = profile.AccentTint;
+        RemoveChild(spriteRoot, "AccentBand");
+        RemoveChild(spriteRoot, "VariantSigil");
+        RemoveChild(spriteRoot, "VariantDetail");
+    }
 
-        var variantSigil = GetOrCreateChild<Label>(spriteRoot, "VariantSigil");
-        variantSigil.Position = new Vector2(4f, -16f);
-        variantSigil.Text = profile.RaceSigil;
-        variantSigil.Modulate = profile.AccentTint;
+    private static void EnsureBodyVisual(IEntity entity, Node2D spriteRoot)
+    {
+        var texture = WorldArtCatalog.GetEntityTexture(entity);
+        if (texture is not null)
+        {
+            RemoveChild(spriteRoot, "Body", typeof(ColorRect));
 
-        var variantDetail = GetOrCreateChild<Label>(spriteRoot, "VariantDetail");
-        variantDetail.Position = new Vector2(18f, 8f);
-        variantDetail.Text = profile.AppearanceMark;
-        variantDetail.Modulate = profile.DetailTint;
+            var spriteBody = FindChild<Sprite2D>(spriteRoot, "Body") ?? GetOrCreateChild<Sprite2D>(spriteRoot, "Body");
+            var displayTexture = CreateDisplayTexture(texture);
+            var displayScale = ResolveTextureScale(displayTexture);
+            spriteBody.Position = new Vector2(0f, ResolveBodyVerticalOffset(displayTexture, displayScale));
+            spriteBody.Scale = displayScale;
+            spriteBody.Texture = displayTexture;
+            return;
+        }
+
+        RemoveChild(spriteRoot, "Body", typeof(Sprite2D));
+
+        var rectBody = FindChild<ColorRect>(spriteRoot, "Body") ?? GetOrCreateChild<ColorRect>(spriteRoot, "Body");
+        rectBody.Position = new Vector2(2f, FallbackBodyTopInset);
+        rectBody.Size = new Vector2(WorldView.TileSize - 4f, WorldView.TileSize - 4f);
+        rectBody.Color = ResolveFallbackTint(entity);
+    }
+
+    private static Texture2D CreateDisplayTexture(Texture2D texture)
+    {
+        if (!ShouldCropPortraitHeadroom(texture))
+        {
+            return texture;
+        }
+
+        return new AtlasTexture
+        {
+            Atlas = texture,
+            ResourcePath = texture.ResourcePath,
+            Region = new Rect2(new Vector2(0f, 8f), new Vector2(16f, 20f)),
+        };
+    }
+
+    private static bool ShouldCropPortraitHeadroom(Texture2D texture)
+    {
+        return texture.ResourcePath.EndsWith("Knight_Male_Idle_1.png", StringComparison.Ordinal)
+            || texture.ResourcePath.EndsWith("Knight_Female_Idle_1.png", StringComparison.Ordinal)
+            || texture.ResourcePath.EndsWith("Elf_Male_Idle_1.png", StringComparison.Ordinal)
+            || texture.ResourcePath.EndsWith("Elf_Female_Idle_1.png", StringComparison.Ordinal)
+            || texture.ResourcePath.EndsWith("Wizzard_Male_Idle_1.png", StringComparison.Ordinal)
+            || texture.ResourcePath.EndsWith("Wizzard_Female_Idle_1.png", StringComparison.Ordinal);
+    }
+
+    private static Vector2 ResolveTextureScale(Texture2D texture)
+    {
+        var sourceSize = ResolveSourceSize(texture);
+        var uniformScale = MathF.Min(EntitySpriteMaxWidth / sourceSize.X, EntitySpriteMaxHeight / sourceSize.Y);
+        return new Vector2(uniformScale, uniformScale);
+    }
+
+    private static float ResolveBodyVerticalOffset(Texture2D texture, Vector2 scale)
+    {
+        var scaledHeight = ResolveSourceSize(texture).Y * scale.Y;
+        return (WorldView.TileSize * 0.5f) - (scaledHeight * 0.5f);
+    }
+
+    private static Vector2 ResolveSourceSize(Texture2D texture)
+    {
+        if (texture is AtlasTexture atlas)
+        {
+            return atlas.Region.Size;
+        }
+
+        if (texture.ResourcePath.EndsWith("Big_Demon_Idle_1.png", StringComparison.Ordinal))
+        {
+            return new Vector2(32f, 36f);
+        }
+
+        if (texture.ResourcePath.EndsWith("Big_Zombie_Idle_1.png", StringComparison.Ordinal))
+        {
+            return new Vector2(32f, 34f);
+        }
+
+        if (texture.ResourcePath.EndsWith("Ogre_Idle_1.png", StringComparison.Ordinal))
+        {
+            return new Vector2(32f, 32f);
+        }
+
+        if (texture.ResourcePath.EndsWith("Elf_Male_Idle_1.png", StringComparison.Ordinal)
+            || texture.ResourcePath.EndsWith("Elf_Female_Idle_1.png", StringComparison.Ordinal)
+            || texture.ResourcePath.EndsWith("Knight_Male_Idle_1.png", StringComparison.Ordinal)
+            || texture.ResourcePath.EndsWith("Knight_Female_Idle_1.png", StringComparison.Ordinal)
+            || texture.ResourcePath.EndsWith("Wizzard_Male_Idle_1.png", StringComparison.Ordinal)
+            || texture.ResourcePath.EndsWith("Wizzard_Female_Idle_1.png", StringComparison.Ordinal))
+        {
+            return new Vector2(16f, 28f);
+        }
+
+        if (texture.ResourcePath.EndsWith("Chort_Idle_1.png", StringComparison.Ordinal))
+        {
+            return new Vector2(16f, 24f);
+        }
+
+        if (texture.ResourcePath.EndsWith("Masked_Orc_Idle_1.png", StringComparison.Ordinal)
+            || texture.ResourcePath.EndsWith("Necromancer_Idle_1.png", StringComparison.Ordinal)
+            || texture.ResourcePath.EndsWith("Orc_Shaman_Idle_1.png", StringComparison.Ordinal)
+            || texture.ResourcePath.EndsWith("Orc_Warrior_Idle_1.png", StringComparison.Ordinal)
+            || texture.ResourcePath.EndsWith("Wogol_Idle_1.png", StringComparison.Ordinal))
+        {
+            return new Vector2(16f, 20f);
+        }
+
+        return new Vector2(16f, 16f);
     }
 
     private static Color ResolveFallbackTint(IEntity entity)
@@ -401,9 +495,14 @@ public sealed class EntityRenderer
 
     private static void RemoveChild(Node parent, string name)
     {
+        RemoveChild(parent, name, null);
+    }
+
+    private static void RemoveChild(Node parent, string name, Type? type)
+    {
         foreach (var child in parent.GetChildren().ToArray())
         {
-            if (child.Name != name)
+            if (child.Name != name || (type is not null && child.GetType() != type))
             {
                 continue;
             }

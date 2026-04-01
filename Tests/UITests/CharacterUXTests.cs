@@ -20,6 +20,7 @@ public sealed class CharacterUXTests : ITestSuite
         registry.Add("UX.Level-up UI shows prompt when points available", LevelUpUIShowsPrompt);
         registry.Add("UX.Level-up overlay lists unlocked perks", LevelUpOverlayListsUnlockedPerks);
         registry.Add("UX.Level-up overlay applies selected perk", LevelUpOverlayAppliesSelectedPerk);
+        registry.Add("UX.Level-up overlay uses compact right-rail layout", LevelUpOverlayUsesCompactRightRailLayout);
         registry.Add("UX.Equipment comparison generates correct delta text", EquipmentComparisonGeneratesCorrectDelta);
         registry.Add("UX.Equipment comparison shows same stats for identical items", EquipmentComparisonSameStats);
         registry.Add("UX.HUD shows level-up indicator when points available", HudShowsLevelUpIndicator);
@@ -245,6 +246,27 @@ public sealed class CharacterUXTests : ITestSuite
         Expect.Equal(0, progression.UnspentPerkChoices, "Choosing a perk should consume the pending perk choice.");
         Expect.True(progression.SelectedPerkIds.Contains("battle_instinct"), "Choosing the default overlay selection should record the perk.");
         Expect.Equal(9, context.Player.Stats.Attack, "Choosing Battle Instinct should increase attack.");
+    }
+
+    private static void LevelUpOverlayUsesCompactRightRailLayout()
+    {
+        var context = CreateContext();
+        context.Player.SetComponent(new ProgressionComponent { Level = 2, UnspentPerkChoices = 1 });
+
+        var overlay = new LevelUpOverlay();
+        overlay.Bind(context.GameManager);
+        overlay.Open();
+
+        Expect.True(overlay.SummaryText.Contains("LEVEL UP"), "Overlay should use a stronger title header.");
+        Expect.True(overlay.SummaryText.Contains("Available Perks"), "Overlay should separate the available perks list into its own section.");
+        Expect.True(overlay.SummaryText.Contains("Selected Perk"), "Overlay should separate the selected perk details into their own section.");
+        Expect.True(overlay.Children.Count > 0 && overlay.Children[0] is Panel, "Overlay should create a panel for the level-up card.");
+
+        var panel = (Panel)overlay.Children[0];
+        Expect.True(panel.Position.X > 600f,
+            "Overlay panel should sit on the right side of the gameplay viewport instead of blocking the center.");
+        Expect.True(panel.Position.Y < 120f,
+            "Overlay panel should sit near the top of the viewport so the center play space stays clearer.");
     }
 
     private static void EquipmentComparisonGeneratesCorrectDelta()

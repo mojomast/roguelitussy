@@ -6,10 +6,11 @@ namespace Godotussy;
 
 public partial class LevelUpOverlay : Control
 {
-    private const float PanelWidth = 760f;
-    private const float PanelHeight = 360f;
-    private const float PanelPadding = 18f;
-    private const float OuterMargin = 24f;
+    private const float PanelWidth = 540f;
+    private const float PanelHeight = 380f;
+    private const float PanelPadding = 20f;
+    private const float OuterMargin = 32f;
+    private const float TopMargin = 40f;
 
     private GameManager? _gameManager;
     private Panel? _panel;
@@ -138,7 +139,7 @@ public partial class LevelUpOverlay : Control
         var panelSize = ResolvePanelSize(viewportSize);
         Size = viewportSize;
         _panel.Size = panelSize;
-        _panel.Position = OverlayLayoutHelper.CenterInViewport(viewportSize, panelSize);
+        _panel.Position = ResolvePanelPosition(viewportSize, panelSize);
         _panel.Visible = Visible;
         _label.Visible = Visible;
         _label.Position = new Vector2(PanelPadding, PanelPadding);
@@ -161,25 +162,33 @@ public partial class LevelUpOverlay : Control
 
         var selected = choices[_selectedIndex];
         var builder = new StringBuilder();
-        builder.AppendLine("[b]Level Up[/b]");
-        builder.AppendLine(ItemRarityPresentation.EscapeBBCode($"Choose a perk for {player.Name}. Pending choices: {progression.UnspentPerkChoices}"));
+        builder.AppendLine("[b]LEVEL UP[/b]");
+        builder.AppendLine(ItemRarityPresentation.EscapeBBCode($"{player.Name} can choose a new perk."));
+        builder.AppendLine(ItemRarityPresentation.EscapeBBCode($"Pending choices: {progression.UnspentPerkChoices}"));
         builder.AppendLine();
+        builder.AppendLine("[b]Available Perks[/b]");
 
         for (var index = 0; index < choices.Count; index++)
         {
-            var marker = index == _selectedIndex ? ">" : " ";
-            builder.AppendLine(ItemRarityPresentation.EscapeBBCode($"{marker} {choices[index].DisplayName} (Lv {choices[index].UnlockLevel})"));
+            var marker = index == _selectedIndex ? ">>" : "  ";
+            var emphasisOpen = index == _selectedIndex ? "[b]" : string.Empty;
+            var emphasisClose = index == _selectedIndex ? "[/b]" : string.Empty;
+            builder.AppendLine($"{emphasisOpen}{ItemRarityPresentation.EscapeBBCode($"{marker} {choices[index].DisplayName}")}{emphasisClose} [i]{ItemRarityPresentation.EscapeBBCode($"(Lv {choices[index].UnlockLevel})") }[/i]");
         }
 
         builder.AppendLine();
+        builder.AppendLine("[b]Selected Perk[/b]");
+        builder.AppendLine($"[b]{ItemRarityPresentation.EscapeBBCode(selected.DisplayName)}[/b]");
         builder.AppendLine(ItemRarityPresentation.EscapeBBCode(selected.Description));
+        builder.AppendLine();
+        builder.AppendLine("[b]Effects[/b]");
         foreach (var effect in selected.Effects)
         {
             builder.AppendLine(ItemRarityPresentation.EscapeBBCode($"- {DescribeEffect(effect)}"));
         }
 
         builder.AppendLine();
-        builder.Append(ItemRarityPresentation.EscapeBBCode("Up/Down: choose  Enter/Right: confirm"));
+        builder.Append($"[i]{ItemRarityPresentation.EscapeBBCode("Up/Down: choose    Enter/Right: confirm") }[/i]");
         return builder.ToString().TrimEnd();
     }
 
@@ -196,6 +205,14 @@ public partial class LevelUpOverlay : Control
     private static Vector2 ResolvePanelSize(Vector2 viewportSize)
     {
         return OverlayLayoutHelper.FitPanelSize(viewportSize, new Vector2(PanelWidth, PanelHeight), OuterMargin);
+    }
+
+    private static Vector2 ResolvePanelPosition(Vector2 viewportSize, Vector2 panelSize)
+    {
+        var maxX = MathF.Max(0f, viewportSize.X - panelSize.X - OuterMargin);
+        var preferredY = MathF.Max(TopMargin, viewportSize.Y * 0.12f);
+        var maxY = MathF.Max(0f, viewportSize.Y - panelSize.Y - OuterMargin);
+        return new Vector2(maxX, MathF.Min(preferredY, maxY));
     }
 
     private Vector2 ResolveViewportSize()

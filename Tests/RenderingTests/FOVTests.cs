@@ -24,6 +24,8 @@ public sealed class FOVTests : ITestSuite
         registry.Add("Rendering.WorldView rerenders dirty tiles without rebuilding the map", WorldViewRerendersDirtyTiles);
         registry.Add("Rendering.WorldView snaps severely desynced actors back to their logical tiles", WorldViewSnapsSeverelyDesyncedActorsBackToTheirLogicalTiles);
         registry.Add("Rendering.WorldView adds wall covers above entities along north edges", WorldViewAddsNorthWallCoverLayer);
+        registry.Add("Rendering.WorldView keeps textured corner covers above same-row actors", WorldViewKeepsTexturedCornerCoversAboveSameRowActors);
+        registry.Add("Rendering.WorldView keeps entity layer above trim accents", WorldViewKeepsEntityLayerAboveTrimAccents);
         registry.Add("Rendering.WorldView clears damage popups after their lifetime", WorldViewExpiresDamagePopups);
     }
 
@@ -245,9 +247,19 @@ public sealed class FOVTests : ITestSuite
         Expect.True(view.WallCoverLayerNode.GetChildren().Count > 0,
             "Walkable tiles beneath north-facing walls should add a dedicated cover layer so actors do not draw through the wall lip.");
         Expect.True(view.WallCoverLayerNode.GetChildren().OfType<Node2D>().Any(node => node.GetChildren().OfType<Sprite2D>().Any()),
-            "The wall cover layer should carry duplicated wall art above entities so front walls occlude sprites with the real tile shapes.");
-        Expect.True(view.WallCoverLayerNode.GetChildren().OfType<Node2D>().Any(node => node.GetChildren().Any(child => child.Name == "NorthCoverFace")),
-            "North-facing wall covers should add an opaque front fascia on the walkable tile below the wall so straight corridors occlude actors consistently, not only corners.");
+            "Corner front walls should still carry textured cap art above entities so the wall shapes read correctly.");
+
+        var straightNorthWallCover = view.WallCoverLayerNode.GetChildren().OfType<Node2D>().FirstOrDefault(node => node.Name == "WallCover_3_0");
+        Expect.True(straightNorthWallCover is null,
+            "Straight north walls should stop duplicating the transparent top-cap texture above actors, because that texture is only a thin fascia line.");
+
+        var straightFloorCover = view.WallCoverLayerNode.GetChildren().OfType<Node2D>().FirstOrDefault(node => node.Name == "WallCover_3_1");
+        Expect.NotNull(straightFloorCover,
+            "The walkable tile beneath a straight north wall should restore the solid front fascia that hides the actor body behind the wall face.");
+        Expect.True(straightFloorCover!.GetChildren().Any(child => child.Name == "NorthCoverFace"),
+            "Straight north wall cover should use the opaque front face on the floor tile below the wall.");
+        Expect.True(straightFloorCover.GetChildren().Any(child => child.Name == "NorthCoverShadow"),
+            "Straight north wall cover should keep the shadow under that fascia so the wall still reads with depth.");
     }
 
     private static void WorldViewExpiresDamagePopups()
@@ -266,6 +278,37 @@ public sealed class FOVTests : ITestSuite
 
         Expect.False(view.EntityLayerNode.GetChildren().OfType<DamagePopup>().Any(),
             "Damage popups should expire and free themselves after their lifetime elapses.");
+    }
+
+    private static void WorldViewKeepsTexturedCornerCoversAboveSameRowActors()
+    {
+        var world = CreateRoomWorld(playerPosition: new Position(1, 1));
+        var view = CreateWorldView(world);
+
+        var playerSprite = view.EntityRenderer.GetSprite(world.Player.Id)!;
+        var cornerCover = view.WallCoverLayerNode.GetChildren()
+            .OfType<Node2D>()
+            .FirstOrDefault(node => node.Name == "WallCover_1_0");
+
+        Expect.NotNull(cornerCover, "A north-wall corner should create a dedicated cover node above the tile below it.");
+        var cornerStrip = cornerCover!.GetChildren().OfType<Sprite2D>().FirstOrDefault();
+        Expect.NotNull(cornerStrip,
+            "Corner covers should keep their textured front strip so the wall cap reads correctly.");
+        Expect.Equal(4f, ((AtlasTexture)cornerStrip!.Texture!).Region.Size.Y,
+            "Corner covers should preserve the full-height textured strip that was already reading correctly.");
+        Expect.True(cornerCover.ZIndex > playerSprite.ZIndex,
+            "Textured corner covers should sort above actors on the same row so corner wall caps occlude correctly.");
+    }
+
+    private static void WorldViewKeepsEntityLayerAboveTrimAccents()
+    {
+        var world = CreateRoomWorld(playerPosition: new Position(3, 1));
+        var view = CreateWorldView(world);
+
+        Expect.True(view.EntityLayerNode.ZIndex > 8,
+            "EntityLayer should sort above the tile trim accents so floor and wall boundary lines do not slice through actors.");
+        Expect.True(view.WallCoverLayerNode.ZIndex > view.EntityLayerNode.ZIndex,
+            "WallCoverLayer should still sort above EntityLayer so dedicated wall occluders keep hiding actors behind wall caps.");
     }
 
     private static WorldState CreateRoomWorld(int width = 7, int height = 7, Position? playerPosition = null)
