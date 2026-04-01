@@ -107,6 +107,8 @@ Current presentation-specific behavior worth knowing:
 - `AnimationController` now advances short eased move animations over multiple `_Process(...)` frames instead of snapping movement immediately.
 - `CameraController.DefaultZoom` is `2f`, which is the baseline zoomed-out framing used by `WorldView`.
 - `MenuBase` now renders menus as separate title, summary, options, and footer regions, and the title-screen-to-workshop handoff temporarily dismisses the main menu so overlays do not stack visually.
+- `HelpOverlay` keeps its gameplay and title-screen guidance condensed enough to fit inside the menu shell on short viewports, instead of relying on off-screen overflow.
+- `DevToolsWorkbench` windows long mode summaries and action lists against the current viewport so the selected tool action, status line, and controls remain readable on shorter screens.
 
 The important constraint is that rendering code mirrors simulation state; it should not become the source of truth.
 

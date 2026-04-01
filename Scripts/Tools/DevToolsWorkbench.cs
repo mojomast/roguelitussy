@@ -21,6 +21,8 @@ public partial class DevToolsWorkbench : Control
     private const float PanelHeight = 660f;
     private const float PanelPadding = 18f;
     private const float OuterMargin = 24f;
+    private const float ApproxGlyphWidth = 7.5f;
+    private const float ApproxLineHeight = 18f;
     private const int MinSaveSlot = 1;
     private const int MaxSaveSlot = 3;
 
@@ -55,6 +57,7 @@ public partial class DevToolsWorkbench : Control
     private IReadOnlyList<string> _roomIds = Array.Empty<string>();
     private string _bodyText = string.Empty;
     private string _optionsText = string.Empty;
+    private IReadOnlyList<string> _currentOptions = Array.Empty<string>();
 
     public DevToolsWorkbench()
     {
@@ -969,8 +972,8 @@ public partial class DevToolsWorkbench : Control
         EnsureVisuals();
 
         _bodyText = BuildBodyText();
-        var options = BuildOptions();
-        _optionsText = BuildOptionsText(options);
+        _currentOptions = BuildOptions();
+        _optionsText = BuildOptionsText(_currentOptions);
 
         var builder = new StringBuilder();
         builder.AppendLine("DEVELOPER WORKSHOP");
@@ -979,10 +982,10 @@ public partial class DevToolsWorkbench : Control
         builder.AppendLine(_bodyText);
         builder.AppendLine();
 
-        for (var index = 0; index < options.Count; index++)
+        for (var index = 0; index < _currentOptions.Count; index++)
         {
             builder.Append(index == _selectedIndex ? "> " : "  ");
-            builder.AppendLine(options[index]);
+            builder.AppendLine(_currentOptions[index]);
         }
 
         builder.AppendLine();
@@ -1184,7 +1187,7 @@ public partial class DevToolsWorkbench : Control
             $"Targets: floor {_pendingFloorDepth}, teleport {_pendingTeleportX},{_pendingTeleportY}",
             "Use this tab to manage runs, saves, travel, visibility, and deeper debug handoffs.",
             "Console commands:",
-            string.Join(", ", commands));
+            string.Join("\n", WrapText(string.Join(", ", commands), 64)));
     }
 
     private WorldState BuildPlaytestWorld()
@@ -1334,26 +1337,24 @@ public partial class DevToolsWorkbench : Control
         _label.Size = new Vector2(
             Math.Max(0f, _bodyCard.Size.X - 28f),
             Math.Max(0f, _bodyCard.Size.Y - 24f));
-        _label.Text = $"MODE SUMMARY\n\n{_bodyText}";
+        _label.Text = BuildVisibleBodyPanelText(_label.Size, compactLayout);
 
         _optionsLabel.Position = new Vector2(14f, 12f);
         _optionsLabel.Size = new Vector2(
             Math.Max(0f, _optionsCard.Size.X - 28f),
             Math.Max(0f, _optionsCard.Size.Y - 24f));
-        _optionsLabel.Text = string.IsNullOrWhiteSpace(_optionsText)
-            ? string.Empty
-            : $"ACTIONS\n\n{_optionsText}";
+        _optionsLabel.Text = BuildVisibleOptionsPanelText(_optionsLabel.Size);
 
         _statusCard.Position = new Vector2(PanelPadding, statusTop);
         _statusCard.Size = new Vector2(Math.Max(0f, panelSize.X - (PanelPadding * 2f)), statusHeight);
 
         _statusLabel.Position = new Vector2(14f, 10f);
         _statusLabel.Size = new Vector2(Math.Max(0f, _statusCard.Size.X - 28f), 22f);
-        _statusLabel.Text = $"Status  {_statusText}";
+        _statusLabel.Text = BuildStatusText(_statusLabel.Size.X);
 
         _controlsLabel.Position = new Vector2(14f, 34f);
         _controlsLabel.Size = new Vector2(Math.Max(0f, _statusCard.Size.X - 28f), 28f);
-        _controlsLabel.Text = "Tab mode  Up/Down select  Left/Right or +/- adjust  Enter apply  Esc/T close";
+        _controlsLabel.Text = BuildControlsText(_controlsLabel.Size.X);
 
         _panel.Visible = Visible;
         _backdrop.Visible = Visible;
@@ -1372,6 +1373,191 @@ public partial class DevToolsWorkbench : Control
     private Vector2 ResolvePanelSize(Vector2 viewportSize)
     {
         return OverlayLayoutHelper.FitPanelSize(viewportSize, new Vector2(PanelWidth, PanelHeight), OuterMargin);
+    }
+
+    private string BuildVisibleBodyPanelText(Vector2 availableSize, bool compactLayout)
+    {
+        var maxCharsPerLine = EstimateCharactersPerLine(availableSize.X);
+        var maxLines = Math.Max(1, EstimateLineCapacity(availableSize.Y) - 2);
+        var wrappedLines = WrapText(_bodyText, maxCharsPerLine);
+
+        var visibleLines = ClampLines(wrappedLines, maxLines);
+        if (visibleLines.Count == 0)
+        {
+            return "MODE SUMMARY";
+        }
+
+        return $"MODE SUMMARY\n\n{string.Join("\n", visibleLines)}";
+    }
+
+    private string BuildVisibleOptionsPanelText(Vector2 availableSize)
+    {
+        if (_currentOptions.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var availableLines = Math.Max(1, EstimateLineCapacity(availableSize.Y) - 2);
+        var visibleOptions = ResolveVisibleOptions(_currentOptions, availableLines);
+        return visibleOptions.Count == 0
+            ? "ACTIONS"
+            : $"ACTIONS\n\n{string.Join("\n", visibleOptions)}";
+    }
+
+    private string BuildStatusText(float availableWidth)
+    {
+        var wrapped = ClampLines(WrapText($"Status  {_statusText}", EstimateCharactersPerLine(availableWidth)), 1);
+        return wrapped.Count == 0 ? "Status" : wrapped[0];
+    }
+
+    private string BuildControlsText(float availableWidth)
+    {
+        const string controls = "Tab mode  Up/Down select  Left/Right or +/- adjust  Enter apply  Esc/T close";
+        var wrapped = ClampLines(WrapText(controls, EstimateCharactersPerLine(availableWidth)), 2);
+        return string.Join("\n", wrapped);
+    }
+
+    private List<string> ResolveVisibleOptions(IReadOnlyList<string> options, int maxLines)
+    {
+        if (options.Count == 0 || maxLines <= 0)
+        {
+            return new List<string>();
+        }
+
+        if (options.Count <= maxLines)
+        {
+            return options.Select((option, index) => $"{(index == _selectedIndex ? "> " : "  ")}{option}").ToList();
+        }
+
+        if (maxLines == 1)
+        {
+            return new List<string> { AppendOverflowMarker($"> {options[_selectedIndex]}") };
+        }
+
+        if (maxLines == 2)
+        {
+            return _selectedIndex == 0
+                ? new List<string> { $"> {options[_selectedIndex]}", "  ..." }
+                : new List<string> { "  ...", AppendOverflowMarker($"> {options[_selectedIndex]}") };
+        }
+
+        var reservedLines = maxLines >= 3 ? 2 : 1;
+        var visibleOptionCount = Math.Max(1, maxLines - reservedLines);
+        var start = Math.Max(0, _selectedIndex - (visibleOptionCount / 2));
+        var maxStart = Math.Max(0, options.Count - visibleOptionCount);
+        start = Math.Min(start, maxStart);
+        var end = Math.Min(options.Count, start + visibleOptionCount);
+        var visible = new List<string>();
+
+        if (start > 0)
+        {
+            visible.Add("  ...");
+        }
+
+        for (var index = start; index < end; index++)
+        {
+            visible.Add($"{(index == _selectedIndex ? "> " : "  ")}{options[index]}");
+        }
+
+        if (end < options.Count)
+        {
+            visible.Add("  ...");
+        }
+
+        while (visible.Count > maxLines)
+        {
+            if (visible[^1] == "  ..." && visible.Count - 1 >= maxLines)
+            {
+                visible.RemoveAt(visible.Count - 2);
+            }
+            else
+            {
+                visible.RemoveAt(visible.Count - 1);
+            }
+        }
+
+        return visible;
+    }
+
+    private static int EstimateCharactersPerLine(float availableWidth)
+    {
+        return Math.Max(12, (int)Math.Floor(Math.Max(0f, availableWidth) / ApproxGlyphWidth));
+    }
+
+    private static int EstimateLineCapacity(float availableHeight)
+    {
+        return Math.Max(1, (int)Math.Floor(Math.Max(0f, availableHeight) / ApproxLineHeight));
+    }
+
+    private static List<string> ClampLines(IReadOnlyList<string> lines, int maxLines)
+    {
+        if (maxLines <= 0 || lines.Count == 0)
+        {
+            return new List<string>();
+        }
+
+        if (lines.Count <= maxLines)
+        {
+            return lines.ToList();
+        }
+
+        var visible = lines.Take(maxLines).ToList();
+        visible[^1] = TrimWithEllipsis(visible[^1]);
+        return visible;
+    }
+
+    private static List<string> WrapText(string text, int maxCharsPerLine)
+    {
+        var wrapped = new List<string>();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return wrapped;
+        }
+
+        foreach (var paragraph in text.Replace("\r", string.Empty).Split('\n'))
+        {
+            if (string.IsNullOrWhiteSpace(paragraph))
+            {
+                wrapped.Add(string.Empty);
+                continue;
+            }
+
+            var remaining = paragraph.Trim();
+            while (remaining.Length > maxCharsPerLine)
+            {
+                var breakIndex = remaining.LastIndexOf(' ', Math.Min(maxCharsPerLine, remaining.Length - 1));
+                if (breakIndex <= 0)
+                {
+                    breakIndex = Math.Min(maxCharsPerLine, remaining.Length);
+                }
+
+                wrapped.Add(remaining[..breakIndex].TrimEnd());
+                remaining = remaining[breakIndex..].TrimStart();
+            }
+
+            if (remaining.Length > 0)
+            {
+                wrapped.Add(remaining);
+            }
+        }
+
+        return wrapped;
+    }
+
+    private static string TrimWithEllipsis(string line)
+    {
+        if (string.IsNullOrWhiteSpace(line))
+        {
+            return "...";
+        }
+
+        var trimmed = line.TrimEnd();
+        return trimmed.EndsWith("...", StringComparison.Ordinal) ? trimmed : $"{trimmed}...";
+    }
+
+    private static string AppendOverflowMarker(string line)
+    {
+        return line.EndsWith("...", StringComparison.Ordinal) ? line : $"{line} ...";
     }
 
     private void CycleBrush(int delta)

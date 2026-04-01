@@ -24,6 +24,8 @@ The workshop is a menu-driven runtime shell around the lower-level tool backends
 - `Enemies` uses `Scripts/Tools/ItemEditor.cs` to scaffold and tune enemy templates before saving `enemies.json`, and can spawn the selected enemy near the player for iteration
 - `Commands` starts seeded expeditions, saves and loads slots, heals, reveals, travels floors, teleports the player, reloads tool/runtime data, validates content, and hands off to the debug console when freeform commands are more efficient
 
+On smaller viewports the workshop now windows long summary and action lists instead of letting text spill past the visible cards. The currently selected action stays in view while the body, options, status, and control hints are shortened to the space available.
+
 Workshop controls:
 
 - `Tab` switches tabs

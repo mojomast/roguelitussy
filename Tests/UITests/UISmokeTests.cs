@@ -26,6 +26,7 @@ public sealed class UISmokeTests : ITestSuite
         registry.Add("UI.CombatLog exposes a live console panel", CombatLogExposesLiveConsolePanel);
         registry.Add("UI.Chest interactions report loot to the combat log", ChestInteractionsReportLootToCombatLog);
         registry.Add("UI.Overlays clamp to the viewport", OverlaysClampToViewport);
+        registry.Add("UI.Workbench windows content for small viewports", WorkbenchWindowsContentForSmallViewports);
         registry.Add("UI.MainMenu scrolls option list within the viewport", MainMenuScrollsOptionListWithinViewport);
         registry.Add("UI.Dialog and shop overlays route interaction flow", DialogAndShopOverlaysRouteInteractionFlow);
         registry.Add("UI.Shop applies perk-based merchant discounts", ShopAppliesPerkDiscounts);
@@ -525,6 +526,31 @@ public sealed class UISmokeTests : ITestSuite
 
             Expect.True(menu.MenuText.Contains("> Quit"), "The selected bottom main-menu option should remain visible after scrolling.");
             Expect.False(menu.MenuText.Contains("Start Expedition\n") || menu.MenuText.Contains("> Start Expedition"), "The rendered menu text should window the option list instead of keeping off-screen top entries visible.");
+        });
+    }
+
+    private static void WorkbenchWindowsContentForSmallViewports()
+    {
+        WithViewportSize(new Vector2(640f, 360f), _ =>
+        {
+            var context = CreateContext();
+            var root = new Control();
+            var workbench = new DevToolsWorkbench();
+            root.AddChild(workbench);
+            workbench.Bind(context.GameManager, context.Bus, context.Content);
+            workbench.Open();
+
+            var panel = FindChild<Panel>(workbench, "Panel");
+            var bodyCard = panel is null ? null : FindChild<ColorRect>(panel, "BodyCard");
+            var optionsCard = panel is null ? null : FindChild<ColorRect>(panel, "OptionsCard");
+            var bodyLabel = bodyCard is null ? null : FindChild<Label>(bodyCard, "Label");
+            var optionsLabel = optionsCard is null ? null : FindChild<Label>(optionsCard, "OptionsLabel");
+
+            Expect.NotNull(bodyLabel, "Workbench should create a body label.");
+            Expect.NotNull(optionsLabel, "Workbench should create an options label.");
+            Expect.True(bodyLabel!.Text.Contains("...", System.StringComparison.Ordinal), "Small viewports should clamp overly long workbench summaries.");
+            Expect.True(optionsLabel!.Text.Contains("> ", System.StringComparison.Ordinal), "The selected workbench option should remain visible on small viewports.");
+            Expect.True(optionsLabel.Text.Contains("...", System.StringComparison.Ordinal), "Small viewports should window long workbench option lists.");
         });
     }
 
