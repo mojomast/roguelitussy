@@ -13,6 +13,7 @@ public sealed class SerializationTests : ITestSuite
         registry.Add("Persistence.SaveSerializer bit-packed flags round-trip", BitPackedFlagsRoundTrip);
         registry.Add("Persistence.SaveSerializer bit-packed all false", BitPackedAllFalse);
         registry.Add("Persistence.SaveSerializer bit-packed all true", BitPackedAllTrue);
+        registry.Add("Persistence.SaveSerializer preserves wallet and merchant stock", PreservesWalletAndMerchantStock);
         registry.Add("Core.EntityId seeded ids are deterministic", SeededIdsAreDeterministic);
     }
 
@@ -92,6 +93,42 @@ public sealed class SerializationTests : ITestSuite
         var first = EntityId.NewSeeded(new Random(42));
         var second = EntityId.NewSeeded(new Random(42));
         Expect.Equal(first, second, "Seeded EntityIds should be deterministic");
+    }
+
+    private static void PreservesWalletAndMerchantStock()
+    {
+        using var sandbox = SaveSandbox.Create();
+        var manager = new SaveManager(sandbox.DirectoryPath, sandbox.Clock);
+        var world = CreateWorld(6, 6);
+        world.Player.SetComponent(new WalletComponent { Gold = 73 });
+
+        var merchant = new Entity(
+            "Quartermaster",
+            new Position(1, 0),
+            new Stats { HP = 1, MaxHP = 1, Attack = 0, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 100, ViewRadius = 6 },
+            Faction.Neutral,
+            id: new EntityId(Guid.Parse("22222222-2222-2222-2222-222222222222")));
+        merchant.SetComponent(new NpcComponent
+        {
+            TemplateId = "quartermaster_vale",
+            Role = "shopkeeper",
+            DialogueId = "merchant_intro",
+        });
+        merchant.SetComponent(new MerchantComponent(new[]
+        {
+            new MerchantOfferState { ItemTemplateId = "potion_health", Price = 24, Quantity = 2 },
+        }));
+        world.AddEntity(merchant);
+
+        Expect.True(manager.SaveGame(world, SaveSlots.Slot1).GetAwaiter().GetResult(), "Save should succeed for wallet and merchant stock persistence.");
+        var restored = manager.LoadGame(SaveSlots.Slot1).GetAwaiter().GetResult();
+
+        Expect.NotNull(restored, "Saved world should load again.");
+        Expect.Equal(73, restored!.Player.GetComponent<WalletComponent>()?.Gold ?? -1, "Player gold should survive round-trip persistence.");
+        var restoredMerchant = restored.GetEntity(new EntityId(Guid.Parse("22222222-2222-2222-2222-222222222222")));
+        Expect.NotNull(restoredMerchant, "Merchant should survive round-trip persistence.");
+        Expect.Equal(2, restoredMerchant!.GetComponent<MerchantComponent>()?.Offers[0].Quantity ?? -1, "Merchant stock quantities should survive round-trip persistence.");
+        Expect.Equal("merchant_intro", restoredMerchant.GetComponent<NpcComponent>()?.DialogueId ?? string.Empty, "NPC dialog links should survive round-trip persistence.");
     }
 
     private static WorldState CreateWorld(int width, int height)

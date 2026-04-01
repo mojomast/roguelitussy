@@ -29,13 +29,25 @@ public sealed class AnimationController
         public float DurationSeconds { get; init; }
     }
 
-    private const float MoveDurationSeconds = 0.12f;
+    private sealed class PopupAnimationState
+    {
+        public required DamagePopup Popup { get; init; }
+
+        public required Vector2 Start { get; init; }
+
+        public float ElapsedSeconds { get; set; }
+    }
+
+    private const float MoveDurationSeconds = 0.08f;
     private readonly List<AnimationRecord> _history = new();
     private readonly Dictionary<EntityId, MoveAnimationState> _activeMoves = new();
+    private readonly List<PopupAnimationState> _activePopups = new();
 
     public IReadOnlyList<AnimationRecord> History => _history;
 
     public int ActiveMoveCount => _activeMoves.Count;
+
+    public int ActivePopupCount => _activePopups.Count;
 
     public bool IsMoveAnimating(EntityId entityId) => _activeMoves.ContainsKey(entityId);
 
@@ -92,6 +104,12 @@ public sealed class AnimationController
         popup.Position = position;
         popup.Setup(amount, isCrit, isHeal, isMiss);
         parent.AddChild(popup);
+        _activePopups.Add(new PopupAnimationState
+        {
+            Popup = popup,
+            Start = position,
+            ElapsedSeconds = 0f,
+        });
     }
 
     public void ClearHistory()
@@ -101,7 +119,7 @@ public sealed class AnimationController
 
     public void Advance(double delta)
     {
-        if (_activeMoves.Count == 0)
+        if (_activeMoves.Count == 0 && _activePopups.Count == 0)
         {
             return;
         }
@@ -120,6 +138,21 @@ public sealed class AnimationController
                 _activeMoves.Remove(entry.Key);
             }
         }
+
+        foreach (var popupState in _activePopups.ToArray())
+        {
+            popupState.ElapsedSeconds += (float)delta;
+            var progress = Math.Clamp(popupState.ElapsedSeconds / DamagePopup.Duration, 0f, 1f);
+            var eased = EaseOutCubic(progress);
+            popupState.Popup.Position = popupState.Start + new Vector2(0f, -DamagePopup.RiseDistance * eased);
+            popupState.Popup.Modulate = new Color(1f, 1f, 1f, 1f - progress);
+
+            if (progress >= 1f)
+            {
+                popupState.Popup.QueueFree();
+                _activePopups.Remove(popupState);
+            }
+        }
     }
 
     public void CompleteAll()
@@ -130,6 +163,13 @@ public sealed class AnimationController
         }
 
         _activeMoves.Clear();
+
+        foreach (var popupState in _activePopups)
+        {
+            popupState.Popup.QueueFree();
+        }
+
+        _activePopups.Clear();
     }
 
     public void CompleteMove(EntityId entityId)

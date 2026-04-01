@@ -1,0 +1,50 @@
+{
+  "$schema": "roguelike-npcs-v1",
+  "version": 1,
+  "npcs": [
+    {
+      "id": "quartermaster_vale",
+      "name": "Quartermaster Vale",
+      "description": "A pragmatic outfitter who prefers sturdy gear to heroic stories.",
+      "role": "shopkeeper",
+      "min_depth": 0,
+      "max_depth": 2,
+      "dialogue_id": "merchant_intro",
+      "race_id": "human",
+      "gender_id": "neutral",
+      "appearance_id": "weathered",
+      "archetype_id": "vanguard",
+      "stock": [
+        {
+          "item_id": "potion_health",
+          "price": 24,
+          "quantity": 5
+        },
+        {
+          "item_id": "shield_wooden",
+          "price": 48,
+          "quantity": 1
+        },
+        {
+          "item_id": "sword_iron",
+          "price": 70,
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "field_chronicler",
+      "name": "Field Chronicler Sen",
+      "description": "A quiet record-keeper who studies how adventurers fail and why some return.",
+      "role": "advisor",
+      "min_depth": 0,
+      "max_depth": 4,
+      "dialogue_id": "chronicler_intro",
+      "race_id": "elf",
+      "gender_id": "feminine",
+      "appearance_id": "scarred",
+      "archetype_id": "mystic",
+      "stock": []
+    }
+  ]
+}

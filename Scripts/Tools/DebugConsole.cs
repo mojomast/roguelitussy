@@ -89,6 +89,7 @@ public partial class DebugConsole : Control
                 Close();
                 return true;
             case Key.Enter:
+            case Key.KpEnter:
                 SubmitCommand();
                 return true;
             case Key.Up:

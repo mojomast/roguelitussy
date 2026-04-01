@@ -27,8 +27,10 @@ public sealed class ProgressionPersistenceTests : ITestSuite
             Experience = 420,
             ExperienceToNextLevel = 500,
             UnspentStatPoints = 3,
+            UnspentPerkChoices = 1,
             Kills = 12,
         });
+        player.GetComponent<ProgressionComponent>()!.SelectedPerkIds.Add("battle_instinct");
 
         Expect.True(manager.SaveGame(world, SaveSlots.Slot1).GetAwaiter().GetResult(), "Save should succeed for progression round-trip");
 
@@ -42,7 +44,9 @@ public sealed class ProgressionPersistenceTests : ITestSuite
         Expect.Equal(420, progression.Experience, "Experience should survive round-trip");
         Expect.Equal(500, progression.ExperienceToNextLevel, "ExperienceToNextLevel should survive round-trip");
         Expect.Equal(3, progression.UnspentStatPoints, "UnspentStatPoints should survive round-trip");
+        Expect.Equal(1, progression.UnspentPerkChoices, "UnspentPerkChoices should survive round-trip");
         Expect.Equal(12, progression.Kills, "Kills should survive round-trip");
+        Expect.True(progression.SelectedPerkIds.Contains("battle_instinct"), "Selected perk ids should survive round-trip");
     }
 
     private static void V3SavesMigrateWithoutProgression()

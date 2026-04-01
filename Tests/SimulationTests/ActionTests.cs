@@ -23,6 +23,8 @@ public sealed class ActionTests : ITestSuite
         registry.Add("Simulation.Actions drop item can split a stack", DropItemSplitsStack);
         registry.Add("Simulation.Actions open and close door toggles walkability", OpenAndCloseDoorTogglesWalkability);
         registry.Add("Simulation.Actions open door moves through when exit tile is clear", OpenDoorMovesThroughWhenExitTileIsClear);
+        registry.Add("Simulation.Actions open chest drops loot and removes chest", OpenChestDropsLootAndRemovesChest);
+        registry.Add("Simulation.Actions open chest reports loot names in the log", OpenChestReportsLootNamesInLog);
         registry.Add("Simulation.Actions stairs validation requires matching tile", StairsValidationRequiresMatchingTile);
     }
 
@@ -314,6 +316,50 @@ public sealed class ActionTests : ITestSuite
         Expect.Equal(ActionResult.Success, outcome.Result, "Opening a clear door should succeed");
         Expect.Equal(new Position(3, 1), actor.Position, "Actor should move to the tile beyond the opened door when it is available");
         Expect.True(world.IsDoorOpen(new Position(2, 1)), "Door should remain open after traversal");
+    }
+
+    private static void OpenChestDropsLootAndRemovesChest()
+    {
+        var world = CreateWorld(seed: 42);
+        world.Depth = 2;
+        world.ContentDatabase = ContentLoader.LoadFromDirectory(ContentLoader.FindContentDirectory());
+
+        var actor = CreateActor("Player", new Position(1, 1), Faction.Player);
+        var chest = new Entity("Treasure Chest", new Position(2, 1), new Stats { HP = 1, MaxHP = 1, Attack = 0, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 0 }, Faction.Neutral);
+        chest.SetComponent(new ChestComponent { LootTableId = "floor_loot" });
+
+        world.Player = actor;
+        world.AddEntity(actor);
+        world.AddEntity(chest);
+
+        var outcome = new OpenChestAction(actor.Id, chest.Id).Execute(world);
+
+        var inventory = actor.GetComponent<InventoryComponent>()!;
+
+        Expect.Equal(ActionResult.Success, outcome.Result, "Opening an adjacent chest should succeed.");
+        Expect.True(world.GetEntity(chest.Id) is null, "Opened chests should be removed from the world.");
+        Expect.True(inventory.Items.Count > 0, "Opening a chest with room in the pack should move loot directly into the actor inventory.");
+        Expect.False(world.HasGroundItems(new Position(2, 1)), "Opening a chest with room in the pack should not leave the loot on the floor.");
+    }
+
+    private static void OpenChestReportsLootNamesInLog()
+    {
+        var world = CreateWorld(seed: 0);
+        var actor = CreateActor("Player", new Position(1, 1), Faction.Player);
+        var chest = new Entity("Treasure Chest", new Position(2, 1), new Stats { HP = 1, MaxHP = 1, Attack = 0, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 0 }, Faction.Neutral);
+        chest.SetComponent(new ChestComponent { LootTableId = "floor_loot" });
+        var content = ContentLoader.LoadFromRepository(throwOnValidationErrors: false);
+        content.EnsureValid();
+        world.ContentDatabase = content;
+
+        world.Player = actor;
+        world.AddEntity(actor);
+        world.AddEntity(chest);
+
+        var outcome = new OpenChestAction(actor.Id, chest.Id).Execute(world);
+
+        Expect.True(outcome.LogMessages.Count > 0, "Opening a chest should emit a log message.");
+        Expect.True(outcome.LogMessages[0].Contains("stows", System.StringComparison.Ordinal) || outcome.LogMessages[0].Contains("spills", System.StringComparison.Ordinal), "Chest logs should explain where the loot went instead of only removing the chest.");
     }
 
     private static void StairsValidationRequiresMatchingTile()

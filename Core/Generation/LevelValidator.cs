@@ -55,6 +55,14 @@ public static class LevelValidator
             }
         }
 
+        foreach (var spawn in data.EnemySpawnDetails ?? System.Array.Empty<EnemySpawnData>())
+        {
+            if (!reachable.Contains(spawn.Position))
+            {
+                errors.Add($"Enemy spawn at {spawn.Position} is unreachable.");
+            }
+        }
+
         for (var i = 0; i < data.ItemSpawns.Count; i++)
         {
             if (!reachable.Contains(data.ItemSpawns[i]))
@@ -63,11 +71,41 @@ public static class LevelValidator
             }
         }
 
+        foreach (var spawn in data.ItemSpawnDetails ?? System.Array.Empty<ItemSpawnData>())
+        {
+            if (!reachable.Contains(spawn.Position))
+            {
+                errors.Add($"Item spawn at {spawn.Position} is unreachable.");
+            }
+        }
+
+        foreach (var spawn in data.ChestSpawnDetails ?? System.Array.Empty<ChestSpawnData>())
+        {
+            if (!reachable.Contains(spawn.Position))
+            {
+                errors.Add($"Chest spawn at {spawn.Position} is unreachable.");
+            }
+        }
+
+        foreach (var spawn in data.NpcSpawns ?? System.Array.Empty<NpcSpawnData>())
+        {
+            if (!reachable.Contains(spawn.Position))
+            {
+                errors.Add($"Npc spawn at {spawn.Position} is unreachable.");
+            }
+        }
+
         for (var y = 0; y < world.Height; y++)
         {
             for (var x = 0; x < world.Width; x++)
             {
                 var position = new Position(x, y);
+                if (world.GetTile(position) == TileType.Door && !HasValidDoorwayShape(world, position))
+                {
+                    errors.Add($"Door at {position} is not connected to a valid doorway.");
+                    return errors;
+                }
+
                 if (IsTraversable(world.GetTile(position)) && !reachable.Contains(position))
                 {
                     errors.Add($"Disconnected walkable tile found at {position}.");
@@ -113,5 +151,22 @@ public static class LevelValidator
     public static bool IsTraversable(TileType tile)
     {
         return tile is TileType.Floor or TileType.Door or TileType.StairsDown or TileType.StairsUp or TileType.Water;
+    }
+
+    private static bool HasValidDoorwayShape(IWorldState world, Position position)
+    {
+        var north = SupportsDoorway(world, position + new Position(0, -1));
+        var east = SupportsDoorway(world, position + new Position(1, 0));
+        var south = SupportsDoorway(world, position + new Position(0, 1));
+        var west = SupportsDoorway(world, position + new Position(-1, 0));
+
+        var verticalDoor = north && south && !east && !west;
+        var horizontalDoor = east && west && !north && !south;
+        return verticalDoor || horizontalDoor;
+    }
+
+    private static bool SupportsDoorway(IWorldState world, Position position)
+    {
+        return world.InBounds(position) && IsTraversable(world.GetTile(position));
     }
 }

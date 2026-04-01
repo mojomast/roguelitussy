@@ -39,7 +39,8 @@ public static class RoomPlacer
         var fittingPrefabs = new List<RoomPrefab>();
         for (var i = 0; i < prefabs.Count; i++)
         {
-            if (prefabs[i].FitsWithin(usableWidth, usableHeight))
+            if (prefabs[i].FitsWithin(usableWidth, usableHeight)
+                && prefabs[i].HasWalkableTiles)
             {
                 fittingPrefabs.Add(prefabs[i]);
             }
@@ -142,6 +143,7 @@ public static class RoomPlacer
 public sealed class RoomPlacement
 {
     private readonly HashSet<Position> _walkableLookup;
+    private readonly List<Position> _doorTiles = new();
 
     public RoomPlacement(RoomData room, IReadOnlyList<Position> walkableTiles, Position origin, RoomPrefab? prefab)
     {
@@ -156,19 +158,21 @@ public sealed class RoomPlacement
         Prefab = prefab;
         _walkableLookup = new HashSet<Position>(walkableTiles);
 
-        var connectionPoint = walkableTiles[0];
-        var bestDistance = connectionPoint.DistanceTo(room.Center);
-        for (var i = 1; i < walkableTiles.Count; i++)
+        if (prefab is not null)
         {
-            var distance = walkableTiles[i].DistanceTo(room.Center);
-            if (distance < bestDistance)
+            for (var y = 0; y < prefab.Height; y++)
             {
-                connectionPoint = walkableTiles[i];
-                bestDistance = distance;
+                for (var x = 0; x < prefab.Width; x++)
+                {
+                    if (prefab.IsDoor(x, y))
+                    {
+                        _doorTiles.Add(new Position(origin.X + x, origin.Y + y));
+                    }
+                }
             }
         }
 
-        ConnectionPoint = connectionPoint;
+        ConnectionPoint = GetConnectionPointTowards(room.Center);
     }
 
     public RoomData Room { get; }
@@ -182,6 +186,68 @@ public sealed class RoomPlacement
     public Position ConnectionPoint { get; }
 
     public bool Contains(Position position) => _walkableLookup.Contains(position);
+
+    public Position GetConnectionPointTowards(Position target)
+    {
+        var candidates = _doorTiles.Count > 0 ? _doorTiles : WalkableTiles;
+        var best = candidates[0];
+        var bestDistance = best.DistanceTo(target);
+
+        for (var i = 1; i < candidates.Count; i++)
+        {
+            var candidate = candidates[i];
+            var distance = candidate.DistanceTo(target);
+            if (distance < bestDistance)
+            {
+                best = candidate;
+                bestDistance = distance;
+            }
+        }
+
+        return best;
+    }
+
+    public IEnumerable<Position> GetSpawnPositions(params string[] types)
+    {
+        foreach (var placement in GetSpawnPlacements(types))
+        {
+            yield return placement.Position;
+        }
+    }
+
+    public IEnumerable<RoomPrefabSpawnPlacement> GetSpawnPlacements(params string[] types)
+    {
+        if (Prefab is null || Prefab.SpawnPoints.Count == 0 || types.Length == 0)
+        {
+            yield break;
+        }
+
+        var allowedTypes = new HashSet<string>(types, StringComparer.OrdinalIgnoreCase);
+        foreach (var spawnPoint in Prefab.SpawnPoints)
+        {
+            if (allowedTypes.Contains(spawnPoint.Type))
+            {
+                yield return new RoomPrefabSpawnPlacement(
+                    new Position(Origin.X + spawnPoint.X, Origin.Y + spawnPoint.Y),
+                    spawnPoint);
+            }
+        }
+    }
+
+    public IEnumerable<RoomPrefabFixedEntityPlacement> GetFixedEntityPlacements()
+    {
+        if (Prefab is null || Prefab.FixedEntities.Count == 0)
+        {
+            yield break;
+        }
+
+        foreach (var fixedEntity in Prefab.FixedEntities)
+        {
+            yield return new RoomPrefabFixedEntityPlacement(
+                new Position(Origin.X + fixedEntity.X, Origin.Y + fixedEntity.Y),
+                fixedEntity);
+        }
+    }
 
     public Position GetRandomWalkableTile(Random rng, HashSet<Position> occupied)
     {

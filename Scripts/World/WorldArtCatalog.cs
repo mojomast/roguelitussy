@@ -90,9 +90,15 @@ public static class WorldArtCatalog
 
     public static Texture2D? GetEntityTexture(IEntity entity)
     {
+        if (entity.GetComponent<ChestComponent>() is not null)
+        {
+            return null;
+        }
+
         return entity.Faction switch
         {
             Faction.Player => PlayerVisualCatalog.GetBaseTexture(entity),
+            Faction.Neutral => PlayerVisualCatalog.GetBaseTexture(entity),
             Faction.Enemy => ResolveEnemyTexture(entity.Name),
             _ => null,
         };
@@ -112,9 +118,36 @@ public static class WorldArtCatalog
             West: IsSolidBoundary(world, new Position(position.X - 1, position.Y)));
     }
 
+    public static bool HasNorthWallCover(IWorldState? world, Position position, TileType tileType)
+    {
+        return ShouldDrawBoundaryTrim(world, position, tileType)
+            && IsSolidBoundary(world, new Position(position.X, position.Y - 1));
+    }
+
     private static Texture2D? ResolveEnemyTexture(string name)
     {
         var normalized = name.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "giant rat" => Load(SpriteBasePath + "Imp_Idle_1.png"),
+            "skeleton warrior" => Load(SpriteBasePath + "Skelet_Idle_1.png"),
+            "goblin archer" => Load(SpriteBasePath + "Goblin_Idle_1.png"),
+            "orc brute" => Load(SpriteBasePath + "Ogre_Idle_1.png"),
+            "spectral wraith" => Load(SpriteBasePath + "Ice_Zombie_Idle_1.png"),
+            "acid slime" => Load(SpriteBasePath + "Swampy_Idle_1.png"),
+            "cave spider" => Load(SpriteBasePath + "Wogol_Idle_1.png"),
+            "skeleton knight" => Load(SpriteBasePath + "Orc_Warrior_Idle_1.png"),
+            "goblin shaman" => Load(SpriteBasePath + "Orc_Shaman_Idle_1.png"),
+            "dark mage" => Load(SpriteBasePath + "Necromancer_Idle_1.png"),
+            "shadow stalker" => Load(SpriteBasePath + "Masked_Orc_Idle_1.png"),
+            "bone lord" => Load(SpriteBasePath + "Big_Zombie_Idle_1.png"),
+            "flame elemental" => Load(SpriteBasePath + "Chort_Idle_1.png"),
+            _ => ResolveEnemyTextureFallback(normalized),
+        };
+    }
+
+    private static Texture2D? ResolveEnemyTextureFallback(string normalized)
+    {
         if (normalized.Contains("rat", StringComparison.Ordinal))
         {
             return Load(SpriteBasePath + "Imp_Idle_1.png");
@@ -241,6 +274,16 @@ public static class WorldArtCatalog
 
         if (southOpen)
         {
+            if (eastOpen && !westOpen)
+            {
+                return TileBasePath + "Wall_Top_Left.png";
+            }
+
+            if (westOpen && !eastOpen)
+            {
+                return TileBasePath + "Wall_Top_Right.png";
+            }
+
             if (southEastOpen && !southWestOpen)
             {
                 return TileBasePath + "Wall_Corner_Top_Left.png";
@@ -258,12 +301,12 @@ public static class WorldArtCatalog
         {
             if (northEastOpen && !southEastOpen)
             {
-                return TileBasePath + "Wall_Corner_Bottom_Left.png";
+                return TileBasePath + "Wall_Side_Front_Left.png";
             }
 
             if (southEastOpen && !northEastOpen)
             {
-                return TileBasePath + "Wall_Corner_Left.png";
+                return TileBasePath + "Wall_Side_Top_Left.png";
             }
 
             if (northEastOpen || southEastOpen)
@@ -278,12 +321,12 @@ public static class WorldArtCatalog
         {
             if (northWestOpen && !southWestOpen)
             {
-                return TileBasePath + "Wall_Corner_Bottom_Right.png";
+                return TileBasePath + "Wall_Side_Front_Right.png";
             }
 
             if (southWestOpen && !northWestOpen)
             {
-                return TileBasePath + "Wall_Corner_Right.png";
+                return TileBasePath + "Wall_Side_Top_Right.png";
             }
 
             if (northWestOpen || southWestOpen)

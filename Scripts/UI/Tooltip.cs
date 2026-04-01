@@ -26,7 +26,7 @@ public partial class Tooltip : Control
     {
         Name = "Tooltip";
         Visible = false;
-        Size = new Vector2(260f, 140f);
+        Size = new Vector2(320f, 200f);
     }
 
     public override void _Ready()
@@ -112,6 +112,11 @@ public partial class Tooltip : Control
         RefreshVisualState();
     }
 
+    public Vector2 ResolveBottomRightPosition(Vector2 viewportSize, float margin = 24f)
+    {
+        return ClampToViewport(new Vector2(viewportSize.X - Size.X - margin, viewportSize.Y - Size.Y - margin), viewportSize);
+    }
+
     public new void Hide()
     {
         Visible = false;
@@ -192,6 +197,11 @@ public partial class Tooltip : Control
     private Vector2 ClampToScreen(Vector2 position)
     {
         var viewport = GetParent() is not null && GetTree() is not null ? GetViewportRect().Size : new Vector2(1600f, 900f);
+        return ClampToViewport(position, viewport);
+    }
+
+    private Vector2 ClampToViewport(Vector2 position, Vector2 viewport)
+    {
         var x = position.X;
         var y = position.Y;
 

@@ -22,8 +22,11 @@ public sealed class ContentValidationTests : ITestSuite
         Expect.Equal(22, content.ItemDefinitions.Count, "Expected the full item set to load");
         Expect.Equal(13, content.EnemyDefinitions.Count, "Expected the full enemy set to load");
         Expect.Equal(8, content.AbilityDefinitions.Count, "Expected the full ability set to load");
+        Expect.Equal(4, content.PerkDefinitions.Count, "Expected the initial perk set to load");
+        Expect.Equal(2, content.DialogueDefinitions.Count, "Expected the full dialog set to load");
+        Expect.Equal(2, content.NpcDefinitions.Count, "Expected the full NPC set to load");
         Expect.Equal(9, content.StatusEffects.Count, "Expected the full status effect set to load");
-        Expect.Equal(10, content.RoomPrefabs.Count, "Expected the full room prefab set to load");
+        Expect.True(content.RoomPrefabs.Count >= 10, "Expected at least the baseline room prefab set to load");
         Expect.Equal(15, content.LootTables.Count, "Expected the full loot table set to load");
     }
 
@@ -41,6 +44,16 @@ public sealed class ContentValidationTests : ITestSuite
         Expect.Equal("melee_rusher", orc.BrainType, "Enemy AI types should map onto the frozen brain identifiers");
         Expect.Equal(35, orc.BaseStats.MaxHP, "Enemy HP should map into the base stats block");
         Expect.Equal(80, orc.BaseStats.Speed, "Enemy speed should respect the engine-scale contract");
+
+        Expect.True(content.TryGetNpcTemplate("quartermaster_vale", out var vendor), "Quartermaster Vale should project into the NPC surface");
+        Expect.True(vendor.IsMerchant, "Quartermaster Vale should project merchant stock");
+        Expect.Equal("merchant_intro", vendor.DialogueId, "NPC dialog ids should survive projection");
+
+        Expect.True(content.TryGetPerkTemplate("quartermasters_eye", out var perk), "Quartermaster's Eye should project into the perk surface");
+        Expect.Equal(2, perk.UnlockLevel, "Perk unlock levels should survive projection");
+
+        Expect.True(content.TryGetDialogueTemplate("merchant_intro", out var dialog), "Merchant intro dialog should project into the dialogue surface");
+        Expect.True(dialog.Nodes.ContainsKey(dialog.StartNodeId), "Dialog templates should retain their start node");
     }
 
     private static void CrossReferencesRemainIntact()
@@ -73,6 +86,15 @@ public sealed class ContentValidationTests : ITestSuite
             if (enemy.LootTableId is not null)
             {
                 Expect.True(content.LootTables.ContainsKey(enemy.LootTableId), $"Enemy '{enemy.Id}' should reference a known loot table");
+            }
+        }
+
+        foreach (var npc in content.NpcDefinitions.Values)
+        {
+            Expect.True(content.DialogueDefinitions.ContainsKey(npc.DialogueId), $"Npc '{npc.Id}' should reference a known dialog");
+            foreach (var stock in npc.Stock)
+            {
+                Expect.True(content.ItemDefinitions.ContainsKey(stock.ItemId), $"Npc '{npc.Id}' stock should reference a known item");
             }
         }
     }

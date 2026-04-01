@@ -152,11 +152,16 @@ public sealed class TurnScheduler : ITurnScheduler
     {
         foreach (var entity in world.Entities)
         {
-            if (entity.IsAlive && !_actors.ContainsKey(entity.Id))
+            if (entity.IsAlive && !_actors.ContainsKey(entity.Id) && ShouldScheduleEntity(entity))
             {
                 Register(entity);
             }
         }
+    }
+
+    private static bool ShouldScheduleEntity(IEntity entity)
+    {
+        return entity.Faction != Faction.Neutral || entity.GetComponent<IBrain>() is not null;
     }
 
     private void PruneMissing(WorldState world)

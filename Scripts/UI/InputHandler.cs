@@ -21,6 +21,8 @@ public partial class InputHandler : Node
 
     public event System.Action? ToolsRequested;
 
+    public event System.Action? InteractRequested;
+
     public void Bind(GameManager? gameManager, EventBus? eventBus)
     {
         _gameManager = gameManager;
@@ -53,21 +55,28 @@ public partial class InputHandler : Node
         var playerId = world.Player.Id;
         return key switch
         {
-            Key.Up or Key.W => Submit(UIActionFactory.CreateDirectionalAction(world, playerId, new Position(0, -1))),
-            Key.Down or Key.S => Submit(UIActionFactory.CreateDirectionalAction(world, playerId, new Position(0, 1))),
-            Key.Left or Key.A => Submit(UIActionFactory.CreateDirectionalAction(world, playerId, new Position(-1, 0))),
-            Key.Right or Key.D => Submit(UIActionFactory.CreateDirectionalAction(world, playerId, new Position(1, 0))),
+            Key.Up or Key.W => HandleDirectionalInput(world, playerId, new Position(0, -1)),
+            Key.Down or Key.S => HandleDirectionalInput(world, playerId, new Position(0, 1)),
+            Key.Left or Key.A => HandleDirectionalInput(world, playerId, new Position(-1, 0)),
+            Key.Right or Key.D => HandleDirectionalInput(world, playerId, new Position(1, 0)),
             Key.Space or Key.Period => Submit(UIActionFactory.CreateWaitAction(world, playerId)),
             Key.G => Submit(UIActionFactory.CreatePickupAction(world, _gameManager?.Content, playerId)),
-            Key.Enter => Submit(UIActionFactory.CreateStairsAction(world, playerId)),
+            Key.Enter or Key.KpEnter => Submit(UIActionFactory.CreateStairsAction(world, playerId)),
             Key.I => Raise(InventoryRequested),
             Key.C => Raise(CharacterSheetRequested),
+            Key.E => Raise(InteractRequested),
             Key.H => Raise(HelpRequested),
+            Key.F => Raise(InteractRequested),
             Key.T => Raise(ToolsRequested),
             Key.Escape => Raise(PauseRequested),
             Key.M or Key.Tab => Raise(MinimapToggleRequested),
             _ => false,
         };
+    }
+
+    private bool HandleDirectionalInput(IWorldState world, EntityId playerId, Position delta)
+    {
+        return Submit(UIActionFactory.CreateDirectionalAction(world, playerId, delta));
     }
 
     private bool Submit(IAction? action)

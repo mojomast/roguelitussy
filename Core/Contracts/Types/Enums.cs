@@ -24,6 +24,7 @@ public enum ActionType : byte
     DropItem,
     OpenDoor,
     CloseDoor,
+    OpenChest,
     Descend,
     Ascend,
     CastAbility,

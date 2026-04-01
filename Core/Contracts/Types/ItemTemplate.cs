@@ -22,4 +22,6 @@ public sealed record ItemTemplate(
     int WeaponAccuracy = 0,
     int SpeedModifier = 0,
     IReadOnlyList<WeaponOnHitEffect>? OnHitEffects = null,
-    IReadOnlyDictionary<string, int>? Requirements = null);
+    IReadOnlyDictionary<string, int>? Requirements = null,
+    int Value = 0,
+    double Weight = 0.0);

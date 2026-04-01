@@ -15,6 +15,11 @@ public sealed class DungeonGeneratorTests : ITestSuite
         registry.Add("Generation.DungeonGenerator applies spawn rules", GeneratorAppliesSpawnRules);
         registry.Add("Generation.BSPNode starter map produces at least four rooms", StarterMapProducesAtLeastFourRooms);
         registry.Add("Generation.CorridorBuilder creates an L-shaped corridor", CorridorBuilderCreatesConnectedCorridor);
+        registry.Add("Generation.RoomPlacement prefers doorway closest to target", RoomPlacementPrefersDoorwayClosestToTarget);
+        registry.Add("Generation.CorridorBuilder preserves door endpoints", CorridorBuilderPreservesDoorEndpoints);
+        registry.Add("Generation.DoorSanitizer removes orphaned door tiles", DoorSanitizerRemovesOrphanedDoorTiles);
+        registry.Add("Generation.RoomPlacement surfaces prefab-authored metadata", RoomPlacementSurfacesPrefabAuthoredMetadata);
+        registry.Add("Generation.RoomPlacer skips prefabs with no walkable tiles", RoomPlacerSkipsPrefabsWithNoWalkableTiles);
     }
 
     private static void SameSeedProducesSameLevel()
@@ -109,6 +114,153 @@ public sealed class DungeonGeneratorTests : ITestSuite
         Expect.Equal(from.DistanceTo(to) + 1, CountTraversableTiles(world), "L-shaped corridor should carve the expected number of tiles");
     }
 
+    private static void RoomPlacementPrefersDoorwayClosestToTarget()
+    {
+        var prefab = new RoomPrefab(
+            "door_test",
+            new[]
+            {
+                "##+##",
+                "#...#",
+                "+...+",
+                "#...#",
+                "##+##",
+            });
+        var origin = new Position(10, 10);
+        var walkableTiles = prefab.GetWalkableOffsets().Select(offset => origin + offset).ToArray();
+        var room = new RoomPlacement(new RoomData(origin.X, origin.Y, prefab.Width, prefab.Height, new Position(12, 12)), walkableTiles, origin, prefab);
+
+        Expect.Equal(new Position(12, 10), room.GetConnectionPointTowards(new Position(12, 0)), "Northward connections should prefer the north door.");
+        Expect.Equal(new Position(14, 12), room.GetConnectionPointTowards(new Position(20, 12)), "Eastward connections should prefer the east door.");
+    }
+
+    private static void CorridorBuilderPreservesDoorEndpoints()
+    {
+        var world = new WorldState();
+        world.InitGrid(12, 12);
+
+        for (var y = 0; y < world.Height; y++)
+        {
+            for (var x = 0; x < world.Width; x++)
+            {
+                world.SetTile(new Position(x, y), TileType.Wall);
+            }
+        }
+
+        var from = new Position(2, 2);
+        var to = new Position(8, 7);
+        world.SetTile(from, TileType.Door);
+        world.SetTile(to, TileType.Door);
+
+        CorridorBuilder.Connect(world, from, to, new Random(0));
+
+        Expect.Equal(TileType.Door, world.GetTile(from), "Connecting corridors should not overwrite the starting door tile.");
+        Expect.Equal(TileType.Door, world.GetTile(to), "Connecting corridors should not overwrite the destination door tile.");
+    }
+
+    private static void DoorSanitizerRemovesOrphanedDoorTiles()
+    {
+        var world = new WorldState();
+        world.InitGrid(8, 8);
+
+        for (var y = 0; y < world.Height; y++)
+        {
+            for (var x = 0; x < world.Width; x++)
+            {
+                world.SetTile(new Position(x, y), TileType.Wall);
+            }
+        }
+
+        var orphanDoor = new Position(2, 2);
+        world.SetTile(orphanDoor, TileType.Door);
+        world.SetTile(new Position(2, 1), TileType.Floor);
+
+        var validDoor = new Position(5, 3);
+        world.SetTile(validDoor, TileType.Door);
+        world.SetTile(new Position(5, 2), TileType.Floor);
+        world.SetTile(new Position(5, 4), TileType.Floor);
+
+        DoorSanitizer.Normalize(world);
+
+        Expect.Equal(TileType.Wall, world.GetTile(orphanDoor), "Doors that only open onto one side should be removed instead of leaving dead-end arches.");
+        Expect.Equal(TileType.Door, world.GetTile(validDoor), "Doors that connect two passages should remain intact.");
+    }
+
+    private static void RoomPlacementSurfacesPrefabAuthoredMetadata()
+    {
+        var prefab = new RoomPrefab(
+            "metadata_test",
+            new[]
+            {
+                "#####",
+                "#.I.#",
+                "#.C.#",
+                "#...#",
+                "##+##",
+            },
+            new[]
+            {
+                new RoomPrefabSpawnPoint(2, 1, "item"),
+                new RoomPrefabSpawnPoint(2, 2, "chest", "deep_floor_loot"),
+                new RoomPrefabSpawnPoint(2, 3, "enemy_boss"),
+            },
+            new[]
+            {
+                new RoomPrefabFixedEntity(1, 3, "npc", "field_chronicler"),
+            },
+            ItemQualityBonus: 2,
+            EnemyCountBonus: 1,
+            LockDoorsOnEnter: true);
+
+        var origin = new Position(20, 30);
+        var walkableTiles = prefab.GetWalkableOffsets().Select(offset => origin + offset).ToArray();
+        var room = new RoomPlacement(new RoomData(origin.X, origin.Y, prefab.Width, prefab.Height, new Position(22, 32)), walkableTiles, origin, prefab);
+
+        var itemSpawn = room.GetSpawnPlacements("item").Single();
+        var chestSpawn = room.GetSpawnPlacements("chest").Single();
+        var fixedNpc = room.GetFixedEntityPlacements().Single();
+
+        Expect.Equal(new Position(22, 31), itemSpawn.Position, "Spawn points should resolve to absolute world positions.");
+        Expect.Equal(new Position(22, 32), chestSpawn.Position, "Chest spawn points should resolve to absolute world positions.");
+        Expect.Equal("deep_floor_loot", chestSpawn.SpawnPoint.ReferenceId ?? string.Empty, "Chest spawn metadata should preserve authored references.");
+        Expect.Equal(new Position(21, 33), fixedNpc.Position, "Fixed entity positions should resolve to absolute world positions.");
+        Expect.Equal("field_chronicler", fixedNpc.FixedEntity.TemplateId ?? string.Empty, "Fixed entity metadata should preserve authored templates.");
+        Expect.Equal(2, room.Prefab?.ItemQualityBonus ?? -1, "Room prefabs should preserve authored item quality bonuses.");
+        Expect.Equal(1, room.Prefab?.EnemyCountBonus ?? -1, "Room prefabs should preserve authored enemy count bonuses.");
+        Expect.True(room.Prefab?.LockDoorsOnEnter == true, "Room prefabs should preserve authored room flags for downstream runtime hooks.");
+    }
+
+    private static void RoomPlacerSkipsPrefabsWithNoWalkableTiles()
+    {
+        var root = BSPNode.Create(60, 40, new Random(17));
+        var world = new WorldState();
+        world.InitGrid(60, 40);
+
+        var invalidPrefab = new RoomPrefab(
+            "all_walls",
+            new[]
+            {
+                "########",
+                "########",
+                "########",
+                "########",
+            });
+        var validPrefab = new RoomPrefab(
+            "valid_room",
+            new[]
+            {
+                "#####",
+                "#...#",
+                "#...#",
+                "#####",
+            });
+
+        var placements = RoomPlacer.PlaceRooms(root, world, new Random(5), new[] { invalidPrefab, validPrefab });
+
+        Expect.True(placements.Count >= 4, "Room placement should still succeed when invalid prefabs are present.");
+        Expect.True(placements.All(room => room.WalkableTiles.Count > 0), "Placed rooms should always expose at least one walkable tile.");
+    }
+
     private static string GetWorldSignature(WorldState world)
     {
         var builder = new StringBuilder(world.Width * world.Height);
@@ -156,6 +308,42 @@ public sealed class DungeonGeneratorTests : ITestSuite
             builder.Append(level.Rooms[i].Height);
             builder.Append(',');
             builder.Append(level.Rooms[i].Center);
+            builder.Append(';');
+        }
+
+        foreach (var spawn in level.EnemySpawnDetails ?? System.Array.Empty<EnemySpawnData>())
+        {
+            builder.Append(spawn.Position);
+            builder.Append(',');
+            builder.Append(spawn.TemplateId);
+            builder.Append(',');
+            builder.Append(spawn.IsBoss);
+            builder.Append(';');
+        }
+
+        foreach (var spawn in level.ItemSpawnDetails ?? System.Array.Empty<ItemSpawnData>())
+        {
+            builder.Append(spawn.Position);
+            builder.Append(',');
+            builder.Append(spawn.TemplateId);
+            builder.Append(',');
+            builder.Append(spawn.QualityBonus);
+            builder.Append(';');
+        }
+
+        foreach (var spawn in level.ChestSpawnDetails ?? System.Array.Empty<ChestSpawnData>())
+        {
+            builder.Append(spawn.Position);
+            builder.Append(',');
+            builder.Append(spawn.LootTableId);
+            builder.Append(';');
+        }
+
+        foreach (var spawn in level.NpcSpawns ?? System.Array.Empty<NpcSpawnData>())
+        {
+            builder.Append(spawn.Position);
+            builder.Append(',');
+            builder.Append(spawn.TemplateId);
             builder.Append(';');
         }
 

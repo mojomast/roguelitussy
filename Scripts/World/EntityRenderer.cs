@@ -8,7 +8,7 @@ namespace Godotussy;
 
 public sealed class EntityRenderer
 {
-    private static readonly Vector2 EntitySpriteScale = new(WorldView.TileSize / 16f, WorldView.TileSize / 16f);
+    private static readonly Vector2 EntitySpriteScale = new((WorldView.TileSize - 8f) / 16f, (WorldView.TileSize - 8f) / 16f);
     private const float MaxAnimatedDriftPixels = WorldView.TileSize * 1.25f;
     private readonly Dictionary<EntityId, Node2D> _sprites = new();
     private readonly Dictionary<EntityId, Position> _lastKnownPositions = new();
@@ -193,7 +193,7 @@ public sealed class EntityRenderer
             spriteRoot.AddChild(new Sprite2D
             {
                 Name = "Body",
-                Position = new Vector2(0f, 0f),
+                Position = new Vector2(0f, 6f),
                 Scale = EntitySpriteScale,
                 Texture = texture,
             });
@@ -219,7 +219,7 @@ public sealed class EntityRenderer
         if (FindChild<Sprite2D>(spriteRoot, "Body") is { } spriteBody)
         {
             spriteBody.Texture = WorldArtCatalog.GetEntityTexture(entity);
-            spriteBody.Modulate = entity.Faction == Faction.Player
+            spriteBody.Modulate = entity.Faction is Faction.Player or Faction.Neutral
                 ? PlayerVisualCatalog.Resolve(entity).BodyTint
                 : ResolveTextureTint(entity);
         }
@@ -228,6 +228,27 @@ public sealed class EntityRenderer
         {
             rectBody.Color = ResolveFallbackTint(entity);
         }
+
+        if (entity.GetComponent<ChestComponent>() is not null)
+        {
+            RemoveChild(spriteRoot, "AccentBand");
+            RemoveChild(spriteRoot, "VariantSigil");
+            RemoveChild(spriteRoot, "VariantDetail");
+
+            var chestBand = GetOrCreateChild<ColorRect>(spriteRoot, "ChestBand");
+            chestBand.Position = new Vector2(4f, 10f);
+            chestBand.Size = new Vector2(WorldView.TileSize - 8f, 6f);
+            chestBand.Color = new Color(0.35f, 0.2f, 0.08f, 1f);
+
+            var chestLatch = GetOrCreateChild<Label>(spriteRoot, "ChestLatch");
+            chestLatch.Position = new Vector2(11f, 9f);
+            chestLatch.Text = "C";
+            chestLatch.Modulate = new Color(0.98f, 0.87f, 0.48f, 1f);
+            return;
+        }
+
+        RemoveChild(spriteRoot, "ChestBand");
+        RemoveChild(spriteRoot, "ChestLatch");
 
         if (entity.Faction != Faction.Player)
         {
@@ -256,7 +277,12 @@ public sealed class EntityRenderer
 
     private static Color ResolveFallbackTint(IEntity entity)
     {
-        if (entity.Faction == Faction.Player)
+        if (entity.GetComponent<ChestComponent>() is not null)
+        {
+            return new Color(0.67f, 0.46f, 0.19f, 1f);
+        }
+
+        if (entity.Faction is Faction.Player or Faction.Neutral)
         {
             return PlayerVisualCatalog.Resolve(entity).BodyTint;
         }

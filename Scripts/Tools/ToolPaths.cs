@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using Godot;
 using Roguelike.Core;
 
 namespace Godotussy;
@@ -11,6 +12,12 @@ internal static class ToolPaths
         if (!string.IsNullOrWhiteSpace(preferredDirectory) && Directory.Exists(preferredDirectory))
         {
             return Path.GetFullPath(preferredDirectory);
+        }
+
+        var godotContentPath = ProjectSettings.GlobalizePath("res://Content");
+        if (!string.IsNullOrWhiteSpace(godotContentPath) && Directory.Exists(godotContentPath))
+        {
+            return Path.GetFullPath(godotContentPath);
         }
 
         var startDirectory = preferredDirectory;

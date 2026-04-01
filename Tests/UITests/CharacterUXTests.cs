@@ -18,6 +18,8 @@ public sealed class CharacterUXTests : ITestSuite
         registry.Add("UX.Main menu body stays compact when graphical preview is present", MainMenuBodyStaysCompact);
         registry.Add("UX.Level-up spend reduces points and increases stat", LevelUpSpendReducesPointsAndIncreasesStat);
         registry.Add("UX.Level-up UI shows prompt when points available", LevelUpUIShowsPrompt);
+        registry.Add("UX.Level-up overlay lists unlocked perks", LevelUpOverlayListsUnlockedPerks);
+        registry.Add("UX.Level-up overlay applies selected perk", LevelUpOverlayAppliesSelectedPerk);
         registry.Add("UX.Equipment comparison generates correct delta text", EquipmentComparisonGeneratesCorrectDelta);
         registry.Add("UX.Equipment comparison shows same stats for identical items", EquipmentComparisonSameStats);
         registry.Add("UX.HUD shows level-up indicator when points available", HudShowsLevelUpIndicator);
@@ -210,10 +212,39 @@ public sealed class CharacterUXTests : ITestSuite
         sheet.Bind(context.GameManager, context.Bus, context.Content);
         sheet.Open();
 
-        Expect.True(sheet.SummaryText.Contains("LEVEL UP!"), "Character sheet should show LEVEL UP! when points are available.");
+        Expect.True(sheet.SummaryText.Contains("TRAINING:"), "Character sheet should show the training prompt when points are available.");
         Expect.True(sheet.SummaryText.Contains("2 point(s) available"), "Character sheet should show how many points are available.");
         Expect.True(sheet.SummaryText.Contains("MaxHP"), "Character sheet should list MaxHP as a spendable stat.");
         Expect.True(sheet.SummaryText.Contains("Attack"), "Character sheet should list Attack as a spendable stat.");
+    }
+
+    private static void LevelUpOverlayListsUnlockedPerks()
+    {
+        var context = CreateContext();
+        context.Player.SetComponent(new ProgressionComponent { Level = 2, UnspentPerkChoices = 1 });
+
+        var overlay = new LevelUpOverlay();
+        overlay.Bind(context.GameManager);
+        overlay.Open();
+
+        Expect.True(overlay.SummaryText.Contains("Battle Instinct"), "Overlay should list unlocked perk names.");
+        Expect.True(overlay.SummaryText.Contains("Quartermaster's Eye"), "Overlay should list all unlocked level 2 perks.");
+    }
+
+    private static void LevelUpOverlayAppliesSelectedPerk()
+    {
+        var context = CreateContext();
+        context.Player.SetComponent(new ProgressionComponent { Level = 2, UnspentPerkChoices = 1 });
+
+        var overlay = new LevelUpOverlay();
+        overlay.Bind(context.GameManager);
+        overlay.Open();
+        overlay.HandleKey(Key.Enter);
+
+        var progression = context.Player.GetComponent<ProgressionComponent>()!;
+        Expect.Equal(0, progression.UnspentPerkChoices, "Choosing a perk should consume the pending perk choice.");
+        Expect.True(progression.SelectedPerkIds.Contains("battle_instinct"), "Choosing the default overlay selection should record the perk.");
+        Expect.Equal(9, context.Player.Stats.Attack, "Choosing Battle Instinct should increase attack.");
     }
 
     private static void EquipmentComparisonGeneratesCorrectDelta()

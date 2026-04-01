@@ -218,6 +218,7 @@ public partial class MainMenu : MenuBase
     private Label? _previewTitle;
     private Label? _previewSubtitle;
     private Label? _previewVariantId;
+    private string _statusMessage = "Ready for deployment.";
 
     public int PendingSeed { get; private set; } = 1337;
 
@@ -240,6 +241,7 @@ public partial class MainMenu : MenuBase
         if (_eventBus is not null)
         {
             _eventBus.LoadCompleted -= OnLoadCompleted;
+            _eventBus.LogMessage -= OnLogMessage;
         }
 
         _gameManager = gameManager;
@@ -247,6 +249,7 @@ public partial class MainMenu : MenuBase
         if (_eventBus is not null)
         {
             _eventBus.LoadCompleted += OnLoadCompleted;
+            _eventBus.LogMessage += OnLogMessage;
         }
 
         if (_gameManager?.Seed > 0)
@@ -288,7 +291,7 @@ public partial class MainMenu : MenuBase
 
     protected override string BuildFooterText()
     {
-        return "Enter deploy  Left/Right edit  H help  T workshop";
+        return "Enter deploy  Arrows or +/- adjust  H help  T workshop";
     }
 
     public string BuildStatPreview()
@@ -340,7 +343,8 @@ public partial class MainMenu : MenuBase
             $"Loadout    {archetype.DisplayName} / {origin.DisplayName} / {trait.DisplayName}",
             $"Identity   {RaceOptions[_raceIndex]} / {GenderOptions[_genderIndex]} / {AppearanceOptions[_appearanceIndex]}",
             $"Training   VIT {_vitalityPoints}  POW {_powerPoints}  GRD {_guardPoints}  FIN {_finessePoints}",
-            $"Reserve    {RemainingPoints} point(s) left  Seed {PendingSeed}");
+            $"Reserve    {RemainingPoints} point(s) left  Seed {PendingSeed}",
+            $"Status     {_statusMessage}");
     }
 
     private string BuildPreviewDetailText()
@@ -364,9 +368,55 @@ public partial class MainMenu : MenuBase
             projectedStats[0],
             projectedStats[1],
             string.Empty,
-            $"{archetype.DisplayName}: {archetype.Summary}",
-            $"{origin.DisplayName}: {origin.Summary}",
-            $"{trait.DisplayName}: {trait.Summary}");
+            $"Route {archetype.DisplayName} / {origin.DisplayName}",
+            $"Edge {trait.DisplayName}");
+    }
+
+    private static string WrapPreviewText(string text, float availableWidth)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return string.Empty;
+        }
+
+        var maxCharsPerLine = System.Math.Max(18, System.Math.Min(30, (int)System.Math.Floor(availableWidth / 7.25f)));
+        var wrappedLines = new List<string>();
+
+        foreach (var rawLine in text.Split('\n'))
+        {
+            var line = rawLine.TrimEnd();
+            if (line.Length <= maxCharsPerLine)
+            {
+                wrappedLines.Add(line);
+                continue;
+            }
+
+            var words = line.Split(' ', System.StringSplitOptions.RemoveEmptyEntries);
+            if (words.Length == 0)
+            {
+                wrappedLines.Add(string.Empty);
+                continue;
+            }
+
+            var currentLine = words[0];
+            for (var index = 1; index < words.Length; index++)
+            {
+                var next = words[index];
+                if (currentLine.Length + 1 + next.Length > maxCharsPerLine)
+                {
+                    wrappedLines.Add(currentLine);
+                    currentLine = next;
+                }
+                else
+                {
+                    currentLine += $" {next}";
+                }
+            }
+
+            wrappedLines.Add(currentLine);
+        }
+
+        return string.Join("\n", wrappedLines);
     }
 
     private string[] BuildProjectedStatLines()
@@ -405,7 +455,7 @@ public partial class MainMenu : MenuBase
     protected override Vector2 ResolveDesiredPanelSize(Vector2 viewportSize)
     {
         var baseSize = base.ResolveDesiredPanelSize(viewportSize);
-        return new Vector2(System.Math.Max(baseSize.X, 760f), System.Math.Max(baseSize.Y, 420f));
+        return new Vector2(System.Math.Max(baseSize.X, 860f), System.Math.Max(baseSize.Y, 500f));
     }
 
     protected override void OnVisualStateRefreshed(Panel panel, Label label, Vector2 viewportSize, Vector2 panelSize)
@@ -419,18 +469,23 @@ public partial class MainMenu : MenuBase
 
         if (HeaderBand is not null)
         {
-            HeaderBand.Color = new Color(0.24f, 0.13f, 0.07f, 0.98f);
+            HeaderBand.Color = new Color(0.19f, 0.10f, 0.06f, 0.98f);
+            HeaderBand.Size = new Vector2(panelSize.X, 60f);
         }
 
         if (TitleLabel is not null)
         {
-            TitleLabel.Text = "GODOTUSSY\nDELVER FOUNDRY";
+            TitleLabel.Text = "GODOTUSSY  //  DELVER FOUNDRY";
+            TitleLabel.Position = new Vector2(PreviewPadding, 16f);
+            TitleLabel.Size = new Vector2(System.Math.Max(0f, panelSize.X - (PreviewPadding * 2f)), 28f);
             TitleLabel.Modulate = new Color(1f, 0.92f, 0.79f, 1f);
         }
 
         if (FooterLabel is not null)
         {
             FooterLabel.Text = BuildFooterText();
+            FooterLabel.Position = new Vector2(PreviewPadding, panelSize.Y - 34f);
+            FooterLabel.Size = new Vector2(System.Math.Max(0f, panelSize.X - (PreviewPadding * 2f)), 22f);
             FooterLabel.Modulate = new Color(0.76f, 0.80f, 0.84f, 1f);
         }
 
@@ -439,37 +494,35 @@ public partial class MainMenu : MenuBase
             return;
         }
 
-        var contentTop = 70f;
+        var contentTop = 78f;
         var footerTop = panelSize.Y - 46f;
         var contentHeight = System.Math.Max(0f, footerTop - contentTop);
-        var previewWidth = System.Math.Clamp(panelSize.X * 0.36f, 180f, 280f);
+        var previewWidth = System.Math.Clamp(panelSize.X * 0.34f, 220f, 320f);
         var contentWidth = System.Math.Max(180f, panelSize.X - previewWidth - (PreviewPadding * 3f));
-        var summaryHeight = System.Math.Clamp(contentHeight * 0.26f, 84f, 118f);
-        var optionsHeight = System.Math.Max(88f, contentHeight - summaryHeight - 14f);
+        var summaryHeight = System.Math.Clamp(contentHeight * 0.32f, 88f, 148f);
+        var optionsHeight = System.Math.Max(68f, contentHeight - summaryHeight - 16f);
 
         BodyCard.Color = new Color(0.11f, 0.14f, 0.18f, 0.98f);
         BodyCard.Position = new Vector2(PreviewPadding, contentTop);
         BodyCard.Size = new Vector2(contentWidth, summaryHeight);
 
-        label.Position = new Vector2(14f, 12f);
+        label.Position = new Vector2(18f, 16f);
         label.Size = new Vector2(
-            System.Math.Max(0f, BodyCard.Size.X - 28f),
-            System.Math.Max(0f, BodyCard.Size.Y - 24f));
-        label.Text = $"CURRENT DOSSIER\n\n{BuildHeroSummary()}";
+            System.Math.Max(0f, BodyCard.Size.X - 36f),
+            System.Math.Max(0f, BodyCard.Size.Y - 32f));
+        label.Text = BuildHeroSummary();
         label.Modulate = new Color(0.96f, 0.97f, 0.99f, 1f);
 
         OptionsCard.Color = new Color(0.08f, 0.09f, 0.13f, 0.99f);
-        OptionsCard.Position = new Vector2(PreviewPadding, contentTop + summaryHeight + 14f);
+        OptionsCard.Position = new Vector2(PreviewPadding, contentTop + summaryHeight + 16f);
         OptionsCard.Size = new Vector2(contentWidth, System.Math.Max(0f, optionsHeight));
 
         var visibleOptionsText = OptionsLabel.Text;
-        OptionsLabel.Position = new Vector2(14f, 12f);
+        OptionsLabel.Position = new Vector2(18f, 14f);
         OptionsLabel.Size = new Vector2(
-            System.Math.Max(0f, OptionsCard.Size.X - 28f),
-            System.Math.Max(0f, OptionsCard.Size.Y - 24f));
-        OptionsLabel.Text = string.IsNullOrWhiteSpace(visibleOptionsText)
-            ? string.Empty
-            : $"SELECT A FIELD\n\n{visibleOptionsText}";
+            System.Math.Max(0f, OptionsCard.Size.X - 36f),
+            System.Math.Max(0f, OptionsCard.Size.Y - 28f));
+        OptionsLabel.Text = visibleOptionsText;
         OptionsLabel.Modulate = new Color(0.99f, 0.93f, 0.84f, 1f);
 
         if (_previewPanel is null)
@@ -518,11 +571,20 @@ public partial class MainMenu : MenuBase
         switch (SelectedIndex)
         {
             case StartIndex:
+                if (_gameManager is null)
+                {
+                    UpdateStatus("Start unavailable: GameManager autoload missing.");
+                    return;
+                }
+
                 _gameManager?.SetCharacterCreationOptions(BuildCharacterCreationOptions());
+                UpdateStatus($"Deploying seed {PendingSeed}...");
                 _gameManager?.StartNewGame(PendingSeed);
-                _eventBus?.EmitLogMessage($"Starting new game with seed {PendingSeed}.");
-                Close();
-                GameStarted?.Invoke();
+                if (_gameManager?.CurrentState == GameManager.GameState.Playing)
+                {
+                    Close();
+                    GameStarted?.Invoke();
+                }
                 break;
             case NameIndex:
                 CycleName(1);
@@ -584,8 +646,52 @@ public partial class MainMenu : MenuBase
     {
         if (success)
         {
+            UpdateStatus("Save loaded.");
             Close();
         }
+    }
+
+    private void OnLogMessage(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return;
+        }
+
+        if (message.StartsWith("Failed to start a new game: ", System.StringComparison.Ordinal))
+        {
+            UpdateStatus($"Start failed: {message[28..]}");
+            return;
+        }
+
+        if (message.StartsWith("Runtime initialization failed: ", System.StringComparison.Ordinal))
+        {
+            UpdateStatus($"Runtime init failed: {message[31..]}");
+            return;
+        }
+
+        if (message.StartsWith("Cannot start a new game", System.StringComparison.Ordinal)
+            || message.StartsWith("Load failed", System.StringComparison.Ordinal))
+        {
+            UpdateStatus(message);
+        }
+    }
+
+    private void UpdateStatus(string message)
+    {
+        var normalized = string.IsNullOrWhiteSpace(message) ? "Ready for deployment." : message.Trim();
+        if (normalized.Length > 72)
+        {
+            normalized = normalized[..69] + "...";
+        }
+
+        if (_statusMessage == normalized)
+        {
+            return;
+        }
+
+        _statusMessage = normalized;
+        RebuildOptions();
     }
 
     private bool AdjustHighlightedField(int delta)
@@ -881,7 +987,7 @@ public partial class MainMenu : MenuBase
 
         if (_previewDetail is not null)
         {
-            _previewDetail.Text = BuildPreviewDetailText();
+            _previewDetail.Text = WrapPreviewText(BuildPreviewDetailText(), _previewDetail.Size.X);
             _previewDetail.Modulate = new Color(0.92f, 0.95f, 0.98f, 1f);
         }
 

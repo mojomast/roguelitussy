@@ -150,6 +150,7 @@ public partial class DevToolsWorkbench : Control
                 AdjustSelected(1);
                 return true;
             case Key.Enter:
+            case Key.KpEnter:
                 ActivateSelected();
                 return true;
             default:

@@ -1,0 +1,72 @@
+{
+  "$schema": "roguelike-perks-v1",
+  "version": 1,
+  "perks": [
+    {
+      "id": "battle_instinct",
+      "name": "Battle Instinct",
+      "description": "Lean into fast reads and decisive aggression.",
+      "unlock_level": 2,
+      "effects": [
+        {
+          "type": "stat_bonus",
+          "stat": "Attack",
+          "value": 1
+        },
+        {
+          "type": "stat_bonus",
+          "stat": "Accuracy",
+          "value": 4
+        }
+      ]
+    },
+    {
+      "id": "quartermasters_eye",
+      "name": "Quartermaster's Eye",
+      "description": "You spot bad markups and make merchants work harder for every coin.",
+      "unlock_level": 2,
+      "effects": [
+        {
+          "type": "shop_discount_percent",
+          "value": 20
+        }
+      ]
+    },
+    {
+      "id": "iron_will",
+      "name": "Iron Will",
+      "description": "A steadier pulse and tougher posture buy you time in ugly fights.",
+      "unlock_level": 3,
+      "effects": [
+        {
+          "type": "stat_bonus",
+          "stat": "MaxHP",
+          "value": 6
+        },
+        {
+          "type": "stat_bonus",
+          "stat": "Defense",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": "ghost_step",
+      "name": "Ghost Step",
+      "description": "You stop wasting motion and start slipping through danger more cleanly.",
+      "unlock_level": 4,
+      "effects": [
+        {
+          "type": "stat_bonus",
+          "stat": "Evasion",
+          "value": 4
+        },
+        {
+          "type": "stat_bonus",
+          "stat": "Speed",
+          "value": 5
+        }
+      ]
+    }
+  ]
+}

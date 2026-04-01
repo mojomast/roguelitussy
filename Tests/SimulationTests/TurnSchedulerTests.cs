@@ -14,6 +14,7 @@ public sealed class TurnSchedulerTests : ITestSuite
         registry.Add("Simulation.TurnScheduler consuming energy requires recharge", ConsumingEnergyRequiresRecharge);
         registry.Add("Simulation.TurnScheduler unregister removes actor from order", UnregisterRemovesActor);
         registry.Add("Simulation.TurnScheduler mixed speeds follow expected ratios", MixedSpeedsFollowRatios);
+        registry.Add("Simulation.TurnScheduler ignores neutral non-brain NPCs", IgnoresNeutralNonBrainNpcs);
     }
 
     private static void TieBreaksByRegistrationOrder()
@@ -111,6 +112,27 @@ public sealed class TurnSchedulerTests : ITestSuite
         Expect.Equal(4, turns.Count(actor => actor.Id == normal.Id), "Speed 100 actor should take four turns in the 12-turn sample");
         Expect.Equal(6, turns.Count(actor => actor.Id == quick.Id), "Speed 150 actor should take six turns in the 12-turn sample");
         Expect.Equal(2, turns.Count(actor => actor.Id == sluggish.Id), "Speed 50 actor should take two turns in the 12-turn sample");
+    }
+
+    private static void IgnoresNeutralNonBrainNpcs()
+    {
+        var world = CreateWorld();
+        var player = new StubEntity("Player", new Position(1, 1), Faction.Player, stats: Stats(100));
+        var npc = new StubEntity("Quartermaster", new Position(2, 1), Faction.Neutral, stats: Stats(100));
+
+        world.Player = player;
+        world.AddEntity(player);
+        world.AddEntity(npc);
+
+        var scheduler = new TurnScheduler();
+        scheduler.BeginRound(world);
+
+        var first = scheduler.GetNextActor();
+        Expect.Equal(player, first!, "Player should act first in a world with only a neutral NPC nearby.");
+        scheduler.ConsumeEnergy(player.Id, 1000);
+
+        var next = scheduler.GetNextActor();
+        Expect.Equal(player, next!, "Neutral NPCs without brains should not be scheduled as autonomous actors.");
     }
 
     private static System.Collections.Generic.IEnumerable<IEntity> TakeTurns(TurnScheduler scheduler, int count)

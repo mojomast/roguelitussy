@@ -28,11 +28,23 @@ public sealed class ContentLoader : IContentDatabase
 
     public IReadOnlyDictionary<string, AbilityTemplate> AbilityTemplates { get; }
 
+    public IReadOnlyDictionary<string, PerkTemplate> PerkTemplates { get; }
+
+    public IReadOnlyDictionary<string, NpcTemplate> NpcTemplates { get; }
+
+    public IReadOnlyDictionary<string, DialogueTemplate> DialogueTemplates { get; }
+
     public IReadOnlyDictionary<string, ItemDefinition> ItemDefinitions { get; }
 
     public IReadOnlyDictionary<string, EnemyDefinition> EnemyDefinitions { get; }
 
     public IReadOnlyDictionary<string, AbilityDefinition> AbilityDefinitions { get; }
+
+    public IReadOnlyDictionary<string, PerkDefinition> PerkDefinitions { get; }
+
+    public IReadOnlyDictionary<string, NpcDefinition> NpcDefinitions { get; }
+
+    public IReadOnlyDictionary<string, DialogueDefinition> DialogueDefinitions { get; }
 
     public IReadOnlyDictionary<string, StatusEffectDefinition> StatusEffects { get; }
 
@@ -51,6 +63,9 @@ public sealed class ContentLoader : IContentDatabase
         SortedDictionary<string, ItemDefinition> itemDefinitions,
         SortedDictionary<string, EnemyDefinition> enemyDefinitions,
         SortedDictionary<string, AbilityDefinition> abilityDefinitions,
+        SortedDictionary<string, PerkDefinition> perkDefinitions,
+        SortedDictionary<string, NpcDefinition> npcDefinitions,
+        SortedDictionary<string, DialogueDefinition> dialogueDefinitions,
         SortedDictionary<string, StatusEffectDefinition> statusEffects,
         SortedDictionary<string, RoomPrefabDefinition> roomPrefabs,
         SortedDictionary<string, LootTableDefinition> lootTables,
@@ -58,12 +73,18 @@ public sealed class ContentLoader : IContentDatabase
         SortedDictionary<string, ItemTemplate> itemTemplates,
         SortedDictionary<string, EnemyTemplate> enemyTemplates,
         SortedDictionary<string, AbilityTemplate> abilityTemplates,
+        SortedDictionary<string, PerkTemplate> perkTemplates,
+        SortedDictionary<string, NpcTemplate> npcTemplates,
+        SortedDictionary<string, DialogueTemplate> dialogueTemplates,
         IReadOnlyList<string> validationErrors)
     {
         ContentDirectory = contentDirectory;
         ItemDefinitions = new ReadOnlyDictionary<string, ItemDefinition>(itemDefinitions);
         EnemyDefinitions = new ReadOnlyDictionary<string, EnemyDefinition>(enemyDefinitions);
         AbilityDefinitions = new ReadOnlyDictionary<string, AbilityDefinition>(abilityDefinitions);
+        PerkDefinitions = new ReadOnlyDictionary<string, PerkDefinition>(perkDefinitions);
+        NpcDefinitions = new ReadOnlyDictionary<string, NpcDefinition>(npcDefinitions);
+        DialogueDefinitions = new ReadOnlyDictionary<string, DialogueDefinition>(dialogueDefinitions);
         StatusEffects = new ReadOnlyDictionary<string, StatusEffectDefinition>(statusEffects);
         RoomPrefabs = new ReadOnlyDictionary<string, RoomPrefabDefinition>(roomPrefabs);
         LootTables = new ReadOnlyDictionary<string, LootTableDefinition>(lootTables);
@@ -71,6 +92,9 @@ public sealed class ContentLoader : IContentDatabase
         ItemTemplates = new ReadOnlyDictionary<string, ItemTemplate>(itemTemplates);
         EnemyTemplates = new ReadOnlyDictionary<string, EnemyTemplate>(enemyTemplates);
         AbilityTemplates = new ReadOnlyDictionary<string, AbilityTemplate>(abilityTemplates);
+        PerkTemplates = new ReadOnlyDictionary<string, PerkTemplate>(perkTemplates);
+        NpcTemplates = new ReadOnlyDictionary<string, NpcTemplate>(npcTemplates);
+        DialogueTemplates = new ReadOnlyDictionary<string, DialogueTemplate>(dialogueTemplates);
         ValidationErrors = validationErrors;
     }
 
@@ -85,6 +109,9 @@ public sealed class ContentLoader : IContentDatabase
         var items = ReadDocument<ItemsDocument>(Path.Combine(fullDirectory, "items.json"));
         var enemies = ReadDocument<EnemiesDocument>(Path.Combine(fullDirectory, "enemies.json"));
         var abilities = ReadDocument<AbilitiesDocument>(Path.Combine(fullDirectory, "abilities.json"));
+        var perks = ReadDocument<PerksDocument>(Path.Combine(fullDirectory, "perks.json"));
+        var dialogs = ReadDocument<DialogsDocument>(Path.Combine(fullDirectory, "dialogs.json"));
+        var npcs = ReadDocument<NpcsDocument>(Path.Combine(fullDirectory, "npcs.json"));
         var statusEffects = ReadDocument<StatusEffectsDocument>(Path.Combine(fullDirectory, "status_effects.json"));
         var rooms = ReadDocument<RoomPrefabsDocument>(Path.Combine(fullDirectory, "room_prefabs.json"));
         var lootTables = ReadDocument<LootTablesDocument>(Path.Combine(fullDirectory, "loot_tables.json"));
@@ -92,6 +119,9 @@ public sealed class ContentLoader : IContentDatabase
         var itemDefinitions = BuildLookup(items.Items, item => item.Id, "item");
         var enemyDefinitions = BuildLookup(enemies.Enemies, enemy => enemy.Id, "enemy");
         var abilityDefinitions = BuildLookup(abilities.Abilities, ability => ability.Id, "ability");
+        var perkDefinitions = BuildLookup(perks.Perks, perk => perk.Id, "perk");
+        var dialogueDefinitions = BuildLookup(dialogs.Dialogs, dialogue => dialogue.Id, "dialog");
+        var npcDefinitions = BuildLookup(npcs.Npcs, npc => npc.Id, "npc");
         var statusDefinitions = BuildLookup(statusEffects.StatusEffects, effect => effect.Id, "status effect");
         var roomDefinitions = BuildLookup(rooms.Rooms, room => room.Id, "room prefab");
         var lootDefinitions = BuildLookup(lootTables.LootTables, table => table.Id, "loot table");
@@ -115,16 +145,40 @@ public sealed class ContentLoader : IContentDatabase
             abilityTemplates[definition.Id] = BuildAbilityTemplate(definition);
         }
 
+        var perkTemplates = new SortedDictionary<string, PerkTemplate>(StringComparer.Ordinal);
+        foreach (var definition in perkDefinitions.Values)
+        {
+            perkTemplates[definition.Id] = BuildPerkTemplate(definition);
+        }
+
+        var dialogueTemplates = new SortedDictionary<string, DialogueTemplate>(StringComparer.Ordinal);
+        foreach (var definition in dialogueDefinitions.Values)
+        {
+            dialogueTemplates[definition.Id] = BuildDialogueTemplate(definition);
+        }
+
+        var npcTemplates = new SortedDictionary<string, NpcTemplate>(StringComparer.Ordinal);
+        foreach (var definition in npcDefinitions.Values)
+        {
+            npcTemplates[definition.Id] = BuildNpcTemplate(definition);
+        }
+
         var validationErrors = Validate(
             items,
             enemies,
             abilities,
+            perks,
+            dialogs,
+            npcs,
             statusEffects,
             rooms,
             lootTables,
             itemDefinitions,
             enemyDefinitions,
             abilityDefinitions,
+            perkDefinitions,
+            dialogueDefinitions,
+            npcDefinitions,
             statusDefinitions,
             roomDefinitions,
             lootDefinitions,
@@ -137,6 +191,9 @@ public sealed class ContentLoader : IContentDatabase
             itemDefinitions,
             enemyDefinitions,
             abilityDefinitions,
+            perkDefinitions,
+            npcDefinitions,
+            dialogueDefinitions,
             statusDefinitions,
             roomDefinitions,
             lootDefinitions,
@@ -144,6 +201,9 @@ public sealed class ContentLoader : IContentDatabase
             itemTemplates,
             enemyTemplates,
             abilityTemplates,
+            perkTemplates,
+            npcTemplates,
+            dialogueTemplates,
             validationErrors.AsReadOnly());
 
         if (throwOnValidationErrors)
@@ -168,6 +228,9 @@ public sealed class ContentLoader : IContentDatabase
             if (File.Exists(Path.Combine(candidate, "items.json"))
                 && File.Exists(Path.Combine(candidate, "enemies.json"))
                 && File.Exists(Path.Combine(candidate, "abilities.json"))
+                && File.Exists(Path.Combine(candidate, "perks.json"))
+                && File.Exists(Path.Combine(candidate, "dialogs.json"))
+                && File.Exists(Path.Combine(candidate, "npcs.json"))
                 && File.Exists(Path.Combine(candidate, "status_effects.json"))
                 && File.Exists(Path.Combine(candidate, "room_prefabs.json"))
                 && File.Exists(Path.Combine(candidate, "loot_tables.json")))
@@ -202,6 +265,27 @@ public sealed class ContentLoader : IContentDatabase
         return found;
     }
 
+    public bool TryGetPerkTemplate(string perkId, out PerkTemplate template)
+    {
+        var found = PerkTemplates.TryGetValue(perkId, out var perkTemplate);
+        template = perkTemplate!;
+        return found;
+    }
+
+    public bool TryGetNpcTemplate(string templateId, out NpcTemplate template)
+    {
+        var found = NpcTemplates.TryGetValue(templateId, out var npcTemplate);
+        template = npcTemplate!;
+        return found;
+    }
+
+    public bool TryGetDialogueTemplate(string dialogueId, out DialogueTemplate template)
+    {
+        var found = DialogueTemplates.TryGetValue(dialogueId, out var dialogueTemplate);
+        template = dialogueTemplate!;
+        return found;
+    }
+
     public IReadOnlyList<ItemTemplate> GetAvailableItems(int depth)
     {
         return ItemDefinitions.Values
@@ -217,6 +301,15 @@ public sealed class ContentLoader : IContentDatabase
             .Where(enemy => depth >= enemy.MinDepth && depth <= enemy.MaxDepth)
             .Select(enemy => EnemyTemplates[enemy.Id])
             .OrderBy(enemy => enemy.TemplateId, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    public IReadOnlyList<NpcTemplate> GetAvailableNpcs(int depth)
+    {
+        return NpcDefinitions.Values
+            .Where(npc => depth >= npc.MinDepth && (npc.MaxDepth < 0 || depth <= npc.MaxDepth))
+            .Select(npc => NpcTemplates[npc.Id])
+            .OrderBy(npc => npc.TemplateId, StringComparer.Ordinal)
             .ToArray();
     }
 
@@ -311,7 +404,48 @@ public sealed class ContentLoader : IContentDatabase
             weaponAccuracy,
             speedModifier,
             onHitEffects,
-            requirements);
+            requirements,
+            item.Value,
+            item.Weight);
+    }
+
+    private static DialogueTemplate BuildDialogueTemplate(DialogueDefinition dialogue)
+    {
+        var nodes = new SortedDictionary<string, DialogueNode>(StringComparer.Ordinal);
+        foreach (var node in dialogue.Nodes)
+        {
+            nodes[node.Id] = new DialogueNode(
+                node.Id,
+                node.Text,
+                node.Options.Select(option => new DialogueOption(option.Text, option.Next, option.Action)).ToArray());
+        }
+
+        return new DialogueTemplate(dialogue.Id, dialogue.StartNode, new ReadOnlyDictionary<string, DialogueNode>(nodes));
+    }
+
+    private static NpcTemplate BuildNpcTemplate(NpcDefinition npc)
+    {
+        IReadOnlyList<MerchantOfferTemplate>? merchantOffers = null;
+        if (npc.Stock.Count > 0)
+        {
+            merchantOffers = npc.Stock
+                .Select(stock => new MerchantOfferTemplate(stock.ItemId, stock.Price, stock.Quantity))
+                .ToArray();
+        }
+
+        return new NpcTemplate(
+            npc.Id,
+            npc.Name,
+            npc.Description,
+            npc.Role,
+            npc.MinDepth,
+            npc.MaxDepth,
+            npc.DialogueId,
+            string.IsNullOrWhiteSpace(npc.RaceId) ? "human" : npc.RaceId,
+            string.IsNullOrWhiteSpace(npc.GenderId) ? "neutral" : npc.GenderId,
+            string.IsNullOrWhiteSpace(npc.AppearanceId) ? "default" : npc.AppearanceId,
+            string.IsNullOrWhiteSpace(npc.ArchetypeId) ? "adventurer" : npc.ArchetypeId,
+            merchantOffers);
     }
 
     private static IReadOnlyList<WeaponOnHitEffect>? BuildOnHitEffects(List<ItemEffectDefinition> effects)
@@ -407,6 +541,20 @@ public sealed class ContentLoader : IContentDatabase
             ability.Costs.Energy,
             ability.Costs.MP,
             effects.AsReadOnly());
+    }
+
+    private static PerkTemplate BuildPerkTemplate(PerkDefinition perk)
+    {
+        var effects = perk.Effects
+            .Select(effect => new PerkEffect(effect.Type, effect.Stat, effect.Value))
+            .ToArray();
+
+        return new PerkTemplate(
+            perk.Id,
+            perk.Name,
+            perk.Description,
+            perk.UnlockLevel,
+            effects);
     }
 
     private static ReadOnlyDictionary<string, int> BuildItemStatModifiers(ItemDefinition item)
@@ -553,12 +701,18 @@ public sealed class ContentLoader : IContentDatabase
         ItemsDocument items,
         EnemiesDocument enemies,
         AbilitiesDocument abilities,
+        PerksDocument perks,
+        DialogsDocument dialogs,
+        NpcsDocument npcs,
         StatusEffectsDocument statusEffects,
         RoomPrefabsDocument rooms,
         LootTablesDocument lootTables,
         IReadOnlyDictionary<string, ItemDefinition> itemDefinitions,
         IReadOnlyDictionary<string, EnemyDefinition> enemyDefinitions,
         IReadOnlyDictionary<string, AbilityDefinition> abilityDefinitions,
+        IReadOnlyDictionary<string, PerkDefinition> perkDefinitions,
+        IReadOnlyDictionary<string, DialogueDefinition> dialogueDefinitions,
+        IReadOnlyDictionary<string, NpcDefinition> npcDefinitions,
         IReadOnlyDictionary<string, StatusEffectDefinition> statusDefinitions,
         IReadOnlyDictionary<string, RoomPrefabDefinition> roomDefinitions,
         IReadOnlyDictionary<string, LootTableDefinition> lootDefinitions,
@@ -569,6 +723,9 @@ public sealed class ContentLoader : IContentDatabase
         ValidateHeader(items.Schema, items.Version, "roguelike-items-v1", "items.json", errors);
         ValidateHeader(enemies.Schema, enemies.Version, "roguelike-enemies-v1", "enemies.json", errors);
         ValidateHeader(abilities.Schema, abilities.Version, "roguelike-abilities-v1", "abilities.json", errors);
+        ValidateHeader(perks.Schema, perks.Version, "roguelike-perks-v1", "perks.json", errors);
+        ValidateHeader(dialogs.Schema, dialogs.Version, "roguelike-dialogs-v1", "dialogs.json", errors);
+        ValidateHeader(npcs.Schema, npcs.Version, "roguelike-npcs-v1", "npcs.json", errors);
         ValidateHeader(statusEffects.Schema, statusEffects.Version, "roguelike-status-effects-v1", "status_effects.json", errors);
         ValidateHeader(rooms.Schema, rooms.Version, "roguelike-room-prefabs-v1", "room_prefabs.json", errors);
         ValidateHeader(lootTables.Schema, lootTables.Version, "roguelike-loot-tables-v1", "loot_tables.json", errors);
@@ -576,8 +733,11 @@ public sealed class ContentLoader : IContentDatabase
         ValidateItems(itemDefinitions, abilityDefinitions, statusDefinitions, errors);
         ValidateEnemies(enemyDefinitions, abilityDefinitions, lootDefinitions, errors);
         ValidateAbilities(abilityDefinitions, statusDefinitions, errors);
+        ValidatePerks(perkDefinitions, errors);
+        ValidateDialogs(dialogueDefinitions, errors);
+        ValidateNpcs(npcDefinitions, dialogueDefinitions, itemDefinitions, errors);
         ValidateStatusEffects(statusDefinitions, errors);
-        ValidateRooms(roomDefinitions, enemyDefinitions, itemDefinitions, tileLegend, errors);
+        ValidateRooms(roomDefinitions, enemyDefinitions, itemDefinitions, npcDefinitions, lootDefinitions, tileLegend, errors);
         ValidateLootTables(lootDefinitions, itemDefinitions, errors);
 
         return errors;
@@ -730,6 +890,48 @@ public sealed class ContentLoader : IContentDatabase
                     default:
                         errors.Add($"Item '{id}' has unknown effect type '{effect.Type}'.");
                         break;
+                }
+            }
+        }
+    }
+
+    private static void ValidatePerks(
+        IReadOnlyDictionary<string, PerkDefinition> perks,
+        ICollection<string> errors)
+    {
+        foreach (var (id, perk) in perks)
+        {
+            ValidateStableId(id, "Perk", errors);
+            ValidateRequiredText(perk.Name, $"Perk '{id}' name", errors);
+            ValidateRequiredText(perk.Description, $"Perk '{id}' description", errors);
+
+            if (perk.UnlockLevel < 2)
+            {
+                errors.Add($"Perk '{id}' must unlock at level 2 or later.");
+            }
+
+            if (perk.Effects.Count == 0)
+            {
+                errors.Add($"Perk '{id}' must define at least one effect.");
+            }
+
+            foreach (var effect in perk.Effects)
+            {
+                ValidateRequiredText(effect.Type, $"Perk '{id}' effect type", errors);
+                if (!IsAllowedValue(effect.Type, "stat_bonus", "shop_discount_percent"))
+                {
+                    errors.Add($"Perk '{id}' has unsupported effect type '{effect.Type}'.");
+                    continue;
+                }
+
+                if (effect.Value == 0)
+                {
+                    errors.Add($"Perk '{id}' has an effect with zero value.");
+                }
+
+                if (string.Equals(effect.Type, "stat_bonus", StringComparison.Ordinal))
+                {
+                    ValidateRequiredText(effect.Stat ?? string.Empty, $"Perk '{id}' stat bonus target", errors);
                 }
             }
         }
@@ -929,6 +1131,110 @@ public sealed class ContentLoader : IContentDatabase
         }
     }
 
+    private static void ValidateDialogs(
+        IReadOnlyDictionary<string, DialogueDefinition> dialogs,
+        ICollection<string> errors)
+    {
+        foreach (var (id, dialog) in dialogs)
+        {
+            ValidateStableId(id, "Dialog", errors);
+            ValidateRequiredText(dialog.StartNode, $"Dialog '{id}' start_node", errors);
+
+            if (dialog.Nodes.Count == 0)
+            {
+                errors.Add($"Dialog '{id}' must define at least one node.");
+                continue;
+            }
+
+            var nodeIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var node in dialog.Nodes)
+            {
+                if (!nodeIds.Add(node.Id))
+                {
+                    errors.Add($"Dialog '{id}' contains duplicate node id '{node.Id}'.");
+                }
+
+                ValidateRequiredText(node.Id, $"Dialog '{id}' node id", errors);
+                ValidateRequiredText(node.Text, $"Dialog '{id}' node '{node.Id}' text", errors);
+
+                if (node.Options.Count == 0)
+                {
+                    errors.Add($"Dialog '{id}' node '{node.Id}' must define at least one option.");
+                }
+
+                foreach (var option in node.Options)
+                {
+                    ValidateRequiredText(option.Text, $"Dialog '{id}' node '{node.Id}' option text", errors);
+
+                    if (!string.IsNullOrWhiteSpace(option.Action) && !IsAllowedValue(option.Action, "close", "shop"))
+                    {
+                        errors.Add($"Dialog '{id}' node '{node.Id}' option has unknown action '{option.Action}'.");
+                    }
+                }
+            }
+
+            if (!nodeIds.Contains(dialog.StartNode))
+            {
+                errors.Add($"Dialog '{id}' start_node '{dialog.StartNode}' does not exist.");
+            }
+
+            foreach (var node in dialog.Nodes)
+            {
+                foreach (var option in node.Options)
+                {
+                    if (!string.IsNullOrWhiteSpace(option.Next) && !nodeIds.Contains(option.Next))
+                    {
+                        errors.Add($"Dialog '{id}' node '{node.Id}' option points to missing node '{option.Next}'.");
+                    }
+                }
+            }
+        }
+    }
+
+    private static void ValidateNpcs(
+        IReadOnlyDictionary<string, NpcDefinition> npcs,
+        IReadOnlyDictionary<string, DialogueDefinition> dialogs,
+        IReadOnlyDictionary<string, ItemDefinition> items,
+        ICollection<string> errors)
+    {
+        foreach (var (id, npc) in npcs)
+        {
+            ValidateStableId(id, "Npc", errors);
+            ValidateRequiredText(npc.Name, $"Npc '{id}' name", errors);
+            ValidateRequiredText(npc.Description, $"Npc '{id}' description", errors);
+            ValidateRequiredText(npc.Role, $"Npc '{id}' role", errors);
+            ValidateRequiredText(npc.DialogueId, $"Npc '{id}' dialogue_id", errors);
+
+            if (npc.MaxDepth >= 0 && npc.MinDepth > npc.MaxDepth)
+            {
+                errors.Add($"Npc '{id}' min_depth cannot exceed max_depth.");
+            }
+
+            if (!dialogs.ContainsKey(npc.DialogueId))
+            {
+                errors.Add($"Npc '{id}' references unknown dialog '{npc.DialogueId}'.");
+            }
+
+            foreach (var stock in npc.Stock)
+            {
+                if (string.IsNullOrWhiteSpace(stock.ItemId) || !items.ContainsKey(stock.ItemId))
+                {
+                    errors.Add($"Npc '{id}' stock references unknown item '{stock.ItemId}'.");
+                }
+
+                if (stock.Price <= 0)
+                {
+                    errors.Add($"Npc '{id}' stock item '{stock.ItemId}' must have a positive price.");
+                }
+
+                if (stock.Quantity <= 0)
+                {
+                    errors.Add($"Npc '{id}' stock item '{stock.ItemId}' must have a positive quantity.");
+                }
+            }
+        }
+    }
+
     private static void ValidateStatusEffects(
         IReadOnlyDictionary<string, StatusEffectDefinition> statusEffects,
         ICollection<string> errors)
@@ -1031,6 +1337,8 @@ public sealed class ContentLoader : IContentDatabase
         IReadOnlyDictionary<string, RoomPrefabDefinition> rooms,
         IReadOnlyDictionary<string, EnemyDefinition> enemies,
         IReadOnlyDictionary<string, ItemDefinition> items,
+        IReadOnlyDictionary<string, NpcDefinition> npcs,
+        IReadOnlyDictionary<string, LootTableDefinition> lootTables,
         IReadOnlyDictionary<string, string> tileLegend,
         ICollection<string> errors)
     {
@@ -1105,11 +1413,48 @@ public sealed class ContentLoader : IContentDatabase
                     errors.Add($"Room '{id}' fixed entity at ({fixedEntity.X},{fixedEntity.Y}) is out of bounds.");
                 }
 
-                if (fixedEntity.TemplateId is not null
-                    && !items.ContainsKey(fixedEntity.TemplateId)
-                    && !enemies.ContainsKey(fixedEntity.TemplateId))
+                var entityType = fixedEntity.EntityType?.Trim().ToLowerInvariant() ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(entityType) && !string.IsNullOrWhiteSpace(fixedEntity.TemplateId))
                 {
-                    errors.Add($"Room '{id}' fixed entity references unknown template '{fixedEntity.TemplateId}'.");
+                    if (items.ContainsKey(fixedEntity.TemplateId))
+                    {
+                        entityType = "item";
+                    }
+                    else if (enemies.ContainsKey(fixedEntity.TemplateId))
+                    {
+                        entityType = "enemy";
+                    }
+                    else if (npcs.ContainsKey(fixedEntity.TemplateId))
+                    {
+                        entityType = "npc";
+                    }
+                }
+
+                switch (entityType)
+                {
+                    case "":
+                        if (!string.IsNullOrWhiteSpace(fixedEntity.TemplateId))
+                        {
+                            errors.Add($"Room '{id}' fixed entity references unknown template '{fixedEntity.TemplateId}'.");
+                        }
+                        break;
+                    case "item" when string.IsNullOrWhiteSpace(fixedEntity.TemplateId) || !items.ContainsKey(fixedEntity.TemplateId):
+                        errors.Add($"Room '{id}' fixed item references unknown template '{fixedEntity.TemplateId}'.");
+                        break;
+                    case "enemy" when string.IsNullOrWhiteSpace(fixedEntity.TemplateId) || !enemies.ContainsKey(fixedEntity.TemplateId):
+                        errors.Add($"Room '{id}' fixed enemy references unknown template '{fixedEntity.TemplateId}'.");
+                        break;
+                    case "npc" when string.IsNullOrWhiteSpace(fixedEntity.TemplateId) || !npcs.ContainsKey(fixedEntity.TemplateId):
+                        errors.Add($"Room '{id}' fixed npc references unknown template '{fixedEntity.TemplateId}'.");
+                        break;
+                    case "chest" when !string.IsNullOrWhiteSpace(fixedEntity.TemplateId) && !lootTables.ContainsKey(fixedEntity.TemplateId):
+                        errors.Add($"Room '{id}' fixed chest references unknown loot table '{fixedEntity.TemplateId}'.");
+                        break;
+                    case "chest":
+                        break;
+                    default:
+                        errors.Add($"Room '{id}' fixed entity type '{fixedEntity.EntityType}' is unsupported.");
+                        break;
                 }
             }
         }

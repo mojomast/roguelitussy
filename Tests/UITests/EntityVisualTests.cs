@@ -13,6 +13,7 @@ public sealed class EntityVisualTests : ITestSuite
         registry.Add("UI.EntityRenderer applies identity-driven player sprite overlays", EntityRendererAppliesIdentityDrivenPlayerSpriteOverlays);
         registry.Add("UI.EntityRenderer refreshes player sprite variant when identity changes", EntityRendererRefreshesPlayerSpriteVariant);
         registry.Add("UI.EntityRenderer uses different 0x72 portraits for different builds", EntityRendererUsesDifferent0x72Portraits);
+        registry.Add("UI.EntityRenderer gives chests dedicated non-humanoid visuals", EntityRendererGivesChestsDedicatedVisuals);
     }
 
     private static void EntityRendererAppliesIdentityDrivenPlayerSpriteOverlays()
@@ -121,6 +122,27 @@ public sealed class EntityVisualTests : ITestSuite
         var skirmisherSprite = (Texture2D)skirmisherTexture!;
         Expect.False(vanguardSprite.ResourcePath == skirmisherSprite.ResourcePath,
             "Different builds should no longer share the same base portrait file.");
+    }
+
+    private static void EntityRendererGivesChestsDedicatedVisuals()
+    {
+        var renderer = new EntityRenderer(new Node2D(), new AnimationController());
+        var chest = new StubEntity("Treasure Chest", new Position(3, 3), Faction.Neutral);
+        chest.SetComponent(new ChestComponent { LootTableId = "deep_floor_loot" });
+
+        renderer.UpsertEntity(chest);
+
+        var spriteRoot = renderer.GetSprite(chest.Id)!;
+        var body = FindChild<ColorRect>(spriteRoot, "Body");
+        var chestBand = FindChild<ColorRect>(spriteRoot, "ChestBand");
+        var chestLatch = FindChild<Label>(spriteRoot, "ChestLatch");
+
+        Expect.NotNull(body, "Chest rendering should use a dedicated fallback body instead of a humanoid sprite texture.");
+        Expect.NotNull(chestBand, "Chest rendering should add a distinct chest band overlay.");
+        Expect.NotNull(chestLatch, "Chest rendering should add a distinct latch marker.");
+        Expect.Equal("C", chestLatch!.Text, "Chest latch marker should stay readable in the fallback presentation.");
+        Expect.True(FindChild<ColorRect>(spriteRoot, "AccentBand") is null, "Chest visuals should not reuse player accent overlays.");
+        Expect.True(FindChild<Label>(spriteRoot, "VariantSigil") is null, "Chest visuals should not reuse player identity sigils.");
     }
 
     private static T? FindChild<T>(Node parent, string name) where T : Node

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 using Roguelike.Core;
 
@@ -26,6 +27,7 @@ public partial class WorldView : Node2D
     private TileMapLayer _fogLayer = new() { Name = "TileMapLayer_Fog" };
     private Node2D _tileArtLayer = new() { Name = "TileArtLayer" };
     private Node2D _entityLayer = new() { Name = "EntityLayer" };
+    private Node2D _wallCoverLayer = new() { Name = "WallCoverLayer", ZIndex = 40 };
     private Camera2D _camera = new() { Name = "Camera2D" };
     private readonly FOVCalculator _fov = new();
     private readonly CameraController _cameraController = new();
@@ -35,6 +37,7 @@ public partial class WorldView : Node2D
     private readonly Dictionary<EntityId, Position> _entitySnapshot = new();
     private readonly Dictionary<Position, Node> _tileArt = new();
     private readonly Dictionary<Position, string> _tileMarkers = new();
+    private readonly Dictionary<Position, Node> _wallCovers = new();
     private readonly EntityRenderer _entityRenderer;
 
     private EventBus? _eventBus;
@@ -58,6 +61,8 @@ public partial class WorldView : Node2D
 
     public Node2D EntityLayerNode => _entityLayer;
 
+    public Node2D WallCoverLayerNode => _wallCoverLayer;
+
     public Camera2D Camera => _camera;
 
     public EntityRenderer EntityRenderer => _entityRenderer;
@@ -70,20 +75,22 @@ public partial class WorldView : Node2D
 
     public override void _Ready()
     {
+        EnsureAuxiliaryLayers();
         _floorLayer = GetNode<TileMapLayer>("TileMapLayer_Floor");
         _wallLayer = GetNode<TileMapLayer>("TileMapLayer_Walls");
         _objectLayer = GetNode<TileMapLayer>("TileMapLayer_Objects");
         _fogLayer = GetNode<TileMapLayer>("TileMapLayer_Fog");
         _tileArtLayer = GetNodeOrNull<Node2D>("TileArtLayer") ?? _tileArtLayer;
         _entityLayer = GetNode<Node2D>("EntityLayer");
+        _wallCoverLayer = GetNodeOrNull<Node2D>("WallCoverLayer") ?? _wallCoverLayer;
         _camera = GetNode<Camera2D>("Camera2D");
 
         _entityRenderer.BindLayer(_entityLayer);
         _cameraController.Bind(_camera);
         HideLegacyTilemapVisuals();
 
-        _gameManager = GetNodeOrNull<GameManager>("/root/GameManager");
-        BindEventBus(GetNodeOrNull<EventBus>("/root/EventBus"));
+        _gameManager = ResolveGameManager();
+        BindEventBus(ResolveEventBus());
 
         if (_gameManager?.World is not null)
         {
@@ -102,6 +109,7 @@ public partial class WorldView : Node2D
 
     public void BindWorld(IWorldState world)
     {
+        EnsureAuxiliaryLayers();
         _world = world;
         RenderFullMap(world);
     }
@@ -117,6 +125,7 @@ public partial class WorldView : Node2D
             _eventBus.EntityMoved -= OnEntityMoved;
             _eventBus.EntitySpawned -= OnEntitySpawned;
             _eventBus.EntityRemoved -= OnEntityRemoved;
+            _eventBus.TileChanged -= OnTileChanged;
         }
 
         _eventBus = eventBus;
@@ -132,6 +141,19 @@ public partial class WorldView : Node2D
         _eventBus.EntityMoved += OnEntityMoved;
         _eventBus.EntitySpawned += OnEntitySpawned;
         _eventBus.EntityRemoved += OnEntityRemoved;
+        _eventBus.TileChanged += OnTileChanged;
+    }
+
+    private GameManager? ResolveGameManager()
+    {
+        return GetNodeOrNull<GameManager>("/root/GameManager")
+            ?? AutoloadResolver.Resolve<GameManager>(this, "GameManager");
+    }
+
+    private EventBus? ResolveEventBus()
+    {
+        return GetNodeOrNull<EventBus>("/root/EventBus")
+            ?? AutoloadResolver.Resolve<EventBus>(this, "EventBus");
     }
 
     public void RenderFullMap(IWorldState world)
@@ -145,6 +167,7 @@ public partial class WorldView : Node2D
         _visibleTiles.Clear();
         _exploredTiles.Clear();
         ClearTileArt();
+        ClearWallCovers();
 
         for (var y = 0; y < world.Height; y++)
         {
@@ -283,6 +306,42 @@ public partial class WorldView : Node2D
         _tileMarkers.Clear();
     }
 
+    private void RemoveTileArt(Position position)
+    {
+        if (_tileArt.Remove(position, out var tile))
+        {
+            _tileArtLayer.RemoveChild(tile);
+            tile.QueueFree();
+        }
+
+        _tileMarkers.Remove(position);
+    }
+
+    private void ClearWallCovers()
+    {
+        foreach (var child in _wallCoverLayer.GetChildren().ToArray())
+        {
+            if (child is not Node node)
+            {
+                continue;
+            }
+
+            _wallCoverLayer.RemoveChild(node);
+            node.QueueFree();
+        }
+
+        _wallCovers.Clear();
+    }
+
+    private void RemoveWallCover(Position position)
+    {
+        if (_wallCovers.Remove(position, out var node))
+        {
+            _wallCoverLayer.RemoveChild(node);
+            node.QueueFree();
+        }
+    }
+
     private void RenderTileArt(Position position, TileType tileType)
     {
         var textures = WorldArtCatalog.GetTileArtLayers(_world, position, tileType);
@@ -334,7 +393,9 @@ public partial class WorldView : Node2D
             _tileMarkers[position] = marker;
         }
 
-        AppendBoundaryTrim(container, WorldArtCatalog.GetWalkableBoundaryMask(_world, position, tileType));
+        var boundaryMask = WorldArtCatalog.GetWalkableBoundaryMask(_world, position, tileType);
+        AppendBoundaryTrim(container, boundaryMask);
+        AppendWallCover(position, tileType, boundaryMask, textures);
 
         _tileArtLayer.AddChild(container);
         _tileArt[position] = container;
@@ -411,18 +472,43 @@ public partial class WorldView : Node2D
         }
 
         AnimateEntityMovesFromSnapshot();
-        ClearTileArt();
-        for (var y = 0; y < _world.Height; y++)
+        _entityRenderer.SyncEntities(_world.Entities);
+        _entityRenderer.ReconcileEntityPositions(_world.Entities);
+        SnapshotEntities();
+    }
+
+    private void OnTileChanged(Position position)
+    {
+        if (_world is null)
         {
-            for (var x = 0; x < _world.Width; x++)
-            {
-                RenderTile(new Position(x, y), _world.GetTile(new Position(x, y)));
-            }
+            return;
         }
 
-        _entityRenderer.SyncEntities(_world.Entities);
-        RecalculateFov();
-        SnapshotEntities();
+        for (var y = position.Y - 1; y <= position.Y + 1; y++)
+        {
+            for (var x = position.X - 1; x <= position.X + 1; x++)
+            {
+                var tilePosition = new Position(x, y);
+                if (!_world.InBounds(tilePosition))
+                {
+                    continue;
+                }
+
+                RefreshTile(tilePosition);
+            }
+        }
+    }
+
+    private void RefreshTile(Position position)
+    {
+        if (_world is null)
+        {
+            return;
+        }
+
+        RemoveTileArt(position);
+        RemoveWallCover(position);
+        RenderTile(position, _world.GetTile(position));
     }
 
     private void OnFloorChanged(int depth)
@@ -504,6 +590,133 @@ public partial class WorldView : Node2D
         {
             AddTrimRect(container, "WestShadow", new Vector2(BoundaryThickness, 0f), new Vector2(BoundaryShadowThickness, TileSize), BoundaryShadowColor, 7);
             AddTrimRect(container, "WestTrim", Vector2.Zero, new Vector2(BoundaryThickness, TileSize), BoundaryTrimColor, 8);
+        }
+    }
+
+    private void AppendWallCover(Position position, TileType tileType, WorldArtCatalog.TileBoundaryMask boundaryMask, IReadOnlyList<Texture2D> textures)
+    {
+        if (tileType == TileType.Wall && ShouldRenderFrontWallOccluder(position))
+        {
+            var wallOccluder = new Node2D
+            {
+                Name = $"WallCover_{position.X}_{position.Y}",
+                Position = new Vector2(position.X * TileSize, position.Y * TileSize),
+                ZIndex = 40,
+            };
+
+            for (var i = 0; i < textures.Count; i++)
+            {
+                wallOccluder.AddChild(new Sprite2D
+                {
+                    Name = i == 0 ? "OccluderTexture" : $"OccluderTexture_{i}",
+                    Position = new Vector2(TileSize * 0.5f, TileSize * 0.5f),
+                    Scale = ResolveTextureScale(),
+                    Texture = textures[i],
+                    ZIndex = i,
+                });
+            }
+
+            _wallCoverLayer.AddChild(wallOccluder);
+            _wallCovers[position] = wallOccluder;
+            return;
+        }
+
+        if (!boundaryMask.HasAny)
+        {
+            return;
+        }
+
+        var container = new Node2D
+        {
+            Name = $"WallCover_{position.X}_{position.Y}",
+            Position = new Vector2(position.X * TileSize, position.Y * TileSize),
+            ZIndex = 40,
+        };
+
+        if (boundaryMask.North)
+        {
+            container.AddChild(new ColorRect
+            {
+                Name = "NorthCoverFace",
+                Position = new Vector2(0f, BoundaryThickness),
+                Size = new Vector2(TileSize, 15f),
+                Color = new Color(0.17f, 0.13f, 0.12f, 0.96f),
+                ZIndex = 40,
+            });
+
+            container.AddChild(new ColorRect
+            {
+                Name = "NorthCoverTrim",
+                Position = Vector2.Zero,
+                Size = new Vector2(TileSize, BoundaryThickness),
+                Color = BoundaryTrimColor,
+                ZIndex = 41,
+            });
+
+            container.AddChild(new ColorRect
+            {
+                Name = "NorthCoverShadow",
+                Position = new Vector2(0f, BoundaryThickness + 15f),
+                Size = new Vector2(TileSize, 5f),
+                Color = new Color(0.08f, 0.06f, 0.05f, 0.7f),
+                ZIndex = 39,
+            });
+        }
+
+        if (boundaryMask.East)
+        {
+            container.AddChild(new ColorRect
+            {
+                Name = "EastCoverShadow",
+                Position = new Vector2(TileSize - 12f, 0f),
+                Size = new Vector2(12f, TileSize),
+                Color = new Color(0.08f, 0.06f, 0.05f, 0.42f),
+                ZIndex = 40,
+            });
+        }
+
+        if (boundaryMask.West)
+        {
+            container.AddChild(new ColorRect
+            {
+                Name = "WestCoverShadow",
+                Position = Vector2.Zero,
+                Size = new Vector2(12f, TileSize),
+                Color = new Color(0.08f, 0.06f, 0.05f, 0.42f),
+                ZIndex = 40,
+            });
+        }
+
+        _wallCoverLayer.AddChild(container);
+        _wallCovers[position] = container;
+    }
+
+    private bool ShouldRenderFrontWallOccluder(Position position)
+    {
+        if (_world is null)
+        {
+            return false;
+        }
+
+        var south = position + new Position(0, 1);
+        if (!_world.InBounds(south))
+        {
+            return false;
+        }
+
+        return _world.GetTile(south) is TileType.Floor or TileType.Door or TileType.StairsDown or TileType.StairsUp or TileType.Water;
+    }
+
+    private void EnsureAuxiliaryLayers()
+    {
+        if (_tileArtLayer.GetParent() is null)
+        {
+            AddChild(_tileArtLayer);
+        }
+
+        if (_wallCoverLayer.GetParent() is null)
+        {
+            AddChild(_wallCoverLayer);
         }
     }
 

@@ -18,9 +18,13 @@ public sealed class FOVTests : ITestSuite
         registry.Add("Rendering.WorldArtCatalog selects contextual wall art for exposed edges", WorldArtCatalogSelectsContextualWallArt);
         registry.Add("Rendering.WorldArtCatalog caps top-left room corners clearly", WorldArtCatalogCapsTopLeftRoomCornersClearly);
         registry.Add("Rendering.WorldArtCatalog resolves sprites for the current enemy roster", WorldArtCatalogResolvesSpritesForCurrentEnemyRoster);
+        registry.Add("Rendering.WorldArtCatalog gives each current monster a distinct sprite", WorldArtCatalogUsesDistinctSpritesForCurrentEnemyRoster);
         registry.Add("Rendering.WorldView marks interactive tiles clearly", WorldViewMarksInteractiveTilesClearly);
         registry.Add("Rendering.WorldView animates movement and attacks via events", WorldViewAnimatesMovementAndAttacks);
+        registry.Add("Rendering.WorldView rerenders dirty tiles without rebuilding the map", WorldViewRerendersDirtyTiles);
         registry.Add("Rendering.WorldView snaps severely desynced actors back to their logical tiles", WorldViewSnapsSeverelyDesyncedActorsBackToTheirLogicalTiles);
+        registry.Add("Rendering.WorldView adds wall covers above entities along north edges", WorldViewAddsNorthWallCoverLayer);
+        registry.Add("Rendering.WorldView clears damage popups after their lifetime", WorldViewExpiresDamagePopups);
     }
 
     private static void FovBlocksTilesBehindWalls()
@@ -97,6 +101,19 @@ public sealed class FOVTests : ITestSuite
         Expect.Equal(AnimationType.Damage, view.Animations.History[1].Type, "Damage flash should play second.");
     }
 
+    private static void WorldViewRerendersDirtyTiles()
+    {
+        var bus = new EventBus();
+        var world = CreateRoomWorld();
+        var view = CreateWorldView(world, bus);
+
+        world.SetTile(new Position(3, 3), TileType.Wall);
+        bus.EmitTileChanged(new Position(3, 3));
+
+        Expect.True(view.WallLayer.TryGetCell(new Vector2I(3, 3), out var wallCell), "Dirty tile refresh should update the changed wall cell.");
+        Expect.Equal(new Vector2I(1, 0), wallCell.AtlasCoords, "Dirty tile refresh should reuse the correct wall atlas cell.");
+    }
+
     private static void WorldViewAppliesDefaultCameraZoom()
     {
         var world = CreateRoomWorld();
@@ -135,8 +152,8 @@ public sealed class FOVTests : ITestSuite
 
         Expect.Equal("res://Assets/Tilesets/0x72/Wall_Corner_Top_Left.png", topLeftTopWallLayers[^1].ResourcePath,
             "Top walls beside the left room boundary should use an explicit corner cap so the tile does not read like an opening.");
-        Expect.Equal("res://Assets/Tilesets/0x72/Wall_Corner_Left.png", topLeftSideWallLayers[^1].ResourcePath,
-            "Left walls beneath the top room boundary should use an explicit corner cap so the top-left corner reads as blocked.");
+        Expect.Equal("res://Assets/Tilesets/0x72/Wall_Side_Top_Left.png", topLeftSideWallLayers[^1].ResourcePath,
+            "Left walls beneath the top room boundary should use the dedicated side-top cap so the corner reads as sealed instead of jagged.");
     }
 
     private static void WorldArtCatalogResolvesSpritesForCurrentEnemyRoster()
@@ -166,6 +183,33 @@ public sealed class FOVTests : ITestSuite
         }
     }
 
+    private static void WorldArtCatalogUsesDistinctSpritesForCurrentEnemyRoster()
+    {
+        var enemyNames = new[]
+        {
+            "Giant Rat",
+            "Skeleton Warrior",
+            "Goblin Archer",
+            "Orc Brute",
+            "Spectral Wraith",
+            "Acid Slime",
+            "Cave Spider",
+            "Skeleton Knight",
+            "Goblin Shaman",
+            "Dark Mage",
+            "Shadow Stalker",
+            "Bone Lord",
+            "Flame Elemental",
+        };
+
+        var resourcePaths = enemyNames
+            .Select(enemyName => WorldArtCatalog.GetEntityTexture(new StubEntity(enemyName, new Position(1, 1), Faction.Enemy))?.ResourcePath ?? string.Empty)
+            .ToArray();
+
+        Expect.Equal(enemyNames.Length, resourcePaths.Distinct(System.StringComparer.Ordinal).Count(),
+            "Each monster in the current roster should map to a distinct imported sprite path.");
+    }
+
     private static void WorldViewMarksInteractiveTilesClearly()
     {
         var world = CreateRoomWorld();
@@ -191,6 +235,37 @@ public sealed class FOVTests : ITestSuite
 
         Expect.Equal(WorldView.ToCanvasPosition(new Position(5, 2)), view.EntityRenderer.GetSprite(world.Player.Id)!.Position,
             "If the logical player position outruns the active move animation by multiple tiles, the renderer should resync the sprite instead of leaving it stranded behind the camera.");
+    }
+
+    private static void WorldViewAddsNorthWallCoverLayer()
+    {
+        var world = CreateRoomWorld();
+        var view = CreateWorldView(world);
+
+        Expect.True(view.WallCoverLayerNode.GetChildren().Count > 0,
+            "Walkable tiles beneath north-facing walls should add a dedicated cover layer so actors do not draw through the wall lip.");
+        Expect.True(view.WallCoverLayerNode.GetChildren().OfType<Node2D>().Any(node => node.GetChildren().OfType<Sprite2D>().Any()),
+            "The wall cover layer should carry duplicated wall art above entities so front walls occlude sprites with the real tile shapes.");
+        Expect.True(view.WallCoverLayerNode.GetChildren().OfType<Node2D>().Any(node => node.GetChildren().Any(child => child.Name == "NorthCoverFace")),
+            "North-facing wall covers should add an opaque front fascia on the walkable tile below the wall so straight corridors occlude actors consistently, not only corners.");
+    }
+
+    private static void WorldViewExpiresDamagePopups()
+    {
+        var bus = new EventBus();
+        var world = CreateRoomWorld();
+        var enemy = new StubEntity("Goblin", new Position(3, 2), Faction.Enemy);
+        world.AddEntity(enemy);
+        var view = CreateWorldView(world, bus);
+
+        bus.EmitDamageDealt(new DamageResult(world.Player.Id, enemy.Id, 4, 4, DamageType.Physical, false, false, false));
+        Expect.True(view.EntityLayerNode.GetChildren().OfType<DamagePopup>().Any(),
+            "Damage events should create a transient popup.");
+
+        view._Process(1.0d);
+
+        Expect.False(view.EntityLayerNode.GetChildren().OfType<DamagePopup>().Any(),
+            "Damage popups should expire and free themselves after their lifetime elapses.");
     }
 
     private static WorldState CreateRoomWorld(int width = 7, int height = 7, Position? playerPosition = null)

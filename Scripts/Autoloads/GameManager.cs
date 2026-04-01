@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Godot;
 using Roguelike.Core;
 
@@ -9,6 +10,10 @@ namespace Godotussy;
 public partial class GameManager : Node
 {
     private readonly Dictionary<int, WorldState> _cachedFloors = new();
+    private readonly Dictionary<int, FloorEntrances> _floorEntrances = new();
+    private const int StartingGold = 120;
+
+    private sealed record FloorEntrances(Position StairsUp, Position StairsDown);
 
     public sealed class CharacterCreationOptions
     {
@@ -103,6 +108,14 @@ public partial class GameManager : Node
 
         public string AppearanceId { get; }
     }
+
+    public sealed record InteractionContext(
+        EntityId NpcId,
+        string DisplayName,
+        string Role,
+        bool IsMerchant,
+        NpcTemplate NpcTemplate,
+        DialogueTemplate DialogueTemplate);
 
     private sealed class OneShotScheduler : ITurnScheduler
     {
@@ -232,7 +245,7 @@ public partial class GameManager : Node
 
     public override void _Ready()
     {
-        BindBus(Bus ?? GetNodeOrNull<EventBus>("/root/EventBus"));
+        BindBus(ResolveEventBus());
         EnsureRuntimeServices();
     }
 
@@ -263,7 +276,7 @@ public partial class GameManager : Node
     public void SetRuntimeContent(IContentDatabase content)
     {
         Content = content;
-        GetNodeOrNull<ContentDatabase>("/root/ContentDatabase")?.SetDatabase(content);
+        ResolveContentAutoload()?.SetDatabase(content);
     }
 
     public IReadOnlyList<string> ReloadContentDatabase(string? contentDirectory = null)
@@ -304,6 +317,8 @@ public partial class GameManager : Node
 
     public bool LoadFromSlot(int slot)
     {
+        EnsureRuntimeServices();
+
         if (SaveManager is null || !SaveManager.HasSave(slot))
         {
             Bus?.EmitLoadCompleted(false);
@@ -325,6 +340,7 @@ public partial class GameManager : Node
         {
             Seed = world.Seed;
             _cachedFloors.Clear();
+            _floorEntrances.Clear();
         }
 
         Scheduler = new TurnScheduler();
@@ -416,6 +432,7 @@ public partial class GameManager : Node
         ArgumentNullException.ThrowIfNull(world);
 
         _cachedFloors.Clear();
+        _floorEntrances.Clear();
         Seed = world.Seed;
         CurrentFloor = world.Depth;
         Scheduler = new TurnScheduler();
@@ -429,9 +446,11 @@ public partial class GameManager : Node
 
     public void StartNewGame(int seed)
     {
+        EnsureRuntimeServices();
         Seed = seed;
         CurrentFloor = 0;
         _cachedFloors.Clear();
+        _floorEntrances.Clear();
 
         if (Generator is null || Content is null)
         {
@@ -442,9 +461,12 @@ public partial class GameManager : Node
 
         try
         {
-            var world = CreateGeneratedWorld(seed, CurrentFloor);
-            var player = CreatePlayer(FindArrivalPosition(world, TileType.StairsUp), new Random(MixSeed(seed, CurrentFloor) ^ 17));
-            PlacePlayerInWorld(world, player, TileType.StairsUp);
+            var generatedFloor = CreateGeneratedWorld(seed, CurrentFloor);
+            var world = generatedFloor.World;
+            _floorEntrances[CurrentFloor] = generatedFloor.Entrances;
+
+            var player = CreatePlayer(generatedFloor.Entrances.StairsUp, new Random(MixSeed(seed, CurrentFloor) ^ 17));
+            PlacePlayerInWorld(world, player, generatedFloor.Entrances.StairsUp, TileType.StairsUp);
             LoadWorld(world);
             Bus?.EmitLogMessage($"Starting new game with seed {seed}.");
         }
@@ -458,6 +480,7 @@ public partial class GameManager : Node
     public void LoadWorld(WorldState world)
     {
         world.ContentDatabase = Content;
+        RememberFloorEntrances(world);
         World = world;
         CurrentFloor = world.Depth;
         CurrentState = GameState.Playing;
@@ -466,6 +489,211 @@ public partial class GameManager : Node
         Bus?.EmitLevelGenerated(world.Depth, world.Width, world.Height);
         Bus?.EmitFloorChanged(CurrentFloor);
         EmitWorldSnapshot(world);
+    }
+
+    public InteractionContext? GetInteractionContext()
+    {
+        if (World?.Player is null || Content is null)
+        {
+            return null;
+        }
+
+        var entity = FindAdjacentNpc(World);
+        var npc = entity?.GetComponent<NpcComponent>();
+        if (entity is null || npc is null)
+        {
+            return null;
+        }
+
+        if (!Content.TryGetNpcTemplate(npc.TemplateId, out var npcTemplate)
+            || !Content.TryGetDialogueTemplate(npc.DialogueId, out var dialogueTemplate))
+        {
+            return null;
+        }
+
+        return new InteractionContext(
+            entity.Id,
+            npcTemplate.DisplayName,
+            npcTemplate.Role,
+            entity.GetComponent<MerchantComponent>() is { Offers.Count: > 0 },
+            npcTemplate,
+            dialogueTemplate);
+    }
+
+    public IReadOnlyList<PerkTemplate> GetAvailablePerkChoices()
+    {
+        return World?.Player is null ? Array.Empty<PerkTemplate>() : ProgressionService.GetAvailablePerkChoices(World.Player, Content);
+    }
+
+    public bool TrySpendStatPoint(string statName, out string message)
+    {
+        message = string.Empty;
+        if (World?.Player is null)
+        {
+            message = "No active player is available.";
+            return false;
+        }
+
+        var player = World.Player;
+        if (!ProgressionService.TrySpendStatPoint(player, statName, out message))
+        {
+            return false;
+        }
+
+        Bus?.EmitLogMessage(message);
+        Bus?.EmitHPChanged(player.Id, player.Stats.HP, player.Stats.MaxHP);
+        Bus?.EmitProgressionChanged(player.Id);
+        return true;
+    }
+
+    public bool TrySelectPerk(string perkId, out string message)
+    {
+        message = string.Empty;
+        if (World?.Player is null)
+        {
+            message = "No active player is available.";
+            return false;
+        }
+
+        var player = World.Player;
+        if (!ProgressionService.TrySelectPerk(player, Content, perkId, out message))
+        {
+            return false;
+        }
+
+        Bus?.EmitLogMessage(message);
+        Bus?.EmitHPChanged(player.Id, player.Stats.HP, player.Stats.MaxHP);
+        Bus?.EmitProgressionChanged(player.Id);
+        return true;
+    }
+
+    public int ResolveMerchantBuyPrice(int basePrice)
+    {
+        return World?.Player is null ? basePrice : ResolveMerchantBuyPrice(World.Player, basePrice);
+    }
+
+    public bool TryBuyMerchantOffer(EntityId merchantId, int offerIndex, out string message)
+    {
+        message = string.Empty;
+        if (!TryResolveMerchantInteraction(merchantId, out var player, out var inventory, out var wallet, out var merchant, out var merchantComponent, out message))
+        {
+            return false;
+        }
+
+        if (Content is null)
+        {
+            message = "Content database is unavailable.";
+            return false;
+        }
+
+        if (offerIndex < 0 || offerIndex >= merchantComponent.Offers.Count)
+        {
+            message = "That item is no longer available.";
+            return false;
+        }
+
+        var offer = merchantComponent.Offers[offerIndex];
+        if (offer.Quantity <= 0)
+        {
+            message = "That item is sold out.";
+            return false;
+        }
+
+        if (!Content.TryGetItemTemplate(offer.ItemTemplateId, out var template))
+        {
+            message = $"The merchant's stock references unknown item '{offer.ItemTemplateId}'.";
+            return false;
+        }
+
+        var price = ResolveMerchantBuyPrice(player, offer.Price);
+
+        if (wallet.Gold < price)
+        {
+            message = $"You need {price} gold for {template.DisplayName}.";
+            return false;
+        }
+
+        var purchasedItem = new ItemInstance
+        {
+            InstanceId = EntityId.New(),
+            TemplateId = offer.ItemTemplateId,
+            StackCount = 1,
+            IsIdentified = true,
+        };
+
+        if (!inventory.CanAccept(purchasedItem, template.MaxStack))
+        {
+            message = "Your pack is too full to buy that.";
+            return false;
+        }
+
+        wallet.Gold -= price;
+        offer.Quantity--;
+        if (template.MaxStack > 1)
+        {
+            inventory.AddWithStacking(purchasedItem, template.MaxStack);
+        }
+        else
+        {
+            inventory.Add(purchasedItem);
+        }
+
+        Bus?.EmitInventoryChanged(player.Id);
+        Bus?.EmitCurrencyChanged(player.Id, wallet.Gold);
+        message = $"Bought {template.DisplayName} from {merchant.Name} for {price} gold.";
+        Bus?.EmitLogMessage(message);
+        return true;
+    }
+
+    public bool TrySellItemToMerchant(EntityId merchantId, EntityId itemInstanceId, out string message)
+    {
+        message = string.Empty;
+        if (!TryResolveMerchantInteraction(merchantId, out var player, out var inventory, out var wallet, out _, out _, out message))
+        {
+            return false;
+        }
+
+        if (Content is null)
+        {
+            message = "Content database is unavailable.";
+            return false;
+        }
+
+        var item = inventory.Get(itemInstanceId);
+        if (item is null)
+        {
+            message = "You are not carrying that item.";
+            return false;
+        }
+
+        if (!Content.TryGetItemTemplate(item.TemplateId, out var template))
+        {
+            message = $"Unknown item '{item.TemplateId}'.";
+            return false;
+        }
+
+        var equippedSlot = inventory.GetEquippedSlot(item.InstanceId);
+        if (equippedSlot != EquipSlot.None && inventory.TryUnequip(equippedSlot, out var removed) && removed is not null)
+        {
+            ApplyStatModifiers(player.Stats, removed.StatModifiers, -1);
+            Bus?.EmitEquipmentChanged(player.Id, equippedSlot, null);
+        }
+
+        var sellQuantity = item.StackCount > 1 ? 1 : int.MaxValue;
+        if (!inventory.RemoveQuantity(item.InstanceId, sellQuantity, out var soldItem) || soldItem is null)
+        {
+            message = "Selling failed because the item could not be removed.";
+            return false;
+        }
+
+        var goldEarned = ResolveSellPrice(template) * Math.Max(1, soldItem.StackCount);
+        wallet.Gold += goldEarned;
+
+        Bus?.EmitInventoryChanged(player.Id);
+        Bus?.EmitCurrencyChanged(player.Id, wallet.Gold);
+        message = $"Sold {template.DisplayName} for {goldEarned} gold.";
+        Bus?.EmitLogMessage(message);
+        return true;
     }
 
     public ActionOutcome ProcessPlayerAction(IAction action)
@@ -483,6 +711,7 @@ public partial class GameManager : Node
 
         var actorBefore = World.GetEntity(action.ActorId);
         var actorPositionBefore = actorBefore?.Position ?? Position.Invalid;
+        var entityPositionsBefore = SnapshotEntityPositions(World);
         var playerId = World.Player.Id;
         var inventoryBefore = SnapshotInventory(actorBefore?.GetComponent<InventoryComponent>());
         var equipmentBefore = SnapshotEquipment(actorBefore?.GetComponent<InventoryComponent>());
@@ -556,7 +785,7 @@ public partial class GameManager : Node
         if (!changedFloor)
         {
             RecalculatePlayerVisibility(World);
-            EmitStateDelta(action, actorPositionBefore, inventoryBefore, equipmentBefore, playerId);
+            EmitStateDelta(action, actorPositionBefore, entityPositionsBefore, inventoryBefore, equipmentBefore, outcome.DirtyPositions, playerId);
             EmitProgressionChanges(playerId, progressionBefore);
         }
 
@@ -613,6 +842,12 @@ public partial class GameManager : Node
 
     private void EnsureRuntimeServices()
     {
+        BindBus(ResolveEventBus());
+        if (Content is not null)
+        {
+            ResolveContentAutoload()?.SetDatabase(Content);
+        }
+
         if (Generator is not null && Scheduler is not null && Content is not null && SaveManager is not null)
         {
             return;
@@ -620,8 +855,8 @@ public partial class GameManager : Node
 
         try
         {
-            var content = Content as ContentLoader ?? ContentLoader.LoadFromRepository(Directory.GetCurrentDirectory());
-            GetNodeOrNull<ContentDatabase>("/root/ContentDatabase")?.SetDatabase(content);
+            var content = Content as ContentLoader ?? ContentLoader.LoadFromDirectory(ToolPaths.ResolveContentDirectory());
+            ResolveContentAutoload()?.SetDatabase(content);
 
             AttachServices(
                 World ?? new WorldState(),
@@ -638,7 +873,20 @@ public partial class GameManager : Node
         }
     }
 
-    private WorldState CreateGeneratedWorld(int seed, int depth)
+    private EventBus? ResolveEventBus()
+    {
+        return Bus
+            ?? GetNodeOrNull<EventBus>("/root/EventBus")
+            ?? AutoloadResolver.Resolve<EventBus>(this, "EventBus");
+    }
+
+    private ContentDatabase? ResolveContentAutoload()
+    {
+        return GetNodeOrNull<ContentDatabase>("/root/ContentDatabase")
+            ?? AutoloadResolver.Resolve<ContentDatabase>(this, "ContentDatabase");
+    }
+
+    private (WorldState World, FloorEntrances Entrances) CreateGeneratedWorld(int seed, int depth)
     {
         if (Generator is null || Content is null)
         {
@@ -646,6 +894,7 @@ public partial class GameManager : Node
         }
 
         var world = new WorldState();
+        world.ContentDatabase = Content;
         var level = Generator.GenerateLevel(world, seed, depth);
         world.ContentDatabase = Content;
         var previousTurnNumber = World?.TurnNumber ?? 0;
@@ -653,7 +902,7 @@ public partial class GameManager : Node
 
         world.TurnNumber = previousTurnNumber;
         PopulateWorld(world, level, rng);
-        return world;
+        return (world, new FloorEntrances(level.PlayerSpawn, level.StairsDown));
     }
 
     private void PopulateWorld(WorldState world, LevelData level, Random rng)
@@ -664,33 +913,53 @@ public partial class GameManager : Node
         }
 
         var enemies = Content.GetAvailableEnemies(world.Depth);
-        foreach (var spawn in level.EnemySpawns)
+        var enemySpawns = level.EnemySpawnDetails
+            ?? level.EnemySpawns.Select(position => new EnemySpawnData(position)).ToArray();
+        foreach (var spawn in enemySpawns)
         {
-            if (enemies.Count == 0)
+            var template = ResolveEnemyTemplate(enemies, spawn, rng, world.Depth);
+            if (template is null)
             {
-                break;
+                continue;
             }
 
-            var template = SelectEnemyTemplate(enemies, rng);
-            var enemy = new Entity(
-                template.DisplayName,
-                spawn,
-                template.BaseStats.Clone(),
-                template.Faction,
-                id: EntityId.NewSeeded(rng));
-            enemy.SetComponent<IBrain>(BrainFactory.Create(template));
-            enemy.SetComponent(new XpValueComponent { Value = template.XpValue });
-            AttachAbilities(enemy, template, Content);
-            world.AddEntity(enemy);
+            if (!TryResolveSpawnPosition(world, spawn.Position, requireEmptyTile: true, avoidStairs: true, out var enemyPosition))
+            {
+                continue;
+            }
+
+            world.AddEntity(CreateEnemyEntity(template, enemyPosition, rng));
         }
 
-        foreach (var spawn in level.ItemSpawns)
+        var itemSpawns = level.ItemSpawnDetails
+            ?? level.ItemSpawns.Select(position => new ItemSpawnData(position)).ToArray();
+        foreach (var spawn in itemSpawns)
         {
-            foreach (var item in CreateFloorItems(world.Depth, rng))
+            if (!TryResolveSpawnPosition(world, spawn.Position, requireEmptyTile: false, avoidStairs: true, out var itemPosition))
             {
-                world.DropItem(spawn, item);
+                continue;
+            }
+
+            foreach (var item in CreateFloorItems(world.Depth, rng, spawn.QualityBonus, spawn.TemplateId))
+            {
+                world.DropItem(itemPosition, item);
             }
         }
+
+        var chestSpawns = level.ChestSpawnDetails
+            ?? (level.ChestSpawns ?? Array.Empty<Position>()).Select(position => new ChestSpawnData(position)).ToArray();
+        foreach (var spawn in chestSpawns)
+        {
+            if (!TryResolveSpawnPosition(world, spawn.Position, requireEmptyTile: true, avoidStairs: true, out var chestPosition))
+            {
+                continue;
+            }
+
+            world.AddEntity(CreateChestEntity(chestPosition, world.Depth, rng, spawn.LootTableId));
+        }
+
+        SpawnAuthoredNpcs(world, level.NpcSpawns ?? Array.Empty<NpcSpawnData>());
+        SpawnNpcs(world, rng);
     }
 
     private static void AttachAbilities(Entity enemy, EnemyTemplate template, IContentDatabase content)
@@ -723,6 +992,20 @@ public partial class GameManager : Node
 
         enemy.SetComponent(abilitiesComp);
         enemy.SetComponent(new CooldownComponent());
+    }
+
+    private Entity CreateEnemyEntity(EnemyTemplate template, Position spawn, Random rng)
+    {
+        var enemy = new Entity(
+            template.DisplayName,
+            spawn,
+            template.BaseStats.Clone(),
+            template.Faction,
+            id: EntityId.NewSeeded(rng));
+        enemy.SetComponent<IBrain>(BrainFactory.Create(template));
+        enemy.SetComponent(new XpValueComponent { Value = template.XpValue });
+        AttachAbilities(enemy, template, Content!);
+        return enemy;
     }
 
     private Entity CreatePlayer(Position spawn, Random rng)
@@ -778,6 +1061,7 @@ public partial class GameManager : Node
         }
 
         player.SetComponent(inventory);
+        player.SetComponent(new WalletComponent { Gold = StartingGold });
         player.SetComponent(new ProgressionComponent());
         player.SetComponent(new IdentityComponent
         {
@@ -833,15 +1117,32 @@ public partial class GameManager : Node
         }
     }
 
-    private IReadOnlyList<ItemInstance> CreateFloorItems(int depth, Random rng)
+    private IReadOnlyList<ItemInstance> CreateFloorItems(int depth, Random rng, int qualityBonus = 0, string? fixedTemplateId = null)
     {
         var content = Content ?? throw new InvalidOperationException("Content service is not available.");
+        var effectiveDepth = Math.Max(0, depth + Math.Max(0, qualityBonus));
+
+        if (!string.IsNullOrWhiteSpace(fixedTemplateId))
+        {
+            return content.TryGetItemTemplate(fixedTemplateId, out _)
+                ? new[]
+                {
+                    new ItemInstance
+                    {
+                        InstanceId = EntityId.NewSeeded(rng),
+                        TemplateId = fixedTemplateId,
+                        StackCount = 1,
+                        IsIdentified = false,
+                    },
+                }
+                : Array.Empty<ItemInstance>();
+        }
 
         if (content is ContentLoader loader)
         {
             try
             {
-                var rolls = LootTableResolver.RollTable(loader, "floor_loot", rng, depth);
+                var rolls = LootTableResolver.RollTable(loader, ResolveFloorLootTableId(effectiveDepth), rng, effectiveDepth);
                 var items = new List<ItemInstance>(rolls.Count);
                 foreach (var roll in rolls)
                 {
@@ -864,7 +1165,7 @@ public partial class GameManager : Node
             }
         }
 
-        var templates = content.GetAvailableItems(depth);
+        var templates = content.GetAvailableItems(effectiveDepth);
         if (templates.Count == 0)
         {
             return Array.Empty<ItemInstance>();
@@ -881,6 +1182,24 @@ public partial class GameManager : Node
                 IsIdentified = false,
             },
         };
+    }
+
+    private EnemyTemplate? ResolveEnemyTemplate(IReadOnlyList<EnemyTemplate> templates, EnemySpawnData spawn, Random rng, int depth)
+    {
+        if (Content is not null && !string.IsNullOrWhiteSpace(spawn.TemplateId) && Content.TryGetEnemyTemplate(spawn.TemplateId, out var fixedTemplate))
+        {
+            return fixedTemplate;
+        }
+
+        var candidates = spawn.IsBoss && Content is not null
+            ? Content.GetAvailableEnemies(depth + 2)
+            : templates;
+        if (candidates.Count == 0)
+        {
+            candidates = templates;
+        }
+
+        return candidates.Count == 0 ? null : SelectEnemyTemplate(candidates, rng);
     }
 
     private EnemyTemplate SelectEnemyTemplate(IReadOnlyList<EnemyTemplate> templates, Random rng)
@@ -912,21 +1231,38 @@ public partial class GameManager : Node
             return false;
         }
 
+        var currentWorld = World;
+        var player = currentWorld.Player;
+        var previousPosition = player.Position;
+
         try
         {
             var previousFloor = CurrentFloor;
-            var currentWorld = World;
-            var player = currentWorld.Player;
             var targetWorld = _cachedFloors.TryGetValue(targetFloor, out var cachedFloor)
                 ? cachedFloor
-                : CreateGeneratedWorld(Seed, targetFloor);
+                : null;
 
-            _cachedFloors[targetFloor] = targetWorld;
-            currentWorld.RemoveEntity(player.Id);
-            _cachedFloors[previousFloor] = currentWorld;
+            if (targetWorld is null)
+            {
+                var generatedFloor = CreateGeneratedWorld(Seed, targetFloor);
+                targetWorld = generatedFloor.World;
+                _cachedFloors[targetFloor] = targetWorld;
+                _floorEntrances[targetFloor] = generatedFloor.Entrances;
+            }
+
+            if (targetWorld.GetEntity(player.Id) is not null)
+            {
+                targetWorld.RemoveEntity(player.Id);
+            }
 
             var arrivalTile = targetFloor > previousFloor ? TileType.StairsUp : TileType.StairsDown;
-            PlacePlayerInWorld(targetWorld, player, arrivalTile);
+            var entrances = ResolveFloorEntrances(targetFloor, targetWorld);
+            var arrivalPosition = arrivalTile == TileType.StairsUp ? entrances.StairsUp : entrances.StairsDown;
+            PlacePlayerInWorld(targetWorld, player, arrivalPosition, arrivalTile);
+
+            currentWorld.RemoveEntity(player.Id);
+            _cachedFloors[previousFloor] = currentWorld;
+            _cachedFloors[targetFloor] = targetWorld;
             Scheduler = new TurnScheduler();
             LoadWorld(targetWorld);
             Bus?.EmitLevelTransition(previousFloor, targetFloor);
@@ -935,6 +1271,13 @@ public partial class GameManager : Node
         }
         catch (Exception ex)
         {
+            player.Position = previousPosition;
+            currentWorld.Player = player;
+            if (currentWorld.GetEntity(player.Id) is null)
+            {
+                currentWorld.AddEntity(player);
+            }
+
             Bus?.EmitLogMessage($"Floor transition failed: {ex.Message}");
             return false;
         }
@@ -965,37 +1308,177 @@ public partial class GameManager : Node
         throw new InvalidOperationException($"No tile of type {tileType} exists in the destination floor.");
     }
 
-    private static void PlacePlayerInWorld(WorldState world, IEntity player, TileType arrivalTile)
+    private static void PlacePlayerInWorld(WorldState world, IEntity player, Position arrivalPosition, TileType arrivalTile)
     {
         if (world.GetEntity(player.Id) is not null)
         {
             world.RemoveEntity(player.Id);
         }
 
-        player.Position = ResolveArrivalPosition(world, arrivalTile);
+        EnsureArrivalTile(world, arrivalPosition, arrivalTile);
         player.Stats.Energy = 0;
         world.Player = player;
-        world.AddEntity(player);
+
+        var primaryPosition = ResolveArrivalPosition(world, arrivalPosition, arrivalTile);
+        if (TryPlacePlayerAt(world, player, primaryPosition, arrivalPosition, arrivalTile))
+        {
+            return;
+        }
+
+        foreach (var candidate in EnumerateArrivalFallbacks(world, arrivalPosition))
+        {
+            if (TryPlacePlayerAt(world, player, candidate, arrivalPosition, arrivalTile))
+            {
+                return;
+            }
+        }
+
+        throw new InvalidOperationException($"No viable tile exists to place the player near arrival tile {arrivalPosition}.");
     }
 
-    private static Position ResolveArrivalPosition(WorldState world, TileType arrivalTile)
+    private static Position ResolveArrivalPosition(WorldState world, Position arrival, TileType arrivalTile)
     {
-        var arrival = FindArrivalPosition(world, arrivalTile);
-        if (world.GetEntityAt(arrival) is null)
+        if (arrival == Position.Invalid)
+        {
+            arrival = FindArrivalPosition(world, arrivalTile);
+        }
+
+        if (IsArrivalCandidateAvailable(world, arrival))
         {
             return arrival;
         }
 
-        foreach (var delta in Position.AllDirections)
+        var frontier = new Queue<Position>();
+        var visited = new HashSet<Position> { arrival };
+        frontier.Enqueue(arrival);
+
+        while (frontier.Count > 0)
         {
-            var candidate = arrival + delta;
-            if (world.InBounds(candidate) && world.IsWalkable(candidate) && world.GetEntityAt(candidate) is null)
+            var current = frontier.Dequeue();
+            foreach (var delta in Position.AllDirections)
             {
-                return candidate;
+                var candidate = current + delta;
+                if (!world.InBounds(candidate) || !visited.Add(candidate))
+                {
+                    continue;
+                }
+
+                if (IsArrivalCandidateAvailable(world, candidate))
+                {
+                    return candidate;
+                }
+
+                frontier.Enqueue(candidate);
             }
         }
 
         throw new InvalidOperationException($"No free walkable tile exists near arrival tile {arrival}.");
+    }
+
+    private static bool IsArrivalCandidateAvailable(WorldState world, Position position)
+    {
+        return world.IsWalkable(position) && world.GetEntityAt(position) is null;
+    }
+
+    private static void EnsureArrivalTile(WorldState world, Position arrivalPosition, TileType arrivalTile)
+    {
+        if (arrivalPosition == Position.Invalid)
+        {
+            return;
+        }
+
+        if (!world.InBounds(arrivalPosition))
+        {
+            throw new InvalidOperationException($"Arrival tile {arrivalPosition} is out of bounds.");
+        }
+
+        if (world.GetTile(arrivalPosition) != arrivalTile)
+        {
+            world.SetTile(arrivalPosition, arrivalTile);
+        }
+    }
+
+    private static bool TryPlacePlayerAt(WorldState world, IEntity player, Position candidate, Position arrivalPosition, TileType arrivalTile)
+    {
+        if (!world.InBounds(candidate) || world.GetEntityAt(candidate) is not null)
+        {
+            return false;
+        }
+
+        if (!world.IsWalkable(candidate))
+        {
+            world.SetTile(candidate, candidate == arrivalPosition ? arrivalTile : TileType.Floor);
+        }
+
+        player.Position = candidate;
+        try
+        {
+            world.AddEntity(player);
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    private static IEnumerable<Position> EnumerateArrivalFallbacks(WorldState world, Position arrivalPosition)
+    {
+        var frontier = new Queue<Position>();
+        var visited = new HashSet<Position> { arrivalPosition };
+        frontier.Enqueue(arrivalPosition);
+
+        while (frontier.Count > 0)
+        {
+            var current = frontier.Dequeue();
+            foreach (var delta in Position.AllDirections)
+            {
+                var candidate = current + delta;
+                if (!world.InBounds(candidate) || !visited.Add(candidate))
+                {
+                    continue;
+                }
+
+                yield return candidate;
+                frontier.Enqueue(candidate);
+            }
+        }
+    }
+
+    private FloorEntrances ResolveFloorEntrances(int floor, WorldState world)
+    {
+        if (_floorEntrances.TryGetValue(floor, out var entrances))
+        {
+            return entrances;
+        }
+
+        entrances = DiscoverFloorEntrances(world);
+        _floorEntrances[floor] = entrances;
+        return entrances;
+    }
+
+    private void RememberFloorEntrances(WorldState world)
+    {
+        _floorEntrances[world.Depth] = DiscoverFloorEntrances(world);
+    }
+
+    private static FloorEntrances DiscoverFloorEntrances(WorldState world)
+    {
+        return new FloorEntrances(
+            FindArrivalPositionOrInvalid(world, TileType.StairsUp),
+            FindArrivalPositionOrInvalid(world, TileType.StairsDown));
+    }
+
+    private static Position FindArrivalPositionOrInvalid(IWorldState world, TileType tileType)
+    {
+        try
+        {
+            return FindArrivalPosition(world, tileType);
+        }
+        catch
+        {
+            return Position.Invalid;
+        }
     }
 
     private void ProcessEnemyResponses(EntityId playerId, ActionOutcome aggregateOutcome)
@@ -1041,7 +1524,10 @@ public partial class GameManager : Node
 
         foreach (var entity in world.Entities)
         {
-            Scheduler.Register(entity);
+            if (ShouldScheduleEntity(entity))
+            {
+                Scheduler.Register(entity);
+            }
         }
     }
 
@@ -1049,7 +1535,7 @@ public partial class GameManager : Node
     {
         foreach (var entity in world.Entities)
         {
-            if (entity.Id != playerId && entity.IsAlive)
+            if (entity.Id != playerId && entity.IsAlive && ShouldScheduleEntity(entity))
             {
                 return true;
             }
@@ -1067,6 +1553,10 @@ public partial class GameManager : Node
         }
 
         Bus?.EmitInventoryChanged(world.Player.Id);
+        if (world.Player.GetComponent<WalletComponent>() is { } wallet)
+        {
+            Bus?.EmitCurrencyChanged(world.Player.Id, wallet.Gold);
+        }
     }
 
     private void RecalculatePlayerVisibility(WorldState? world)
@@ -1105,8 +1595,10 @@ public partial class GameManager : Node
     private void EmitStateDelta(
         IAction action,
         Position actorPositionBefore,
+        Dictionary<EntityId, Position> entityPositionsBefore,
         HashSet<EntityId> inventoryBefore,
         Dictionary<EquipSlot, EntityId> equipmentBefore,
+        IReadOnlyList<Position> dirtyPositions,
         EntityId playerId)
     {
         if (World is null)
@@ -1114,14 +1606,18 @@ public partial class GameManager : Node
             return;
         }
 
+        foreach (var pair in entityPositionsBefore)
+        {
+            var entityAfterMove = World.GetEntity(pair.Key);
+            if (entityAfterMove is not null && pair.Value != entityAfterMove.Position)
+            {
+                Bus?.EmitEntityMoved(pair.Key, pair.Value, entityAfterMove.Position);
+            }
+        }
+
         var actorAfter = World.GetEntity(action.ActorId);
         if (actorAfter is not null)
         {
-            if (actorPositionBefore != Position.Invalid && actorPositionBefore != actorAfter.Position)
-            {
-                Bus?.EmitEntityMoved(action.ActorId, actorPositionBefore, actorAfter.Position);
-            }
-
             Bus?.EmitHPChanged(actorAfter.Id, actorAfter.Stats.HP, actorAfter.Stats.MaxHP);
 
             var inventoryAfter = actorAfter.GetComponent<InventoryComponent>();
@@ -1136,7 +1632,7 @@ public partial class GameManager : Node
                 }
 
                 if (inventoryBefore.Count != inventoryAfter.Items.Count
-                    || action.Type is ActionType.UseItem or ActionType.ToggleEquip or ActionType.DropItem or ActionType.PickupItem)
+                    || action.Type is ActionType.UseItem or ActionType.ToggleEquip or ActionType.DropItem or ActionType.PickupItem or ActionType.OpenChest)
                 {
                     Bus?.EmitInventoryChanged(actorAfter.Id);
                 }
@@ -1167,15 +1663,42 @@ public partial class GameManager : Node
         {
             Bus?.EmitHPChanged(player.Id, player.Stats.HP, player.Stats.MaxHP);
         }
+
+        if (Bus is null || dirtyPositions.Count == 0)
+        {
+            return;
+        }
+
+        var uniqueDirtyPositions = new HashSet<Position>(dirtyPositions);
+        foreach (var position in uniqueDirtyPositions)
+        {
+            if (World.InBounds(position))
+            {
+                Bus.EmitTileChanged(position);
+            }
+        }
     }
 
-    private static (int Experience, int Level) SnapshotProgression(IEntity? entity)
+    private static Dictionary<EntityId, Position> SnapshotEntityPositions(WorldState world)
+    {
+        var snapshot = new Dictionary<EntityId, Position>(world.Entities.Count);
+        foreach (var entity in world.Entities)
+        {
+            snapshot[entity.Id] = entity.Position;
+        }
+
+        return snapshot;
+    }
+
+    private static (int Experience, int Level, int UnspentStatPoints, int UnspentPerkChoices) SnapshotProgression(IEntity? entity)
     {
         var progression = entity?.GetComponent<ProgressionComponent>();
-        return progression is null ? (0, 0) : (progression.Experience, progression.Level);
+        return progression is null
+            ? (0, 0, 0, 0)
+            : (progression.Experience, progression.Level, progression.UnspentStatPoints, progression.UnspentPerkChoices);
     }
 
-    private void EmitProgressionChanges(EntityId playerId, (int Experience, int Level) before)
+    private void EmitProgressionChanges(EntityId playerId, (int Experience, int Level, int UnspentStatPoints, int UnspentPerkChoices) before)
     {
         if (World is null || Bus is null)
         {
@@ -1200,6 +1723,14 @@ public partial class GameManager : Node
             {
                 Bus.EmitLeveledUp(playerId, level);
             }
+        }
+
+        if (progression.Experience != before.Experience
+            || progression.Level != before.Level
+            || progression.UnspentStatPoints != before.UnspentStatPoints
+            || progression.UnspentPerkChoices != before.UnspentPerkChoices)
+        {
+            Bus.EmitProgressionChanged(playerId);
         }
     }
 
@@ -1233,6 +1764,445 @@ public partial class GameManager : Node
         }
 
         return snapshot;
+    }
+
+    private static bool ShouldScheduleEntity(IEntity entity)
+    {
+        return entity.Faction != Faction.Neutral || entity.GetComponent<IBrain>() is not null;
+    }
+
+    private Entity CreateChestEntity(Position spawn, int depth, Random rng, string? lootTableId = null)
+    {
+        var chest = new Entity(
+            "Treasure Chest",
+            spawn,
+            new Stats
+            {
+                HP = 1,
+                MaxHP = 1,
+                Attack = 0,
+                Accuracy = 0,
+                Defense = 0,
+                Evasion = 0,
+                Speed = 0,
+                ViewRadius = 0,
+            },
+            Faction.Neutral,
+            id: EntityId.NewSeeded(rng));
+
+        chest.SetComponent(new ChestComponent
+        {
+            LootTableId = ResolveChestLootTableId(depth, lootTableId),
+        });
+
+        return chest;
+    }
+
+    private string ResolveChestLootTableId(int depth, string? explicitLootTableId = null)
+    {
+        if (!string.IsNullOrWhiteSpace(explicitLootTableId)
+            && (Content is not ContentLoader explicitLoader || explicitLoader.LootTables.ContainsKey(explicitLootTableId)))
+        {
+            return explicitLootTableId;
+        }
+
+        return ResolveFloorLootTableId(depth);
+    }
+
+    private string ResolveFloorLootTableId(int depth)
+    {
+        if (Content is ContentLoader loader && depth >= 4 && loader.LootTables.ContainsKey("deep_floor_loot"))
+        {
+            return "deep_floor_loot";
+        }
+
+        return "floor_loot";
+    }
+
+    private void SpawnAuthoredNpcs(WorldState world, IReadOnlyList<NpcSpawnData> npcSpawns)
+    {
+        if (Content is null || npcSpawns.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var spawn in npcSpawns)
+        {
+            if (!Content.TryGetNpcTemplate(spawn.TemplateId, out var template))
+            {
+                continue;
+            }
+
+            if (!TryResolveSpawnPosition(world, spawn.Position, requireEmptyTile: true, avoidStairs: true, out var npcPosition))
+            {
+                continue;
+            }
+
+            world.AddEntity(CreateNpcEntity(template, npcPosition));
+        }
+    }
+
+    private void SpawnNpcs(WorldState world, Random rng)
+    {
+        if (Content is null)
+        {
+            return;
+        }
+
+        var availableNpcs = Content.GetAvailableNpcs(world.Depth);
+        if (availableNpcs.Count == 0)
+        {
+            return;
+        }
+
+        var existingTemplates = world.Entities
+            .Select(entity => entity.GetComponent<NpcComponent>()?.TemplateId)
+            .Where(templateId => !string.IsNullOrWhiteSpace(templateId))
+            .Cast<string>()
+            .ToHashSet(StringComparer.Ordinal);
+        var remainingSlots = Math.Max(0, 2 - existingTemplates.Count);
+        if (remainingSlots == 0)
+        {
+            return;
+        }
+
+        var spawned = 0;
+        foreach (var npcTemplate in availableNpcs.OrderByDescending(template => template.IsMerchant).ThenBy(template => template.TemplateId, StringComparer.Ordinal))
+        {
+            if (spawned >= remainingSlots)
+            {
+                break;
+            }
+
+            if (existingTemplates.Contains(npcTemplate.TemplateId))
+            {
+                continue;
+            }
+
+            if (!TryFindNpcSpawn(world, rng, out var spawn))
+            {
+                break;
+            }
+
+            world.AddEntity(CreateNpcEntity(npcTemplate, spawn));
+            existingTemplates.Add(npcTemplate.TemplateId);
+            spawned++;
+        }
+    }
+
+    private static bool TryFindNpcSpawn(WorldState world, Random rng, out Position spawn)
+    {
+        var candidates = FindNpcSpawnCandidates(world, preferOpenArea: true).ToList();
+
+        if (candidates.Count == 0)
+        {
+            candidates = FindNpcSpawnCandidates(world, preferOpenArea: false).ToList();
+        }
+
+        if (candidates.Count == 0)
+        {
+            spawn = Position.Invalid;
+            return false;
+        }
+
+        spawn = candidates[rng.Next(candidates.Count)];
+        return true;
+    }
+
+    private static bool TryResolveSpawnPosition(WorldState world, Position requested, bool requireEmptyTile, bool avoidStairs, out Position resolved)
+    {
+        if (IsValidSpawnPosition(world, requested, requireEmptyTile, avoidStairs))
+        {
+            resolved = requested;
+            return true;
+        }
+
+        var frontier = new Queue<Position>();
+        var visited = new HashSet<Position>();
+
+        if (world.InBounds(requested))
+        {
+            frontier.Enqueue(requested);
+            visited.Add(requested);
+        }
+        else
+        {
+            for (var y = 0; y < world.Height; y++)
+            {
+                for (var x = 0; x < world.Width; x++)
+                {
+                    var candidate = new Position(x, y);
+                    if (IsValidSpawnPosition(world, candidate, requireEmptyTile, avoidStairs))
+                    {
+                        resolved = candidate;
+                        return true;
+                    }
+                }
+            }
+
+            resolved = Position.Invalid;
+            return false;
+        }
+
+        while (frontier.Count > 0)
+        {
+            var current = frontier.Dequeue();
+            foreach (var delta in Position.AllDirections)
+            {
+                var candidate = current + delta;
+                if (!world.InBounds(candidate) || !visited.Add(candidate))
+                {
+                    continue;
+                }
+
+                if (IsValidSpawnPosition(world, candidate, requireEmptyTile, avoidStairs))
+                {
+                    resolved = candidate;
+                    return true;
+                }
+
+                frontier.Enqueue(candidate);
+            }
+        }
+
+        resolved = Position.Invalid;
+        return false;
+    }
+
+    private static bool IsValidSpawnPosition(WorldState world, Position position, bool requireEmptyTile, bool avoidStairs)
+    {
+        if (!world.InBounds(position) || !world.IsWalkable(position))
+        {
+            return false;
+        }
+
+        if (avoidStairs && world.GetTile(position) is TileType.StairsUp or TileType.StairsDown)
+        {
+            return false;
+        }
+
+        return !requireEmptyTile || world.GetEntityAt(position) is null;
+    }
+
+    private static IEnumerable<Position> FindNpcSpawnCandidates(WorldState world, bool preferOpenArea)
+    {
+        for (var y = 0; y < world.Height; y++)
+        {
+            for (var x = 0; x < world.Width; x++)
+            {
+                var position = new Position(x, y);
+                if (!IsEligibleNpcSpawnTile(world, position))
+                {
+                    continue;
+                }
+
+                if (preferOpenArea)
+                {
+                    if (CountWalkableNeighbors(world, position) < 3)
+                    {
+                        continue;
+                    }
+
+                    if (IsAdjacentToDoor(world, position))
+                    {
+                        continue;
+                    }
+                }
+
+                yield return position;
+            }
+        }
+    }
+
+    private static bool IsEligibleNpcSpawnTile(WorldState world, Position position)
+    {
+        if (!world.IsWalkable(position)
+            || world.GetEntityAt(position) is not null
+            || world.GetTile(position) is TileType.Door or TileType.StairsUp or TileType.StairsDown)
+        {
+            return false;
+        }
+
+        return !IsNearStairs(world, position, 4);
+    }
+
+    private static int CountWalkableNeighbors(WorldState world, Position position)
+    {
+        var count = 0;
+        foreach (var delta in Position.Cardinals)
+        {
+            var candidate = position + delta;
+            if (world.InBounds(candidate) && world.IsWalkable(candidate) && world.GetTile(candidate) != TileType.Door)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private static bool IsAdjacentToDoor(WorldState world, Position position)
+    {
+        foreach (var delta in Position.Cardinals)
+        {
+            var candidate = position + delta;
+            if (world.InBounds(candidate) && world.GetTile(candidate) == TileType.Door)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsNearStairs(WorldState world, Position position, int maxDistance)
+    {
+        for (var y = 0; y < world.Height; y++)
+        {
+            for (var x = 0; x < world.Width; x++)
+            {
+                var candidate = new Position(x, y);
+                if (world.GetTile(candidate) is TileType.StairsUp or TileType.StairsDown
+                    && position.DistanceTo(candidate) <= maxDistance)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static Entity CreateNpcEntity(NpcTemplate template, Position spawn)
+    {
+        var npc = new Entity(
+            template.DisplayName,
+            spawn,
+            new Stats
+            {
+                HP = 1,
+                MaxHP = 1,
+                Attack = 0,
+                Accuracy = 0,
+                Defense = 0,
+                Evasion = 0,
+                Speed = 100,
+                ViewRadius = 6,
+            },
+            Faction.Neutral,
+            id: EntityId.New());
+
+        npc.SetComponent(new NpcComponent
+        {
+            TemplateId = template.TemplateId,
+            Role = template.Role,
+            DialogueId = template.DialogueId,
+        });
+        npc.SetComponent(new IdentityComponent
+        {
+            RaceId = template.RaceId,
+            GenderId = template.GenderId,
+            AppearanceId = template.AppearanceId,
+            SpriteVariantId = PlayerVisualCatalog.ComposeVariantId(
+                template.RaceId,
+                template.GenderId,
+                template.AppearanceId,
+                template.ArchetypeId),
+        });
+
+        if (template.IsMerchant && template.MerchantOffers is not null)
+        {
+            npc.SetComponent(new MerchantComponent(template.MerchantOffers.Select(offer => new MerchantOfferState
+            {
+                ItemTemplateId = offer.ItemTemplateId,
+                Price = offer.Price,
+                Quantity = offer.Quantity,
+            })));
+        }
+
+        return npc;
+    }
+
+    private IEntity? FindAdjacentNpc(WorldState world)
+    {
+        var player = world.Player;
+        foreach (var delta in Position.Cardinals)
+        {
+            var candidate = world.GetEntityAt(player.Position + delta);
+            if (candidate?.GetComponent<NpcComponent>() is not null)
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private bool TryResolveMerchantInteraction(
+        EntityId merchantId,
+        out IEntity player,
+        out InventoryComponent inventory,
+        out WalletComponent wallet,
+        out IEntity merchant,
+        out MerchantComponent merchantComponent,
+        out string message)
+    {
+        player = null!;
+        inventory = null!;
+        wallet = null!;
+        merchant = null!;
+        merchantComponent = null!;
+        message = string.Empty;
+
+        if (World?.Player is null)
+        {
+            message = "No active run is available.";
+            return false;
+        }
+
+        player = World.Player;
+        inventory = player.GetComponent<InventoryComponent>()!;
+        wallet = player.GetComponent<WalletComponent>()!;
+
+        if (inventory is null || wallet is null)
+        {
+            message = "The player is missing inventory or wallet state.";
+            return false;
+        }
+
+        merchant = World.GetEntity(merchantId)!;
+        if (merchant is null)
+        {
+            message = "That merchant is no longer here.";
+            return false;
+        }
+
+        merchantComponent = merchant.GetComponent<MerchantComponent>()!;
+        if (merchantComponent is null)
+        {
+            message = $"{merchant.Name} has nothing to trade.";
+            return false;
+        }
+
+        if (merchant.Position.ChebyshevTo(player.Position) > 1)
+        {
+            message = $"Move next to {merchant.Name} to trade.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static int ResolveSellPrice(ItemTemplate template)
+    {
+        return Math.Max(1, template.Value / 2);
+    }
+
+    private int ResolveMerchantBuyPrice(IEntity player, int basePrice)
+    {
+        var discountPercent = ProgressionService.ResolveShopDiscountPercent(player, Content);
+        var discounted = basePrice * Math.Max(0, 100 - discountPercent) / 100;
+        return Math.Max(1, discounted);
     }
 
     private static void ApplyStatModifiers(Stats stats, IReadOnlyDictionary<string, int> modifiers, int direction)

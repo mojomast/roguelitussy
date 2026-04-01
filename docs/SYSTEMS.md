@@ -43,6 +43,8 @@ Player-specific long-run state lives in explicit components instead of bloating 
 
 XP is awarded on kill, level thresholds are deterministic, level-ups grant baseline stat growth plus unspent points, and progression/identity data are persisted with saves.
 
+The planned expansion path for progression is documented in `docs/PROGRESSION.md`.
+
 ## AI
 
 Enemy decision-making lives in `Core/AI/`.

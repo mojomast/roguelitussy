@@ -227,6 +227,121 @@ public sealed class StubContentDatabase : IContentDatabase
                     new("apply_status", DamageType.Physical, 0, null, 0.0, "phased", 100, 2, null, null, 0.0, null),
                 }),
         };
+
+        PerkTemplates = new Dictionary<string, PerkTemplate>
+        {
+            ["battle_instinct"] = new(
+                "battle_instinct",
+                "Battle Instinct",
+                "Sharpen the aggressive habits that keep the fight tilted in your favor.",
+                2,
+                new PerkEffect[]
+                {
+                    new("stat_bonus", "Attack", 1),
+                    new("stat_bonus", "Accuracy", 4),
+                }),
+            ["quartermasters_eye"] = new(
+                "quartermasters_eye",
+                "Quartermaster's Eye",
+                "You know when a merchant is padding the margin and when to push back.",
+                2,
+                new PerkEffect[]
+                {
+                    new("shop_discount_percent", null, 20),
+                }),
+            ["iron_will"] = new(
+                "iron_will",
+                "Iron Will",
+                "Steady breath and harder resolve buy time when a run starts going wrong.",
+                3,
+                new PerkEffect[]
+                {
+                    new("stat_bonus", "MaxHP", 6),
+                    new("stat_bonus", "Defense", 1),
+                }),
+        };
+
+        DialogueTemplates = new Dictionary<string, DialogueTemplate>
+        {
+            ["merchant_intro"] = new(
+                "merchant_intro",
+                "start",
+                new Dictionary<string, DialogueNode>
+                {
+                    ["start"] = new(
+                        "start",
+                        "Supply lines are bad down here. Spend well and leave with something sharp.",
+                        new DialogueOption[]
+                        {
+                            new("Show me your stock.", null, "shop"),
+                            new("Any advice?", "advice", null),
+                            new("Maybe later.", null, "close"),
+                        }),
+                    ["advice"] = new(
+                        "advice",
+                        "Buy mobility first, defense second, and only carry the consumables you will actually use this floor.",
+                        new DialogueOption[]
+                        {
+                            new("Back to business.", "start", null),
+                            new("I am done here.", null, "close"),
+                        }),
+                }),
+            ["chronicler_intro"] = new(
+                "chronicler_intro",
+                "start",
+                new Dictionary<string, DialogueNode>
+                {
+                    ["start"] = new(
+                        "start",
+                        "Every floor teaches the same lesson: carry fewer things, but know exactly why each one is in your pack.",
+                        new DialogueOption[]
+                        {
+                            new("Explain.", "pack_logic", null),
+                            new("I have heard enough.", null, "close"),
+                        }),
+                    ["pack_logic"] = new(
+                        "pack_logic",
+                        "A clean bag means faster decisions. Sell dead weight, keep one emergency heal, and compare gear by the stat it changes for your build.",
+                        new DialogueOption[]
+                        {
+                            new("That helps.", null, "close"),
+                        }),
+                }),
+        };
+
+        NpcTemplates = new Dictionary<string, NpcTemplate>
+        {
+            ["quartermaster"] = new(
+                "quartermaster",
+                "Quartermaster Vale",
+                "A cautious outfitter who trades in practical dungeon gear.",
+                "shopkeeper",
+                0,
+                -1,
+                "merchant_intro",
+                "human",
+                "neutral",
+                "weathered",
+                "vanguard",
+                new MerchantOfferTemplate[]
+                {
+                    new("potion_health", 24, 4),
+                    new("shield_wooden", 48, 1),
+                    new("sword_iron", 70, 1),
+                }),
+            ["field_chronicler"] = new(
+                "field_chronicler",
+                "Field Chronicler Sen",
+                "A quiet record-keeper who studies how adventurers fail and why some return.",
+                "advisor",
+                0,
+                -1,
+                "chronicler_intro",
+                "elf",
+                "feminine",
+                "scarred",
+                "mystic"),
+        };
     }
 
     public IReadOnlyDictionary<string, ItemTemplate> ItemTemplates { get; }
@@ -234,6 +349,12 @@ public sealed class StubContentDatabase : IContentDatabase
     public IReadOnlyDictionary<string, EnemyTemplate> EnemyTemplates { get; }
 
     public IReadOnlyDictionary<string, AbilityTemplate> AbilityTemplates { get; }
+
+    public IReadOnlyDictionary<string, PerkTemplate> PerkTemplates { get; }
+
+    public IReadOnlyDictionary<string, NpcTemplate> NpcTemplates { get; }
+
+    public IReadOnlyDictionary<string, DialogueTemplate> DialogueTemplates { get; }
 
     public bool TryGetItemTemplate(string templateId, out ItemTemplate template)
     {
@@ -256,9 +377,33 @@ public sealed class StubContentDatabase : IContentDatabase
         return found;
     }
 
+    public bool TryGetPerkTemplate(string perkId, out PerkTemplate template)
+    {
+        var found = PerkTemplates.TryGetValue(perkId, out var perk);
+        template = perk!;
+        return found;
+    }
+
+    public bool TryGetNpcTemplate(string templateId, out NpcTemplate template)
+    {
+        var found = NpcTemplates.TryGetValue(templateId, out var npc);
+        template = npc!;
+        return found;
+    }
+
+    public bool TryGetDialogueTemplate(string dialogueId, out DialogueTemplate template)
+    {
+        var found = DialogueTemplates.TryGetValue(dialogueId, out var dialogue);
+        template = dialogue!;
+        return found;
+    }
+
     public IReadOnlyList<ItemTemplate> GetAvailableItems(int depth) =>
         ItemTemplates.Values.ToArray();
 
     public IReadOnlyList<EnemyTemplate> GetAvailableEnemies(int depth) =>
         EnemyTemplates.Values.Where(enemy => depth >= enemy.MinDepth && (enemy.MaxDepth < 0 || depth <= enemy.MaxDepth)).ToArray();
+
+    public IReadOnlyList<NpcTemplate> GetAvailableNpcs(int depth) =>
+        NpcTemplates.Values.Where(npc => depth >= npc.MinDepth && (npc.MaxDepth < 0 || depth <= npc.MaxDepth)).ToArray();
 }

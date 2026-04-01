@@ -40,6 +40,8 @@ public partial class CharacterSheet : Control
             _eventBus.TurnCompleted -= OnTurnCompleted;
             _eventBus.InventoryChanged -= OnInventoryChanged;
             _eventBus.LoadCompleted -= OnLoadCompleted;
+            _eventBus.CurrencyChanged -= OnCurrencyChanged;
+            _eventBus.ProgressionChanged -= OnProgressionChanged;
         }
 
         _gameManager = gameManager;
@@ -50,6 +52,8 @@ public partial class CharacterSheet : Control
             _eventBus.TurnCompleted += OnTurnCompleted;
             _eventBus.InventoryChanged += OnInventoryChanged;
             _eventBus.LoadCompleted += OnLoadCompleted;
+            _eventBus.CurrencyChanged += OnCurrencyChanged;
+            _eventBus.ProgressionChanged += OnProgressionChanged;
         }
 
         Refresh();
@@ -111,50 +115,13 @@ public partial class CharacterSheet : Control
                     _levelUpCursor = (_levelUpCursor + 1) % LevelUpStats.Length;
                     Refresh();
                     return true;
-                case Key.Enter or Key.Right or Key.Plus:
-                    SpendStatPoint(LevelUpStats[_levelUpCursor]);
+                case Key.Enter or Key.KpEnter or Key.Right or Key.Plus:
+                    _gameManager?.TrySpendStatPoint(LevelUpStats[_levelUpCursor], out _);
                     return true;
             }
         }
 
         return false;
-    }
-
-    private void SpendStatPoint(string statName)
-    {
-        var player = _gameManager?.World?.Player;
-        var progression = player?.GetComponent<ProgressionComponent>();
-        if (player is null || progression is null || progression.UnspentStatPoints <= 0)
-        {
-            return;
-        }
-
-        switch (statName)
-        {
-            case "MaxHP":
-                player.Stats.MaxHP += 3;
-                player.Stats.HP += 3;
-                break;
-            case "Attack":
-                player.Stats.Attack += 1;
-                break;
-            case "Defense":
-                player.Stats.Defense += 1;
-                break;
-            case "Accuracy":
-                player.Stats.Accuracy += 1;
-                break;
-            case "Evasion":
-                player.Stats.Evasion += 1;
-                break;
-            default:
-                return;
-        }
-
-        progression.UnspentStatPoints--;
-        _eventBus?.EmitLogMessage($"Spent a stat point on {statName}.");
-        _eventBus?.EmitHPChanged(player.Id, player.Stats.HP, player.Stats.MaxHP);
-        Refresh();
     }
 
     private void OnTurnCompleted()
@@ -173,6 +140,22 @@ public partial class CharacterSheet : Control
     private void OnLoadCompleted(bool success)
     {
         if (success)
+        {
+            Refresh();
+        }
+    }
+
+    private void OnCurrencyChanged(EntityId entityId, int gold)
+    {
+        if (_gameManager?.World?.Player?.Id == entityId)
+        {
+            Refresh();
+        }
+    }
+
+    private void OnProgressionChanged(EntityId entityId)
+    {
+        if (_gameManager?.World?.Player?.Id == entityId)
         {
             Refresh();
         }
@@ -218,19 +201,43 @@ public partial class CharacterSheet : Control
 
         builder.AppendLine($"Floor: {world.Depth}");
         builder.AppendLine($"Turn: {world.TurnNumber}");
+        builder.AppendLine($"Gold: {player.GetComponent<WalletComponent>()?.Gold ?? 0}");
+        builder.AppendLine($"Pack Weight: {ResolveTotalWeight(inventory):0.0}");
+        builder.AppendLine($"Pack Value: {ResolveTotalValue(inventory)}");
 
         var progression = player.GetComponent<ProgressionComponent>();
         if (progression is not null)
         {
             builder.AppendLine($"Level: {progression.Level}");
             builder.AppendLine($"XP: {progression.Experience} / {progression.ExperienceToNextLevel}");
-            builder.AppendLine($"Unspent Points: {progression.UnspentStatPoints}");
+            builder.AppendLine($"Unspent Stat Points: {progression.UnspentStatPoints}");
+            builder.AppendLine($"Pending Perk Choices: {progression.UnspentPerkChoices}");
             builder.AppendLine($"Kills: {progression.Kills}");
+
+            builder.AppendLine("Perks:");
+            if (progression.SelectedPerkIds.Count == 0)
+            {
+                builder.AppendLine("- None");
+            }
+            else
+            {
+                foreach (var perkId in progression.SelectedPerkIds)
+                {
+                    if (_content is not null && _content.TryGetPerkTemplate(perkId, out var perk))
+                    {
+                        builder.AppendLine($"- {perk.DisplayName}");
+                    }
+                    else
+                    {
+                        builder.AppendLine($"- {perkId}");
+                    }
+                }
+            }
 
             if (progression.UnspentStatPoints > 0)
             {
                 builder.AppendLine();
-                builder.AppendLine($"=== LEVEL UP! {progression.UnspentStatPoints} point(s) available ===");
+                builder.AppendLine($"=== TRAINING: {progression.UnspentStatPoints} point(s) available ===");
                 for (var i = 0; i < LevelUpStats.Length; i++)
                 {
                     var marker = i == _levelUpCursor ? "> " : "  ";
@@ -239,6 +246,12 @@ public partial class CharacterSheet : Control
                 }
 
                 builder.AppendLine("Up/Down: select stat  Enter/Right/+: spend");
+            }
+
+            if (progression.UnspentPerkChoices > 0)
+            {
+                builder.AppendLine();
+                builder.AppendLine($"Perk choices waiting: {progression.UnspentPerkChoices}");
             }
         }
 
@@ -251,6 +264,9 @@ public partial class CharacterSheet : Control
         builder.AppendLine($"Speed: {player.Stats.Speed}");
         builder.AppendLine($"View Radius: {player.Stats.ViewRadius}");
         builder.AppendLine($"Inventory: {inventory?.Items.Count ?? 0}/{inventory?.Capacity ?? 0}");
+        builder.AppendLine($"Weapon Damage: {ResolveWeaponDamage(inventory)}");
+        builder.AppendLine($"Crit: {ResolveWeaponCrit(inventory)}%");
+        builder.AppendLine($"Gear Bonus: {ResolveEquipmentBonusSummary(inventory)}");
         builder.AppendLine();
         builder.AppendLine($"Weapon: {ResolveEquippedItemName(inventory, EquipSlot.MainHand)}");
         builder.AppendLine($"Off-hand: {ResolveEquippedItemName(inventory, EquipSlot.OffHand)}");
@@ -311,6 +327,88 @@ public partial class CharacterSheet : Control
 
     private static string CapitalizeFirst(string value) =>
         string.IsNullOrEmpty(value) ? value : char.ToUpperInvariant(value[0]) + value[1..];
+
+    private double ResolveTotalWeight(InventoryComponent? inventory)
+    {
+        if (inventory is null || _content is null)
+        {
+            return 0.0;
+        }
+
+        var total = 0.0;
+        foreach (var item in inventory.Items)
+        {
+            if (_content.TryGetItemTemplate(item.TemplateId, out var template))
+            {
+                total += template.Weight * System.Math.Max(1, item.StackCount);
+            }
+        }
+
+        return total;
+    }
+
+    private int ResolveTotalValue(InventoryComponent? inventory)
+    {
+        if (inventory is null || _content is null)
+        {
+            return 0;
+        }
+
+        var total = 0;
+        foreach (var item in inventory.Items)
+        {
+            if (_content.TryGetItemTemplate(item.TemplateId, out var template))
+            {
+                total += template.Value * System.Math.Max(1, item.StackCount);
+            }
+        }
+
+        return total;
+    }
+
+    private string ResolveWeaponDamage(InventoryComponent? inventory)
+    {
+        var equipped = inventory?.GetEquipped(EquipSlot.MainHand);
+        if (equipped is null || _content is null || !_content.TryGetItemTemplate(equipped.Item.TemplateId, out var template))
+        {
+            return playerDamageFallback();
+        }
+
+        return $"{template.DamageMin}-{template.DamageMax}";
+
+        string playerDamageFallback()
+        {
+            var attack = _gameManager?.World?.Player?.Stats.Attack ?? 0;
+            return $"{System.Math.Max(1, attack - 1)}-{System.Math.Max(1, attack + 1)}";
+        }
+    }
+
+    private int ResolveWeaponCrit(InventoryComponent? inventory)
+    {
+        var equipped = inventory?.GetEquipped(EquipSlot.MainHand);
+        return equipped is not null && _content is not null && _content.TryGetItemTemplate(equipped.Item.TemplateId, out var template)
+            ? template.CritChance
+            : 0;
+    }
+
+    private static string ResolveEquipmentBonusSummary(InventoryComponent? inventory)
+    {
+        if (inventory is null || inventory.EquippedItems.Count == 0)
+        {
+            return "none";
+        }
+
+        var totals = new Dictionary<string, int>(System.StringComparer.OrdinalIgnoreCase);
+        foreach (var equipped in inventory.EquippedItems.Values)
+        {
+            foreach (var modifier in equipped.StatModifiers)
+            {
+                totals[modifier.Key] = totals.TryGetValue(modifier.Key, out var current) ? current + modifier.Value : modifier.Value;
+            }
+        }
+
+        return string.Join(", ", totals.OrderBy(pair => pair.Key).Select(pair => $"{pair.Key} {pair.Value:+#;-#;0}"));
+    }
 
     private void EnsureVisuals()
     {

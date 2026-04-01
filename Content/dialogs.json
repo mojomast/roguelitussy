@@ -1,0 +1,74 @@
+{
+  "$schema": "roguelike-dialogs-v1",
+  "version": 1,
+  "dialogs": [
+    {
+      "id": "merchant_intro",
+      "start_node": "start",
+      "nodes": [
+        {
+          "id": "start",
+          "text": "I trade in things that keep you alive: medicine, steel, and one spare shield when luck goes bad.",
+          "options": [
+            {
+              "text": "Show me what you have.",
+              "action": "shop"
+            },
+            {
+              "text": "What should I prioritize?",
+              "next": "advice"
+            },
+            {
+              "text": "I will be moving on.",
+              "action": "close"
+            }
+          ]
+        },
+        {
+          "id": "advice",
+          "text": "Buy for the floor you are on. Mobility and recovery solve more runs than greedy upgrades you cannot afford to carry.",
+          "options": [
+            {
+              "text": "Back to your stock.",
+              "action": "shop"
+            },
+            {
+              "text": "Understood.",
+              "action": "close"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "chronicler_intro",
+      "start_node": "start",
+      "nodes": [
+        {
+          "id": "start",
+          "text": "Every floor teaches the same lesson: carry fewer things, but know exactly why each one is in your pack.",
+          "options": [
+            {
+              "text": "Explain.",
+              "next": "pack_logic"
+            },
+            {
+              "text": "I have heard enough.",
+              "action": "close"
+            }
+          ]
+        },
+        {
+          "id": "pack_logic",
+          "text": "A clean bag means faster decisions. Sell dead weight, keep one emergency heal, and compare gear by the stat it changes for your build.",
+          "options": [
+            {
+              "text": "That helps.",
+              "action": "close"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

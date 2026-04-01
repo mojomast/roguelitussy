@@ -19,7 +19,12 @@ internal static class UIActionFactory
 
         var target = actor.Position + delta;
         var occupant = world.GetEntityAt(target);
-        if (occupant is not null && occupant.Faction != actor.Faction)
+        if (occupant?.GetComponent<ChestComponent>() is not null)
+        {
+            return new OpenChestAction(actorId, occupant.Id);
+        }
+
+        if (occupant is not null && occupant.Faction != actor.Faction && occupant.Faction != Faction.Neutral)
         {
             return new AttackAction(actorId, occupant.Id);
         }

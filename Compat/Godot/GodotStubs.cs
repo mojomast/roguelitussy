@@ -13,6 +13,7 @@ public enum Key
     Left,
     Right,
     Enter,
+    KpEnter,
     Escape,
     Space,
     Period,
@@ -21,6 +22,8 @@ public enum Key
     Quoteleft = Backquote,
     Plus,
     Minus,
+    B,
+    F,
     W,
     A,
     S,
@@ -37,6 +40,21 @@ public enum Key
     One,
     Two,
     Three,
+    Four,
+    Five,
+    Six,
+    Seven,
+    Eight,
+    Nine,
+    Key1 = One,
+    Key2 = Two,
+    Key3 = Three,
+    Key4 = Four,
+    Key5 = Five,
+    Key6 = Six,
+    Key7 = Seven,
+    Key8 = Eight,
+    Key9 = Nine,
 }
 
 public enum MouseButton
@@ -388,6 +406,8 @@ public class InputEvent : GodotObject
 public class InputEventKey : InputEvent
 {
     public bool Pressed { get; set; }
+
+    public bool Echo { get; set; }
 
     public Key Keycode { get; set; }
 

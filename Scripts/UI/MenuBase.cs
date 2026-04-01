@@ -107,6 +107,7 @@ public abstract partial class MenuBase : Control
                 SetSelection(SelectedIndex + 1);
                 return true;
             case Key.Enter:
+            case Key.KpEnter:
                 ActivateSelected();
                 return true;
             case Key.Escape:

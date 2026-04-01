@@ -21,7 +21,9 @@ public static class CorridorBuilder
             return;
         }
 
-        Connect(world, leftRoom.ConnectionPoint, rightRoom.ConnectionPoint, rng);
+        var leftPoint = leftRoom.GetConnectionPointTowards(rightRoom.Room.Center);
+        var rightPoint = rightRoom.GetConnectionPointTowards(leftRoom.Room.Center);
+        Connect(world, leftPoint, rightPoint, rng);
     }
 
     public static void Connect(WorldState world, Position from, Position to, Random rng)
@@ -44,7 +46,7 @@ public static class CorridorBuilder
         var end = Math.Max(x1, x2);
         for (var x = start; x <= end; x++)
         {
-            world.SetTile(new Position(x, y), TileType.Floor);
+            CarveCorridorTile(world, new Position(x, y));
         }
     }
 
@@ -54,7 +56,15 @@ public static class CorridorBuilder
         var end = Math.Max(y1, y2);
         for (var y = start; y <= end; y++)
         {
-            world.SetTile(new Position(x, y), TileType.Floor);
+            CarveCorridorTile(world, new Position(x, y));
+        }
+    }
+
+    private static void CarveCorridorTile(WorldState world, Position position)
+    {
+        if (world.GetTile(position) != TileType.Door)
+        {
+            world.SetTile(position, TileType.Floor);
         }
     }
 }

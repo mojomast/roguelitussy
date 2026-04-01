@@ -64,6 +64,7 @@ public partial class InventoryUI : Control
             _eventBus.InventoryChanged -= OnInventoryChanged;
             _eventBus.TurnCompleted -= OnTurnCompleted;
             _eventBus.LoadCompleted -= OnLoadCompleted;
+            _eventBus.CurrencyChanged -= OnCurrencyChanged;
         }
 
         _gameManager = gameManager;
@@ -75,6 +76,7 @@ public partial class InventoryUI : Control
             _eventBus.InventoryChanged += OnInventoryChanged;
             _eventBus.TurnCompleted += OnTurnCompleted;
             _eventBus.LoadCompleted += OnLoadCompleted;
+            _eventBus.CurrencyChanged += OnCurrencyChanged;
         }
 
         RefreshFromWorld();
@@ -130,6 +132,7 @@ public partial class InventoryUI : Control
                 MoveSelection(1, 0);
                 return true;
             case Key.Enter:
+            case Key.KpEnter:
                 SubmitPrimary();
                 return true;
             case Key.U:
@@ -170,6 +173,14 @@ public partial class InventoryUI : Control
     private void OnLoadCompleted(bool success)
     {
         if (success)
+        {
+            RefreshFromWorld();
+        }
+    }
+
+    private void OnCurrencyChanged(EntityId entityId, int gold)
+    {
+        if (_gameManager?.World?.Player?.Id == entityId)
         {
             RefreshFromWorld();
         }
@@ -277,7 +288,8 @@ public partial class InventoryUI : Control
     {
         var builder = new StringBuilder();
         var inventory = _gameManager?.World?.Player?.GetComponent<InventoryComponent>();
-        builder.AppendLine($"Inventory  {_items.Count}/{inventory?.Capacity ?? 0}");
+        builder.AppendLine($"Inventory  {_items.Count}/{inventory?.Capacity ?? 0} stacks  {ResolveTotalCarriedItems()} items");
+        builder.AppendLine($"Gold: {ResolveGold()}  Weight: {ResolveTotalWeight():0.0}  Value: {ResolveTotalValue()}");
         builder.AppendLine($"Sort: {CurrentSort}");
         builder.AppendLine();
         for (var row = 0; row < Rows; row++)
@@ -323,8 +335,16 @@ public partial class InventoryUI : Control
                 $"Category: {template.Category}",
                 $"Slot: {(template.Slot == EquipSlot.None ? "None" : template.Slot.ToString())}",
                 $"Stack: {item.StackCount}",
+                $"Unit Value: {template.Value}",
+                $"Unit Weight: {template.Weight:0.0}",
                 $"Status: {(IsEquipped(item) ? $"Equipped in {ResolveEquippedSlot(item)}" : "Carried")}",
             };
+
+            if (item.StackCount > 1)
+            {
+                lines.Add($"Stack Value: {template.Value * item.StackCount}");
+                lines.Add($"Stack Weight: {template.Weight * item.StackCount:0.0}");
+            }
 
             foreach (var modifier in template.StatModifiers)
             {
@@ -362,7 +382,8 @@ public partial class InventoryUI : Control
             DescriptionMarkup = BuildDescriptionMarkup(template, item, lines);
             var tooltipComparison = (template.Slot != EquipSlot.None && !IsEquipped(item))
                 ? BuildEquipmentComparison(template) : null;
-            _tooltip?.ShowItemTooltip(template, item, new Vector2(840f, 220f), tooltipComparison);
+            var tooltipPosition = _tooltip?.ResolveBottomRightPosition(GetViewportRect().Size) ?? new Vector2(840f, 220f);
+            _tooltip?.ShowItemTooltip(template, item, tooltipPosition, tooltipComparison);
             RefreshVisualState();
             return;
         }
@@ -631,7 +652,8 @@ public partial class InventoryUI : Control
     {
         var builder = new StringBuilder();
         var inventory = _gameManager?.World?.Player?.GetComponent<InventoryComponent>();
-        builder.AppendLine(ItemRarityPresentation.EscapeBBCode($"Inventory  {_items.Count}/{inventory?.Capacity ?? 0}"));
+        builder.AppendLine(ItemRarityPresentation.EscapeBBCode($"Inventory  {_items.Count}/{inventory?.Capacity ?? 0} stacks  {ResolveTotalCarriedItems()} items"));
+        builder.AppendLine(ItemRarityPresentation.EscapeBBCode($"Gold: {ResolveGold()}  Weight: {ResolveTotalWeight():0.0}  Value: {ResolveTotalValue()}"));
         builder.AppendLine(ItemRarityPresentation.EscapeBBCode($"Sort: {CurrentSort}"));
         builder.AppendLine();
         for (var row = 0; row < Rows; row++)
@@ -665,5 +687,49 @@ public partial class InventoryUI : Control
         }
 
         return builder.ToString().TrimEnd();
+    }
+
+    private int ResolveGold()
+    {
+        return _gameManager?.World?.Player?.GetComponent<WalletComponent>()?.Gold ?? 0;
+    }
+
+    private int ResolveTotalCarriedItems()
+    {
+        var total = 0;
+        foreach (var item in _items)
+        {
+            total += System.Math.Max(1, item.StackCount);
+        }
+
+        return total;
+    }
+
+    private double ResolveTotalWeight()
+    {
+        var total = 0.0;
+        foreach (var item in _items)
+        {
+            if (_content is not null && _content.TryGetItemTemplate(item.TemplateId, out var template))
+            {
+                total += template.Weight * System.Math.Max(1, item.StackCount);
+            }
+        }
+
+        return total;
+    }
+
+    private int ResolveTotalValue()
+    {
+        var total = 0;
+        foreach (var item in _items)
+        {
+            if (_content is not null && _content.TryGetItemTemplate(item.TemplateId, out var template))
+            {
+                total += template.Value * System.Math.Max(1, item.StackCount);
+            }
+        }
+
+        return total;
     }
 }

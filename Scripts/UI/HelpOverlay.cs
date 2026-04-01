@@ -49,6 +49,7 @@ public partial class HelpOverlay : MenuBase
             "Wait: Space or .",
             "Pick up item: G",
             "Use stairs: Enter",
+            "Interact / talk: F",
             "Inventory: I",
             "Character sheet: C",
             "Help: H",
@@ -80,7 +81,14 @@ public partial class HelpOverlay : MenuBase
             "D: drop item",
             "Tab: cycle sort mode",
             "Esc or I: close inventory",
-            "Equipment comparison shown automatically for equippable items");
+            "Equipment comparison appears automatically for equippable items",
+            "Shops use the same value and weight data",
+            "",
+            "Dialog / shops",
+            "",
+            "F: talk",
+            "Tab: swap buy or sell",
+            "Enter: confirm trade");
         base.Open();
     }
 
@@ -120,5 +128,17 @@ public partial class HelpOverlay : MenuBase
         }
 
         return false;
+    }
+
+    protected override Vector2 ResolveDesiredPanelSize(Vector2 viewportSize)
+    {
+        var maxWidth = viewportSize.X * 0.92f;
+        var maxHeight = viewportSize.Y * 0.92f;
+        return OverlayLayoutHelper.FitPanelSize(viewportSize, new Vector2(maxWidth, maxHeight), 24f);
+    }
+
+    protected override float ResolveApproxLineHeight()
+    {
+        return 20f;
     }
 }

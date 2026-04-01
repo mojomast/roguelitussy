@@ -4,9 +4,9 @@
   "tile_legend": {
     "#": "wall",
     ".": "floor",
-    "+": "door",
-    ">": "stairs_down",
-    "<": "stairs_up",
+    "\u002B": "door",
+    "\u003E": "stairs_down",
+    "\u003C": "stairs_up",
     "~": "water",
     "^": "trap",
     "S": "spawn_enemy",
@@ -17,121 +17,12 @@
   },
   "rooms": [
     {
-      "id": "start_room",
-      "name": "Starting Chamber",
-      "tags": ["start", "guaranteed"],
-      "width": 9,
-      "height": 9,
-      "min_depth": 1,
-      "max_depth": 1,
-      "layout": [
-        "#########",
-        "#.......#",
-        "#.......#",
-        "#...P...#",
-        "#.......#",
-        "#.......#",
-        "#.......#",
-        "#.......#",
-        "####+####"
-      ],
-      "doors": [
-        {
-          "x": 4,
-          "y": 8,
-          "direction": "south"
-        }
-      ],
-      "spawn_points": [
-        {
-          "x": 4,
-          "y": 3,
-          "type": "player"
-        }
-      ],
-      "fixed_entities": []
-    },
-    {
-      "id": "corridor_h",
-      "name": "Horizontal Corridor",
-      "tags": ["corridor"],
-      "width": 7,
-      "height": 3,
-      "min_depth": 1,
-      "max_depth": 99,
-      "layout": [
-        "#######",
-        "+.....+",
-        "#######"
-      ],
-      "doors": [
-        {
-          "x": 0,
-          "y": 1,
-          "direction": "west"
-        },
-        {
-          "x": 6,
-          "y": 1,
-          "direction": "east"
-        }
-      ],
-      "spawn_points": [],
-      "fixed_entities": []
-    },
-    {
-      "id": "treasure_room",
-      "name": "Treasure Vault",
-      "tags": ["loot", "rare"],
-      "width": 7,
-      "height": 7,
-      "min_depth": 2,
-      "max_depth": 99,
-      "layout": [
-        "#######",
-        "#..I..#",
-        "#.....#",
-        "+..C..+",
-        "#.....#",
-        "#..I..#",
-        "#######"
-      ],
-      "doors": [
-        {
-          "x": 0,
-          "y": 3,
-          "direction": "west"
-        },
-        {
-          "x": 6,
-          "y": 3,
-          "direction": "east"
-        }
-      ],
-      "spawn_points": [
-        {
-          "x": 3,
-          "y": 1,
-          "type": "item"
-        },
-        {
-          "x": 3,
-          "y": 5,
-          "type": "item"
-        },
-        {
-          "x": 3,
-          "y": 3,
-          "type": "chest"
-        }
-      ],
-      "fixed_entities": [],
-      "item_quality_bonus": 2
-    },
-    {
       "id": "ambush_room",
       "name": "Shadowed Hall",
-      "tags": ["combat", "ambush"],
+      "tags": [
+        "combat",
+        "ambush"
+      ],
       "width": 11,
       "height": 9,
       "min_depth": 2,
@@ -141,7 +32,7 @@
         "#....S....#",
         "#.#.....#.#",
         "#.#.....#.#",
-        "+....I....+",
+        "\u002B....I....\u002B",
         "#.#.....#.#",
         "#.#.....#.#",
         "#....S....#",
@@ -163,26 +54,84 @@
         {
           "x": 5,
           "y": 1,
-          "type": "enemy"
+          "type": "enemy",
+          "trap_id": null
         },
         {
           "x": 5,
           "y": 7,
-          "type": "enemy"
+          "type": "enemy",
+          "trap_id": null
         },
         {
           "x": 5,
           "y": 4,
-          "type": "item"
+          "type": "item",
+          "trap_id": null
         }
       ],
       "fixed_entities": [],
-      "enemy_count_bonus": 1
+      "item_quality_bonus": null,
+      "enemy_count_bonus": 1,
+      "lock_doors_on_enter": false
+    },
+    {
+      "id": "arena_room",
+      "name": "Battleground Arena",
+      "tags": [
+        "combat",
+        "elite",
+        "open"
+      ],
+      "width": 13,
+      "height": 11,
+      "min_depth": 4,
+      "max_depth": 99,
+      "layout": [
+        "#############",
+        "#...........#",
+        "#.#.......#.#",
+        "#...........#",
+        "#...........#",
+        "\u002B.....S.....\u002B",
+        "#...........#",
+        "#...........#",
+        "#.#.......#.#",
+        "#...........#",
+        "#############"
+      ],
+      "doors": [
+        {
+          "x": 0,
+          "y": 5,
+          "direction": "west"
+        },
+        {
+          "x": 12,
+          "y": 5,
+          "direction": "east"
+        }
+      ],
+      "spawn_points": [
+        {
+          "x": 6,
+          "y": 5,
+          "type": "enemy_boss",
+          "trap_id": null
+        }
+      ],
+      "fixed_entities": [],
+      "item_quality_bonus": null,
+      "enemy_count_bonus": null,
+      "lock_doors_on_enter": true
     },
     {
       "id": "boss_arena",
       "name": "Boss Arena",
-      "tags": ["boss", "guaranteed"],
+      "tags": [
+        "boss",
+        "guaranteed"
+      ],
       "width": 15,
       "height": 13,
       "min_depth": 5,
@@ -194,12 +143,12 @@
         "#.#.........#.#",
         "#.#.........#.#",
         "#.....S.S.....#",
-        "+......S......+",
+        "\u002B......S......\u002B",
         "#.....S.S.....#",
         "#.#.........#.#",
         "#.#.........#.#",
         "#.###.....###.#",
-        "#......>......#",
+        "#......\u003E......#",
         "###############"
       ],
       "doors": [
@@ -218,41 +167,270 @@
         {
           "x": 6,
           "y": 5,
-          "type": "enemy"
+          "type": "enemy",
+          "trap_id": null
         },
         {
           "x": 8,
           "y": 5,
-          "type": "enemy"
+          "type": "enemy",
+          "trap_id": null
         },
         {
           "x": 7,
           "y": 6,
-          "type": "enemy_boss"
+          "type": "enemy_boss",
+          "trap_id": null
         },
         {
           "x": 6,
           "y": 7,
-          "type": "enemy"
+          "type": "enemy",
+          "trap_id": null
         },
         {
           "x": 8,
           "y": 7,
-          "type": "enemy"
+          "type": "enemy",
+          "trap_id": null
         },
         {
           "x": 7,
           "y": 11,
-          "type": "stairs_down"
+          "type": "stairs_down",
+          "trap_id": null
         }
       ],
       "fixed_entities": [],
+      "item_quality_bonus": null,
+      "enemy_count_bonus": null,
       "lock_doors_on_enter": true
+    },
+    {
+      "id": "chokepoint",
+      "name": "Chokepoint Passage",
+      "tags": [
+        "combat",
+        "ambush",
+        "narrow"
+      ],
+      "width": 11,
+      "height": 7,
+      "min_depth": 2,
+      "max_depth": 99,
+      "layout": [
+        "###########",
+        "#....S....#",
+        "###.....###",
+        "\u002B....I....\u002B",
+        "###.....###",
+        "#....S....#",
+        "###########"
+      ],
+      "doors": [
+        {
+          "x": 0,
+          "y": 3,
+          "direction": "west"
+        },
+        {
+          "x": 10,
+          "y": 3,
+          "direction": "east"
+        }
+      ],
+      "spawn_points": [
+        {
+          "x": 5,
+          "y": 1,
+          "type": "enemy",
+          "trap_id": null
+        },
+        {
+          "x": 5,
+          "y": 5,
+          "type": "enemy",
+          "trap_id": null
+        },
+        {
+          "x": 5,
+          "y": 3,
+          "type": "item",
+          "trap_id": null
+        }
+      ],
+      "fixed_entities": [],
+      "item_quality_bonus": null,
+      "enemy_count_bonus": 1,
+      "lock_doors_on_enter": false
+    },
+    {
+      "id": "corridor_h",
+      "name": "Horizontal Corridor",
+      "tags": [
+        "corridor"
+      ],
+      "width": 7,
+      "height": 3,
+      "min_depth": 1,
+      "max_depth": 99,
+      "layout": [
+        "#######",
+        "\u002B.....\u002B",
+        "#######"
+      ],
+      "doors": [
+        {
+          "x": 0,
+          "y": 1,
+          "direction": "west"
+        },
+        {
+          "x": 6,
+          "y": 1,
+          "direction": "east"
+        }
+      ],
+      "spawn_points": [],
+      "fixed_entities": [],
+      "item_quality_bonus": null,
+      "enemy_count_bonus": null,
+      "lock_doors_on_enter": false
+    },
+    {
+      "id": "custom_room_1",
+      "name": "Custom Room 1",
+      "tags": [
+        "custom"
+      ],
+      "width": 20,
+      "height": 20,
+      "min_depth": 1,
+      "max_depth": 99,
+      "layout": [
+        "####################",
+        "#P.................#",
+        "#..................#",
+        "#..................#",
+        "#..................#",
+        "#..................#",
+        "#..................#",
+        "#..................#",
+        "#..................#",
+        "#..................#",
+        "\u002B..................\u002B",
+        "#..................#",
+        "#..................#",
+        "#..................#",
+        "#..................#",
+        "#..................#",
+        "#..................#",
+        "#..................#",
+        "#.................\u003E#",
+        "####################"
+      ],
+      "doors": [
+        {
+          "x": 0,
+          "y": 10,
+          "direction": "west"
+        },
+        {
+          "x": 19,
+          "y": 10,
+          "direction": "east"
+        }
+      ],
+      "spawn_points": [
+        {
+          "x": 1,
+          "y": 1,
+          "type": "player",
+          "trap_id": null
+        },
+        {
+          "x": 18,
+          "y": 18,
+          "type": "stairs_down",
+          "trap_id": null
+        }
+      ],
+      "fixed_entities": [],
+      "item_quality_bonus": null,
+      "enemy_count_bonus": null,
+      "lock_doors_on_enter": false
+    },
+    {
+      "id": "custom_room_2",
+      "name": "Custom Room 2",
+      "tags": [
+        "custom"
+      ],
+      "width": 22,
+      "height": 21,
+      "min_depth": 1,
+      "max_depth": 99,
+      "layout": [
+        "######################",
+        "#P.................###",
+        "#..................###",
+        "#..................###",
+        "#..................###",
+        "#..................###",
+        "#..................###",
+        "#..................###",
+        "#..................###",
+        "#..................###",
+        "\u002B..................\u002B##",
+        "#..................###",
+        "#..................###",
+        "#..................###",
+        "#..................###",
+        "#..................###",
+        "#..................###",
+        "#..................###",
+        "#.................\u003E###",
+        "######################",
+        "######################"
+      ],
+      "doors": [
+        {
+          "x": 0,
+          "y": 10,
+          "direction": "west"
+        },
+        {
+          "x": 19,
+          "y": 10,
+          "direction": "north"
+        }
+      ],
+      "spawn_points": [
+        {
+          "x": 1,
+          "y": 1,
+          "type": "player",
+          "trap_id": null
+        },
+        {
+          "x": 18,
+          "y": 18,
+          "type": "stairs_down",
+          "trap_id": null
+        }
+      ],
+      "fixed_entities": [],
+      "item_quality_bonus": null,
+      "enemy_count_bonus": null,
+      "lock_doors_on_enter": false
     },
     {
       "id": "flooded_passage",
       "name": "Flooded Passage",
-      "tags": ["hazard", "mid_game"],
+      "tags": [
+        "hazard",
+        "mid_game"
+      ],
       "width": 9,
       "height": 7,
       "min_depth": 3,
@@ -260,8 +438,8 @@
       "layout": [
         "#########",
         "#...#...#",
-        "#.~.+.~.#",
-        "+.~...~.+",
+        "#.~.\u002B.~.#",
+        "\u002B.~...~.\u002B",
         "#.~.^.~.#",
         "#...#...#",
         "#########"
@@ -291,104 +469,217 @@
           "trap_id": "spike_trap"
         }
       ],
-      "fixed_entities": []
+      "fixed_entities": [],
+      "item_quality_bonus": null,
+      "enemy_count_bonus": null,
+      "lock_doors_on_enter": false
     },
     {
-      "id": "chokepoint",
-      "name": "Chokepoint Passage",
-      "tags": ["combat", "ambush", "narrow"],
+      "id": "library_room",
+      "name": "Forgotten Library",
+      "tags": [
+        "loot",
+        "caster",
+        "mid_game"
+      ],
       "width": 11,
-      "height": 7,
-      "min_depth": 2,
+      "height": 9,
+      "min_depth": 3,
       "max_depth": 99,
       "layout": [
         "###########",
-        "#....S....#",
-        "###.....###",
-        "+....I....+",
-        "###.....###",
-        "#....S....#",
+        "#.I.....I.#",
+        "#.#.#.#.#.#",
+        "#.........#",
+        "\u002B....S....\u002B",
+        "#.........#",
+        "#.#.#.#.#.#",
+        "#.I.....I.#",
         "###########"
       ],
       "doors": [
         {
           "x": 0,
-          "y": 3,
+          "y": 4,
           "direction": "west"
         },
         {
           "x": 10,
-          "y": 3,
+          "y": 4,
           "direction": "east"
         }
       ],
       "spawn_points": [
         {
-          "x": 5,
+          "x": 2,
           "y": 1,
-          "type": "enemy"
+          "type": "item",
+          "trap_id": null
+        },
+        {
+          "x": 8,
+          "y": 1,
+          "type": "item",
+          "trap_id": null
         },
         {
           "x": 5,
-          "y": 5,
-          "type": "enemy"
+          "y": 4,
+          "type": "enemy",
+          "trap_id": null
         },
         {
-          "x": 5,
-          "y": 3,
-          "type": "item"
+          "x": 2,
+          "y": 7,
+          "type": "item",
+          "trap_id": null
+        },
+        {
+          "x": 8,
+          "y": 7,
+          "type": "item",
+          "trap_id": null
         }
       ],
       "fixed_entities": [],
-      "enemy_count_bonus": 1
+      "item_quality_bonus": null,
+      "enemy_count_bonus": null,
+      "lock_doors_on_enter": false
     },
     {
-      "id": "arena_room",
-      "name": "Battleground Arena",
-      "tags": ["combat", "elite", "open"],
-      "width": 13,
-      "height": 11,
-      "min_depth": 4,
+      "id": "new_room",
+      "name": "New Room",
+      "tags": [
+        "custom"
+      ],
+      "width": 21,
+      "height": 8,
+      "min_depth": 1,
       "max_depth": 99,
       "layout": [
-        "#############",
-        "#...........#",
-        "#.#.......#.#",
-        "#...........#",
-        "#...........#",
-        "+.....S.....+",
-        "#...........#",
-        "#...........#",
-        "#.#.......#.#",
-        "#...........#",
-        "#############"
+        "#####################",
+        "#####################",
+        "#####################",
+        "#####################",
+        "#####################",
+        "#####################",
+        "#####################",
+        "#####################"
+      ],
+      "doors": [],
+      "spawn_points": [],
+      "fixed_entities": [],
+      "item_quality_bonus": null,
+      "enemy_count_bonus": null,
+      "lock_doors_on_enter": false
+    },
+    {
+      "id": "start_room",
+      "name": "Starting Chamber",
+      "tags": [
+        "start",
+        "guaranteed"
+      ],
+      "width": 9,
+      "height": 9,
+      "min_depth": 1,
+      "max_depth": 1,
+      "layout": [
+        "#########",
+        "#.......#",
+        "#.......#",
+        "#...P...#",
+        "#.......#",
+        "#.......#",
+        "#.......#",
+        "#.......#",
+        "####\u002B####"
+      ],
+      "doors": [
+        {
+          "x": 4,
+          "y": 8,
+          "direction": "south"
+        }
+      ],
+      "spawn_points": [
+        {
+          "x": 4,
+          "y": 3,
+          "type": "player",
+          "trap_id": null
+        }
+      ],
+      "fixed_entities": [],
+      "item_quality_bonus": null,
+      "enemy_count_bonus": null,
+      "lock_doors_on_enter": false
+    },
+    {
+      "id": "treasure_room",
+      "name": "Treasure Vault",
+      "tags": [
+        "loot",
+        "rare"
+      ],
+      "width": 7,
+      "height": 7,
+      "min_depth": 2,
+      "max_depth": 99,
+      "layout": [
+        "#######",
+        "#..I..#",
+        "#.....#",
+        "\u002B..C..\u002B",
+        "#.....#",
+        "#..I..#",
+        "#######"
       ],
       "doors": [
         {
           "x": 0,
-          "y": 5,
+          "y": 3,
           "direction": "west"
         },
         {
-          "x": 12,
-          "y": 5,
+          "x": 6,
+          "y": 3,
           "direction": "east"
         }
       ],
       "spawn_points": [
         {
-          "x": 6,
+          "x": 3,
+          "y": 1,
+          "type": "item",
+          "trap_id": null
+        },
+        {
+          "x": 3,
           "y": 5,
-          "type": "enemy_boss"
+          "type": "item",
+          "trap_id": null
+        },
+        {
+          "x": 3,
+          "y": 3,
+          "type": "chest",
+          "trap_id": null
         }
       ],
       "fixed_entities": [],
-      "lock_doors_on_enter": true
+      "item_quality_bonus": 2,
+      "enemy_count_bonus": null,
+      "lock_doors_on_enter": false
     },
     {
       "id": "vault_room",
       "name": "Guarded Vault",
-      "tags": ["loot", "combat", "dead_end"],
+      "tags": [
+        "loot",
+        "combat",
+        "dead_end"
+      ],
       "width": 9,
       "height": 9,
       "min_depth": 3,
@@ -402,7 +693,7 @@
         "#..S.S..#",
         "#.......#",
         "#.......#",
-        "####+####"
+        "####\u002B####"
       ],
       "doors": [
         {
@@ -415,96 +706,44 @@
         {
           "x": 3,
           "y": 1,
-          "type": "item"
+          "type": "item",
+          "trap_id": null
         },
         {
           "x": 5,
           "y": 1,
-          "type": "item"
+          "type": "item",
+          "trap_id": null
         },
         {
           "x": 3,
           "y": 3,
-          "type": "chest"
+          "type": "chest",
+          "trap_id": null
         },
         {
           "x": 5,
           "y": 3,
-          "type": "chest"
+          "type": "chest",
+          "trap_id": null
         },
         {
           "x": 3,
           "y": 5,
-          "type": "enemy"
+          "type": "enemy",
+          "trap_id": null
         },
         {
           "x": 5,
           "y": 5,
-          "type": "enemy"
+          "type": "enemy",
+          "trap_id": null
         }
       ],
       "fixed_entities": [],
-      "item_quality_bonus": 3
-    },
-    {
-      "id": "library_room",
-      "name": "Forgotten Library",
-      "tags": ["loot", "caster", "mid_game"],
-      "width": 11,
-      "height": 9,
-      "min_depth": 3,
-      "max_depth": 99,
-      "layout": [
-        "###########",
-        "#.I.....I.#",
-        "#.#.#.#.#.#",
-        "#.........#",
-        "+....S....+",
-        "#.........#",
-        "#.#.#.#.#.#",
-        "#.I.....I.#",
-        "###########"
-      ],
-      "doors": [
-        {
-          "x": 0,
-          "y": 4,
-          "direction": "west"
-        },
-        {
-          "x": 10,
-          "y": 4,
-          "direction": "east"
-        }
-      ],
-      "spawn_points": [
-        {
-          "x": 2,
-          "y": 1,
-          "type": "item"
-        },
-        {
-          "x": 8,
-          "y": 1,
-          "type": "item"
-        },
-        {
-          "x": 5,
-          "y": 4,
-          "type": "enemy"
-        },
-        {
-          "x": 2,
-          "y": 7,
-          "type": "item"
-        },
-        {
-          "x": 8,
-          "y": 7,
-          "type": "item"
-        }
-      ],
-      "fixed_entities": []
+      "item_quality_bonus": 3,
+      "enemy_count_bonus": null,
+      "lock_doors_on_enter": false
     }
   ]
 }

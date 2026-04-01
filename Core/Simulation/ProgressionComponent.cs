@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Roguelike.Core;
 
 public sealed class ProgressionComponent
@@ -6,7 +8,10 @@ public sealed class ProgressionComponent
     public int Experience { get; set; }
     public int ExperienceToNextLevel { get; set; } = 50;
     public int UnspentStatPoints { get; set; }
+    public int UnspentPerkChoices { get; set; }
     public int Kills { get; set; }
+
+    public List<string> SelectedPerkIds { get; } = new();
 
     public static int CalculateXpThreshold(int level)
     {

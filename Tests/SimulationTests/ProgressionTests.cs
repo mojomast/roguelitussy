@@ -15,6 +15,8 @@ public sealed class ProgressionTests : ITestSuite
         registry.Add("Simulation.Progression multiple level ups from single large XP gain", MultipleLevelUpsFromLargeXp);
         registry.Add("Simulation.Progression stats increase on level up", StatsIncreaseOnLevelUp);
         registry.Add("Simulation.Progression unspent stat points increase by 2 per level", UnspentStatPointsIncrease);
+        registry.Add("Simulation.Progression level up grants perk choices", LevelUpGrantsPerkChoice);
+        registry.Add("Simulation.Progression perk selection applies stat bonuses", PerkSelectionAppliesBonuses);
         registry.Add("Simulation.Progression kills counter increments on kill", KillsCounterIncrements);
         registry.Add("Simulation.Progression no crash when attacker has no ProgressionComponent", NoCrashWithoutProgression);
         registry.Add("Simulation.Progression no crash when target has no XpValueComponent", NoCrashWithoutXpValue);
@@ -122,6 +124,40 @@ public sealed class ProgressionTests : ITestSuite
         var progression = attacker.GetComponent<ProgressionComponent>()!;
         var expectedPoints = (progression.Level - 1) * 2;
         Expect.Equal(expectedPoints, progression.UnspentStatPoints, "Unspent stat points should be 2 per level gained");
+    }
+
+    private static void LevelUpGrantsPerkChoice()
+    {
+        var world = CreateWorld(seed: 0);
+        var attacker = CreateActor("Player", new Position(1, 1), Faction.Player, new Stats { HP = 50, MaxHP = 50, Attack = 100, Defense = 1, Accuracy = 0, Evasion = 0, Speed = 100 });
+        attacker.SetComponent(new ProgressionComponent { Experience = 49 });
+        var defender = CreateActor("Rat", new Position(2, 1), Faction.Enemy, new Stats { HP = 1, MaxHP = 1, Attack = 1, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 100 });
+        defender.SetComponent(new XpValueComponent { Value = 1 });
+
+        world.Player = attacker;
+        world.AddEntity(attacker);
+        world.AddEntity(defender);
+
+        new AttackAction(attacker.Id, defender.Id).Execute(world);
+
+        var progression = attacker.GetComponent<ProgressionComponent>()!;
+        Expect.Equal(1, progression.UnspentPerkChoices, "Each level gained should grant one pending perk choice.");
+    }
+
+    private static void PerkSelectionAppliesBonuses()
+    {
+        var player = CreateActor("Player", new Position(1, 1), Faction.Player, new Stats { HP = 40, MaxHP = 40, Attack = 8, Defense = 2, Accuracy = 80, Evasion = 10, Speed = 100 });
+        player.SetComponent(new ProgressionComponent { Level = 2, UnspentPerkChoices = 1 });
+        var content = new StubContentDatabase();
+
+        var selected = ProgressionService.TrySelectPerk(player, content, "battle_instinct", out var message);
+
+        Expect.True(selected, $"Perk selection should succeed. Got: {message}");
+        var progression = player.GetComponent<ProgressionComponent>()!;
+        Expect.Equal(0, progression.UnspentPerkChoices, "Selecting a perk should consume the pending choice.");
+        Expect.True(progression.SelectedPerkIds.Contains("battle_instinct"), "Selected perk ids should record the chosen perk.");
+        Expect.Equal(9, player.Stats.Attack, "Battle Instinct should add attack.");
+        Expect.Equal(84, player.Stats.Accuracy, "Battle Instinct should add accuracy.");
     }
 
     private static void KillsCounterIncrements()

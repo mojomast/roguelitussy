@@ -60,6 +60,40 @@ internal sealed class EntitySaveData
     public ProgressionSaveData? Progression { get; set; }
 
     public IdentitySaveData? Identity { get; set; }
+
+    public WalletSaveData? Wallet { get; set; }
+
+    public NpcSaveData? Npc { get; set; }
+
+    public MerchantSaveData? Merchant { get; set; }
+}
+
+internal sealed class WalletSaveData
+{
+    public int Gold { get; set; }
+}
+
+internal sealed class NpcSaveData
+{
+    public string TemplateId { get; set; } = string.Empty;
+
+    public string Role { get; set; } = string.Empty;
+
+    public string DialogueId { get; set; } = string.Empty;
+}
+
+internal sealed class MerchantSaveData
+{
+    public List<MerchantOfferSaveData> Offers { get; set; } = new();
+}
+
+internal sealed class MerchantOfferSaveData
+{
+    public string ItemTemplateId { get; set; } = string.Empty;
+
+    public int Price { get; set; }
+
+    public int Quantity { get; set; }
 }
 
 internal sealed class ProgressionSaveData
@@ -72,7 +106,11 @@ internal sealed class ProgressionSaveData
 
     public int UnspentStatPoints { get; set; }
 
+    public int UnspentPerkChoices { get; set; }
+
     public int Kills { get; set; }
+
+    public List<string> SelectedPerkIds { get; set; } = new();
 }
 
 internal sealed class IdentitySaveData
@@ -168,7 +206,7 @@ internal sealed class PositionSaveData
 
 public static class SaveSerializer
 {
-    public const int CurrentVersion = 4;
+    public const int CurrentVersion = 6;
 
     internal static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -297,6 +335,9 @@ public static class SaveSerializer
         var statusEffects = entity.GetComponent<StatusEffectsComponent>();
         var progression = entity.GetComponent<ProgressionComponent>();
         var identity = entity.GetComponent<IdentityComponent>();
+        var wallet = entity.GetComponent<WalletComponent>();
+        var npc = entity.GetComponent<NpcComponent>();
+        var merchant = entity.GetComponent<MerchantComponent>();
 
         return new EntitySaveData
         {
@@ -326,7 +367,9 @@ public static class SaveSerializer
                 Experience = progression.Experience,
                 ExperienceToNextLevel = progression.ExperienceToNextLevel,
                 UnspentStatPoints = progression.UnspentStatPoints,
+                UnspentPerkChoices = progression.UnspentPerkChoices,
                 Kills = progression.Kills,
+                SelectedPerkIds = progression.SelectedPerkIds.ToList(),
             },
             Identity = identity is null ? null : new IdentitySaveData
             {
@@ -334,6 +377,25 @@ public static class SaveSerializer
                 GenderId = identity.GenderId,
                 AppearanceId = identity.AppearanceId,
                 SpriteVariantId = identity.SpriteVariantId,
+            },
+            Wallet = wallet is null ? null : new WalletSaveData
+            {
+                Gold = wallet.Gold,
+            },
+            Npc = npc is null ? null : new NpcSaveData
+            {
+                TemplateId = npc.TemplateId,
+                Role = npc.Role,
+                DialogueId = npc.DialogueId,
+            },
+            Merchant = merchant is null ? null : new MerchantSaveData
+            {
+                Offers = merchant.Offers.Select(offer => new MerchantOfferSaveData
+                {
+                    ItemTemplateId = offer.ItemTemplateId,
+                    Price = offer.Price,
+                    Quantity = offer.Quantity,
+                }).ToList(),
             },
         };
     }
@@ -532,14 +594,22 @@ public static class SaveSerializer
 
         if (data.Progression is not null)
         {
-            entity.SetComponent(new ProgressionComponent
+            var progression = new ProgressionComponent
             {
                 Level = data.Progression.Level,
                 Experience = data.Progression.Experience,
                 ExperienceToNextLevel = data.Progression.ExperienceToNextLevel,
                 UnspentStatPoints = data.Progression.UnspentStatPoints,
+                UnspentPerkChoices = data.Progression.UnspentPerkChoices,
                 Kills = data.Progression.Kills,
-            });
+            };
+
+            foreach (var perkId in data.Progression.SelectedPerkIds)
+            {
+                progression.SelectedPerkIds.Add(perkId);
+            }
+
+            entity.SetComponent(progression);
         }
 
         if (data.Identity is not null)
@@ -551,6 +621,34 @@ public static class SaveSerializer
                 AppearanceId = data.Identity.AppearanceId,
                 SpriteVariantId = data.Identity.SpriteVariantId,
             });
+        }
+
+        if (data.Wallet is not null)
+        {
+            entity.SetComponent(new WalletComponent
+            {
+                Gold = data.Wallet.Gold,
+            });
+        }
+
+        if (data.Npc is not null)
+        {
+            entity.SetComponent(new NpcComponent
+            {
+                TemplateId = data.Npc.TemplateId,
+                Role = data.Npc.Role,
+                DialogueId = data.Npc.DialogueId,
+            });
+        }
+
+        if (data.Merchant is not null)
+        {
+            entity.SetComponent(new MerchantComponent(data.Merchant.Offers.Select(offer => new MerchantOfferState
+            {
+                ItemTemplateId = offer.ItemTemplateId,
+                Price = offer.Price,
+                Quantity = offer.Quantity,
+            })));
         }
 
         return entity;

@@ -40,6 +40,18 @@ public sealed class AbilitiesDocument
     public List<AbilityDefinition> Abilities { get; set; } = new();
 }
 
+public sealed class PerksDocument
+{
+    [JsonPropertyName("$schema")]
+    public string Schema { get; set; } = string.Empty;
+
+    [JsonPropertyName("version")]
+    public int Version { get; set; }
+
+    [JsonPropertyName("perks")]
+    public List<PerkDefinition> Perks { get; set; } = new();
+}
+
 public sealed class StatusEffectsDocument
 {
     [JsonPropertyName("$schema")]
@@ -77,6 +89,30 @@ public sealed class LootTablesDocument
 
     [JsonPropertyName("loot_tables")]
     public List<LootTableDefinition> LootTables { get; set; } = new();
+}
+
+public sealed class DialogsDocument
+{
+    [JsonPropertyName("$schema")]
+    public string Schema { get; set; } = string.Empty;
+
+    [JsonPropertyName("version")]
+    public int Version { get; set; }
+
+    [JsonPropertyName("dialogs")]
+    public List<DialogueDefinition> Dialogs { get; set; } = new();
+}
+
+public sealed class NpcsDocument
+{
+    [JsonPropertyName("$schema")]
+    public string Schema { get; set; } = string.Empty;
+
+    [JsonPropertyName("version")]
+    public int Version { get; set; }
+
+    [JsonPropertyName("npcs")]
+    public List<NpcDefinition> Npcs { get; set; } = new();
 }
 
 public sealed class ItemDefinition
@@ -245,6 +281,123 @@ public sealed class EnemyAbilityReference
 
     [JsonPropertyName("priority")]
     public int Priority { get; set; }
+}
+
+public sealed class DialogueDefinition
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = string.Empty;
+
+    [JsonPropertyName("start_node")]
+    public string StartNode { get; set; } = string.Empty;
+
+    [JsonPropertyName("nodes")]
+    public List<DialogueNodeDefinition> Nodes { get; set; } = new();
+}
+
+public sealed class DialogueNodeDefinition
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = string.Empty;
+
+    [JsonPropertyName("text")]
+    public string Text { get; set; } = string.Empty;
+
+    [JsonPropertyName("options")]
+    public List<DialogueOptionDefinition> Options { get; set; } = new();
+}
+
+public sealed class DialogueOptionDefinition
+{
+    [JsonPropertyName("text")]
+    public string Text { get; set; } = string.Empty;
+
+    [JsonPropertyName("next")]
+    public string? Next { get; set; }
+
+    [JsonPropertyName("action")]
+    public string? Action { get; set; }
+}
+
+public sealed class NpcDefinition
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = string.Empty;
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("description")]
+    public string Description { get; set; } = string.Empty;
+
+    [JsonPropertyName("role")]
+    public string Role { get; set; } = string.Empty;
+
+    [JsonPropertyName("min_depth")]
+    public int MinDepth { get; set; }
+
+    [JsonPropertyName("max_depth")]
+    public int MaxDepth { get; set; }
+
+    [JsonPropertyName("dialogue_id")]
+    public string DialogueId { get; set; } = string.Empty;
+
+    [JsonPropertyName("race_id")]
+    public string RaceId { get; set; } = string.Empty;
+
+    [JsonPropertyName("gender_id")]
+    public string GenderId { get; set; } = string.Empty;
+
+    [JsonPropertyName("appearance_id")]
+    public string AppearanceId { get; set; } = string.Empty;
+
+    [JsonPropertyName("archetype_id")]
+    public string ArchetypeId { get; set; } = string.Empty;
+
+    [JsonPropertyName("stock")]
+    public List<MerchantStockDefinition> Stock { get; set; } = new();
+}
+
+public sealed class MerchantStockDefinition
+{
+    [JsonPropertyName("item_id")]
+    public string ItemId { get; set; } = string.Empty;
+
+    [JsonPropertyName("price")]
+    public int Price { get; set; }
+
+    [JsonPropertyName("quantity")]
+    public int Quantity { get; set; }
+}
+
+public sealed class PerkDefinition
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = string.Empty;
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("description")]
+    public string Description { get; set; } = string.Empty;
+
+    [JsonPropertyName("unlock_level")]
+    public int UnlockLevel { get; set; }
+
+    [JsonPropertyName("effects")]
+    public List<PerkEffectDefinition> Effects { get; set; } = new();
+}
+
+public sealed class PerkEffectDefinition
+{
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = string.Empty;
+
+    [JsonPropertyName("stat")]
+    public string? Stat { get; set; }
+
+    [JsonPropertyName("value")]
+    public int Value { get; set; }
 }
 
 public sealed class AbilityDefinition

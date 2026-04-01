@@ -45,7 +45,13 @@ public sealed class MoveAction : IAction
             }
         }
 
-        if (!world.IsWalkable(target) || world.GetEntityAt(target) is not null)
+        var occupant = world.GetEntityAt(target);
+        if (occupant is not null)
+        {
+            return CanSwapWith(actor, occupant) ? ActionResult.Success : ActionResult.Blocked;
+        }
+
+        if (!world.IsWalkable(target))
         {
             return ActionResult.Blocked;
         }
@@ -64,6 +70,22 @@ public sealed class MoveAction : IAction
         var actor = world.GetEntity(ActorId)!;
         var from = actor.Position;
         var target = from + Delta;
+
+        if (world.GetEntityAt(target) is { } occupant)
+        {
+            if (!CanSwapWith(actor, occupant) || !world.TrySwapEntities(actor.Id, occupant.Id))
+            {
+                return ActionOutcome.Fail(ActionResult.Blocked);
+            }
+
+            return new ActionOutcome
+            {
+                Result = ActionResult.Success,
+                DirtyPositions = { from, target },
+                LogMessages = { $"{actor.Name} swaps places with {occupant.Name}." },
+            };
+        }
+
         if (!world.MoveEntity(ActorId, target))
         {
             return ActionOutcome.Fail(ActionResult.Blocked);
@@ -80,4 +102,13 @@ public sealed class MoveAction : IAction
     public int GetEnergyCost() => 1000;
 
     private static bool IsStep(Position delta) => delta != Position.Zero && Math.Abs(delta.X) <= 1 && Math.Abs(delta.Y) <= 1;
+
+    private static bool CanSwapWith(IEntity actor, IEntity occupant)
+    {
+        return actor.Faction == Faction.Player
+            && occupant.Faction == Faction.Neutral
+            && occupant.GetComponent<NpcComponent>() is not null
+            && actor.IsAlive
+            && occupant.IsAlive;
+    }
 }

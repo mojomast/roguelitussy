@@ -14,8 +14,8 @@ public sealed class CameraController
     {
         _camera = camera;
         _camera.Enabled = true;
-        _camera.PositionSmoothingEnabled = true;
-        _camera.PositionSmoothingSpeed = 10f;
+        _camera.PositionSmoothingEnabled = false;
+        _camera.PositionSmoothingSpeed = 0f;
         _camera.Zoom = new Vector2(DefaultZoom, DefaultZoom);
     }
 

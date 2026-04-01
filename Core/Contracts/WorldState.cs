@@ -174,6 +174,34 @@ public sealed class WorldState : IWorldState
         return true;
     }
 
+    public bool TrySwapEntities(EntityId firstId, EntityId secondId)
+    {
+        if (firstId == secondId
+            || !_entityById.TryGetValue(firstId, out var first)
+            || !_entityById.TryGetValue(secondId, out var second))
+        {
+            return false;
+        }
+
+        var firstPosition = first.Position;
+        var secondPosition = second.Position;
+        if (firstPosition == secondPosition)
+        {
+            return true;
+        }
+
+        if (!IsTileWalkable(firstPosition) || !IsTileWalkable(secondPosition))
+        {
+            return false;
+        }
+
+        _entityByPosition[firstPosition] = second;
+        _entityByPosition[secondPosition] = first;
+        first.Position = secondPosition;
+        second.Position = firstPosition;
+        return true;
+    }
+
     public void UpdateEntityPosition(EntityId id, Position oldPosition, Position newPosition)
     {
         if (!_entityById.TryGetValue(id, out var entity))

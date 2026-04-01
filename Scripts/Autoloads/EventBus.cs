@@ -18,6 +18,7 @@ public partial class EventBus : Node
     public event Action<EntityId, Position, Position>? EntityMoved;
     public event Action<IEntity>? EntitySpawned;
     public event Action<EntityId>? EntityRemoved;
+    public event Action<Position>? TileChanged;
     public event Action<EntityId, ItemInstance>? ItemPickedUp;
     public event Action<EntityId, ItemInstance, Position>? ItemDropped;
     public event Action<string>? LogMessage;
@@ -34,6 +35,8 @@ public partial class EventBus : Node
     public event Action<int, int>? GameOver;
     public event Action<EntityId, int, int>? ExperienceGained;
     public event Action<EntityId, int>? LeveledUp;
+    public event Action<EntityId>? ProgressionChanged;
+    public event Action<EntityId, int>? CurrencyChanged;
 
     public void EmitTurnStarted(int turnNumber) => TurnStarted?.Invoke(turnNumber);
 
@@ -61,6 +64,8 @@ public partial class EventBus : Node
     public void EmitEntitySpawned(IEntity entity) => EntitySpawned?.Invoke(entity);
 
     public void EmitEntityRemoved(EntityId entityId) => EntityRemoved?.Invoke(entityId);
+
+    public void EmitTileChanged(Position position) => TileChanged?.Invoke(position);
 
     public void EmitItemPickedUp(EntityId entityId, ItemInstance item) => ItemPickedUp?.Invoke(entityId, item);
 
@@ -96,4 +101,8 @@ public partial class EventBus : Node
     public void EmitExperienceGained(EntityId entityId, int amount, int total) => ExperienceGained?.Invoke(entityId, amount, total);
 
     public void EmitLeveledUp(EntityId entityId, int newLevel) => LeveledUp?.Invoke(entityId, newLevel);
+
+    public void EmitProgressionChanged(EntityId entityId) => ProgressionChanged?.Invoke(entityId);
+
+    public void EmitCurrencyChanged(EntityId entityId, int gold) => CurrencyChanged?.Invoke(entityId, gold);
 }

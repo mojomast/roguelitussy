@@ -1,5 +1,3 @@
-using System;
-
 namespace Roguelike.Core;
 
 public sealed class AttackAction : IAction
@@ -104,20 +102,16 @@ public sealed class AttackAction : IAction
                 var attackerProgression = actor.GetComponent<ProgressionComponent>();
                 if (attackerProgression is not null)
                 {
-                    attackerProgression.Experience += xpComponent.Value;
                     attackerProgression.Kills++;
-                    outcome.LogMessages.Add($"{actor.Name} gains {xpComponent.Value} XP.");
-
-                    while (attackerProgression.CanLevelUp)
+                    var progressionResult = ProgressionService.AwardExperience(actor, xpComponent.Value);
+                    if (progressionResult.ExperienceGained > 0)
                     {
-                        attackerProgression.Level++;
-                        attackerProgression.UnspentStatPoints += 2;
-                        attackerProgression.ExperienceToNextLevel = ProgressionComponent.CalculateXpThreshold(attackerProgression.Level);
-                        outcome.LogMessages.Add($"{actor.Name} reaches level {attackerProgression.Level}!");
+                        outcome.LogMessages.Add($"{actor.Name} gains {progressionResult.ExperienceGained} XP.");
+                    }
 
-                        actor.Stats.MaxHP += 3;
-                        actor.Stats.HP = Math.Min(actor.Stats.HP + 3, actor.Stats.MaxHP);
-                        actor.Stats.Attack += 1;
+                    foreach (var level in progressionResult.ReachedLevels)
+                    {
+                        outcome.LogMessages.Add($"{actor.Name} reaches level {level}!");
                     }
                 }
             }
