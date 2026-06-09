@@ -47,7 +47,7 @@ public static class AbilityResolver
         return targets;
     }
 
-    public static int CalculateAbilityDamage(AbilityEffect effect, IEntity caster, Random rng)
+    public static int CalculateAbilityDamage(AbilityEffect effect, IEntity caster, DeterministicRandom rng)
     {
         var baseDamage = effect.BaseValue;
 

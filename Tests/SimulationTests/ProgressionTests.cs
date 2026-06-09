@@ -18,6 +18,7 @@ public sealed class ProgressionTests : ITestSuite
         registry.Add("Simulation.Progression level up grants perk choices", LevelUpGrantsPerkChoice);
         registry.Add("Simulation.Progression perk selection applies stat bonuses", PerkSelectionAppliesBonuses);
         registry.Add("Simulation.Progression kills counter increments on kill", KillsCounterIncrements);
+        registry.Add("Simulation.Progression melee kill without XP increments kills", MeleeKillWithoutXpIncrementsKills);
         registry.Add("Simulation.Progression no crash when attacker has no ProgressionComponent", NoCrashWithoutProgression);
         registry.Add("Simulation.Progression no crash when target has no XpValueComponent", NoCrashWithoutXpValue);
     }
@@ -191,6 +192,24 @@ public sealed class ProgressionTests : ITestSuite
 
         var outcome = new AttackAction(attacker.Id, defender.Id).Execute(world);
         Expect.Equal(ActionResult.Success, outcome.Result, "Attack should succeed even without ProgressionComponent on attacker");
+    }
+
+    private static void MeleeKillWithoutXpIncrementsKills()
+    {
+        var world = CreateWorld(seed: 0);
+        var attacker = CreateActor("Player", new Position(1, 1), Faction.Player, new Stats { HP = 50, MaxHP = 50, Attack = 100, Defense = 1, Accuracy = 0, Evasion = 0, Speed = 100 });
+        attacker.SetComponent(new ProgressionComponent());
+        var defender = CreateActor("Rat", new Position(2, 1), Faction.Enemy, new Stats { HP = 1, MaxHP = 1, Attack = 1, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 100 });
+
+        world.Player = attacker;
+        world.AddEntity(attacker);
+        world.AddEntity(defender);
+
+        new AttackAction(attacker.Id, defender.Id).Execute(world);
+
+        var progression = attacker.GetComponent<ProgressionComponent>()!;
+        Expect.Equal(1, progression.Kills, "Kills should increment even when victim has no XP value");
+        Expect.Equal(0, progression.Experience, "No XP should be awarded without XpValueComponent");
     }
 
     private static void NoCrashWithoutXpValue()

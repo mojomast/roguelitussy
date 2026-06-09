@@ -1,5 +1,7 @@
 # Godotussy Improvement Spec
 
+> Status note (2026-06-09): this file is historical backlog context. Many gap sections below have since been resolved or partially resolved, including identity/progression persistence, runtime ability casting, combat item stats, AI role support, equipment requirements, content expansion, save versioning, and workflow documentation. Treat older "Missing" lists as audit history; confirm against the live code and current docs before starting work.
+
 ## Purpose
 
 This document is the current-state improvement spec for turning the existing project into a more complete, playable roguelike. It is intentionally written for parallel subagents. It replaces vague backlog work with concrete, codebase-specific workstreams, ordering, file targets, and acceptance criteria.

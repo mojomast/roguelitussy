@@ -107,6 +107,16 @@ internal static class UIActionFactory
             return null;
         }
 
+        if (TryResolveCastAbility(content, template, out var ability))
+        {
+            if (string.Equals(ability.Targeting.Type, "self", System.StringComparison.OrdinalIgnoreCase))
+            {
+                return new UseItemAction(actorId, itemInstanceId, template, ability);
+            }
+
+            return null;
+        }
+
         return new UseItemAction(actorId, itemInstanceId, template);
     }
 
@@ -131,5 +141,18 @@ internal static class UIActionFactory
     public static IAction? CreateDropItemAction(IWorldState? world, EntityId actorId, EntityId itemInstanceId, int quantity = int.MaxValue)
     {
         return world?.GetEntity(actorId) is null ? null : new DropItemAction(actorId, itemInstanceId, quantity);
+    }
+
+    private static bool TryResolveCastAbility(IContentDatabase content, ItemTemplate template, out AbilityTemplate ability)
+    {
+        const string prefix = "cast_ability:";
+        ability = null!;
+
+        if (template.UseEffect is null || !template.UseEffect.StartsWith(prefix, System.StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return content.TryGetAbilityTemplate(template.UseEffect[prefix.Length..], out ability);
     }
 }

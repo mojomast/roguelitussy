@@ -18,6 +18,8 @@ internal sealed class SaveFileData
 
     public int TurnNumber { get; set; }
 
+    public ulong CombatRandomState { get; set; }
+
     public int Width { get; set; }
 
     public int Height { get; set; }
@@ -66,6 +68,56 @@ internal sealed class EntitySaveData
     public NpcSaveData? Npc { get; set; }
 
     public MerchantSaveData? Merchant { get; set; }
+
+    public ChestSaveData? Chest { get; set; }
+
+    public XpValueSaveData? XpValue { get; set; }
+
+    public AbilitiesSaveData? Abilities { get; set; }
+
+    public CooldownsSaveData? Cooldowns { get; set; }
+
+    public AIStateSaveData? AIState { get; set; }
+
+    public string BrainType { get; set; } = string.Empty;
+}
+
+internal sealed class ChestSaveData
+{
+    public string LootTableId { get; set; } = string.Empty;
+}
+
+internal sealed class XpValueSaveData
+{
+    public int Value { get; set; }
+}
+
+internal sealed class AbilitiesSaveData
+{
+    public List<AbilitySlotSaveData> Slots { get; set; } = new();
+}
+
+internal sealed class AbilitySlotSaveData
+{
+    public string AbilityId { get; set; } = string.Empty;
+    public int Cooldown { get; set; }
+    public int Priority { get; set; }
+}
+
+internal sealed class CooldownsSaveData
+{
+    public Dictionary<string, int> Active { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+}
+
+internal sealed class AIStateSaveData
+{
+    public int State { get; set; }
+    public int IdleTurns { get; set; }
+    public PositionSaveData PatrolTarget { get; set; } = new();
+    public int PatrolSteps { get; set; }
+    public int PatrolSequence { get; set; }
+    public PositionSaveData LastKnownTargetPosition { get; set; } = new();
+    public string TargetId { get; set; } = string.Empty;
 }
 
 internal sealed class WalletSaveData
@@ -206,7 +258,7 @@ internal sealed class PositionSaveData
 
 public static class SaveSerializer
 {
-    public const int CurrentVersion = 6;
+    public const int CurrentVersion = 7;
 
     internal static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -222,6 +274,7 @@ public static class SaveSerializer
             Seed = world.Seed,
             Depth = world.Depth,
             TurnNumber = world.TurnNumber,
+            CombatRandomState = world.CombatRandomState,
             Width = world.Width,
             Height = world.Height,
             Tiles = EncodeTiles(world.GetRawGrid()),
@@ -255,6 +308,11 @@ public static class SaveSerializer
         var world = new WorldState();
         world.InitGrid(data.Width, data.Height);
         world.Seed = data.Seed;
+        if (data.CombatRandomState != 0UL)
+        {
+            world.CombatRandomState = data.CombatRandomState;
+        }
+
         world.Depth = data.Depth;
         world.TurnNumber = data.TurnNumber;
 
@@ -338,6 +396,12 @@ public static class SaveSerializer
         var wallet = entity.GetComponent<WalletComponent>();
         var npc = entity.GetComponent<NpcComponent>();
         var merchant = entity.GetComponent<MerchantComponent>();
+        var chest = entity.GetComponent<ChestComponent>();
+        var xpValue = entity.GetComponent<XpValueComponent>();
+        var abilities = entity.GetComponent<AbilitiesComponent>();
+        var cooldowns = entity.GetComponent<CooldownComponent>();
+        var aiState = entity.GetComponent<AIStateComponent>();
+        var brain = entity.GetComponent<IBrain>();
 
         return new EntitySaveData
         {
@@ -397,6 +461,40 @@ public static class SaveSerializer
                     Quantity = offer.Quantity,
                 }).ToList(),
             },
+            Chest = chest is null ? null : new ChestSaveData
+            {
+                LootTableId = chest.LootTableId,
+            },
+            XpValue = xpValue is null ? null : new XpValueSaveData
+            {
+                Value = xpValue.Value,
+            },
+            Abilities = abilities is null ? null : new AbilitiesSaveData
+            {
+                Slots = abilities.Slots.Select(slot => new AbilitySlotSaveData
+                {
+                    AbilityId = slot.AbilityId,
+                    Cooldown = slot.Cooldown,
+                    Priority = slot.Priority,
+                }).ToList(),
+            },
+            Cooldowns = cooldowns is null ? null : new CooldownsSaveData
+            {
+                Active = cooldowns.ActiveCooldowns
+                    .Where(pair => pair.Value > 0)
+                    .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase),
+            },
+            AIState = aiState is null ? null : new AIStateSaveData
+            {
+                State = (int)aiState.State,
+                IdleTurns = aiState.IdleTurns,
+                PatrolTarget = new PositionSaveData { X = aiState.PatrolTarget.X, Y = aiState.PatrolTarget.Y },
+                PatrolSteps = aiState.PatrolSteps,
+                PatrolSequence = aiState.PatrolSequence,
+                LastKnownTargetPosition = new PositionSaveData { X = aiState.LastKnownTargetPosition.X, Y = aiState.LastKnownTargetPosition.Y },
+                TargetId = aiState.TargetId.IsValid ? aiState.TargetId.Value.ToString("N") : string.Empty,
+            },
+            BrainType = brain is null ? string.Empty : ToBrainType(brain),
         };
     }
 
@@ -651,8 +749,75 @@ public static class SaveSerializer
             })));
         }
 
+        if (data.Chest is not null)
+        {
+            entity.SetComponent(new ChestComponent { LootTableId = data.Chest.LootTableId });
+        }
+
+        if (data.XpValue is not null)
+        {
+            entity.SetComponent(new XpValueComponent { Value = data.XpValue.Value });
+        }
+
+        if (data.Abilities is not null)
+        {
+            var abilities = new AbilitiesComponent();
+            foreach (var slot in data.Abilities.Slots)
+            {
+                abilities.Slots.Add(new EnemyAbilitySlot
+                {
+                    AbilityId = slot.AbilityId,
+                    Cooldown = slot.Cooldown,
+                    Priority = slot.Priority,
+                });
+            }
+
+            entity.SetComponent(abilities);
+        }
+
+        if (data.Cooldowns is not null)
+        {
+            var cooldowns = new CooldownComponent();
+            foreach (var pair in data.Cooldowns.Active)
+            {
+                cooldowns.SetCooldown(pair.Key, pair.Value);
+            }
+
+            entity.SetComponent(cooldowns);
+        }
+
+        if (data.AIState is not null)
+        {
+            entity.SetComponent(new AIStateComponent
+            {
+                State = (AIState)data.AIState.State,
+                IdleTurns = data.AIState.IdleTurns,
+                PatrolTarget = new Position(data.AIState.PatrolTarget.X, data.AIState.PatrolTarget.Y),
+                PatrolSteps = data.AIState.PatrolSteps,
+                PatrolSequence = data.AIState.PatrolSequence,
+                LastKnownTargetPosition = new Position(data.AIState.LastKnownTargetPosition.X, data.AIState.LastKnownTargetPosition.Y),
+                TargetId = string.IsNullOrWhiteSpace(data.AIState.TargetId) ? EntityId.Invalid : EntityId.From(data.AIState.TargetId),
+            });
+        }
+
+        if (!string.IsNullOrWhiteSpace(data.BrainType))
+        {
+            entity.SetComponent<IBrain>(BrainFactory.Create(data.BrainType));
+        }
+
         return entity;
     }
+
+    private static string ToBrainType(IBrain brain) => brain switch
+    {
+        RangedKiterBrain => "ranged_kiter",
+        PatrolGuardBrain => "patrol_guard",
+        FleeingBrain => "fleeing",
+        AmbushBrain => "ambush",
+        SupportBrain => "support",
+        MeleeRusherBrain => "melee_rusher",
+        _ => string.Empty,
+    };
 
     private static ItemInstance ToItemInstance(ItemSaveData data)
     {

@@ -72,6 +72,8 @@ Combat is still resolved inside `Core/Simulation/CombatResolver.cs`, but it is n
 - empowered and corroded states now influence outgoing damage and effective armor
 - `CastAbilityAction` and `AbilityResolver` execute ability effects from `abilities.json`
 - supported ability effects currently include damage, apply_status, teleport, and heal_self
+- `CastAbilityAction` performs targeting validation for self, single-target, tile, and area ability shapes before mutating world state.
+- Kills from melee attacks and ability damage both route through the shared `DeathResolver`, so XP, kill counts, level-up log messages, and entity removal stay aligned for those paths. Status ticks, traps, and future environmental deaths still need attribution work.
 
 The ability pipeline is shared by item casts and AI casts so the runtime rules stay in one place.
 
@@ -126,14 +128,15 @@ Persistence lives in `Core/Persistence/`.
 
 ### Current Save Version
 
-The current normalized save version is `4`.
+The current normalized save version is `7`.
 
 Notable details:
 
 - Explored and visible map flags are stored as packed bitfields.
-- Version 1, version 2, and version 3 save payloads are migrated on load.
-- Progression and identity components round-trip through the normalized save shape.
-- Save validation checks dimensions, entity IDs, inventory/equipment integrity, status effects, and payload sizes.
+- Legacy version 1 through version 6 payloads are migrated on load.
+- Progression, identity, inventory/equipment, wallet, NPC, merchant, chest, ability, cooldown, XP value, and AI/template rehydration data round-trip through the normalized save shape where applicable.
+- `CombatRandomState` is persisted so combat RNG continues deterministically after load instead of restarting from only seed and turn number.
+- Save validation checks dimensions, entity IDs, inventory/equipment integrity, persisted component payloads, status effects, and payload sizes.
 
 ### Save Slots
 
@@ -154,9 +157,12 @@ By default, `SaveManager` writes to:
 
 The runtime-facing templates now cover:
 
-- items, including weapon combat fields, on-hit effects, and equipment requirements
+- items, including weapon combat fields, on-hit effects, equipment requirements, and consumable `on_use` behavior
 - enemies, including XP values
 - abilities, including targeting and effect definitions
+- perks, NPCs, and dialogs used by progression/service content and room fixtures
+
+Consumable item use supports authored healing, status application, and ability-cast delegation. `cast_ability` use effects must be paired with valid ability content and targeting data from the caller/UI so the same targeting validation path is used as direct ability casts.
 
 The loader can locate the repository content directory automatically by walking upward until it finds the required JSON files.
 

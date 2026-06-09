@@ -604,6 +604,31 @@ public sealed class ContentLoader : IContentDatabase
             }
         }
 
+        foreach (var effect in item.Effects)
+        {
+            if (!string.Equals(effect.Type, "on_use", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (string.Equals(effect.Action, "heal", StringComparison.Ordinal) && effect.Value is int healValue)
+            {
+                modifiers["heal"] = healValue;
+            }
+            else if (string.Equals(effect.Action, "apply_status", StringComparison.Ordinal))
+            {
+                if (effect.Duration is int duration)
+                {
+                    modifiers["duration"] = duration;
+                }
+
+                if (effect.Value is int magnitude)
+                {
+                    modifiers["magnitude"] = magnitude;
+                }
+            }
+        }
+
         return new ReadOnlyDictionary<string, int>(modifiers);
     }
 

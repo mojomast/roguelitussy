@@ -1,26 +1,27 @@
 # godotussy
 
-A deterministic roguelike foundation for Godot 4.4 with a pure C# simulation core, Godot-facing presentation scripts, data-driven content, and a custom .NET test harness.
+A deterministic roguelike foundation for Godot 4.4.1 Mono/.NET with a pure C# simulation core, Godot-facing presentation scripts, data-driven content, and a custom .NET test harness.
 
 The current build includes character identity and progression, ability casting, gear-driven combat, role-specific AI, equipment requirements, refreshed CC0 0x72 dungeon art with contextual wall layering, reconciled world-space movement, overlay-aware gameplay chrome, expanded enemy sprite coverage, and broader mid- and late-floor content.
 
 ## Quick Start
 
 1. Install .NET 8 SDK.
-2. Install Godot 4.4 with C# support if you want to open or run the game inside the editor.
-3. Build the solution:
+2. Install Godot 4.4.1 Mono/.NET if you want to open or run the game inside the editor.
+3. Build the editorless Godot stub profile:
 
    ```powershell
-   dotnet build godotussy.sln
+   dotnet build godotussy.csproj -p:UseGodotStubs=true
    ```
 
-4. Run the automated test suite:
+4. Build and run the automated test harness:
 
    ```powershell
+   dotnet build Tests/godotussy.Tests.csproj
    dotnet run --project Tests/godotussy.Tests.csproj
    ```
 
-5. Open `project.godot` in Godot 4.4 to inspect scenes, autoloads, and editor tools.
+5. Open `project.godot` in Godot 4.4.1 Mono/.NET to inspect scenes, autoloads, and editor tools. Godot 4.5 should be verified in a branch before upgrading package or project pins.
 
 6. Launch the playable shell and use the built-in developer workshop from the title screen or pause menu if you want to author rooms and content without opening the Godot editor.
 
@@ -30,7 +31,7 @@ The current build includes character identity and progression, ability casting, 
 - Godot-side autoloads and presentation scripts for UI, rendering, and debug/editor tooling.
 - Layered 0x72 world rendering with contextual wall caps, trims, and sprite-backed entity presentation for the current enemy roster.
 - An in-app developer workshop for creating room drafts and scaffolding item/enemy content directly from the runtime shell.
-- JSON-driven content for items, enemies, abilities, status effects, loot tables, and room prefabs.
+- JSON-driven content for items, enemies, abilities, status effects, loot tables, room prefabs, perks, NPCs, and dialogs.
 - Save/load infrastructure with validation and migration support for progression and identity state.
 - A custom test runner covering simulation, AI, generation, content, persistence, rendering, UI, and integration flows.
 
@@ -72,10 +73,16 @@ The current build includes character identity and progression, ability casting, 
 
 ## Common Commands
 
-Build the solution:
+Build the editorless stub profile:
 
 ```powershell
-dotnet build godotussy.sln
+dotnet build godotussy.csproj -p:UseGodotStubs=true
+```
+
+Build the test project:
+
+```powershell
+dotnet build Tests/godotussy.Tests.csproj
 ```
 
 Run the full test suite:
@@ -93,7 +100,7 @@ dotnet run --project Tests/godotussy.Tests.csproj -p:RenderingValidation=true
 Run the game headlessly to validate startup:
 
 ```powershell
-Godot_v4.4.1-stable_mono_win64_console.exe --headless --path . --quit
+Godot_v4.4.1-stable_mono_linux_x86_64 --headless --path . --quit
 ```
 
 ## Notes For Contributors
@@ -102,7 +109,7 @@ Godot_v4.4.1-stable_mono_win64_console.exe --headless --path . --quit
 - Save data is versioned and migrated on load; do not change persistence shapes casually.
 - Content IDs are expected to be stable lowercase snake_case keys.
 - The runtime shell now exposes a developer workshop for room and content authoring, so editor plugin usage is optional for common content-building tasks.
-- The repository currently validates 176 deterministic tests; keep new gameplay, rendering, and content changes covered in the same style.
+- The custom harness prints the current deterministic test count; keep new gameplay, rendering, and content changes covered in the same style.
 - Temporary root-level `.cs` scratch files are included by the SDK globbing rules and can break builds.
 
 Start with [docs/SETUP.md](docs/SETUP.md) if you are new to the repository, then use [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) before making structural changes.

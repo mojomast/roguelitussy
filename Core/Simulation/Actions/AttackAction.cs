@@ -94,29 +94,8 @@ public sealed class AttackAction : IAction
 
         if (damage.IsKill || target.Stats.HP <= 0)
         {
-            target.Stats.HP = 0;
-
-            var xpComponent = target.GetComponent<XpValueComponent>();
-            if (xpComponent is not null)
-            {
-                var attackerProgression = actor.GetComponent<ProgressionComponent>();
-                if (attackerProgression is not null)
-                {
-                    attackerProgression.Kills++;
-                    var progressionResult = ProgressionService.AwardExperience(actor, xpComponent.Value);
-                    if (progressionResult.ExperienceGained > 0)
-                    {
-                        outcome.LogMessages.Add($"{actor.Name} gains {progressionResult.ExperienceGained} XP.");
-                    }
-
-                    foreach (var level in progressionResult.ReachedLevels)
-                    {
-                        outcome.LogMessages.Add($"{actor.Name} reaches level {level}!");
-                    }
-                }
-            }
-
-            world.RemoveEntity(TargetId);
+            var death = DeathResolver.ResolveKill(world, actor, target);
+            DeathResolver.AppendProgressionLogMessages(outcome.LogMessages, actor.Name, death);
             outcome.LogMessages.Add(weaponName is not null
                 ? $"{actor.Name} kills {target.Name} with {weaponName} for {damage.FinalDamage} damage."
                 : $"{actor.Name} kills {target.Name} for {damage.FinalDamage} damage.");

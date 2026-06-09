@@ -112,6 +112,7 @@ public static class SaveValidator
             ValidateStats(entity, errors);
             ValidateInventory(entity, errors);
             ValidateStatusEffects(entity, errors);
+            ValidateNewComponentPayloads(entity, errors);
         }
 
         if (!playerFound)
@@ -132,9 +133,9 @@ public static class SaveValidator
             errors.Add($"Entity '{entity.Name}' has an invalid HP value {entity.Stats.HP}.");
         }
 
-        if (entity.Stats.Speed <= 0)
+        if (entity.Stats.Speed < 0 || (entity.Stats.Speed == 0 && entity.Chest is null))
         {
-            errors.Add($"Entity '{entity.Name}' must have positive speed.");
+            errors.Add($"Entity '{entity.Name}' must have positive speed unless it is a chest.");
         }
 
         if (entity.Stats.ViewRadius < 0)
@@ -231,6 +232,74 @@ public static class SaveValidator
         }
     }
 
+    private static void ValidateNewComponentPayloads(EntitySaveData entity, List<string> errors)
+    {
+        if (entity.Chest is not null && string.IsNullOrWhiteSpace(entity.Chest.LootTableId))
+        {
+            errors.Add($"Entity '{entity.Name}' has a chest without a loot table id.");
+        }
+
+        if (entity.XpValue is not null && entity.XpValue.Value < 0)
+        {
+            errors.Add($"Entity '{entity.Name}' has a negative XP value {entity.XpValue.Value}.");
+        }
+
+        if (entity.Abilities is not null)
+        {
+            foreach (var slot in entity.Abilities.Slots)
+            {
+                if (string.IsNullOrWhiteSpace(slot.AbilityId))
+                {
+                    errors.Add($"Entity '{entity.Name}' has an ability slot without an ability id.");
+                }
+
+                if (slot.Cooldown < 0)
+                {
+                    errors.Add($"Entity '{entity.Name}' has ability '{slot.AbilityId}' with negative cooldown {slot.Cooldown}.");
+                }
+
+                if (slot.Priority < 0)
+                {
+                    errors.Add($"Entity '{entity.Name}' has ability '{slot.AbilityId}' with negative priority {slot.Priority}.");
+                }
+            }
+        }
+
+        if (entity.Cooldowns is not null)
+        {
+            foreach (var cooldown in entity.Cooldowns.Active)
+            {
+                if (string.IsNullOrWhiteSpace(cooldown.Key))
+                {
+                    errors.Add($"Entity '{entity.Name}' has an active cooldown without an ability id.");
+                }
+
+                if (cooldown.Value < 0)
+                {
+                    errors.Add($"Entity '{entity.Name}' has active cooldown '{cooldown.Key}' with negative value {cooldown.Value}.");
+                }
+            }
+        }
+
+        if (entity.AIState is not null)
+        {
+            if (!IsDefinedEnumValue<AIState>(entity.AIState.State))
+            {
+                errors.Add($"Entity '{entity.Name}' has an invalid AI state value {entity.AIState.State}.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(entity.AIState.TargetId) && !Guid.TryParse(entity.AIState.TargetId, out _))
+            {
+                errors.Add($"Entity '{entity.Name}' has an invalid AI target id '{entity.AIState.TargetId}'.");
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(entity.BrainType) && !IsAllowedBrainType(entity.BrainType))
+        {
+            errors.Add($"Entity '{entity.Name}' has an invalid brain type '{entity.BrainType}'.");
+        }
+    }
+
     private static void ValidateGroundItems(SaveFileData data, List<string> errors)
     {
         var itemIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -290,6 +359,14 @@ public static class SaveValidator
 
     private static bool IsInBounds(PositionSaveData position, int width, int height) =>
         position.X >= 0 && position.X < width && position.Y >= 0 && position.Y < height;
+
+    private static bool IsAllowedBrainType(string brainType) => brainType is
+        "melee_rusher" or
+        "ranged_kiter" or
+        "patrol_guard" or
+        "fleeing" or
+        "ambush" or
+        "support";
 
     private static bool IsDefinedEnumValue<TEnum>(int value)
         where TEnum : struct, Enum

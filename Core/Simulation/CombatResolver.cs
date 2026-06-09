@@ -7,17 +7,29 @@ public sealed class CombatResolver
 {
     private const int BaseHitChance = 80;
     private const int DefaultCritChance = 5;
-    private readonly Random _rng;
+    private readonly DeterministicRandom _rng;
 
     public CombatResolver(int seed)
-        : this(new Random(seed))
+        : this(new DeterministicRandom(seed))
+    {
+    }
+
+    public CombatResolver(ulong state)
+        : this(new DeterministicRandom(state))
     {
     }
 
     public CombatResolver(Random rng)
+        : this(new DeterministicRandom(rng.Next()))
+    {
+    }
+
+    private CombatResolver(DeterministicRandom rng)
     {
         _rng = rng;
     }
+
+    public ulong RandomState => _rng.State;
 
     public int CalculateHitChance(IEntity attacker, IEntity defender, ItemTemplate? weapon = null)
     {

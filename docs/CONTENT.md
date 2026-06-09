@@ -10,6 +10,9 @@ The project uses flat JSON documents under `Content/` as the source of truth for
 - `status_effects.json`
 - `loot_tables.json`
 - `room_prefabs.json`
+- `perks.json`
+- `dialogs.json`
+- `npcs.json`
 
 `ContentLoader` expects all of these files to exist and will fail loading if any are missing.
 
@@ -21,15 +24,11 @@ The project uses flat JSON documents under `Content/` as the source of truth for
 - `status_effects.json` defines status effect metadata used by simulation and content references.
 - `loot_tables.json` defines weighted loot outcomes.
 - `room_prefabs.json` defines prefab rooms and the tile legend used to interpret them.
+- `perks.json` defines progression perk metadata and effects.
+- `dialogs.json` defines NPC dialogue graphs.
+- `npcs.json` defines NPC metadata, roles, service hooks, and dialogue references.
 
-The current repository content set includes expanded mid- and late-game coverage:
-
-- 22 items
-- 13 enemies
-- 8 abilities
-- 9 status effects
-- 15 loot tables
-- 10 room prefabs
+The current repository content set includes expanded mid- and late-game coverage. Use the loader/tests or the runtime validation tools for current generated counts instead of copying exact numbers into docs.
 
 ## Versioning
 
@@ -53,9 +52,9 @@ This matters because:
 
 1. Reads all required JSON documents from the selected content directory.
 2. Deserializes them with strict casing and no trailing commas.
-3. Builds deterministic lookups for items, enemies, abilities, status effects, room prefabs, and loot tables.
+3. Builds deterministic lookups for items, enemies, abilities, status effects, room prefabs, loot tables, perks, dialogs, and NPCs.
 4. Produces simulation-facing item and enemy templates.
-5. Produces simulation-facing ability templates.
+5. Produces simulation-facing ability templates and validation-ready progression/NPC content lookups.
 6. Collects validation errors for malformed or inconsistent content.
 
 `LoadFromRepository()` can locate the repository content directory automatically by walking upward from a start directory.
@@ -73,6 +72,13 @@ When adding an item, provide at least:
 - stack or slot information where appropriate
 
 Weapon items can now drive live combat behavior through fields such as damage range, crit chance, accuracy, speed modifier, and `on_hit` status effects. Equippable items may also include runtime-enforced `requirements`.
+
+Consumable authoring rules:
+
+- `on_use` healing effects should use the supported heal shape/amount expected by `ContentLoader` so runtime item templates receive a concrete heal value.
+- `on_use` status effects should reference existing `status_effects.json` IDs and use the `apply_status` behavior recognized by item use.
+- `on_use` ability casts should reference an existing `abilities.json` ID through `cast_ability`; aimed casts still require valid target information from UI or AI before `CastAbilityAction` executes.
+- Keep item effects content-backed and covered by tests when adding a new effect family.
 
 ### Enemies
 
@@ -93,7 +99,7 @@ Enemy speed values should stay on the engine's current 100-based scale.
 
 When linking abilities or status effects from other content, make sure the referenced IDs already exist and match exactly.
 
-Supported ability targeting types currently in runtime use are `self`, `single`, `tile`, and `aoe_circle`. Supported effect types currently executed by the runtime are `damage`, `apply_status`, `teleport`, and `heal_self`.
+Supported ability targeting types currently in runtime use are `self`, `single`, `tile`, and `aoe_circle`. Supported effect types currently executed by the runtime are `damage`, `apply_status`, `teleport`, and `heal_self`. Targeting is validated by `CastAbilityAction`; keep content targeting definitions precise so direct casts and item-delegated casts behave the same way.
 
 ### Room Prefabs
 

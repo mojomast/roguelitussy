@@ -20,6 +20,9 @@ public sealed class AbilityTests : ITestSuite
         registry.Add("Simulation.Ability cooldown prevents reuse", CooldownPreventsReuse);
         registry.Add("Simulation.Ability self target applies status", SelfTargetAppliesStatus);
         registry.Add("Simulation.Ability aoe does not hit caster when no self center", AoeNoSelfCenter);
+        registry.Add("Simulation.Ability kill awards XP and kill credit", AbilityKillAwardsXpAndKills);
+        registry.Add("Simulation.Ability multi-kill awards XP and kill credit", AbilityMultiKillAwardsXpAndKills);
+        registry.Add("Simulation.Ability does not apply status to killed target", AbilityDoesNotApplyStatusToKilledTarget);
     }
 
     private static void SingleTargetDealsDamage()
@@ -247,6 +250,92 @@ public sealed class AbilityTests : ITestSuite
         Expect.Equal(ActionResult.Success, outcome.Result, "Fireball should succeed");
         Expect.True(enemy.Stats.HP < 10, "Enemy should take damage");
         Expect.Equal(20, caster.Stats.HP, "Caster outside blast radius should not take damage");
+    }
+
+    private static void AbilityKillAwardsXpAndKills()
+    {
+        var world = CreateWorld(seed: 0);
+        var caster = CreateActor("Mage", new Position(1, 1), Faction.Player, new Stats { HP = 20, MaxHP = 20, Attack = 10, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 100 });
+        caster.SetComponent(new ProgressionComponent());
+        var target = CreateActor("Imp", new Position(2, 1), Faction.Enemy, new Stats { HP = 1, MaxHP = 1, Attack = 1, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 100 });
+        target.SetComponent(new XpValueComponent { Value = 12 });
+        world.Player = caster;
+        world.AddEntity(caster);
+        world.AddEntity(target);
+
+        var outcome = new CastAbilityAction(caster.Id, CreateDamageAbility("zap", "Zap", "single", 0, 25), target.Position).Execute(world);
+
+        var progression = caster.GetComponent<ProgressionComponent>()!;
+        Expect.Equal(ActionResult.Success, outcome.Result, "Ability cast should succeed");
+        Expect.Equal(1, progression.Kills, "Ability kill should increment kill credit");
+        Expect.Equal(12, progression.Experience, "Ability kill should award target XP");
+        Expect.True(world.GetEntity(target.Id) is null, "Killed target should be removed");
+    }
+
+    private static void AbilityMultiKillAwardsXpAndKills()
+    {
+        var world = CreateWorld(seed: 0);
+        var caster = CreateActor("Mage", new Position(1, 1), Faction.Player, new Stats { HP = 20, MaxHP = 20, Attack = 10, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 100 });
+        caster.SetComponent(new ProgressionComponent());
+        var first = CreateActor("Imp1", new Position(4, 4), Faction.Enemy, new Stats { HP = 1, MaxHP = 1, Attack = 1, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 100 });
+        var second = CreateActor("Imp2", new Position(5, 4), Faction.Enemy, new Stats { HP = 1, MaxHP = 1, Attack = 1, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 100 });
+        first.SetComponent(new XpValueComponent { Value = 7 });
+        second.SetComponent(new XpValueComponent { Value = 8 });
+        world.Player = caster;
+        world.AddEntity(caster);
+        world.AddEntity(first);
+        world.AddEntity(second);
+
+        var outcome = new CastAbilityAction(caster.Id, CreateDamageAbility("blast", "Blast", "aoe_circle", 1, 25), first.Position).Execute(world);
+
+        var progression = caster.GetComponent<ProgressionComponent>()!;
+        Expect.Equal(ActionResult.Success, outcome.Result, "Area ability should succeed");
+        Expect.Equal(2, progression.Kills, "Each killed target should grant kill credit");
+        Expect.Equal(15, progression.Experience, "XP should total all killed targets");
+    }
+
+    private static void AbilityDoesNotApplyStatusToKilledTarget()
+    {
+        var world = CreateWorld(seed: 0);
+        var caster = CreateActor("Mage", new Position(1, 1), Faction.Player, new Stats { HP = 20, MaxHP = 20, Attack = 10, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 100 });
+        var target = CreateActor("Imp", new Position(2, 1), Faction.Enemy, new Stats { HP = 1, MaxHP = 1, Attack = 1, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 100 });
+        world.Player = caster;
+        world.AddEntity(caster);
+        world.AddEntity(target);
+
+        var ability = new AbilityTemplate(
+            "scorch",
+            "Scorch",
+            "Kills and then would burn if the target survived.",
+            new AbilityTargeting("single", 8, 0, false, false, false, null),
+            1000,
+            null,
+            new AbilityEffect[]
+            {
+                new("damage", DamageType.Fire, 25, null, 0.0, null, 0, 0, "enemies", null, 0.0, null),
+                new("apply_status", DamageType.Fire, 0, null, 0.0, "burning", 100, 3, "enemies", null, 0.0, null),
+            });
+
+        var outcome = new CastAbilityAction(caster.Id, ability, target.Position).Execute(world);
+
+        Expect.Equal(ActionResult.Success, outcome.Result, "Ability should succeed");
+        Expect.True(world.GetEntity(target.Id) is null, "Killed target should be removed");
+        Expect.False(StatusEffectProcessor.HasEffect(target, StatusEffectType.Burning), "Dead/removed target should not receive later status effects");
+    }
+
+    private static AbilityTemplate CreateDamageAbility(string id, string name, string targetingType, int radius, int damage)
+    {
+        return new AbilityTemplate(
+            id,
+            name,
+            "Test damage ability.",
+            new AbilityTargeting(targetingType, 8, radius, false, false, false, null),
+            1000,
+            null,
+            new AbilityEffect[]
+            {
+                new("damage", DamageType.Physical, damage, null, 0.0, null, 0, 0, "enemies", null, 0.0, null),
+            });
     }
 
     private static WorldState CreateWorld(int seed = 1)

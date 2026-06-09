@@ -78,7 +78,7 @@ public sealed class CastAbilityAction : IAction
 
         var actor = world.GetEntity(ActorId)!;
         world.CombatResolver ??= new CombatResolver(world.Seed);
-        var rng = new Random(world.Seed + world.TurnNumber + ActorId.GetHashCode());
+        var rng = new DeterministicRandom(CreateStableSeed(world));
 
         var outcome = new ActionOutcome
         {
@@ -99,6 +99,11 @@ public sealed class CastAbilityAction : IAction
                     var damageTargets = AbilityResolver.FilterByRelation(targets, actor, effect.Filter);
                     foreach (var target in damageTargets)
                     {
+                        if (world.GetEntity(target.Id) is null || !target.IsAlive)
+                        {
+                            continue;
+                        }
+
                         var rawDamage = AbilityResolver.CalculateAbilityDamage(effect, actor, rng);
                         var finalDamage = world.CombatResolver.ApplyArmor(rawDamage, target, effect.DamageType);
                         var isKill = target.Stats.HP - finalDamage <= 0;
@@ -112,8 +117,8 @@ public sealed class CastAbilityAction : IAction
 
                         if (isKill || target.Stats.HP <= 0)
                         {
-                            target.Stats.HP = 0;
-                            world.RemoveEntity(target.Id);
+                            var death = DeathResolver.ResolveKill(world, actor, target);
+                            DeathResolver.AppendProgressionLogMessages(outcome.LogMessages, actor.Name, death);
                             outcome.LogMessages.Add($"{actor.Name}'s {Ability.DisplayName} kills {target.Name} for {finalDamage} damage.");
                         }
                         else
@@ -137,6 +142,11 @@ public sealed class CastAbilityAction : IAction
                     var statusTargets = AbilityResolver.FilterByRelation(targets, actor, effect.Filter);
                     foreach (var target in statusTargets)
                     {
+                        if (world.GetEntity(target.Id) is null || !target.IsAlive)
+                        {
+                            continue;
+                        }
+
                         if (effect.StatusChance < 100 && rng.Next(100) >= effect.StatusChance)
                         {
                             continue;
@@ -197,4 +207,32 @@ public sealed class CastAbilityAction : IAction
     }
 
     public int GetEnergyCost() => Ability.EnergyCost;
+
+    private int CreateStableSeed(WorldState world)
+    {
+        unchecked
+        {
+            var hash = 2166136261u;
+            void Add(uint value)
+            {
+                hash ^= value;
+                hash *= 16777619u;
+            }
+
+            Add((uint)world.Seed);
+            Add((uint)world.TurnNumber);
+
+            foreach (var b in ActorId.Value.ToByteArray())
+            {
+                Add(b);
+            }
+
+            foreach (var ch in Ability.AbilityId)
+            {
+                Add(ch);
+            }
+
+            return (int)hash;
+        }
+    }
 }

@@ -7,7 +7,7 @@ Once the game shell is running, the title screen and pause menu both expose an i
 ## Requirements
 
 - .NET 8 SDK
-- Godot 4.4 with C# support for editor/runtime work
+- Godot 4.4.1 Mono/.NET for editor/runtime work; verify Godot 4.5 compatibility before upgrading project/package pins
 - Windows PowerShell or another shell capable of running `dotnet`
 - A C#-capable editor such as VS Code or Visual Studio
 
@@ -15,21 +15,22 @@ Once the game shell is running, the title screen and pause menu both expose an i
 
 1. Clone the repository.
 2. Open the repository root.
-3. Restore and build:
+3. Restore and build the editorless stub profile:
 
    ```powershell
-   dotnet build godotussy.sln
+   dotnet build godotussy.csproj -p:UseGodotStubs=true
    ```
 
 4. Run the test suite to confirm the local environment is healthy:
 
    ```powershell
+   dotnet build Tests/godotussy.Tests.csproj
    dotnet run --project Tests/godotussy.Tests.csproj
    ```
 
 ## Opening The Project In Godot
 
-1. Launch Godot 4.4.
+1. Launch Godot 4.4.1 Mono/.NET.
 2. Import or open `project.godot` from the repository root.
 3. Confirm these autoloads are present:
    - `GameManager`
@@ -76,10 +77,16 @@ The editor plugin is still useful for scene-centric workflows, but it is no long
 
 ## Build And Validation Commands
 
-Build the main solution:
+Build the main project using the Godot compatibility stubs:
 
 ```powershell
-dotnet build godotussy.sln
+dotnet build godotussy.csproj -p:UseGodotStubs=true
+```
+
+Build the test project:
+
+```powershell
+dotnet build Tests/godotussy.Tests.csproj
 ```
 
 Run the full custom test harness:
@@ -101,5 +108,5 @@ dotnet run --project Tests/godotussy.Tests.csproj -p:RenderingValidation=true
 ## Common Setup Pitfalls
 
 - Do not leave temporary `.cs` files in the repository root. The SDK project includes them automatically and they can break the build.
-- Use Godot 4.4 when opening the project. The project file declares `4.4` as a feature target.
+- Use Godot 4.4.1 Mono/.NET when opening the project. The SDK and package references pin 4.4.1 even though the Godot feature flag is `4.4`.
 - If you add new Godot API usage to scripts, update the compatibility stubs when necessary so CI-style .NET builds remain healthy.

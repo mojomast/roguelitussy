@@ -16,12 +16,18 @@ Run the full suite:
 dotnet run --project Tests/godotussy.Tests.csproj
 ```
 
-At the time of writing, the full suite executes 172 tests.
+The harness prints the current test count at runtime; avoid hardcoding exact counts in docs unless they are generated from the harness output.
 
-Build everything before a larger change set:
+Build the editorless Godot stub profile before a larger change set:
 
 ```powershell
-dotnet build godotussy.sln
+dotnet build godotussy.csproj -p:UseGodotStubs=true
+```
+
+Build the test project explicitly:
+
+```powershell
+dotnet build Tests/godotussy.Tests.csproj
 ```
 
 Run the rendering-focused compile profile:

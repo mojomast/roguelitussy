@@ -150,6 +150,8 @@ This project already has room prefabs, shops, NPCs, and floor-based generation. 
 
 ### Phase 1: Refactor The Current Level-Up Core
 
+Status: implemented for the current melee and ability-damage kill paths. XP and level-up mutation now route through shared simulation-side death/progression handling instead of being exclusive to melee attack code. Remaining attribution work should extend the same shared path to status-effect kills, trap/environmental kills, and any future damage-over-time systems so they can credit the correct source consistently.
+
 Move level-up logic out of `AttackAction`.
 
 Current problems:

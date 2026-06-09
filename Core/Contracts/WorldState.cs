@@ -40,6 +40,12 @@ public sealed class WorldState : IWorldState
 
     public CombatResolver? CombatResolver { get; set; }
 
+    public ulong CombatRandomState
+    {
+        get => CombatResolver?.RandomState ?? 0UL;
+        set => CombatResolver = value == 0UL ? new CombatResolver(Seed) : new CombatResolver(value);
+    }
+
     public IContentDatabase? ContentDatabase { get; set; }
 
     public void InitGrid(int width, int height)

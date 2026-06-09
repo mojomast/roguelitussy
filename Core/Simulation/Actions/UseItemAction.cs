@@ -12,6 +12,7 @@ public sealed class UseItemAction : IAction
         Template = template;
         CastAbility = castAbility;
         AbilityTarget = abilityTarget ?? default;
+        HasAbilityTarget = abilityTarget.HasValue;
     }
 
     public EntityId ActorId { get; }
@@ -24,6 +25,8 @@ public sealed class UseItemAction : IAction
 
     public Position AbilityTarget { get; }
 
+    public bool HasAbilityTarget { get; }
+
     public ActionType Type => ActionType.UseItem;
 
     public ActionResult Validate(IWorldState world)
@@ -35,7 +38,17 @@ public sealed class UseItemAction : IAction
             return ActionResult.Invalid;
         }
 
-        return Template.Slot == EquipSlot.None ? ActionResult.Success : ActionResult.Invalid;
+        if (Template.Slot != EquipSlot.None)
+        {
+            return ActionResult.Invalid;
+        }
+
+        if (TryCreateCastAbilityAction(world, actor, out var castAction, out var castValidationFailure))
+        {
+            return castAction.Validate(world);
+        }
+
+        return castValidationFailure ?? ActionResult.Success;
     }
 
     public ActionOutcome Execute(WorldState world)
@@ -60,7 +73,12 @@ public sealed class UseItemAction : IAction
             DirtyPositions = { actor.Position },
         };
 
-        ApplyEffect(actor, outcome, world);
+        var effectResult = ApplyEffect(actor, outcome, world);
+        if (effectResult != ActionResult.Success)
+        {
+            return ActionOutcome.Fail(effectResult);
+        }
+
         ConsumeIfNeeded(inventory, item);
         outcome.LogMessages.Add($"{actor.Name} uses {Template.DisplayName}." );
         return outcome;
@@ -68,29 +86,38 @@ public sealed class UseItemAction : IAction
 
     public int GetEnergyCost() => 500;
 
-    private void ApplyEffect(IEntity actor, ActionOutcome outcome, WorldState world)
+    private ActionResult ApplyEffect(IEntity actor, ActionOutcome outcome, WorldState world)
     {
-        if (CastAbility is not null)
+        if (TryCreateCastAbilityAction(world, actor, out var castAction, out var castValidationFailure))
         {
-            var castAction = new CastAbilityAction(ActorId, CastAbility, AbilityTarget);
             var castOutcome = castAction.Execute(world);
+            if (castOutcome.Result != ActionResult.Success)
+            {
+                return castOutcome.Result;
+            }
+
             outcome.CombatEvents.AddRange(castOutcome.CombatEvents);
             outcome.LogMessages.AddRange(castOutcome.LogMessages);
             outcome.DirtyPositions.AddRange(castOutcome.DirtyPositions);
-            return;
+            return ActionResult.Success;
+        }
+
+        if (castValidationFailure is ActionResult failure)
+        {
+            return failure;
         }
 
         if (string.IsNullOrWhiteSpace(Template.UseEffect))
         {
             ApplyStatModifiers(actor.Stats, Template.StatModifiers, 1);
-            return;
+            return ActionResult.Success;
         }
 
         if (string.Equals(Template.UseEffect, "heal", StringComparison.OrdinalIgnoreCase))
         {
             var healAmount = ResolveModifier(Template.StatModifiers, "heal", 5);
             actor.Stats.HP = Math.Min(actor.Stats.MaxHP, actor.Stats.HP + healAmount);
-            return;
+            return ActionResult.Success;
         }
 
         if (TryParseApplyStatus(Template.UseEffect, out var effectType))
@@ -104,13 +131,50 @@ public sealed class UseItemAction : IAction
                 outcome.CombatEvents.Add(new CombatEvent(0, Type, Array.Empty<DamageResult>(), new[] { applied }));
             }
 
-            return;
+            return ActionResult.Success;
         }
 
         if (TryParseCureStatus(Template.UseEffect, out effectType))
         {
             StatusEffectProcessor.RemoveEffect(actor, effectType);
         }
+
+        return ActionResult.Success;
+    }
+
+    private bool TryCreateCastAbilityAction(IWorldState world, IEntity actor, out CastAbilityAction castAction, out ActionResult? validationFailure)
+    {
+        castAction = null!;
+        validationFailure = null;
+
+        var ability = CastAbility;
+        if (ability is null && TryParseCastAbility(Template.UseEffect, out var abilityId))
+        {
+            if (string.IsNullOrWhiteSpace(abilityId) || world is not WorldState { ContentDatabase: not null } mutableWorld || !mutableWorld.ContentDatabase.TryGetAbilityTemplate(abilityId, out ability))
+            {
+                validationFailure = ActionResult.Invalid;
+                return false;
+            }
+        }
+
+        if (ability is null)
+        {
+            return false;
+        }
+
+        var target = AbilityTarget;
+        if (string.Equals(ability.Targeting.Type, "self", StringComparison.OrdinalIgnoreCase))
+        {
+            target = actor.Position;
+        }
+        else if (!HasAbilityTarget)
+        {
+            validationFailure = ActionResult.Invalid;
+            return false;
+        }
+
+        castAction = new CastAbilityAction(ActorId, ability, target);
+        return true;
     }
 
     private void ConsumeIfNeeded(InventoryComponent inventory, ItemInstance item)
@@ -178,6 +242,12 @@ public sealed class UseItemAction : IAction
     {
         const string statusPrefix = "status:";
         const string applyPrefix = "apply:";
+        const string applyStatusPrefix = "apply_status:";
+
+        if (useEffect.StartsWith(applyStatusPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return StatusEffectProcessor.TryParseStatusEffect(useEffect[applyStatusPrefix.Length..], out effectType);
+        }
 
         if (useEffect.StartsWith(statusPrefix, StringComparison.OrdinalIgnoreCase))
         {
@@ -190,6 +260,30 @@ public sealed class UseItemAction : IAction
         }
 
         effectType = StatusEffectType.None;
+        return false;
+    }
+
+    private static bool TryParseCastAbility(string? useEffect, out string? abilityId)
+    {
+        const string castPrefix = "cast_ability:";
+        abilityId = null;
+
+        if (string.IsNullOrWhiteSpace(useEffect))
+        {
+            return false;
+        }
+
+        if (useEffect.StartsWith(castPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            abilityId = useEffect[castPrefix.Length..];
+            return true;
+        }
+
+        if (string.Equals(useEffect, "cast_ability", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
         return false;
     }
 

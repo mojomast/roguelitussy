@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  dotnet-validation:
+    name: .NET 8 stub build and tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore Tests/godotussy.Tests.csproj
+
+      - name: Build Godot stub profile
+        run: dotnet build godotussy.csproj -p:UseGodotStubs=true --no-restore
+
+      - name: Build test project
+        run: dotnet build Tests/godotussy.Tests.csproj --no-restore
+
+      - name: Run full custom test harness
+        run: dotnet run --project Tests/godotussy.Tests.csproj --no-build
+
+      - name: Run rendering validation profile
+        run: dotnet run --project Tests/godotussy.Tests.csproj -p:RenderingValidation=true

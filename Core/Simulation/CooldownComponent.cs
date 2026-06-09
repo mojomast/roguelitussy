@@ -7,6 +7,8 @@ public sealed class CooldownComponent
 {
     private readonly Dictionary<string, int> _cooldowns = new();
 
+    public IReadOnlyDictionary<string, int> ActiveCooldowns => _cooldowns;
+
     public bool IsOnCooldown(string abilityId) => _cooldowns.TryGetValue(abilityId, out var cd) && cd > 0;
 
     public int GetCooldown(string abilityId) => _cooldowns.TryGetValue(abilityId, out var cd) ? cd : 0;
