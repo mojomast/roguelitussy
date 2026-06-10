@@ -13,6 +13,8 @@ public sealed class FOVTests : ITestSuite
         registry.Add("Rendering.FOV blocks tiles behind walls", FovBlocksTilesBehindWalls);
         registry.Add("Rendering.FOV remains symmetric in open space", FovRemainsSymmetric);
         registry.Add("Rendering.WorldView renders map and fog from world state", WorldViewRendersMapAndFog);
+        registry.Add("Rendering.WorldView renders textured tile art", WorldViewRendersTexturedTileArt);
+        registry.Add("Rendering.WorldView scene includes runtime art layers", WorldViewSceneIncludesRuntimeArtLayers);
         registry.Add("Rendering.WorldView binding does not mutate world fog flags", WorldViewBindingDoesNotMutateWorldFogFlags);
         registry.Add("Rendering.WorldView applies the default zoomed-out camera framing", WorldViewAppliesDefaultCameraZoom);
         registry.Add("Rendering.WorldArtCatalog uses the 0x72 wall tile", WorldArtCatalogUses0x72WallArt);
@@ -69,6 +71,30 @@ public sealed class FOVTests : ITestSuite
         Expect.Equal(new Vector2I(1, 0), wallCell.AtlasCoords, "Wall atlas coordinates should match the wall tile.");
         Expect.Equal(FogTileState.Visible, view.GetFogState(world.Player.Position), "Player tile should be visible after initial render.");
         Expect.Equal(WorldView.ToCanvasPosition(world.Player.Position), view.Camera.Position, "Camera should center on the player after rendering.");
+    }
+
+    private static void WorldViewRendersTexturedTileArt()
+    {
+        var world = CreateRoomWorld();
+        var view = CreateWorldView(world);
+
+        Expect.True(view.TileArtLayerNode.GetChildren().Count > 0,
+            "WorldView should populate the runtime TileArtLayer instead of relying on hidden legacy TileMap layers.");
+        Expect.True(view.TileArtLayerNode.GetChildren()
+            .OfType<Node2D>()
+            .Any(tile => tile.GetChildren().OfType<Sprite2D>().Any(sprite => sprite.Texture is Texture2D texture && !string.IsNullOrWhiteSpace(texture.ResourcePath))),
+            "World tile art should contain Sprite2D nodes with imported texture resources.");
+    }
+
+    private static void WorldViewSceneIncludesRuntimeArtLayers()
+    {
+        var scenePath = System.IO.Path.Combine("Scenes", "World", "WorldView.tscn");
+        var scene = System.IO.File.ReadAllText(scenePath);
+
+        Expect.True(scene.Contains("name=\"TileArtLayer\"", System.StringComparison.Ordinal),
+            "WorldView scene should declare TileArtLayer so textured tiles render consistently in editor-spawned scenes.");
+        Expect.True(scene.Contains("name=\"WallCoverLayer\"", System.StringComparison.Ordinal),
+            "WorldView scene should declare WallCoverLayer so wall occluders are not dependent on runtime fallback nodes.");
     }
 
     private static void WorldViewBindingDoesNotMutateWorldFogFlags()

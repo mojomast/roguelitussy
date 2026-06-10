@@ -130,10 +130,15 @@ public sealed class CharacterUXTests : ITestSuite
         Expect.NotNull(previewBody, "Graphical preview should include a body texture.");
         Expect.NotNull(previewTitle, "Graphical preview should expose a title label.");
         Expect.NotNull(previewVariant, "Graphical preview should expose a variant id label.");
+        var previewTexture = previewBody!.Texture;
+        Expect.True(previewTexture is not null,
+            "Graphical preview body should have a loaded Texture2D.");
+        Expect.False(string.IsNullOrWhiteSpace(previewTexture!.ResourcePath),
+            "Graphical preview texture should resolve to a sprite asset path.");
 
         var beforeTitle = previewTitle!.Text;
         var beforeVariant = previewVariant!.Text;
-        var beforeTint = previewBody!.Modulate;
+        var beforeTint = previewBody.Modulate;
 
         menu.HandleKey(Key.Down);
         menu.HandleKey(Key.Down);

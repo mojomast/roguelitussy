@@ -13,6 +13,10 @@ script = ExtResource("1")
 
 [node name="TileMapLayer_Fog" type="TileMapLayer" parent="."]
 
+[node name="TileArtLayer" type="Node2D" parent="."]
+
 [node name="EntityLayer" type="Node2D" parent="."]
+
+[node name="WallCoverLayer" type="Node2D" parent="."]
 
 [node name="Camera2D" type="Camera2D" parent="."]

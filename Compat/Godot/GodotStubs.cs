@@ -376,7 +376,7 @@ public class TextureRect : Control
         KeepAspectCentered,
     }
 
-    public object? Texture { get; set; }
+    public Texture2D? Texture { get; set; }
 
     public StretchModeEnum StretchMode { get; set; }
 }
@@ -632,7 +632,7 @@ public static class Colors
 
 public class Sprite2D : Node2D
 {
-    public object? Texture { get; set; }
+    public Texture2D? Texture { get; set; }
 
     public bool RegionEnabled { get; set; }
 

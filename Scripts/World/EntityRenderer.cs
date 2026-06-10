@@ -266,6 +266,7 @@ public sealed class EntityRenderer
             RemoveChild(spriteRoot, "Body", typeof(ColorRect));
 
             var spriteBody = FindChild<Sprite2D>(spriteRoot, "Body") ?? GetOrCreateChild<Sprite2D>(spriteRoot, "Body");
+            spriteBody.Texture = texture;
             var shouldCrop = ShouldCropPortraitHeadroom(texture);
             spriteBody.RegionEnabled = shouldCrop;
             spriteBody.RegionRect = shouldCrop
@@ -275,7 +276,6 @@ public sealed class EntityRenderer
             var displayScale = ResolveTextureScale(displaySize);
             spriteBody.Position = new Vector2(0f, ResolveBodyVerticalOffset(displaySize, displayScale));
             spriteBody.Scale = displayScale;
-            spriteBody.Texture = texture;
             return;
         }
 

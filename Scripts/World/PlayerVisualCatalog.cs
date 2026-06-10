@@ -63,6 +63,9 @@ internal static class PlayerVisualCatalog
         var variantId = string.IsNullOrWhiteSpace(spriteVariantId)
             ? ComposeVariantId(race, gender, appearance, archetypeId)
             : spriteVariantId.Trim().ToLowerInvariant();
+        var effectiveArchetypeId = string.IsNullOrWhiteSpace(archetypeId)
+            ? ExtractArchetypeFromVariantId(variantId)
+            : archetypeId;
 
         return new PlayerVisualProfile(
             ResolveRaceTint(race),
@@ -71,9 +74,9 @@ internal static class PlayerVisualCatalog
             ResolveRaceSigil(race),
             ResolveAppearanceMark(appearance),
             $"{DisplayIdentity(race)} {DisplayIdentity(gender)}",
-            ResolveSpriteLabel(race, archetypeId),
+            ResolveSpriteLabel(race, effectiveArchetypeId),
             variantId,
-            ResolveTextureKey(race, gender, archetypeId));
+            ResolveTextureKey(race, gender, effectiveArchetypeId));
     }
 
     public static string ComposeVariantId(
@@ -91,6 +94,12 @@ internal static class PlayerVisualCatalog
     }
 
     public static string BuildPreviewToken(PlayerVisualProfile profile) => $"[{profile.RaceSigil}{profile.AppearanceMark}]";
+
+    private static string? ExtractArchetypeFromVariantId(string variantId)
+    {
+        var parts = variantId.Split('_', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 4 ? parts[^1] : null;
+    }
 
     private static string ResolveTextureKey(string raceId, string genderId, string? archetypeId)
     {

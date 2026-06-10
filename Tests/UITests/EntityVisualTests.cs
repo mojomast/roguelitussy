@@ -13,6 +13,7 @@ public sealed class EntityVisualTests : ITestSuite
         registry.Add("UI.EntityRenderer applies identity-driven player sprite tint without world overlays", EntityRendererAppliesIdentityDrivenPlayerSpriteTintWithoutWorldOverlays);
         registry.Add("UI.EntityRenderer refreshes player sprite variant when identity changes", EntityRendererRefreshesPlayerSpriteVariant);
         registry.Add("UI.EntityRenderer uses different 0x72 portraits for different builds", EntityRendererUsesDifferent0x72Portraits);
+        registry.Add("UI.EntityRenderer resolves default vanguard portrait from variant", EntityRendererResolvesDefaultVanguardPortraitFromVariant);
         registry.Add("UI.EntityRenderer keeps visible bodies across repeated refreshes", EntityRendererKeepsVisibleBodiesAcrossRepeatedRefreshes);
         registry.Add("UI.EntityRenderer crops tall player portraits to gameplay bounds", EntityRendererCropsTallPlayerPortraitsToGameplayBounds);
         registry.Add("UI.EntityRenderer honors bound world visibility during stale cache updates", EntityRendererHonorsBoundWorldVisibilityDuringStaleCacheUpdates);
@@ -69,10 +70,10 @@ public sealed class EntityVisualTests : ITestSuite
 
         player.SetComponent(new IdentityComponent
         {
-            RaceId = "dwarf",
-            GenderId = "masculine",
+            RaceId = "elf",
+            GenderId = "feminine",
             AppearanceId = "weathered",
-            SpriteVariantId = "dwarf_masculine_weathered_vanguard",
+            SpriteVariantId = "elf_feminine_weathered_skirmisher",
         });
 
         renderer.UpsertEntity(player);
@@ -122,6 +123,28 @@ public sealed class EntityVisualTests : ITestSuite
         var skirmisherSprite = (Texture2D)skirmisherTexture!;
         Expect.False(GetTextureSourcePath(vanguardSprite) == GetTextureSourcePath(skirmisherSprite),
             "Different builds should no longer share the same base portrait file.");
+    }
+
+    private static void EntityRendererResolvesDefaultVanguardPortraitFromVariant()
+    {
+        var renderer = new EntityRenderer(new Node2D(), new AnimationController());
+        var player = new StubEntity("Player", new Position(1, 1), Faction.Player);
+        player.SetComponent(new IdentityComponent
+        {
+            RaceId = "human",
+            GenderId = "neutral",
+            AppearanceId = "default",
+            SpriteVariantId = "human_neutral_default_vanguard",
+        });
+
+        renderer.UpsertEntity(player);
+
+        var body = FindChild<Sprite2D>(renderer.GetSprite(player.Id)!, "Body");
+        Expect.NotNull(body, "Default vanguard player should render a sprite body.");
+        var texture = body!.Texture;
+        Expect.NotNull(texture, "Default vanguard player should keep a loaded texture assigned.");
+        Expect.True(texture!.ResourcePath.EndsWith("Knight_Male_Idle_1.png", System.StringComparison.Ordinal),
+            "The archetype encoded in SpriteVariantId should resolve the default human vanguard to the knight portrait.");
     }
 
     private static void EntityRendererKeepsVisibleBodiesAcrossRepeatedRefreshes()

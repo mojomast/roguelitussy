@@ -66,6 +66,8 @@ public partial class WorldView : Node2D
 
     public Node2D EntityLayerNode => _entityLayer;
 
+    public Node2D TileArtLayerNode => _tileArtLayer;
+
     public Node2D WallCoverLayerNode => _wallCoverLayer;
 
     public Camera2D Camera => _camera;
@@ -80,7 +82,6 @@ public partial class WorldView : Node2D
 
     public override void _Ready()
     {
-        EnsureAuxiliaryLayers();
         _floorLayer = GetNode<TileMapLayer>("TileMapLayer_Floor");
         _wallLayer = GetNode<TileMapLayer>("TileMapLayer_Walls");
         _objectLayer = GetNode<TileMapLayer>("TileMapLayer_Objects");
@@ -89,6 +90,7 @@ public partial class WorldView : Node2D
         _entityLayer = GetNode<Node2D>("EntityLayer");
         _wallCoverLayer = GetNodeOrNull<Node2D>("WallCoverLayer") ?? _wallCoverLayer;
         _camera = GetNode<Camera2D>("Camera2D");
+        EnsureAuxiliaryLayers();
 
         _entityLayer.ZIndex = EntityLayerZIndex;
         _wallCoverLayer.ZIndex = 40;
