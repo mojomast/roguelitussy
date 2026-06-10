@@ -174,27 +174,23 @@ public sealed class EntityVisualTests : ITestSuite
         var body = FindChild<Sprite2D>(spriteRoot, "Body");
 
         Expect.NotNull(body, "Player renderer should create a body sprite for tall portraits.");
-        Expect.True(body!.Texture is AtlasTexture,
-            "Tall player portraits should crop their transparent headroom before rendering into gameplay tiles.");
-
-        var atlas = (AtlasTexture)body.Texture!;
-        Expect.Equal(8f, atlas.Region.Position.Y,
+        Expect.True(body!.Texture is Texture2D,
+            "Tall player portraits should keep the imported texture assigned to the sprite.");
+        Expect.True(body.RegionEnabled,
+            "Tall player portraits should crop their transparent headroom with Sprite2D region rendering instead of runtime texture wrappers.");
+        Expect.Equal(8f, body.RegionRect.Position.Y,
             "Tall player portraits should skip the empty top rows that were pushing the sprite into nearby wall space.");
-        Expect.Equal(20f, atlas.Region.Size.Y,
+        Expect.Equal(20f, body.RegionRect.Size.Y,
             "Tall player portraits should keep only the gameplay-visible body region after cropping.");
         Expect.Equal(6f, body.Position.Y,
             "Cropped tall portraits should sit lower in the tile so the sprite clears the north wall lip in gameplay.");
         Expect.Equal(1.4f, body.Scale.Y,
             "Cropped tall portraits should scale to the tighter gameplay height budget so they no longer clip into the top wall.");
-        Expect.True(string.IsNullOrEmpty(atlas.ResourcePath),
-            "Runtime atlas wrappers should not claim the imported PNG resource path because Godot treats that as a duplicate loaded resource.");
     }
 
     private static string GetTextureSourcePath(Texture2D texture)
     {
-        return texture is AtlasTexture { Atlas: Texture2D atlas }
-            ? atlas.ResourcePath
-            : texture.ResourcePath;
+        return texture.ResourcePath;
     }
 
     private static void EntityRendererHonorsBoundWorldVisibilityDuringStaleCacheUpdates()

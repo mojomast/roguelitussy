@@ -266,11 +266,16 @@ public sealed class EntityRenderer
             RemoveChild(spriteRoot, "Body", typeof(ColorRect));
 
             var spriteBody = FindChild<Sprite2D>(spriteRoot, "Body") ?? GetOrCreateChild<Sprite2D>(spriteRoot, "Body");
-            var displayTexture = CreateDisplayTexture(texture);
-            var displayScale = ResolveTextureScale(displayTexture);
-            spriteBody.Position = new Vector2(0f, ResolveBodyVerticalOffset(displayTexture, displayScale));
+            var shouldCrop = ShouldCropPortraitHeadroom(texture);
+            spriteBody.RegionEnabled = shouldCrop;
+            spriteBody.RegionRect = shouldCrop
+                ? new Rect2(new Vector2(0f, 8f), new Vector2(16f, 20f))
+                : new Rect2();
+            var displaySize = shouldCrop ? spriteBody.RegionRect.Size : ResolveSourceSize(texture);
+            var displayScale = ResolveTextureScale(displaySize);
+            spriteBody.Position = new Vector2(0f, ResolveBodyVerticalOffset(displaySize, displayScale));
             spriteBody.Scale = displayScale;
-            spriteBody.Texture = displayTexture;
+            spriteBody.Texture = texture;
             return;
         }
 
@@ -280,20 +285,6 @@ public sealed class EntityRenderer
         rectBody.Position = new Vector2(2f, FallbackBodyTopInset);
         rectBody.Size = new Vector2(WorldView.TileSize - 4f, WorldView.TileSize - 4f);
         rectBody.Color = ResolveFallbackTint(entity);
-    }
-
-    private static Texture2D CreateDisplayTexture(Texture2D texture)
-    {
-        if (!ShouldCropPortraitHeadroom(texture))
-        {
-            return texture;
-        }
-
-        return new AtlasTexture
-        {
-            Atlas = texture,
-            Region = new Rect2(new Vector2(0f, 8f), new Vector2(16f, 20f)),
-        };
     }
 
     private static bool ShouldCropPortraitHeadroom(Texture2D texture)
@@ -306,16 +297,15 @@ public sealed class EntityRenderer
             || texture.ResourcePath.EndsWith("Wizzard_Female_Idle_1.png", StringComparison.Ordinal);
     }
 
-    private static Vector2 ResolveTextureScale(Texture2D texture)
+    private static Vector2 ResolveTextureScale(Vector2 sourceSize)
     {
-        var sourceSize = ResolveSourceSize(texture);
         var uniformScale = MathF.Min(EntitySpriteMaxWidth / sourceSize.X, EntitySpriteMaxHeight / sourceSize.Y);
         return new Vector2(uniformScale, uniformScale);
     }
 
-    private static float ResolveBodyVerticalOffset(Texture2D texture, Vector2 scale)
+    private static float ResolveBodyVerticalOffset(Vector2 sourceSize, Vector2 scale)
     {
-        var scaledHeight = ResolveSourceSize(texture).Y * scale.Y;
+        var scaledHeight = sourceSize.Y * scale.Y;
         return (WorldView.TileSize * 0.5f) - (scaledHeight * 0.5f);
     }
 

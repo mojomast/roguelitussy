@@ -633,6 +633,10 @@ public static class Colors
 public class Sprite2D : Node2D
 {
     public object? Texture { get; set; }
+
+    public bool RegionEnabled { get; set; }
+
+    public Rect2 RegionRect { get; set; }
 }
 
 public readonly record struct TileCell(int SourceId, Vector2I AtlasCoords);
