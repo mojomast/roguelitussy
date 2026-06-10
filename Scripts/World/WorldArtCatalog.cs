@@ -62,6 +62,12 @@ public static class WorldArtCatalog
         return layers;
     }
 
+    public static void ClearTextureCachesForTests()
+    {
+        TextureCache.Clear();
+        PlayerVisualCatalog.ClearTextureCacheForTests();
+    }
+
     public static Texture2D? GetTileTexture(TileType tileType, bool isDoorOpen)
     {
         return tileType switch
@@ -423,12 +429,6 @@ public static class WorldArtCatalog
 
     private static Texture2D? Load(string path)
     {
-        if (!TextureCache.TryGetValue(path, out var texture))
-        {
-            texture = GD.Load<Texture2D>(path);
-            TextureCache[path] = texture;
-        }
-
-        return texture;
+        return RuntimeTextureLoader.Load(path, TextureCache);
     }
 }

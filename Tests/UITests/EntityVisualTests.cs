@@ -14,6 +14,7 @@ public sealed class EntityVisualTests : ITestSuite
         registry.Add("UI.EntityRenderer refreshes player sprite variant when identity changes", EntityRendererRefreshesPlayerSpriteVariant);
         registry.Add("UI.EntityRenderer uses different 0x72 portraits for different builds", EntityRendererUsesDifferent0x72Portraits);
         registry.Add("UI.EntityRenderer resolves default vanguard portrait from variant", EntityRendererResolvesDefaultVanguardPortraitFromVariant);
+        registry.Add("UI.EntityRenderer falls back when portrait import cache is missing", EntityRendererFallsBackWhenPortraitImportCacheIsMissing);
         registry.Add("UI.EntityRenderer keeps visible bodies across repeated refreshes", EntityRendererKeepsVisibleBodiesAcrossRepeatedRefreshes);
         registry.Add("UI.EntityRenderer crops tall player portraits to gameplay bounds", EntityRendererCropsTallPlayerPortraitsToGameplayBounds);
         registry.Add("UI.EntityRenderer honors bound world visibility during stale cache updates", EntityRendererHonorsBoundWorldVisibilityDuringStaleCacheUpdates);
@@ -145,6 +146,39 @@ public sealed class EntityVisualTests : ITestSuite
         Expect.NotNull(texture, "Default vanguard player should keep a loaded texture assigned.");
         Expect.True(texture!.ResourcePath.EndsWith("Knight_Male_Idle_1.png", System.StringComparison.Ordinal),
             "The archetype encoded in SpriteVariantId should resolve the default human vanguard to the knight portrait.");
+    }
+
+    private static void EntityRendererFallsBackWhenPortraitImportCacheIsMissing()
+    {
+        const string path = "res://Assets/Sprites/0x72/Orc_Warrior_Idle_1.png";
+        WorldArtCatalog.ClearTextureCachesForTests();
+        GD.MissingResourcePaths.Add(path);
+        try
+        {
+            var renderer = new EntityRenderer(new Node2D(), new AnimationController());
+            var player = new StubEntity("Player", new Position(1, 1), Faction.Player);
+            player.SetComponent(new IdentityComponent
+            {
+                RaceId = "orc",
+                GenderId = "masculine",
+                AppearanceId = "default",
+                SpriteVariantId = "orc_masculine_default_skirmisher",
+            });
+
+            renderer.UpsertEntity(player);
+
+            var body = FindChild<Sprite2D>(renderer.GetSprite(player.Id)!, "Body");
+            Expect.NotNull(body, "Player should still create a sprite body when imported portrait cache files are absent.");
+            Expect.True(body!.Texture is ImageTexture,
+                "Player portraits should fall back to source image loading when the generated Godot import cache is missing on first run.");
+            Expect.Equal(path, body.Texture!.ResourcePath,
+                "Fallback player portrait should preserve the source resource path.");
+        }
+        finally
+        {
+            GD.MissingResourcePaths.Remove(path);
+            WorldArtCatalog.ClearTextureCachesForTests();
+        }
     }
 
     private static void EntityRendererKeepsVisibleBodiesAcrossRepeatedRefreshes()

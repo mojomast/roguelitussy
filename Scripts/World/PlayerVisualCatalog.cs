@@ -40,6 +40,11 @@ internal static class PlayerVisualCatalog
         };
     }
 
+    public static void ClearTextureCacheForTests()
+    {
+        TextureCache.Clear();
+    }
+
     public static PlayerVisualProfile Resolve(IEntity entity)
     {
         var identity = entity.GetComponent<IdentityComponent>();
@@ -152,13 +157,7 @@ internal static class PlayerVisualCatalog
 
     private static Texture2D? Load(string path)
     {
-        if (!TextureCache.TryGetValue(path, out var texture))
-        {
-            texture = GD.Load<Texture2D>(path);
-            TextureCache[path] = texture;
-        }
-
-        return texture;
+        return RuntimeTextureLoader.Load(path, TextureCache);
     }
 
     private static Color ResolveRaceTint(string raceId)

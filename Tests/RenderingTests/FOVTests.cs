@@ -18,6 +18,8 @@ public sealed class FOVTests : ITestSuite
         registry.Add("Rendering.WorldView binding does not mutate world fog flags", WorldViewBindingDoesNotMutateWorldFogFlags);
         registry.Add("Rendering.WorldView applies the default zoomed-out camera framing", WorldViewAppliesDefaultCameraZoom);
         registry.Add("Rendering.WorldArtCatalog uses the 0x72 wall tile", WorldArtCatalogUses0x72WallArt);
+        registry.Add("Rendering.WorldArtCatalog falls back when import cache is missing", WorldArtCatalogFallsBackWhenImportCacheIsMissing);
+        registry.Add("Rendering.WorldArtCatalog falls back before imported loads fail", WorldArtCatalogFallsBackBeforeImportedLoadsFail);
         registry.Add("Rendering.WorldArtCatalog selects contextual wall art for exposed edges", WorldArtCatalogSelectsContextualWallArt);
         registry.Add("Rendering.WorldArtCatalog caps top-left room corners clearly", WorldArtCatalogCapsTopLeftRoomCornersClearly);
         registry.Add("Rendering.WorldArtCatalog resolves sprites for the current enemy roster", WorldArtCatalogResolvesSpritesForCurrentEnemyRoster);
@@ -202,6 +204,67 @@ public sealed class FOVTests : ITestSuite
         Expect.NotNull(wallTexture, "Wall art should resolve to a texture.");
         Expect.Equal("res://Assets/Tilesets/0x72/Wall_Mid.png", wallTexture!.ResourcePath,
             "Wall art should come from the imported 0x72 tileset instead of the regressed Kenney crop.");
+    }
+
+    private static void WorldArtCatalogFallsBackWhenImportCacheIsMissing()
+    {
+        const string path = "res://Assets/Tilesets/0x72/Wall_Mid.png";
+        WorldArtCatalog.ClearTextureCachesForTests();
+        GD.MissingResourcePaths.Add(path);
+        try
+        {
+            var wallTexture = WorldArtCatalog.GetTileTexture(TileType.Wall, false);
+
+            Expect.True(wallTexture is ImageTexture,
+                "World art should fall back to source image loading when the generated Godot import cache is missing on first run.");
+            Expect.Equal(path, wallTexture!.ResourcePath,
+                "Fallback world art should preserve the source resource path for rendering diagnostics.");
+        }
+        finally
+        {
+            GD.MissingResourcePaths.Remove(path);
+            WorldArtCatalog.ClearTextureCachesForTests();
+        }
+    }
+
+    private static void WorldArtCatalogFallsBackBeforeImportedLoadsFail()
+    {
+        const string path = "res://Assets/Tilesets/0x72/Wall_Mid.png";
+        var importMetadataPath = System.IO.Path.Combine("Assets", "Tilesets", "0x72", "Wall_Mid.png.import");
+        var importMetadata = System.IO.File.ReadAllText(importMetadataPath);
+        var importedPath = importMetadata.Split('\n')
+            .First(line => line.StartsWith("path=\"", System.StringComparison.Ordinal))[6..]
+            .TrimEnd('"', '\r');
+        var importedFullPath = ProjectSettings.GlobalizePath(importedPath);
+        var backupPath = importedFullPath + ".testbak";
+
+        WorldArtCatalog.ClearTextureCachesForTests();
+        GD.MissingResourcePaths.Add(path);
+        if (System.IO.File.Exists(importedFullPath))
+        {
+            System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(backupPath)!);
+            System.IO.File.Move(importedFullPath, backupPath, overwrite: true);
+        }
+
+        try
+        {
+            var wallTexture = WorldArtCatalog.GetTileTexture(TileType.Wall, false);
+
+            Expect.True(wallTexture is ImageTexture,
+                "When .import metadata points at a missing .ctex, world art should bypass imported resource loading and use the source image fallback.");
+            Expect.Equal(path, wallTexture!.ResourcePath,
+                "Missing .ctex fallback should preserve the source resource path.");
+        }
+        finally
+        {
+            GD.MissingResourcePaths.Remove(path);
+            if (System.IO.File.Exists(backupPath))
+            {
+                System.IO.File.Move(backupPath, importedFullPath, overwrite: true);
+            }
+
+            WorldArtCatalog.ClearTextureCachesForTests();
+        }
     }
 
     private static void WorldArtCatalogSelectsContextualWallArt()

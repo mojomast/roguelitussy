@@ -391,6 +391,35 @@ public class Texture2D : GodotObject
     public string ResourcePath { get; set; } = string.Empty;
 }
 
+public class Image : GodotObject
+{
+    public static HashSet<string> MissingImagePaths { get; } = new(StringComparer.Ordinal);
+
+    public string Path { get; private set; } = string.Empty;
+
+    public static Image? LoadFromFile(string path)
+    {
+        if (MissingImagePaths.Contains(path))
+        {
+            return null;
+        }
+
+        return new Image { Path = path };
+    }
+
+    public bool IsEmpty() => string.IsNullOrWhiteSpace(Path);
+}
+
+public class ImageTexture : Texture2D
+{
+    public Image? Image { get; private set; }
+
+    public static ImageTexture CreateFromImage(Image image)
+    {
+        return new ImageTexture { Image = image };
+    }
+}
+
 public class AtlasTexture : Texture2D
 {
     public Texture2D? Atlas { get; set; }
@@ -448,9 +477,16 @@ public static class Input
 
 public static class GD
 {
+    public static HashSet<string> MissingResourcePaths { get; } = new(StringComparer.Ordinal);
+
     public static T? Load<T>(string path)
         where T : class, new()
     {
+        if (MissingResourcePaths.Contains(path))
+        {
+            return null;
+        }
+
         var resource = new T();
         if (resource is Texture2D texture)
         {
