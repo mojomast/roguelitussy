@@ -103,6 +103,8 @@ public sealed class MigrationTests : ITestSuite
         var metadata = manager.GetSaveMetadata(SaveSlots.Slot1);
         Expect.NotNull(metadata, "Migrated save should expose metadata");
         Expect.Equal(SaveSerializer.CurrentVersion, metadata!.Version, "Migrated save should report the new version");
+        Expect.True(metadata.ContentVersion is null, "Migrated v2 saves should report unknown content version.");
+        Expect.True(metadata.ContentHash is null, "Migrated v2 saves should report unknown content hash.");
     }
 
     private static string Version2SaveJson() => """
@@ -159,6 +161,8 @@ public sealed class MigrationTests : ITestSuite
         var metadata = manager.GetSaveMetadata(SaveSlots.Slot1);
         Expect.NotNull(metadata, "Migrated v7 save should expose metadata");
         Expect.Equal(SaveSerializer.CurrentVersion, metadata!.Version, "Migrated v7 save should report the current normalized version");
+        Expect.True(metadata.ContentVersion is null, "Migrated v7 saves should report unknown content version.");
+        Expect.True(metadata.ContentHash is null, "Migrated v7 saves should report unknown content hash.");
     }
 
     private static string Version7SaveJson() => """

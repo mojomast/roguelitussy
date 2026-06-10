@@ -6,6 +6,9 @@ namespace Roguelike.Tests.Stubs;
 
 public sealed class StubContentDatabase : IContentDatabase
 {
+    public const int DefaultContentVersion = 1;
+    public const string DefaultContentHash = "stub-content-hash";
+
     public StubContentDatabase()
     {
         ItemTemplates = new Dictionary<string, ItemTemplate>
@@ -343,6 +346,10 @@ public sealed class StubContentDatabase : IContentDatabase
                 "mystic"),
         };
     }
+
+    public int ContentVersion { get; set; } = DefaultContentVersion;
+
+    public string ContentHash { get; set; } = DefaultContentHash;
 
     public IReadOnlyDictionary<string, ItemTemplate> ItemTemplates { get; }
 

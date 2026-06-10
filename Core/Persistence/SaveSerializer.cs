@@ -12,6 +12,10 @@ internal sealed class SaveFileData
 
     public DateTime SavedAt { get; set; }
 
+    public int? ContentVersion { get; set; }
+
+    public string? ContentHash { get; set; }
+
     public int Seed { get; set; }
 
     public int Depth { get; set; }
@@ -305,6 +309,8 @@ public static class SaveSerializer
         {
             Version = CurrentVersion,
             SavedAt = savedAt,
+            ContentVersion = world.ContentDatabase?.ContentVersion,
+            ContentHash = world.ContentDatabase?.ContentHash,
             Seed = world.Seed,
             Depth = world.Depth,
             TurnNumber = world.TurnNumber,
@@ -338,6 +344,8 @@ public static class SaveSerializer
         {
             Version = CurrentVersion,
             SavedAt = savedAt,
+            ContentVersion = snapshot.ActiveWorld.ContentDatabase?.ContentVersion,
+            ContentHash = snapshot.ActiveWorld.ContentDatabase?.ContentHash,
             Seed = snapshot.Seed,
             Depth = snapshot.CurrentFloor,
             TurnNumber = snapshot.ActiveWorld.TurnNumber,
@@ -360,7 +368,7 @@ public static class SaveSerializer
     internal static SaveMetadata ToMetadata(SaveFileData data, int slotIndex)
     {
         var playerName = data.Entities.First(entity => string.Equals(entity.Id, data.PlayerId, StringComparison.OrdinalIgnoreCase)).Name;
-        return new SaveMetadata(slotIndex, data.Depth, data.TurnNumber, playerName, data.SavedAt, data.Version);
+        return new SaveMetadata(slotIndex, data.Depth, data.TurnNumber, playerName, data.SavedAt, data.Version, data.ContentVersion, data.ContentHash);
     }
 
     internal static WorldState ToWorldState(SaveFileData data)

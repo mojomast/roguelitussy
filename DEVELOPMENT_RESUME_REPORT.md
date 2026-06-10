@@ -47,6 +47,7 @@ godot --headless --path . --quit
 - Completed: v8 persistence loose-end coverage now rejects missing active floors, duplicate player entities across floors, and duplicate floor depths; UI/GameManager coverage saves a multi-floor run, reloads it, and travels back to a cached inactive floor.
 - Completed: authored item/status/enemy visual paths now resolve to committed assets, with simple SVG item/status icon source art and enemy paths repointed to existing 0x72 sprites.
 - Completed: inventory and menu screens received a focused presentation pass: stable item category glyphs, explicit equipped/stack/charge/comparison details, contextual inventory footer text, clearer pause/help hierarchy, and sectioned character-sheet chrome.
+- Completed: v8 saves now carry optional content version/hash metadata for warning-only load diagnostics when runtime JSON content differs from the saved run; legacy/migrated saves still load with unknown content metadata.
 
 ## Current Strengths
 

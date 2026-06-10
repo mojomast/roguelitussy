@@ -144,11 +144,13 @@ Notable details:
 - Explored and visible map flags are stored as packed bitfields.
 - Legacy version 1 through version 7 payloads are migrated on load.
 - Saves now persist the active floor plus cached inactive floors through a normalized floor list, while retaining active-floor root aliases for compatibility with metadata and existing tooling.
+- New saves include optional content metadata (`contentVersion` and a deterministic content hash) so load flows can warn when the authored JSON set differs from the one that created the save.
 - Multi-floor validation requires unique floor depths, an active floor payload, and exactly one player entity across all saved floors on the active floor.
 - Persistence tests cover malformed v8 floor payloads for missing active floors, duplicate player entities across floors, and duplicate floor depths; `GameManager` save/load coverage also exercises travel back to a cached inactive floor.
 - Progression, identity, inventory/equipment, wallet, NPC, merchant, chest, ability, cooldown, XP value, AI/template rehydration data, and status-effect source attribution round-trip through the normalized save shape where applicable.
 - `CombatRandomState` is persisted so combat RNG continues deterministically after load instead of restarting from only seed and turn number.
 - `ItemRandomState` is persisted so stack splitting and stack overflow clone IDs continue deterministically after save/load.
+- Content metadata is warning-only: legacy or migrated saves with missing metadata still load, and hash/version mismatches emit a runtime log warning instead of failing validation.
 - Save validation checks dimensions, entity IDs, inventory/equipment integrity, persisted component payloads, status effects, and payload sizes.
 
 ### Save Slots

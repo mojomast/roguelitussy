@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -12,6 +13,19 @@ namespace Roguelike.Core;
 public sealed class ContentLoader : IContentDatabase
 {
     private const int SupportedVersion = 1;
+    private static readonly string[] RequiredContentFiles =
+    {
+        "items.json",
+        "enemies.json",
+        "abilities.json",
+        "perks.json",
+        "dialogs.json",
+        "npcs.json",
+        "status_effects.json",
+        "room_prefabs.json",
+        "loot_tables.json",
+    };
+
     private static readonly Regex StableIdPattern = new("^[a-z0-9_]+$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -21,6 +35,10 @@ public sealed class ContentLoader : IContentDatabase
     };
 
     public string ContentDirectory { get; }
+
+    public int ContentVersion { get; }
+
+    public string ContentHash { get; }
 
     public IReadOnlyDictionary<string, ItemTemplate> ItemTemplates { get; }
 
@@ -76,9 +94,12 @@ public sealed class ContentLoader : IContentDatabase
         SortedDictionary<string, PerkTemplate> perkTemplates,
         SortedDictionary<string, NpcTemplate> npcTemplates,
         SortedDictionary<string, DialogueTemplate> dialogueTemplates,
+        string contentHash,
         IReadOnlyList<string> validationErrors)
     {
         ContentDirectory = contentDirectory;
+        ContentVersion = SupportedVersion;
+        ContentHash = contentHash;
         ItemDefinitions = new ReadOnlyDictionary<string, ItemDefinition>(itemDefinitions);
         EnemyDefinitions = new ReadOnlyDictionary<string, EnemyDefinition>(enemyDefinitions);
         AbilityDefinitions = new ReadOnlyDictionary<string, AbilityDefinition>(abilityDefinitions);
@@ -185,6 +206,7 @@ public sealed class ContentLoader : IContentDatabase
             tileLegend);
 
         validationErrors.AddRange(DifficultyScaler.ValidateBalance(itemDefinitions, enemyDefinitions, lootDefinitions));
+        var contentHash = ComputeContentHash(fullDirectory);
 
         var loader = new ContentLoader(
             fullDirectory,
@@ -204,6 +226,7 @@ public sealed class ContentLoader : IContentDatabase
             perkTemplates,
             npcTemplates,
             dialogueTemplates,
+            contentHash,
             validationErrors.AsReadOnly());
 
         if (throwOnValidationErrors)
@@ -225,15 +248,7 @@ public sealed class ContentLoader : IContentDatabase
         while (current is not null)
         {
             var candidate = Path.Combine(current.FullName, "Content");
-            if (File.Exists(Path.Combine(candidate, "items.json"))
-                && File.Exists(Path.Combine(candidate, "enemies.json"))
-                && File.Exists(Path.Combine(candidate, "abilities.json"))
-                && File.Exists(Path.Combine(candidate, "perks.json"))
-                && File.Exists(Path.Combine(candidate, "dialogs.json"))
-                && File.Exists(Path.Combine(candidate, "npcs.json"))
-                && File.Exists(Path.Combine(candidate, "status_effects.json"))
-                && File.Exists(Path.Combine(candidate, "room_prefabs.json"))
-                && File.Exists(Path.Combine(candidate, "loot_tables.json")))
+            if (RequiredContentFiles.All(fileName => File.Exists(Path.Combine(candidate, fileName))))
             {
                 return candidate;
             }
@@ -242,6 +257,23 @@ public sealed class ContentLoader : IContentDatabase
         }
 
         throw new DirectoryNotFoundException("Could not locate the repository Content directory.");
+    }
+
+    private static string ComputeContentHash(string contentDirectory)
+    {
+        using var sha256 = SHA256.Create();
+        foreach (var fileName in RequiredContentFiles)
+        {
+            var nameBytes = System.Text.Encoding.UTF8.GetBytes(fileName);
+            sha256.TransformBlock(nameBytes, 0, nameBytes.Length, null, 0);
+            sha256.TransformBlock(new byte[] { 0 }, 0, 1, null, 0);
+            var fileBytes = File.ReadAllBytes(Path.Combine(contentDirectory, fileName));
+            sha256.TransformBlock(fileBytes, 0, fileBytes.Length, null, 0);
+            sha256.TransformBlock(new byte[] { 0 }, 0, 1, null, 0);
+        }
+
+        sha256.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+        return Convert.ToHexString(sha256.Hash!).ToLowerInvariant();
     }
 
     public bool TryGetItemTemplate(string templateId, out ItemTemplate template)

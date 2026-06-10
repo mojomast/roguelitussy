@@ -36,6 +36,8 @@ The current content documents use version `1`.
 
 Keep document versions aligned with the expectations in `ContentLoader`. If the loader changes compatibility rules, update the documentation and validation tests at the same time.
 
+`ContentLoader` also computes a deterministic SHA-256 hash from the required JSON files in fixed order. New saves store the current content version and hash as optional metadata. Loading remains warning-only: missing metadata or a version/hash mismatch should alert the player/developer through the runtime log, but it should not reject the save by itself.
+
 ## ID Rules
 
 Content IDs should be stable lowercase snake_case strings.
@@ -45,6 +47,7 @@ This matters because:
 - content is referenced across multiple JSON files
 - tests assume stable IDs
 - content lookups are exact and deterministic
+- saves can contain content-backed references such as item template IDs, ability IDs, NPC/dialog IDs, and persisted runtime components
 
 ## Loader Behavior
 
@@ -121,7 +124,7 @@ Content validation tests assert the expected item, enemy, loot table, room prefa
 
 Authored item, enemy, and status-effect visual paths are also audited by tests to ensure each `res://` path resolves to a committed source file. Runtime loading remains soft: missing art should not crash content loading, but repository content should keep these paths valid.
 
-Current item and status icons are simple limited-palette SVG source files under `Assets/Sprites/items/` and `Assets/Sprites/ui/`. Keep future SVGs simple, avoid embedded text, and run the Godot headless editor import after changing assets so Godot import metadata/cache can be regenerated locally.
+Current item and status icons are simple limited-palette SVG source files under `Assets/Sprites/items/` and `Assets/Sprites/ui/`. Keep future SVGs simple, avoid embedded text, commit the matching `.svg.import` sidecars, and run the Godot headless editor import after changing assets so ignored `.godot/imported` cache files can be regenerated locally.
 
 ## Godot Tooling And Content
 

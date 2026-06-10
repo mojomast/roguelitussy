@@ -8,4 +8,6 @@ public sealed record SaveMetadata(
     int TurnNumber,
     string PlayerName,
     DateTime SavedAt,
-    int Version);
+    int Version,
+    int? ContentVersion,
+    string? ContentHash);

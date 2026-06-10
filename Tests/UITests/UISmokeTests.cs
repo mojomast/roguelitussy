@@ -14,6 +14,7 @@ public sealed class UISmokeTests : ITestSuite
         registry.Add("UI.GameManager new game generates a populated floor", GameManagerGeneratesPopulatedFloor);
         registry.Add("UI.GameManager floor travel preserves run state", GameManagerPreservesRunStateAcrossFloors);
         registry.Add("UI.GameManager save load travel back restores inactive floor", GameManagerSaveLoadTravelBackRestoresInactiveFloor);
+        registry.Add("UI.GameManager load warns on content metadata mismatch", GameManagerLoadWarnsOnContentMetadataMismatch);
         registry.Add("UI.GameManager floor travel succeeds when arrival stair is occupied", GameManagerFloorTravelFindsNearbyArrival);
         registry.Add("UI.GameManager floor travel restores mutated arrival stairs", GameManagerFloorTravelRepairsMutatedArrivalTile);
         registry.Add("UI.HUD updates from bus and exposes keyboard toggles", HudUpdatesFromBus);
@@ -133,6 +134,39 @@ public sealed class UISmokeTests : ITestSuite
         Expect.True(loaded.World.GetEntity(removedEnemy.Id) is null, "Inactive floor entity removals should survive save/load.");
         Expect.True(loaded.World.GetItemsAt(new Position(3, 3)).Any(item => item.TemplateId == "floor_cache_token"), "Inactive floor ground items should survive save/load.");
         Expect.Equal(1, loaded.World.Entities.Count(entity => entity.Id == loaded.World.Player.Id), "Returning to the cached floor should not duplicate the player.");
+    }
+
+    private static void GameManagerLoadWarnsOnContentMetadataMismatch()
+    {
+        var saveManager = new StubSaveManager();
+        var gameManager = new GameManager();
+        var bus = new EventBus();
+        var content = new StubContentDatabase
+        {
+            ContentVersion = 1,
+            ContentHash = "runtime-hash",
+        };
+        gameManager.AttachServices(new WorldState(), new TurnScheduler(), new StubGenerator(), new FOVCalculator(), content, saveManager, bus);
+        gameManager.StartNewGame(9001);
+
+        Expect.True(gameManager.SaveToSlot(1), "Test setup should save a run before testing load warnings.");
+        var metadata = saveManager.GetSaveMetadata(1)!;
+        saveManager.SetMetadata(1, metadata with { ContentHash = "older-hash" });
+
+        var loaded = new GameManager();
+        var loadedBus = new EventBus();
+        var logs = new System.Collections.Generic.List<string>();
+        loadedBus.LogMessage += logs.Add;
+        loaded.AttachServices(new WorldState(), new TurnScheduler(), new StubGenerator(), new FOVCalculator(), content, saveManager, loadedBus);
+
+        Expect.True(loaded.LoadFromSlot(1), "Content metadata mismatch should warn but still load.");
+        Expect.True(logs.Any(message => message.Contains("content hash differs", System.StringComparison.Ordinal)), "Load should warn when saved content hash differs from runtime content.");
+
+        saveManager.SetMetadata(1, metadata with { ContentVersion = null, ContentHash = null });
+        logs.Clear();
+
+        Expect.True(loaded.LoadFromSlot(1), "Missing content metadata should warn but still load.");
+        Expect.True(logs.Any(message => message.Contains("no content metadata", System.StringComparison.Ordinal)), "Load should warn when a save has no content metadata.");
     }
 
     private static void HudUpdatesFromBus()

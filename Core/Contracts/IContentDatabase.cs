@@ -4,6 +4,10 @@ namespace Roguelike.Core;
 
 public interface IContentDatabase
 {
+    int ContentVersion { get; }
+
+    string ContentHash { get; }
+
     IReadOnlyDictionary<string, ItemTemplate> ItemTemplates { get; }
 
     IReadOnlyDictionary<string, EnemyTemplate> EnemyTemplates { get; }

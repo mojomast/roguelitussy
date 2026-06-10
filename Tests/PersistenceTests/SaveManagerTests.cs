@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json.Nodes;
 using Roguelike.Core;
+using Roguelike.Tests.Stubs;
 using Roguelike.Tests.TestFramework;
 
 namespace Roguelike.Tests.PersistenceTests;
@@ -18,6 +19,8 @@ public sealed class SaveManagerTests : ITestSuite
         registry.Add("Persistence.SaveValidator rejects v8 saves with duplicate player across floors", RejectsDuplicatePlayerAcrossFloors);
         registry.Add("Persistence.SaveValidator rejects v8 saves with duplicate floor depths", RejectsDuplicateFloorDepths);
         registry.Add("Persistence.SaveManager exposes save metadata", MetadataIsAvailableAfterSave);
+        registry.Add("Persistence.SaveManager stores optional content metadata", StoresOptionalContentMetadata);
+        registry.Add("Persistence.SaveManager accepts saves without content metadata", AcceptsMissingContentMetadata);
         registry.Add("Persistence.SaveManager supports autosave slot", AutosaveSlotUsesDedicatedPath);
     }
 
@@ -51,6 +54,57 @@ public sealed class SaveManagerTests : ITestSuite
         Expect.Equal(world.Player.Name, metadata.PlayerName, "Metadata should include the player name");
         Expect.Equal(sandbox.Timestamp, metadata.SavedAt, "Metadata should use the save timestamp");
         Expect.Equal(SaveSerializer.CurrentVersion, metadata.Version, "Metadata should expose the normalized save version");
+        Expect.True(metadata.ContentVersion is null, "Saves without attached content should report unknown content version.");
+        Expect.True(metadata.ContentHash is null, "Saves without attached content should report unknown content hash.");
+    }
+
+    private static void StoresOptionalContentMetadata()
+    {
+        using var sandbox = SaveSandbox.Create();
+        var manager = new SaveManager(sandbox.DirectoryPath, sandbox.Clock);
+        var world = CreateWorld();
+        world.ContentDatabase = new StubContentDatabase
+        {
+            ContentVersion = 1,
+            ContentHash = "abc123",
+        };
+
+        Expect.True(manager.SaveGame(world, SaveSlots.Slot1).GetAwaiter().GetResult(), "SaveManager should save content-backed worlds.");
+
+        var metadata = manager.GetSaveMetadata(SaveSlots.Slot1);
+        Expect.NotNull(metadata, "Saved content metadata should be exposed through slot metadata.");
+        Expect.Equal(1, metadata!.ContentVersion!.Value, "Metadata should include the saved content document version.");
+        Expect.Equal("abc123", metadata.ContentHash!, "Metadata should include the saved content hash.");
+
+        var root = LoadSaveJson(Path.Combine(sandbox.DirectoryPath, SaveSlots.GetFileName(SaveSlots.Slot1)));
+        Expect.Equal(1, (int)root["contentVersion"]!, "Serialized save JSON should contain contentVersion.");
+        Expect.Equal("abc123", (string)root["contentHash"]!, "Serialized save JSON should contain contentHash.");
+    }
+
+    private static void AcceptsMissingContentMetadata()
+    {
+        using var sandbox = SaveSandbox.Create();
+        var manager = new SaveManager(sandbox.DirectoryPath, sandbox.Clock);
+        var world = CreateWorld();
+        world.ContentDatabase = new StubContentDatabase
+        {
+            ContentVersion = 1,
+            ContentHash = "abc123",
+        };
+
+        Expect.True(manager.SaveGame(world, SaveSlots.Slot1).GetAwaiter().GetResult(), "Test setup should save a valid content-backed world.");
+        var path = Path.Combine(sandbox.DirectoryPath, SaveSlots.GetFileName(SaveSlots.Slot1));
+        var root = LoadSaveJson(path);
+        root.Remove("contentVersion");
+        root.Remove("contentHash");
+        File.WriteAllText(path, root.ToJsonString());
+
+        var loaded = manager.LoadGame(SaveSlots.Slot1).GetAwaiter().GetResult();
+        Expect.NotNull(loaded, "Missing content metadata should not block loading.");
+        var metadata = manager.GetSaveMetadata(SaveSlots.Slot1);
+        Expect.NotNull(metadata, "Missing content metadata should not suppress otherwise valid slot metadata.");
+        Expect.True(metadata!.ContentVersion is null, "Missing contentVersion should remain unknown after load.");
+        Expect.True(metadata.ContentHash is null, "Missing contentHash should remain unknown after load.");
     }
 
     private static void RoundTripRestoresMultiFloorRunState()

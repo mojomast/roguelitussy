@@ -349,6 +349,8 @@ public partial class GameManager : Node
             return false;
         }
 
+        WarnIfContentMetadataDiffers(slot);
+
         Seed = snapshot.Seed;
         _cachedFloors.Clear();
         _floorEntrances.Clear();
@@ -365,6 +367,31 @@ public partial class GameManager : Node
         Bus?.EmitTurnCompleted();
         Bus?.EmitLogMessage($"Loaded slot {slot}.");
         return true;
+    }
+
+    private void WarnIfContentMetadataDiffers(int slot)
+    {
+        var metadata = SaveManager?.GetSaveMetadata(slot);
+        if (metadata is null || Content is null)
+        {
+            return;
+        }
+
+        if (metadata.ContentVersion is null || string.IsNullOrWhiteSpace(metadata.ContentHash))
+        {
+            Bus?.EmitLogMessage($"Loaded slot {slot}; save has no content metadata, compatibility cannot be verified.");
+            return;
+        }
+
+        if (metadata.ContentVersion.Value != Content.ContentVersion)
+        {
+            Bus?.EmitLogMessage($"Loaded slot {slot}; save content version {metadata.ContentVersion.Value} differs from runtime content version {Content.ContentVersion}.");
+        }
+
+        if (!string.Equals(metadata.ContentHash, Content.ContentHash, StringComparison.OrdinalIgnoreCase))
+        {
+            Bus?.EmitLogMessage($"Loaded slot {slot}; save content hash differs from current runtime content. Some content-backed references may behave differently.");
+        }
     }
 
     private SaveRunSnapshot CreateSaveRunSnapshot()

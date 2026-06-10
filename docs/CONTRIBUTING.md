@@ -17,6 +17,7 @@ This repository is organized around a strict split between deterministic simulat
 - Avoid introducing Godot dependencies into `Core/`.
 - Keep public contracts stable unless the change genuinely requires contract evolution.
 - Treat save compatibility as a real project constraint.
+- Treat content IDs as save-facing references. Content version/hash metadata is warning-only; do not bump the save version unless the normalized save shape or load semantics become incompatible.
 
 ## Workflow Expectations
 
@@ -64,6 +65,7 @@ Before committing, verify:
 - docs still match the implementation
 - no temporary root-level `.cs` files were left behind
 - content changes preserve stable references
+- save/content metadata warnings remain non-blocking unless an explicit compatibility gate is added
 - authored `res://` art paths resolve to committed source assets when content visuals change
 
 ## Documentation Rule

@@ -18,9 +18,19 @@ public sealed class StubSaveManager : ISaveManager
     public Task<bool> SaveRun(SaveRunSnapshot snapshot, int slotIndex)
     {
         _slots[slotIndex] = snapshot;
-        _metadata[slotIndex] = new SaveMetadata(slotIndex, snapshot.CurrentFloor, snapshot.ActiveWorld.TurnNumber, snapshot.ActiveWorld.Player.Name, System.DateTime.UtcNow, MetadataVersion);
+        _metadata[slotIndex] = new SaveMetadata(
+            slotIndex,
+            snapshot.CurrentFloor,
+            snapshot.ActiveWorld.TurnNumber,
+            snapshot.ActiveWorld.Player.Name,
+            System.DateTime.UtcNow,
+            MetadataVersion,
+            snapshot.ActiveWorld.ContentDatabase?.ContentVersion,
+            snapshot.ActiveWorld.ContentDatabase?.ContentHash);
         return Task.FromResult(true);
     }
+
+    public void SetMetadata(int slotIndex, SaveMetadata metadata) => _metadata[slotIndex] = metadata;
 
     public Task<WorldState?> LoadGame(int slotIndex)
     {
