@@ -23,7 +23,7 @@ public sealed class AttackAction : IAction
             return ActionResult.Invalid;
         }
 
-        if (actor.Faction == target.Faction)
+        if (actor.Faction == target.Faction || actor.Faction == Faction.Neutral || target.Faction == Faction.Neutral)
         {
             return ActionResult.Invalid;
         }

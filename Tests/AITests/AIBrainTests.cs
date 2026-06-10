@@ -9,6 +9,7 @@ public sealed class AIBrainTests : ITestSuite
     public void Register(TestRegistry registry)
     {
         registry.Add("AI.Brain attacks adjacent hostiles", AdjacentTargetsProduceAttackAction);
+        registry.Add("AI.Brain ignores neutral chests when acquiring targets", IgnoresNeutralChestsWhenAcquiringTargets);
         registry.Add("AI.Brain chases visible hostiles", VisibleTargetsProduceChaseMove);
         registry.Add("AI.Brain flees when low health", LowHealthEnemiesRetreatFromThreats);
         registry.Add("AI.Brain patrols after idling", IdleEnemiesEventuallyPatrol);
@@ -30,6 +31,27 @@ public sealed class AIBrainTests : ITestSuite
         var action = brain.DecideAction(enemy, world, pathfinder);
 
         Expect.True(action is AttackAction, "Adjacent hostile targets should trigger a melee attack");
+    }
+
+    private static void IgnoresNeutralChestsWhenAcquiringTargets()
+    {
+        var world = CreateWorld();
+        var pathfinder = new Pathfinder();
+        var brain = new MeleeRusherBrain();
+        var enemy = CreateEnemy(new Position(2, 2));
+        var player = CreatePlayer(new Position(5, 2));
+        var chest = new Entity("Treasure Chest", new Position(3, 2), new Stats { HP = 1, MaxHP = 1, Attack = 0, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 0, ViewRadius = 0 }, Faction.Neutral);
+        chest.SetComponent(new ChestComponent { LootTableId = "chest_loot" });
+
+        world.Player = player;
+        world.AddEntity(player);
+        world.AddEntity(enemy);
+        world.AddEntity(chest);
+
+        var action = brain.DecideAction(enemy, world, pathfinder);
+
+        Expect.False(action is AttackAction attack && attack.TargetId == chest.Id, "AI must not attack adjacent neutral chests.");
+        Expect.True(action is MoveAction, "AI should ignore the chest and chase the visible player instead.");
     }
 
     private static void VisibleTargetsProduceChaseMove()

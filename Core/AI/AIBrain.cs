@@ -152,7 +152,7 @@ public class AIBrain : IBrain
 
         foreach (var entity in world.Entities)
         {
-            if (entity.Id == self.Id || !entity.IsAlive || entity.Faction == self.Faction)
+            if (entity.Id == self.Id || !entity.IsAlive || entity.Faction == self.Faction || self.Faction == Faction.Neutral || entity.Faction == Faction.Neutral)
             {
                 continue;
             }

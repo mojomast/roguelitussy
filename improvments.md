@@ -4,6 +4,10 @@
 
 > UI/assets follow-up note (2026-06-10): inventory/menu readability and authored visual-path validation have a first polish pass. Item/status SVG source icons now exist, enemy content paths point at committed 0x72 sprites, and tests audit authored `res://` art paths. Remaining UI work should focus on real focusable inventory slot controls, controller action maps, and optional PNG atlas workflow rather than more text-panel expansion.
 
+> Chest/overflow follow-up note (2026-06-10): mobs now ignore and cannot melee neutral chests, chest-opening logs explicitly list `Loot found:` plus stowed/spilled destinations, and text-driven inventory/dialog/shop/tooltip surfaces window or clamp long content. A per-item chest-loot modal remains open work because safe leave-behind behavior requires persistent chest contents rather than the current atomic open-and-remove chest semantics.
+
+> Consumable stack follow-up note (2026-06-10): stacked consumables and scrolls now consume one item per successful use, leaving the remaining stack in inventory.
+
 ## Purpose
 
 This document is the current-state improvement spec for turning the existing project into a more complete, playable roguelike. It is intentionally written for parallel subagents. It replaces vague backlog work with concrete, codebase-specific workstreams, ordering, file targets, and acceptance criteria.

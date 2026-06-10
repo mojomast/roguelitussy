@@ -48,6 +48,9 @@ godot --headless --path . --quit
 - Completed: authored item/status/enemy visual paths now resolve to committed assets, with simple SVG item/status icon source art and enemy paths repointed to existing 0x72 sprites.
 - Completed: inventory and menu screens received a focused presentation pass: stable item category glyphs, explicit equipped/stack/charge/comparison details, contextual inventory footer text, clearer pause/help hierarchy, and sectioned character-sheet chrome.
 - Completed: v8 saves now carry optional content version/hash metadata for warning-only load diagnostics when runtime JSON content differs from the saved run; legacy/migrated saves still load with unknown content metadata.
+- Completed: neutral chests are protected from mob targeting and melee validation, chest-open logs now explicitly list found loot and where it went, and long inventory/dialog/shop/tooltip UI content is windowed or clamped.
+- Completed: stacked consumables and scrolls now consume exactly one item per successful use instead of deleting the whole stack.
+- Deferred: per-item chest loot selection needs persistent chest contents for safe leave-behind semantics; current v8-compatible behavior remains atomic open with inventory stow plus ground spill.
 
 ## Current Strengths
 

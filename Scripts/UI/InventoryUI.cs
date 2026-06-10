@@ -25,6 +25,7 @@ public partial class InventoryUI : Control
     private Panel? _panel;
     private RichTextLabel? _gridLabel;
     private RichTextLabel? _descriptionLabel;
+    private int _firstVisibleIndex;
 
     private const float PanelWidth = 960f;
     private const float PanelHeight = 420f;
@@ -87,6 +88,7 @@ public partial class InventoryUI : Control
         Visible = true;
         RefreshFromWorld();
         SelectedIndex = 0;
+        _firstVisibleIndex = 0;
         UpdateDescription();
         UpdateGrid();
         RefreshVisualState();
@@ -200,10 +202,12 @@ public partial class InventoryUI : Control
 
         SortItems();
 
-        if (SelectedIndex >= Columns * Rows)
+        if (SelectedIndex >= _items.Count)
         {
             SelectedIndex = 0;
         }
+
+        EnsureSelectionVisible();
 
         UpdateDescription();
         UpdateGrid();
@@ -211,13 +215,10 @@ public partial class InventoryUI : Control
 
     private void MoveSelection(int dx, int dy)
     {
-        var column = SelectedIndex % Columns;
-        var row = SelectedIndex / Columns;
-
-        column = (column + dx + Columns) % Columns;
-        row = (row + dy + Rows) % Rows;
-
-        SelectedIndex = (row * Columns) + column;
+        var pageSize = Columns * Rows;
+        var selectableCount = System.Math.Max(pageSize, _items.Count);
+        SelectedIndex = (SelectedIndex + dx + (dy * Columns) + selectableCount) % selectableCount;
+        EnsureSelectionVisible();
         UpdateDescription();
         UpdateGrid();
     }
@@ -304,7 +305,7 @@ public partial class InventoryUI : Control
         {
             for (var column = 0; column < Columns; column++)
             {
-                var slotIndex = (row * Columns) + column;
+                var slotIndex = _firstVisibleIndex + (row * Columns) + column;
                 var selected = slotIndex == SelectedIndex;
                 var label = slotIndex < _items.Count ? ResolveSlotToken(_items[slotIndex]) : "   ";
                 builder.Append(selected ? ">" : " ");
@@ -416,6 +417,7 @@ public partial class InventoryUI : Control
         };
 
         SortItems();
+        EnsureSelectionVisible();
         UpdateDescription();
         UpdateGrid();
     }
@@ -552,6 +554,20 @@ public partial class InventoryUI : Control
 
         item = _items[SelectedIndex];
         return true;
+    }
+
+    private void EnsureSelectionVisible()
+    {
+        var pageSize = Columns * Rows;
+        if (_items.Count <= pageSize)
+        {
+            _firstVisibleIndex = 0;
+            return;
+        }
+
+        _firstVisibleIndex = (SelectedIndex / pageSize) * pageSize;
+        var maxFirst = ((_items.Count - 1) / pageSize) * pageSize;
+        _firstVisibleIndex = System.Math.Clamp(_firstVisibleIndex, 0, maxFirst);
     }
 
     public static string BuildEquipmentComparisonText(
@@ -742,7 +758,7 @@ public partial class InventoryUI : Control
         {
             for (var column = 0; column < Columns; column++)
             {
-                var slotIndex = (row * Columns) + column;
+                var slotIndex = _firstVisibleIndex + (row * Columns) + column;
                 var selected = slotIndex == SelectedIndex;
                 var label = slotIndex < _items.Count ? ResolveSlotTokenMarkup(_items[slotIndex]) : "       ";
                 builder.Append(selected ? ">" : " ");
@@ -770,10 +786,18 @@ public partial class InventoryUI : Control
                 ? (CanUseFromInventory(template) ? "Enter/U use" : "Aimed item")
                 : (IsEquipped(item) ? "Enter/E unequip" : "Enter/E equip");
             var drop = item.StackCount > 1 ? "D drop one" : "D drop";
-            return $"{primary}  {drop}  A auto-equip  Tab sort  I/Esc close";
+            return $"{ResolvePageText()}  {primary}  {drop}  A auto-equip  Tab sort  I/Esc close";
         }
 
-        return "Arrow keys move  Tab sort  A auto-equip  I/Esc close";
+        return $"{ResolvePageText()}  Arrow keys move  Tab sort  A auto-equip  I/Esc close";
+    }
+
+    private string ResolvePageText()
+    {
+        var pageSize = Columns * Rows;
+        var totalPages = System.Math.Max(1, (_items.Count + pageSize - 1) / pageSize);
+        var currentPage = System.Math.Min(totalPages, (_firstVisibleIndex / pageSize) + 1);
+        return $"Page {currentPage}/{totalPages}";
     }
 
     private string ResolveCategorySummary()

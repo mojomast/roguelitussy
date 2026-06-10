@@ -11,6 +11,7 @@ public partial class DialogUI : Control
     private const float PanelHeight = 300f;
     private const float PanelPadding = 18f;
     private const float OuterMargin = 24f;
+    private const int VisibleOptionRows = 6;
 
     private Panel? _panel;
     private RichTextLabel? _bodyLabel;
@@ -87,6 +88,8 @@ public partial class DialogUI : Control
                 return false;
         }
     }
+
+    public string SnapshotBodyMarkup() => BuildBodyMarkup();
 
     private bool ActivateByNumber(Key key, int optionCount)
     {
@@ -220,10 +223,21 @@ public partial class DialogUI : Control
         builder.AppendLine();
         builder.AppendLine(ItemRarityPresentation.EscapeBBCode(node.Text));
         builder.AppendLine();
-        for (var index = 0; index < node.Options.Count; index++)
+        var window = ResolveVisibleWindow(node.Options.Count);
+        if (window.Start > 0)
+        {
+            builder.AppendLine("...");
+        }
+
+        for (var index = window.Start; index < window.End; index++)
         {
             var marker = index == _selectedOptionIndex ? ">" : " ";
             builder.AppendLine(ItemRarityPresentation.EscapeBBCode($"{marker} {index + 1}. {node.Options[index].Text}"));
+        }
+
+        if (window.End < node.Options.Count)
+        {
+            builder.AppendLine("...");
         }
 
         builder.AppendLine();
@@ -234,6 +248,17 @@ public partial class DialogUI : Control
     private static Vector2 ResolvePanelSize(Vector2 viewportSize)
     {
         return OverlayLayoutHelper.FitPanelSize(viewportSize, new Vector2(PanelWidth, PanelHeight), OuterMargin);
+    }
+
+    private (int Start, int End) ResolveVisibleWindow(int count)
+    {
+        if (count <= VisibleOptionRows)
+        {
+            return (0, count);
+        }
+
+        var start = System.Math.Clamp(_selectedOptionIndex - (VisibleOptionRows / 2), 0, count - VisibleOptionRows);
+        return (start, start + VisibleOptionRows);
     }
 
     private Vector2 ResolveViewportSize()

@@ -67,8 +67,9 @@ public partial class Tooltip : Control
             lines.Add(comparisonText);
         }
 
-        BodyText = string.Join("\n", lines);
-        BodyMarkup = BuildItemBodyMarkup(template, lines);
+        var visibleLines = ClampLines(lines, 9);
+        BodyText = string.Join("\n", visibleLines);
+        BodyMarkup = BuildItemBodyMarkup(template, visibleLines);
         ScreenPosition = ClampToScreen(screenPos);
         Visible = true;
         RefreshVisualState();
@@ -92,6 +93,7 @@ public partial class Tooltip : Control
 
         TitleText = enemy.Name;
         BodyText = builder.ToString().TrimEnd();
+        BodyText = string.Join("\n", ClampLines(BodyText.Split('\n'), 9));
         TitleMarkup = ItemRarityPresentation.EscapeBBCode(TitleText);
         BodyMarkup = ItemRarityPresentation.EscapeBBCode(BodyText);
         ScreenPosition = ClampToScreen(screenPos);
@@ -103,8 +105,9 @@ public partial class Tooltip : Control
     {
         TitleText = title;
         BodyText = body;
+        BodyText = string.Join("\n", ClampLines(BodyText.Split('\n'), 9));
         TitleMarkup = ItemRarityPresentation.EscapeBBCode(title);
-        BodyMarkup = ItemRarityPresentation.EscapeBBCode(body);
+        BodyMarkup = ItemRarityPresentation.EscapeBBCode(BodyText);
         ScreenPosition = ClampToScreen(screenPos);
         Visible = true;
         RefreshVisualState();
@@ -190,6 +193,23 @@ public partial class Tooltip : Control
         }
 
         return builder.ToString().TrimEnd();
+    }
+
+    private static IReadOnlyList<string> ClampLines(IReadOnlyList<string> lines, int maxLines)
+    {
+        if (lines.Count <= maxLines)
+        {
+            return lines;
+        }
+
+        var visible = new List<string>();
+        for (var i = 0; i < maxLines - 1; i++)
+        {
+            visible.Add(lines[i]);
+        }
+
+        visible.Add("...");
+        return visible;
     }
 
     private Vector2 ClampToScreen(Vector2 position)

@@ -33,7 +33,10 @@ Notable action families now in play:
 - cast actions for self, single-target, tile-targeted, and area abilities
 - equip toggles that validate item requirements before mutating inventory state
 
+Stacked consumables and scrolls consume one item from the stack per successful use; the remaining stack stays in inventory.
 Inventory UI also exposes a runtime-only auto-equip upgrades toggle. Press `A` while inventory is open to enable or disable it; pickup with `G` honors the current toggle when deciding whether upgrades should be equipped automatically.
+
+Neutral entities, including treasure chests and NPCs, are not valid melee targets. Enemy AI ignores neutral entities when acquiring targets, so mobs do not path to, attack, or destroy containers.
 
 ## Progression And Identity
 
@@ -97,6 +100,7 @@ The current flow in `DungeonGenerator` is:
 
 Generation retries up to a fixed limit if a connected, valid layout is not produced.
 Generated chests use guaranteed chest loot tables, so chest rewards stay deterministic and content-authored instead of falling back to generic item placement.
+Opening a chest is currently atomic: the chest rolls deterministic loot, stows anything that fits in the opener's inventory, spills overflow to the floor, logs an explicit `Loot found:` summary, and removes the opened chest entity.
 
 ## Rendering And UI Flow
 
@@ -118,6 +122,7 @@ Current presentation-specific behavior worth knowing:
 - `MenuBase` now renders menus as separate title, summary, options, and footer regions, and the title-screen-to-workshop handoff temporarily dismisses the main menu so overlays do not stack visually.
 - `MainMenu`, `PauseMenu`, `HelpOverlay`, and `CharacterSheet` now use clearer run/build/tool hierarchy, sectioned body text, and shared dungeon-console chrome so modal screens read as deliberate game surfaces instead of generic panels.
 - `InventoryUI` remains text-driven for low-risk stub testing, but uses stable category glyphs, explicit equipped markers, full stack counts, contextual footers, stack/charge details, and multiline equipment comparisons for faster scanning.
+- Long text-driven UI surfaces now window or clamp overflow: inventory pages beyond its visible grid, shop and dialog option lists keep the selected row visible with ellipses, and tooltip bodies cap long content instead of rendering beyond the panel.
 - `HelpOverlay` keeps its gameplay and title-screen guidance condensed enough to fit inside the menu shell on short viewports, instead of relying on off-screen overflow.
 - `DevToolsWorkbench` windows long mode summaries and action lists against the current viewport so the selected tool action, status line, and controls remain readable on shorter screens.
 

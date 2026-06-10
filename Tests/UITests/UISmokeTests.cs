@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using Godotussy;
@@ -31,6 +32,9 @@ public sealed class UISmokeTests : ITestSuite
         registry.Add("UI.CombatLog escapes BBCode and reacts to combat events", CombatLogReactsToEvents);
         registry.Add("UI.CombatLog exposes a live console panel", CombatLogExposesLiveConsolePanel);
         registry.Add("UI.Chest interactions report loot to the combat log", ChestInteractionsReportLootToCombatLog);
+        registry.Add("UI.Inventory pages items that exceed the visible grid", InventoryPagesItemsBeyondVisibleGrid);
+        registry.Add("UI.Dialog and shop window long option lists", DialogAndShopWindowLongLists);
+        registry.Add("UI.Tooltip clamps long bodies", TooltipClampsLongBodies);
         registry.Add("UI.Overlays clamp to the viewport", OverlaysClampToViewport);
         registry.Add("UI.Workbench windows content for small viewports", WorkbenchWindowsContentForSmallViewports);
         registry.Add("UI.MainMenu scrolls option list within the viewport", MainMenuScrollsOptionListWithinViewport);
@@ -621,6 +625,105 @@ public sealed class UISmokeTests : ITestSuite
 
         Expect.True(root.CombatLog.RenderedText.Contains("opens the chest", System.StringComparison.OrdinalIgnoreCase),
             "Opening a chest through gameplay input should add an explicit loot message to the combat log.");
+        Expect.True(root.CombatLog.RenderedText.Contains("Loot found:", System.StringComparison.OrdinalIgnoreCase),
+            "Chest feedback should explicitly list the found loot.");
+    }
+
+    private static void InventoryPagesItemsBeyondVisibleGrid()
+    {
+        var world = new WorldState();
+        world.InitGrid(4, 4);
+        for (var y = 0; y < world.Height; y++)
+        {
+            for (var x = 0; x < world.Width; x++)
+            {
+                world.SetTile(new Position(x, y), TileType.Floor);
+            }
+        }
+
+        var player = new StubEntity("Player", new Position(1, 1), Faction.Player,
+            stats: new Stats { HP = 20, MaxHP = 20, Attack = 5, Defense = 2, Accuracy = 0, Evasion = 0, Speed = 100, ViewRadius = 8 });
+        var inventory = new InventoryComponent(26);
+        for (var i = 0; i < 21; i++)
+        {
+            inventory.Add(new ItemInstance { TemplateId = i % 2 == 0 ? "potion_health" : "scroll_blink", IsIdentified = true });
+        }
+
+        player.SetComponent(inventory);
+        player.SetComponent(new WalletComponent { Gold = 0 });
+        world.Player = player;
+        world.AddEntity(player);
+
+        var bus = new EventBus();
+        var gameManager = new GameManager();
+        var content = new StubContentDatabase();
+        gameManager.AttachServices(world, new TurnScheduler(), new StubGenerator(), new FOVCalculator(), content, new StubSaveManager(), bus);
+
+        var ui = new InventoryUI();
+        ui.Bind(gameManager, bus, content, new Tooltip());
+        ui.Open();
+        for (var i = 0; i < 4; i++)
+        {
+            ui.HandleKey(Key.Down);
+        }
+
+        Expect.True(ui.GridText.Contains("Page 2/2", System.StringComparison.Ordinal), "Inventory should page when more stacks exist than fit in the visible grid.");
+        Expect.Equal(20, ui.SelectedIndex, "Selection should move onto the first item on the second inventory page.");
+    }
+
+    private static void DialogAndShopWindowLongLists()
+    {
+        var options = new List<DialogueOption>();
+        for (var i = 1; i <= 10; i++)
+        {
+            options.Add(new DialogueOption($"Option {i}", null, "close"));
+        }
+
+        var node = new DialogueNode("start", "Choose a long path.", options);
+        var dialogTemplate = new DialogueTemplate("long_dialog", "start", new Dictionary<string, DialogueNode> { ["start"] = node });
+        var npcTemplate = new NpcTemplate("guide", "Guide", "Test guide.", "Guide", 0, -1, "long_dialog", "human", "neutral", "plain", "wanderer");
+        var dialog = new DialogUI();
+        dialog.Open(new GameManager.InteractionContext(EntityId.New(), "Guide", "Guide", false, npcTemplate, dialogTemplate));
+        for (var i = 0; i < 9; i++)
+        {
+            dialog.HandleKey(Key.Down);
+        }
+
+        var dialogMarkup = dialog.SnapshotBodyMarkup();
+        Expect.True(dialogMarkup.Contains("...", System.StringComparison.Ordinal), "Dialog should window long option lists with an ellipsis.");
+        Expect.True(dialogMarkup.Contains("> 10. Option 10", System.StringComparison.Ordinal), "Dialog should keep the selected late option visible.");
+
+        var context = CreateContext();
+        var merchant = new Entity("Loaded Merchant", new Position(2, 1), new Stats { HP = 1, MaxHP = 1, Attack = 0, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 100, ViewRadius = 6 }, Faction.Neutral);
+        var offers = new List<MerchantOfferState>();
+        for (var i = 0; i < 14; i++)
+        {
+            offers.Add(new MerchantOfferState { ItemTemplateId = i % 2 == 0 ? "potion_health" : "scroll_blink", Price = 10 + i, Quantity = 1 });
+        }
+
+        merchant.SetComponent(new MerchantComponent(offers));
+        context.World.AddEntity(merchant);
+
+        var shop = new ShopUI();
+        shop.Bind(context.GameManager, context.Bus, context.Content);
+        shop.Open(merchant.Id);
+        for (var i = 0; i < 12; i++)
+        {
+            shop.HandleKey(Key.Down);
+        }
+
+        var shopMarkup = shop.SnapshotBodyMarkup();
+        Expect.True(shopMarkup.Contains("...", System.StringComparison.Ordinal), "Shop should window long buy/sell lists with an ellipsis.");
+        Expect.True(shopMarkup.Contains(">", System.StringComparison.Ordinal), "Shop should keep the selected row visible inside the window.");
+    }
+
+    private static void TooltipClampsLongBodies()
+    {
+        var tooltip = new Tooltip();
+        tooltip.ShowShortcutTooltip("Long Help", string.Join("\n", Enumerable.Range(1, 20).Select(index => $"Line {index}")), new Vector2(0f, 0f));
+
+        Expect.True(tooltip.BodyText.Contains("...", System.StringComparison.Ordinal), "Long tooltip bodies should be capped with an ellipsis.");
+        Expect.False(tooltip.BodyText.Contains("Line 20", System.StringComparison.Ordinal), "Long tooltip bodies should not render off-panel tail lines.");
     }
 
     private static void OverlaysClampToViewport()

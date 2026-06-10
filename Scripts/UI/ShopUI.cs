@@ -16,6 +16,7 @@ public partial class ShopUI : Control
     private const float PanelHeight = 420f;
     private const float PanelPadding = 18f;
     private const float OuterMargin = 24f;
+    private const int VisibleEntryRows = 10;
 
     private GameManager? _gameManager;
     private EventBus? _eventBus;
@@ -295,7 +296,9 @@ public partial class ShopUI : Control
 
         if (_mode == ShopMode.Buy)
         {
-            for (var index = 0; index < merchantStock.Offers.Count; index++)
+            var window = ResolveVisibleWindow(merchantStock.Offers.Count);
+            AppendWindowPrefix(builder, window.Start);
+            for (var index = window.Start; index < window.End; index++)
             {
                 var offer = merchantStock.Offers[index];
                 var name = _content is not null && _content.TryGetItemTemplate(offer.ItemTemplateId, out var template)
@@ -306,10 +309,14 @@ public partial class ShopUI : Control
                 var suffix = offer.Quantity > 0 ? $"qty {offer.Quantity}" : "sold out";
                 builder.AppendLine(ItemRarityPresentation.EscapeBBCode($"{marker} {name}  {price}g  {suffix}"));
             }
+
+            AppendWindowSuffix(builder, window.End, merchantStock.Offers.Count);
         }
         else
         {
-            for (var index = 0; index < inventory.Items.Count; index++)
+            var window = ResolveVisibleWindow(inventory.Items.Count);
+            AppendWindowPrefix(builder, window.Start);
+            for (var index = window.Start; index < window.End; index++)
             {
                 var item = inventory.Items[index];
                 var name = _content is not null && _content.TryGetItemTemplate(item.TemplateId, out var template)
@@ -322,6 +329,8 @@ public partial class ShopUI : Control
                 var marker = index == _selectedIndex ? ">" : " ";
                 builder.AppendLine(ItemRarityPresentation.EscapeBBCode($"{marker} {name} {quantityText}  {sellPrice}g"));
             }
+
+            AppendWindowSuffix(builder, window.End, inventory.Items.Count);
         }
 
         builder.AppendLine();
@@ -332,6 +341,33 @@ public partial class ShopUI : Control
     private static Vector2 ResolvePanelSize(Vector2 viewportSize)
     {
         return OverlayLayoutHelper.FitPanelSize(viewportSize, new Vector2(PanelWidth, PanelHeight), OuterMargin);
+    }
+
+    private (int Start, int End) ResolveVisibleWindow(int count)
+    {
+        if (count <= VisibleEntryRows)
+        {
+            return (0, count);
+        }
+
+        var start = System.Math.Clamp(_selectedIndex - (VisibleEntryRows / 2), 0, count - VisibleEntryRows);
+        return (start, start + VisibleEntryRows);
+    }
+
+    private static void AppendWindowPrefix(StringBuilder builder, int start)
+    {
+        if (start > 0)
+        {
+            builder.AppendLine("...");
+        }
+    }
+
+    private static void AppendWindowSuffix(StringBuilder builder, int end, int count)
+    {
+        if (end < count)
+        {
+            builder.AppendLine("...");
+        }
     }
 
     private Vector2 ResolveViewportSize()

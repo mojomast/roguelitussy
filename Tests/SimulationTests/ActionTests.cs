@@ -15,11 +15,13 @@ public sealed class ActionTests : ITestSuite
         registry.Add("Simulation.Actions attack action damages adjacent enemies", AttackActionDamagesAdjacentEnemies);
         registry.Add("Simulation.Actions attack action removes killed enemies", AttackActionRemovesKilledEnemies);
         registry.Add("Simulation.Actions attack action rejects same faction targets", AttackActionRejectsSameFaction);
+        registry.Add("Simulation.Actions attack action rejects neutral chest targets", AttackActionRejectsNeutralChestTargets);
         registry.Add("Simulation.Actions pickup action rejects full inventory", PickupActionRejectsFullInventory);
         registry.Add("Simulation.Actions pickup action merges stacks when bag is full", PickupActionMergesStacksWhenFull);
         registry.Add("Simulation.Actions pickup auto-equips strict upgrades only when enabled", PickupAutoEquipsStrictUpgradesOnlyWhenEnabled);
         registry.Add("Simulation.Actions pickup auto-equip respects requirements", PickupAutoEquipRespectsRequirements);
         registry.Add("Simulation.Actions use item heals and consumes potion", UseItemHealsAndConsumes);
+        registry.Add("Simulation.Actions use item consumes one stacked potion", UseItemConsumesOneStackedPotion);
         registry.Add("Simulation.Actions toggle equip action changes equipment state", ToggleEquipActionChangesEquipmentState);
         registry.Add("Simulation.Actions drop item places it on the ground", DropItemPlacesGroundItem);
         registry.Add("Simulation.Actions drop item can split a stack", DropItemSplitsStack);
@@ -125,6 +127,25 @@ public sealed class ActionTests : ITestSuite
         Expect.Equal(ActionResult.Invalid, result, "Friendly targets should be rejected during validation");
     }
 
+    private static void AttackActionRejectsNeutralChestTargets()
+    {
+        var world = CreateWorld(seed: 0);
+        var attacker = CreateActor("Enemy", new Position(1, 1), Faction.Enemy);
+        var chest = new Entity("Treasure Chest", new Position(2, 1), new Stats { HP = 1, MaxHP = 1, Attack = 0, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 0 }, Faction.Neutral);
+        chest.SetComponent(new ChestComponent { LootTableId = "chest_loot" });
+
+        world.AddEntity(attacker);
+        world.AddEntity(chest);
+
+        var action = new AttackAction(attacker.Id, chest.Id);
+        var outcome = action.Execute(world);
+
+        Expect.Equal(ActionResult.Invalid, action.Validate(world), "Neutral chests should not validate as melee targets.");
+        Expect.Equal(ActionResult.Invalid, outcome.Result, "Executing an attack against a neutral chest should fail.");
+        Expect.Equal(1, chest.Stats.HP, "Invalid attacks must not damage the chest.");
+        Expect.True(world.GetEntity(chest.Id) is not null, "Invalid attacks must not remove the chest.");
+    }
+
     private static void PickupActionRejectsFullInventory()
     {
         var world = CreateWorld();
@@ -204,6 +225,38 @@ public sealed class ActionTests : ITestSuite
         Expect.Equal(ActionResult.Success, outcome.Result, "Using a consumable should succeed when the item is in the inventory");
         Expect.Equal(9, actor.Stats.HP, "Health potion should heal the actor");
         Expect.False(inventory.Contains(item.InstanceId), "Consumed item should be removed from inventory");
+    }
+
+    private static void UseItemConsumesOneStackedPotion()
+    {
+        var world = CreateWorld();
+        var actor = CreateActor("Player", new Position(1, 1), Faction.Player, new Stats { HP = 4, MaxHP = 10, Attack = 3, Defense = 1, Accuracy = 0, Evasion = 0, Speed = 100 });
+        var inventory = new InventoryComponent();
+        var item = new ItemInstance { TemplateId = "potion_health", StackCount = 3 };
+        inventory.Add(item);
+        actor.SetComponent(inventory);
+
+        world.Player = actor;
+        world.AddEntity(actor);
+
+        var template = new ItemTemplate(
+            "potion_health",
+            "Health Potion",
+            "Restores health.",
+            ItemCategory.Consumable,
+            EquipSlot.None,
+            new Dictionary<string, int> { ["heal"] = 5 },
+            "heal",
+            -1,
+            5,
+            "common");
+
+        var outcome = new UseItemAction(actor.Id, item.InstanceId, template).Execute(world);
+
+        Expect.Equal(ActionResult.Success, outcome.Result, "Using a stacked consumable should succeed.");
+        Expect.True(inventory.Contains(item.InstanceId), "Using one item from a stack should keep the remaining stack.");
+        Expect.Equal(2, inventory.Get(item.InstanceId)?.StackCount ?? 0, "Using a stacked consumable should consume exactly one item.");
+        Expect.Equal(9, actor.Stats.HP, "The consumed potion should still apply its effect once.");
     }
 
     private static void PickupAutoEquipsStrictUpgradesOnlyWhenEnabled()
@@ -449,7 +502,8 @@ public sealed class ActionTests : ITestSuite
         var outcome = new OpenChestAction(actor.Id, chest.Id).Execute(world);
 
         Expect.True(outcome.LogMessages.Count > 0, "Opening a chest should emit a log message.");
-        Expect.True(outcome.LogMessages[0].Contains("stows", System.StringComparison.Ordinal) || outcome.LogMessages[0].Contains("spills", System.StringComparison.Ordinal), "Chest logs should explain where the loot went instead of only removing the chest.");
+        Expect.True(outcome.LogMessages[0].Contains("Loot found:", System.StringComparison.Ordinal), "Chest logs should explicitly call out the found loot.");
+        Expect.True(outcome.LogMessages[0].Contains("Stowed:", System.StringComparison.Ordinal) || outcome.LogMessages[0].Contains("Spilled onto the floor:", System.StringComparison.Ordinal), "Chest logs should explain where the loot went instead of only removing the chest.");
     }
 
     private static void StairsValidationRequiresMatchingTile()

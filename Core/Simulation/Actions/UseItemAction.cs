@@ -194,7 +194,7 @@ public sealed class UseItemAction : IAction
             }
         }
 
-        inventory.Remove(item.InstanceId, out _);
+        inventory.RemoveQuantity(item.InstanceId, 1, out _);
     }
 
     private static void ApplyStatModifiers(Stats stats, IReadOnlyDictionary<string, int> modifiers, int direction)

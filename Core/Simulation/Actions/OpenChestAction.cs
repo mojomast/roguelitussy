@@ -44,6 +44,7 @@ public sealed class OpenChestAction : IAction
         var chest = world.GetEntity(ChestId)!;
         var chestComponent = chest.GetComponent<ChestComponent>()!;
         var rolledItemCount = 0;
+        var foundDescriptions = new List<string>();
         var stowedDescriptions = new List<string>();
         var spilledDescriptions = new List<string>();
         var inventory = actor.GetComponent<InventoryComponent>();
@@ -64,6 +65,7 @@ public sealed class OpenChestAction : IAction
                 var stackCount = Math.Max(1, roll.Count);
                 rolledItemCount += stackCount;
                 var description = DescribeLoot(loader, roll.ItemId, stackCount);
+                foundDescriptions.Add(description);
 
                 if (TryAddToInventory(world, inventory, loader, item))
                 {
@@ -93,17 +95,18 @@ public sealed class OpenChestAction : IAction
 
         var stowedText = JoinDistinct(stowedDescriptions);
         var spilledText = JoinDistinct(spilledDescriptions);
+        var foundText = JoinDistinct(foundDescriptions);
         if (!string.IsNullOrWhiteSpace(stowedText) && !string.IsNullOrWhiteSpace(spilledText))
         {
-            outcome.LogMessages.Add($"{actor.Name} opens the chest and stows {stowedText}; the rest spills onto the floor: {spilledText}.");
+            outcome.LogMessages.Add($"{actor.Name} opens the chest. Loot found: {foundText}. Stowed: {stowedText}. Spilled onto the floor: {spilledText}.");
         }
         else if (!string.IsNullOrWhiteSpace(stowedText))
         {
-            outcome.LogMessages.Add($"{actor.Name} opens the chest and stows {stowedText}.");
+            outcome.LogMessages.Add($"{actor.Name} opens the chest. Loot found: {foundText}. Stowed: {stowedText}.");
         }
         else
         {
-            outcome.LogMessages.Add($"{actor.Name} opens the chest and spills {spilledText} onto the floor.");
+            outcome.LogMessages.Add($"{actor.Name} opens the chest. Loot found: {foundText}. Spilled onto the floor: {spilledText}.");
         }
 
         return outcome;
