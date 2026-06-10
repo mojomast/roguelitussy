@@ -469,12 +469,12 @@ public partial class MainMenu : MenuBase
 
         if (Backdrop is not null)
         {
-            Backdrop.Color = new Color(0.05f, 0.07f, 0.11f, 0.98f);
+            Backdrop.Color = UiStyle.PanelBlack(0.98f);
         }
 
         if (HeaderBand is not null)
         {
-            HeaderBand.Color = new Color(0.19f, 0.10f, 0.06f, 0.98f);
+            HeaderBand.Color = UiStyle.PanelHighlight(0.98f);
             HeaderBand.Size = new Vector2(panelSize.X, 60f);
         }
 
@@ -483,7 +483,7 @@ public partial class MainMenu : MenuBase
             TitleLabel.Text = "GODOTUSSY  //  DELVER FOUNDRY";
             TitleLabel.Position = new Vector2(PreviewPadding, 16f);
             TitleLabel.Size = new Vector2(System.Math.Max(0f, panelSize.X - (PreviewPadding * 2f)), 28f);
-            TitleLabel.Modulate = new Color(1f, 0.92f, 0.79f, 1f);
+            TitleLabel.Modulate = UiStyle.BrightGold();
         }
 
         if (FooterLabel is not null)
@@ -491,7 +491,7 @@ public partial class MainMenu : MenuBase
             FooterLabel.Text = BuildFooterText();
             FooterLabel.Position = new Vector2(PreviewPadding, panelSize.Y - 34f);
             FooterLabel.Size = new Vector2(System.Math.Max(0f, panelSize.X - (PreviewPadding * 2f)), 22f);
-            FooterLabel.Modulate = new Color(0.76f, 0.80f, 0.84f, 1f);
+            FooterLabel.Modulate = UiStyle.MutedText();
         }
 
         if (BodyCard is null || OptionsCard is null || OptionsLabel is null)
@@ -507,7 +507,7 @@ public partial class MainMenu : MenuBase
         var summaryHeight = System.Math.Clamp(contentHeight * 0.32f, 88f, 148f);
         var optionsHeight = System.Math.Max(68f, contentHeight - summaryHeight - 16f);
 
-        BodyCard.Color = new Color(0.11f, 0.14f, 0.18f, 0.98f);
+        BodyCard.Color = UiStyle.PanelInner(0.98f);
         BodyCard.Position = new Vector2(PreviewPadding, contentTop);
         BodyCard.Size = new Vector2(contentWidth, summaryHeight);
 
@@ -516,9 +516,9 @@ public partial class MainMenu : MenuBase
             System.Math.Max(0f, BodyCard.Size.X - 36f),
             System.Math.Max(0f, BodyCard.Size.Y - 32f));
         label.Text = BuildHeroSummary();
-        label.Modulate = new Color(0.96f, 0.97f, 0.99f, 1f);
+        label.Modulate = UiStyle.Parchment();
 
-        OptionsCard.Color = new Color(0.08f, 0.09f, 0.13f, 0.99f);
+        OptionsCard.Color = UiStyle.CathedralBlack(0.99f);
         OptionsCard.Position = new Vector2(PreviewPadding, contentTop + summaryHeight + 16f);
         OptionsCard.Size = new Vector2(contentWidth, System.Math.Max(0f, optionsHeight));
 
@@ -528,7 +528,7 @@ public partial class MainMenu : MenuBase
             System.Math.Max(0f, OptionsCard.Size.X - 36f),
             System.Math.Max(0f, OptionsCard.Size.Y - 28f));
         OptionsLabel.Text = visibleOptionsText;
-        OptionsLabel.Modulate = new Color(0.99f, 0.93f, 0.84f, 1f);
+        OptionsLabel.Modulate = UiStyle.Parchment();
 
         if (_previewPanel is null)
         {
@@ -879,7 +879,7 @@ public partial class MainMenu : MenuBase
         _previewFrame = new ColorRect
         {
             Name = "PreviewFrame",
-            Color = new Color(0.10f, 0.12f, 0.18f, 1f),
+            Color = UiStyle.PanelInner(),
         };
         _previewBody = new TextureRect
         {
@@ -993,13 +993,13 @@ public partial class MainMenu : MenuBase
         if (_previewDetail is not null)
         {
             _previewDetail.Text = WrapPreviewText(BuildPreviewDetailText(), _previewDetail.Size.X);
-            _previewDetail.Modulate = new Color(0.92f, 0.95f, 0.98f, 1f);
+            _previewDetail.Modulate = UiStyle.Parchment();
         }
 
         if (_previewTitle is not null)
         {
             _previewTitle.Text = profile.Title.ToUpperInvariant();
-            _previewTitle.Modulate = new Color(1f, 0.94f, 0.82f, 1f);
+            _previewTitle.Modulate = UiStyle.BrightGold();
         }
 
         if (_previewSubtitle is not null)
@@ -1011,7 +1011,7 @@ public partial class MainMenu : MenuBase
         if (_previewVariantId is not null)
         {
             _previewVariantId.Text = $"Variant ID\n{profile.VariantId}";
-            _previewVariantId.Modulate = new Color(0.74f, 0.79f, 0.84f, 1f);
+            _previewVariantId.Modulate = UiStyle.MutedText();
         }
     }
 

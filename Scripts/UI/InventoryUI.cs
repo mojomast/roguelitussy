@@ -678,18 +678,21 @@ public partial class InventoryUI : Control
         {
             Name = "Panel",
             Size = panelSize,
+            Modulate = UiStyle.GoldTrim(),
         };
         _gridLabel = new RichTextLabel
         {
             Name = "GridLabel",
             Position = new Vector2(PanelPadding, PanelPadding),
             BbcodeEnabled = true,
+            Modulate = UiStyle.Parchment(),
         };
         _descriptionLabel = new RichTextLabel
         {
             Name = "DescriptionLabel",
             Position = new Vector2(PanelPadding, PanelPadding),
             BbcodeEnabled = true,
+            Modulate = UiStyle.Parchment(),
         };
         _panel.AddChild(_gridLabel);
         _panel.AddChild(_descriptionLabel);
@@ -745,9 +748,9 @@ public partial class InventoryUI : Control
     {
         var builder = new StringBuilder();
         var inventory = _gameManager?.World?.Player?.GetComponent<InventoryComponent>();
-        builder.AppendLine(ItemRarityPresentation.EscapeBBCode($"Inventory  {_items.Count}/{inventory?.Capacity ?? 0} stacks  {ResolveTotalCarriedItems()} items"));
-        builder.AppendLine(ItemRarityPresentation.EscapeBBCode($"Gold: {ResolveGold()}  Weight: {ResolveTotalWeight():0.0}  Value: {ResolveTotalValue()}"));
-        builder.AppendLine(ItemRarityPresentation.EscapeBBCode($"Sort: {CurrentSort}  Auto-equip upgrades: {ResolveAutoEquipLabel()}"));
+        builder.AppendLine($"[color={UiStyle.LegendaryHex}]Inventory[/color]  {ItemRarityPresentation.EscapeBBCode($"{_items.Count}/{inventory?.Capacity ?? 0} stacks  {ResolveTotalCarriedItems()} items")}");
+        builder.AppendLine($"[color={UiStyle.CommonHex}]{ItemRarityPresentation.EscapeBBCode($"Gold: {ResolveGold()}  Weight: {ResolveTotalWeight():0.0}  Value: {ResolveTotalValue()}")}[/color]");
+        builder.AppendLine($"[color={UiStyle.CommonHex}]{ItemRarityPresentation.EscapeBBCode($"Sort: {CurrentSort}  Auto-equip upgrades: {ResolveAutoEquipLabel()}")}[/color]");
         if (CurrentSort == SortMode.Category)
         {
             builder.AppendLine(ItemRarityPresentation.EscapeBBCode($"Groups: {ResolveCategorySummary()}"));
@@ -761,10 +764,10 @@ public partial class InventoryUI : Control
                 var slotIndex = _firstVisibleIndex + (row * Columns) + column;
                 var selected = slotIndex == SelectedIndex;
                 var label = slotIndex < _items.Count ? ResolveSlotTokenMarkup(_items[slotIndex]) : "       ";
-                builder.Append(selected ? ">" : " ");
-                builder.Append("[lb]");
+                builder.Append(selected ? $"[color={UiStyle.LegendaryHex}]>[/color]" : " ");
+                builder.Append(selected ? $"[color={UiStyle.LegendaryHex}][lb]" : "[lb]");
                 builder.Append(label);
-                builder.Append("[rb] ");
+                builder.Append(selected ? $"[rb][/color] " : "[rb] ");
             }
 
             builder.AppendLine();

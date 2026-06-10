@@ -435,27 +435,28 @@ public partial class CharacterSheet : Control
         {
             Name = "Panel",
             Size = panelSize,
+            Modulate = UiStyle.GoldTrim(),
         };
         _headerBand = new ColorRect
         {
             Name = "HeaderBand",
-            Color = new Color(0.19f, 0.10f, 0.06f, 0.98f),
+            Color = UiStyle.PanelHighlight(0.98f),
         };
         _bodyCard = new ColorRect
         {
             Name = "BodyCard",
-            Color = new Color(0.09f, 0.11f, 0.15f, 0.98f),
+            Color = UiStyle.PanelInner(0.98f),
         };
         _titleLabel = new Label
         {
             Name = "TitleLabel",
             Text = "CHARACTER DOSSIER",
-            Modulate = new Color(1f, 0.92f, 0.79f, 1f),
+            Modulate = UiStyle.BrightGold(),
         };
         _label = new Label
         {
             Name = "Label",
-            Modulate = new Color(0.94f, 0.96f, 0.98f, 1f),
+            Modulate = UiStyle.Parchment(),
         };
         _bodyCard.AddChild(_label);
         _panel.AddChild(_headerBand);

@@ -4,6 +4,8 @@
 
 > UI/assets follow-up note (2026-06-10): inventory/menu readability and authored visual-path validation have a first polish pass. Item/status SVG source icons now exist, enemy content paths point at committed 0x72 sprites, and tests audit authored `res://` art paths. Remaining UI work should focus on real focusable inventory slot controls, controller action maps, and optional PNG atlas workflow rather than more text-panel expansion.
 
+> UI chrome follow-up note (2026-06-10): gameplay chrome now has an incremental Diablo II-inspired procedural style pass in `Scripts/UI`: dark gothic panel colors, gold trim/title accents, parchment text, blood-red HUD HP treatment, rarity-tinted inventory/tooltip details, and darker minimap colors. Remaining high-value UI work is still a real focusable/icon inventory grid, richer HUD orb/status presentation, and optional full map overlay rather than changing Core rules.
+
 > Chest/overflow follow-up note (2026-06-10): mobs now ignore and cannot melee neutral chests, chest-opening logs explicitly list `Loot found:` plus stowed/spilled destinations, and text-driven inventory/dialog/shop/tooltip surfaces window or clamp long content. A per-item chest-loot modal remains open work because safe leave-behind behavior requires persistent chest contents rather than the current atomic open-and-remove chest semantics.
 
 > Consumable stack follow-up note (2026-06-10): stacked consumables and scrolls now consume one item per successful use, leaving the remaining stack in inventory.

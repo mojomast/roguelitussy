@@ -255,9 +255,9 @@ public partial class HUD : Control
         var ratio = maxHp <= 0 ? 0f : (float)currentHp / maxHp;
         HPColor = ratio switch
         {
-            > 0.6f => Colors.Green,
-            > 0.3f => Colors.Yellow,
-            _ => Colors.Red,
+            > 0.6f => UiStyle.BloodRedBright(),
+            > 0.3f => UiStyle.BrightGold(),
+            _ => UiStyle.BloodRed(),
         };
     }
 
@@ -280,6 +280,7 @@ public partial class HUD : Control
         {
             Name = "Panel",
             Position = new Vector2(12f, 12f),
+            Modulate = UiStyle.GoldTrim(),
         };
         AddChild(_panel);
 
@@ -318,11 +319,15 @@ public partial class HUD : Control
         }
 
         _headerLabel.Text = $"{EnergyText}  {FloorText}  {TurnText}";
-        _headerLabel.Modulate = Colors.White;
+        _headerLabel.Modulate = UiStyle.Parchment();
         _progressLabel.Text = string.Join("  ", new[] { LevelText, GoldText }.Where(text => !string.IsNullOrWhiteSpace(text)));
+        _progressLabel.Modulate = LevelText.Contains("LV UP!", System.StringComparison.Ordinal) ? UiStyle.BrightGold() : UiStyle.GoldTrim();
         _statsLabel.Text = StatsText;
+        _statsLabel.Modulate = UiStyle.MutedText();
         _effectsLabel.Text = string.IsNullOrWhiteSpace(StatusEffectsText) ? "Effects: none" : StatusEffectsText;
+        _effectsLabel.Modulate = string.IsNullOrWhiteSpace(StatusEffectsText) ? UiStyle.MutedText() : UiStyle.Parchment();
         _mapLabel.Text = MinimapText;
+        _mapLabel.Modulate = MinimapVisible ? UiStyle.MapGold() : UiStyle.MutedText();
     }
 
     private void UpdateHPVisuals()

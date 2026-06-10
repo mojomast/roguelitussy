@@ -201,7 +201,6 @@ public sealed class UISmokeTests : ITestSuite
         Expect.Equal("Turn: 17", hud.TurnText, "HUD should render the current turn number");
         Expect.True(hud.StatsText.Contains("ATK 8"), "HUD should expose the player's combat stats.");
         Expect.True(hud.LevelText.Contains("XP: 24/40"), "HUD should expose level progression and experience.");
-        Expect.Equal(Colors.Red.R, hud.HPColor.R, "Low HP should switch the HUD into the red threshold");
         Expect.True(hud.Children.Count > 0 && hud.Children[0] is Panel, "HUD should create a visible panel container.");
         var panel = (Panel)hud.Children[0];
         var hpLabel = FindChild<Label>(panel, "HPLabel");
@@ -214,7 +213,9 @@ public sealed class UISmokeTests : ITestSuite
         Expect.Equal(100d, hpBar!.MaxValue, "HP bar should use max HP as its range.");
         Expect.Equal(25d, hpBar.Value, "HP bar should use current HP as its value.");
         Expect.False(headerLabel!.Text.Contains("HP:"), "Energy/Floor/Turn label should not duplicate HP text.");
-        Expect.Equal(Colors.White.G, headerLabel.Modulate.G, "Energy/Floor/Turn label should not inherit the HP danger tint.");
+        AssertColor(UiStyle.BloodRed(), hud.HPColor, "Low HP should use the gothic blood-red HUD danger tint.");
+        AssertColor(UiStyle.Parchment(), headerLabel.Modulate, "Energy/Floor/Turn label should keep the parchment tint instead of inheriting HP danger color.");
+        AssertColor(UiStyle.GoldTrim(), panel.Modulate, "HUD panel should use the shared gold-trim chrome.");
 
         var before = hud.MinimapText;
         hud.ToggleMinimap();
@@ -325,6 +326,28 @@ public sealed class UISmokeTests : ITestSuite
 
         minimap.Toggle();
         Expect.True(minimap.Visible, "Toggling the minimap again should restore the overlay.");
+
+        WithViewportSize(new Vector2(640f, 360f), viewportSize =>
+        {
+            var root = new Control();
+            var smallMap = new Minimap();
+            root.AddChild(smallMap);
+            smallMap.Bind(context.GameManager, context.Bus);
+
+            Expect.True(smallMap.Position.X >= 0f && smallMap.Position.Y >= 0f, "Minimap should stay inside the small viewport origin.");
+            Expect.True(smallMap.Position.X + smallMap.Size.X <= viewportSize.X + 0.1f, "Minimap should fit horizontally in a small viewport.");
+            Expect.True(smallMap.Position.Y + smallMap.Size.Y <= viewportSize.Y + 0.1f, "Minimap should fit vertically in a small viewport.");
+
+            smallMap.SetSuppressed(true);
+            Expect.False(smallMap.Visible, "Suppressed minimap should hide without disabling the user toggle state.");
+            Expect.True(smallMap.MinimapEnabled, "Overlay suppression should preserve the minimap enabled state.");
+            smallMap.Toggle();
+            Expect.False(smallMap.Visible, "Toggling while suppressed should keep the minimap hidden until overlays close.");
+            Expect.False(smallMap.MinimapEnabled, "Toggling while suppressed should still update the enabled state.");
+            smallMap.Toggle();
+            smallMap.SetSuppressed(false);
+            Expect.True(smallMap.Visible, "Unsuppressing should restore a still-enabled minimap.");
+        });
     }
 
     private static void InventoryEmitsConcreteActions()
@@ -408,10 +431,13 @@ public sealed class UISmokeTests : ITestSuite
             Expect.True(inventory.DescriptionText.Contains("Rarity: Rare"), "Inventory descriptions should expose the selected item's rarity tier.");
             Expect.True(inventory.DescriptionText.Contains("Requires targeting"), "Aimed consumables should explain why they cannot fire directly from the inventory.");
             Expect.True(inventory.GridMarkup.Contains("[color="), "Inventory grid markup should colorize loot by rarity.");
+            Expect.True(inventory.GridMarkup.Contains(UiStyle.LegendaryHex), "Inventory grid should use the shared gold accent for selected slots and headers.");
             Expect.True(inventory.GridText.Contains("▤"), "Scrolls should use a stable category glyph instead of a display-name initial.");
             Expect.True(tooltip.BodyText.Contains("Rarity: Rare"), "Item tooltips should expose rarity details.");
             Expect.True(tooltip.BodyText.Contains("Status: Carried"), "Item tooltips should expose carried/equipped state.");
             Expect.True(tooltip.TitleMarkup.Contains("[color="), "Item tooltip titles should be colorized by rarity.");
+            Expect.True(tooltip.TitleMarkup.Contains(UiStyle.RareHex), "Rare item tooltip titles should use the Diablo-style rare blue.");
+            AssertColor(UiStyle.GoldTrim(), ((Panel)tooltip.Children[0]).Modulate, "Tooltip panel should use the shared carved gold trim.");
             Expect.Equal(new Vector2(viewportSize.X - tooltip.Size.X - 24f, viewportSize.Y - tooltip.Size.Y - 24f), tooltip.ScreenPosition,
                 "Inventory comparison and detail tooltips should anchor to the bottom-right corner of the viewport.");
         });
@@ -547,6 +573,9 @@ public sealed class UISmokeTests : ITestSuite
         Expect.NotNull(header, "Character sheet should render a header band.");
         Expect.NotNull(body, "Character sheet should render a body card.");
         Expect.NotNull(title, "Character sheet should render an explicit title label.");
+        AssertColor(UiStyle.PanelHighlight(0.98f), header!.Color, "Character sheet header should use shared gothic panel highlight.");
+        AssertColor(UiStyle.PanelInner(0.98f), body!.Color, "Character sheet body should use shared carved panel fill.");
+        AssertColor(UiStyle.BrightGold(), title!.Modulate, "Character sheet title should use the shared gold title tint.");
     }
 
     private static void CombatLogReactsToEvents()
@@ -583,6 +612,7 @@ public sealed class UISmokeTests : ITestSuite
 
         Expect.True(log.Children.Count > 0 && log.Children[0] is Control, "Combat log should create a visible console panel.");
         Expect.True(log.RenderedText.Contains("Console live."), "Combat log should keep rendering live updates from the event stream.");
+        AssertColor(UiStyle.GoldTrim(0.88f), ((Panel)log.Children[0]).Modulate, "Combat log should use muted gold chrome.");
     }
 
     private static void ChestInteractionsReportLootToCombatLog()
@@ -786,6 +816,13 @@ public sealed class UISmokeTests : ITestSuite
 
             Expect.True(menu.MenuText.Contains("> Quit"), "The selected bottom main-menu option should remain visible after scrolling.");
             Expect.False(menu.MenuText.Contains("Start Expedition\n") || menu.MenuText.Contains("> Start Expedition"), "The rendered menu text should window the option list instead of keeping off-screen top entries visible.");
+            var panel = FindChild<Panel>(menu, "Panel");
+            var header = panel is null ? null : FindChild<ColorRect>(panel, "HeaderBand");
+            var options = panel is null ? null : FindChild<ColorRect>(panel, "OptionsCard");
+            Expect.NotNull(header, "Main menu should keep its header chrome after windowing options.");
+            Expect.NotNull(options, "Main menu should keep its options chrome after windowing options.");
+            AssertColor(UiStyle.PanelHighlight(0.98f), header!.Color, "Main menu header should use the shared gothic panel highlight.");
+            AssertColor(UiStyle.CathedralBlack(0.99f), options!.Color, "Main menu options should use the shared cathedral-black backing.");
         });
     }
 
@@ -1366,6 +1403,16 @@ public sealed class UISmokeTests : ITestSuite
             Expect.True(child.Position.X + child.Size.X <= panel.Size.X + 0.1f, $"{overlayName} child controls should fit horizontally within the panel.");
             Expect.True(child.Position.Y + child.Size.Y <= panel.Size.Y + 0.1f, $"{overlayName} child controls should fit vertically within the panel.");
         }
+    }
+
+    private static void AssertColor(Color expected, Color actual, string message)
+    {
+        const float tolerance = 0.001f;
+        Expect.True(System.Math.Abs(expected.R - actual.R) <= tolerance
+            && System.Math.Abs(expected.G - actual.G) <= tolerance
+            && System.Math.Abs(expected.B - actual.B) <= tolerance
+            && System.Math.Abs(expected.A - actual.A) <= tolerance,
+            message);
     }
 
     private static int CountVisibleTiles(IWorldState world)

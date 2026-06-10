@@ -43,12 +43,12 @@ public static class ItemRarityPresentation
     {
         return Normalize(rarity) switch
         {
-            "uncommon" => "#78c27d",
-            "rare" => "#63a9ff",
-            "epic" => "#c987ff",
-            "legendary" => "#f1b24a",
-            "artifact" => "#ff7a59",
-            _ => "#d7d7d7",
+            "uncommon" => UiStyle.UncommonHex,
+            "rare" => UiStyle.RareHex,
+            "epic" => UiStyle.EpicHex,
+            "legendary" => UiStyle.LegendaryHex,
+            "artifact" => UiStyle.ArtifactHex,
+            _ => UiStyle.CommonHex,
         };
     }
 

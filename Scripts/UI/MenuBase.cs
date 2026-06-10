@@ -240,43 +240,43 @@ public abstract partial class MenuBase : Control
         _backdrop = new ColorRect
         {
             Name = "Backdrop",
-            Color = new Color(0.05f, 0.07f, 0.10f, 0.97f),
+            Color = UiStyle.PanelBlack(0.98f),
         };
         _headerBand = new ColorRect
         {
             Name = "HeaderBand",
-            Color = new Color(0.23f, 0.14f, 0.08f, 0.98f),
+            Color = UiStyle.PanelHighlight(0.98f),
         };
         _bodyCard = new ColorRect
         {
             Name = "BodyCard",
-            Color = new Color(0.11f, 0.14f, 0.18f, 0.96f),
+            Color = UiStyle.PanelInner(0.96f),
         };
         _optionsCard = new ColorRect
         {
             Name = "OptionsCard",
-            Color = new Color(0.09f, 0.10f, 0.13f, 0.98f),
+            Color = UiStyle.CathedralBlack(0.98f),
         };
         _titleLabel = new Label
         {
             Name = "TitleLabel",
-            Modulate = new Color(0.98f, 0.92f, 0.78f, 1f),
+            Modulate = UiStyle.BrightGold(),
         };
 
         _label = new Label
         {
             Name = "Label",
-            Modulate = new Color(0.95f, 0.96f, 0.98f, 1f),
+            Modulate = UiStyle.Parchment(),
         };
         _optionsLabel = new Label
         {
             Name = "OptionsLabel",
-            Modulate = new Color(0.98f, 0.91f, 0.82f, 1f),
+            Modulate = UiStyle.Parchment(),
         };
         _footerLabel = new Label
         {
             Name = "FooterLabel",
-            Modulate = new Color(0.72f, 0.77f, 0.82f, 1f),
+            Modulate = UiStyle.MutedText(),
         };
 
         _bodyCard.AddChild(_label);
@@ -316,6 +316,7 @@ public abstract partial class MenuBase : Control
 
         _panel.Size = panelSize;
         _panel.Position = OverlayLayoutHelper.CenterInViewport(viewportSize, panelSize);
+        _panel.Modulate = UiStyle.GoldTrim();
         _backdrop.Position = Vector2.Zero;
         _backdrop.Size = panelSize;
         _headerBand.Position = Vector2.Zero;

@@ -139,6 +139,7 @@ public partial class Tooltip : Control
         {
             Name = "Panel",
             Size = Size,
+            Modulate = UiStyle.GoldTrim(),
         };
         _titleLabel = new RichTextLabel
         {
@@ -146,6 +147,7 @@ public partial class Tooltip : Control
             Position = new Vector2(PanelPadding, PanelPadding),
             Size = new Vector2(Math.Max(0f, Size.X - (PanelPadding * 2f)), 24f),
             BbcodeEnabled = true,
+            Modulate = UiStyle.BrightGold(),
         };
         _bodyLabel = new RichTextLabel
         {
@@ -153,6 +155,7 @@ public partial class Tooltip : Control
             Position = new Vector2(PanelPadding, PanelPadding + 28f),
             Size = new Vector2(Math.Max(0f, Size.X - (PanelPadding * 2f)), Math.Max(0f, Size.Y - 40f - PanelPadding)),
             BbcodeEnabled = true,
+            Modulate = UiStyle.Parchment(),
         };
         _panel.AddChild(_titleLabel);
         _panel.AddChild(_bodyLabel);

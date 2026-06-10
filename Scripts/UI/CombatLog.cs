@@ -187,6 +187,7 @@ public partial class CombatLog : Control
         {
             Name = "Panel",
             Size = panelSize,
+            Modulate = UiStyle.GoldTrim(0.88f),
         };
         _textLabel = new RichTextLabel
         {
@@ -197,6 +198,7 @@ public partial class CombatLog : Control
                 System.Math.Max(0f, panelSize.Y - (PanelPadding * 2f))),
             BbcodeEnabled = true,
             ScrollFollowing = true,
+            Modulate = UiStyle.Parchment(),
         };
         _panel.AddChild(_textLabel);
         AddChild(_panel);

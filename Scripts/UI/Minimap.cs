@@ -143,7 +143,8 @@ public partial class Minimap : Control
             return;
         }
 
-        DrawRect(new Rect2(Vector2.Zero, Size), new Color(0.05f, 0.06f, 0.08f, 0.88f));
+        DrawRect(new Rect2(Vector2.Zero, Size), UiStyle.CathedralBlack(0.88f));
+        DrawRect(new Rect2(Vector2.Zero, Size), UiStyle.GoldTrim(0.9f), filled: false);
 
         var availableWidth = Math.Max(1f, Size.X - (InnerPadding * 2f));
         var availableHeight = Math.Max(1f, Size.Y - (InnerPadding * 2f));
@@ -176,7 +177,7 @@ public partial class Minimap : Control
             var playerRect = new Rect2(
                 origin + new Vector2(PlayerWorldPosition.X * cellSize, PlayerWorldPosition.Y * cellSize) + new Vector2(inset, inset),
                 new Vector2(MathF.Max(1f, cellSize - (inset * 2f)), MathF.Max(1f, cellSize - (inset * 2f))));
-            DrawRect(playerRect, new Color(0.95f, 0.82f, 0.24f, 1f));
+            DrawRect(playerRect, UiStyle.BrightGold());
         }
     }
 
@@ -220,11 +221,11 @@ public partial class Minimap : Control
 
         var baseColor = world.GetTile(position) switch
         {
-            TileType.Floor => new Color(0.46f, 0.46f, 0.5f, 1f),
-            TileType.Wall => new Color(0.17f, 0.18f, 0.22f, 1f),
-            TileType.Door => new Color(0.61f, 0.4f, 0.18f, 1f),
-            TileType.StairsDown => new Color(0.24f, 0.52f, 0.85f, 1f),
-            TileType.StairsUp => new Color(0.28f, 0.72f, 0.42f, 1f),
+            TileType.Floor => UiStyle.MapLineBlue(0.84f),
+            TileType.Wall => new Color(0.08f, 0.07f, 0.06f, 0.95f),
+            TileType.Door => UiStyle.MapGold(0.95f),
+            TileType.StairsDown => UiStyle.MapLineBlue(1f),
+            TileType.StairsUp => UiStyle.GoldTrim(1f),
             TileType.Water => new Color(0.12f, 0.38f, 0.75f, 1f),
             TileType.Lava => new Color(0.82f, 0.32f, 0.12f, 1f),
             _ => new Color(0.08f, 0.08f, 0.1f, 1f),

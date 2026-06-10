@@ -51,6 +51,7 @@ godot --headless --path . --quit
 - Completed: neutral chests are protected from mob targeting and melee validation, chest-open logs now explicitly list found loot and where it went, and long inventory/dialog/shop/tooltip UI content is windowed or clamped.
 - Completed: stacked consumables and scrolls now consume exactly one item per successful use instead of deleting the whole stack.
 - Completed: loading a save with pending perk choices reopens the level-up overlay, and Core pickup actions now resolve stack metadata from world content instead of relying on UI-supplied templates.
+- Completed: UI chrome received an incremental Diablo II-inspired pass in Godot-facing scripts only: shared gothic palette, gold/parchment menu and sheet chrome, blood-red HUD HP styling, rarity-tinted inventory/tooltip text, muted combat log frame, and darker framed minimap colors. Core simulation behavior was not changed.
 - Deferred: per-item chest loot selection needs persistent chest contents for safe leave-behind semantics; current v8-compatible behavior remains atomic open with inventory stow plus ground spill.
 
 ## Current Strengths
