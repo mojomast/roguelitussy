@@ -11,6 +11,8 @@ public sealed class StatusTickResult
 
     public bool Died { get; init; }
 
+    public DeathResolver.DeathResolution? Death { get; init; }
+
     public IReadOnlyList<StatusEffectType> ExpiredEffects { get; init; } = Array.Empty<StatusEffectType>();
 }
 
@@ -50,12 +52,14 @@ public static class StatusEffectProcessor
         return entity.Stats.Speed;
     }
 
-    public static bool ApplyEffect(IEntity entity, StatusEffectType type, int duration, int magnitude = 1)
+    public static bool ApplyEffect(IEntity entity, StatusEffectType type, int duration, int magnitude = 1, EntityId? sourceEntityId = null)
     {
         if (type == StatusEffectType.None || duration <= 0 || magnitude <= 0)
         {
             return false;
         }
+
+        ApplyLifecycleEffects(entity, type);
 
         var component = entity.GetComponent<StatusEffectsComponent>();
         if (component is null)
@@ -72,12 +76,12 @@ public static class StatusEffectProcessor
         {
             var current = component[existingIndex];
             var nextMagnitude = stackable ? Math.Min(maxStacks, current.Magnitude + magnitude) : Math.Max(current.Magnitude, magnitude);
-            var refreshed = new StatusEffectInstance(type, Math.Max(current.RemainingTurns, duration), nextMagnitude);
+            var refreshed = new StatusEffectInstance(type, Math.Max(current.RemainingTurns, duration), nextMagnitude, sourceEntityId ?? current.SourceEntityId);
             component.Replace(existingIndex, refreshed);
             return true;
         }
 
-        component.Add(new StatusEffectInstance(type, duration, Math.Min(maxStacks, magnitude)));
+        component.Add(new StatusEffectInstance(type, duration, Math.Min(maxStacks, magnitude), sourceEntityId));
         return true;
     }
 
@@ -104,6 +108,7 @@ public static class StatusEffectProcessor
         var damageTaken = 0;
         var healingDone = 0;
         var expired = new List<StatusEffectType>();
+        EntityId? lethalSourceId = null;
 
         for (var index = component.Count - 1; index >= 0; index--)
         {
@@ -113,10 +118,12 @@ public static class StatusEffectProcessor
                 case StatusEffectType.Poisoned:
                     damageTaken += 2 * effect.Magnitude;
                     entity.Stats.HP -= 2 * effect.Magnitude;
+                    lethalSourceId = entity.Stats.HP <= 0 ? effect.SourceEntityId : lethalSourceId;
                     break;
                 case StatusEffectType.Burning:
                     damageTaken += 3 * effect.Magnitude;
                     entity.Stats.HP -= 3 * effect.Magnitude;
+                    lethalSourceId = entity.Stats.HP <= 0 ? effect.SourceEntityId : lethalSourceId;
                     break;
                 case StatusEffectType.Regenerating:
                     var healed = Math.Min(2 * effect.Magnitude, Math.Max(0, entity.Stats.MaxHP - entity.Stats.HP));
@@ -139,9 +146,13 @@ public static class StatusEffectProcessor
 
         entity.Stats.HP = Math.Min(entity.Stats.HP, entity.Stats.MaxHP);
         var died = entity.Stats.HP <= 0;
+        DeathResolver.DeathResolution? death = null;
         if (died)
         {
-            world.RemoveEntity(entity.Id);
+            var killer = lethalSourceId is { } sourceId ? world.GetEntity(sourceId) : null;
+            death = killer is null
+                ? DeathResolver.ResolveUnattributedDeath(world, entity)
+                : DeathResolver.ResolveKill(world, killer, entity);
         }
 
         return new StatusTickResult
@@ -149,6 +160,7 @@ public static class StatusEffectProcessor
             DamageTaken = damageTaken,
             HealingDone = healingDone,
             Died = died,
+            Death = death,
             ExpiredEffects = expired,
         };
     }
@@ -213,15 +225,29 @@ public static class StatusEffectProcessor
     }
 
     private static bool IsStackable(StatusEffectType type) =>
-        type is StatusEffectType.Poisoned or StatusEffectType.Regenerating or StatusEffectType.Shielded;
+        type is StatusEffectType.Poisoned or StatusEffectType.Regenerating or StatusEffectType.Shielded or StatusEffectType.Corroded;
 
     private static int GetMaxStacks(StatusEffectType type) => type switch
     {
         StatusEffectType.Poisoned => 5,
         StatusEffectType.Regenerating => 3,
         StatusEffectType.Shielded => 3,
+        StatusEffectType.Corroded => 3,
         _ => 1,
     };
+
+    private static void ApplyLifecycleEffects(IEntity entity, StatusEffectType type)
+    {
+        // Mirrors the currently authored status lifecycle metadata until status definitions are data-driven at runtime.
+        if (type == StatusEffectType.Burning)
+        {
+            RemoveEffect(entity, StatusEffectType.Frozen);
+        }
+        else if (type == StatusEffectType.Frozen)
+        {
+            RemoveEffect(entity, StatusEffectType.Burning);
+        }
+    }
 
     private static string Normalize(string value) => value.Trim().Replace("_", string.Empty).Replace("-", string.Empty).ToLowerInvariant();
 }

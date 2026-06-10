@@ -35,6 +35,19 @@ dotnet run --project Tests/godotussy.Tests.csproj -p:RenderingValidation=true
 godot --headless --path . --quit
 ```
 
+### Follow-up Status - 2026-06-10
+
+- Completed: local .NET 8 SDK installed under `$HOME/.dotnet`; stub build, test project build, full harness, and rendering validation now run in this environment.
+- Completed: ability damage/status randomness now advances the serialized combat RNG stream, with save/load continuation coverage.
+- Completed: sourced poison/burning status kills now route through `DeathResolver` and award XP/kill credit to the source; source attribution is persisted.
+- Completed: harmful area effects now honor `hits_allies: false` by defaulting unfiltered harmful effects to enemies only.
+- Completed: rendering validation profile compiles without persistence implementation files by using a no-op save manager under `RENDERING_VALIDATION` and skipping persistence-backed tests.
+- Completed: save version 8 persists cached multi-floor run state through `SaveRunSnapshot`, including migration from v7 single-floor saves and validation that the player exists only on the active floor.
+- Completed: CI now includes a real Godot 4.4.1 Mono headless editor import and startup smoke, and rendering-validation intermediates are isolated from the normal stub build profile.
+- Completed: v8 persistence loose-end coverage now rejects missing active floors, duplicate player entities across floors, and duplicate floor depths; UI/GameManager coverage saves a multi-floor run, reloads it, and travels back to a cached inactive floor.
+- Completed: authored item/status/enemy visual paths now resolve to committed assets, with simple SVG item/status icon source art and enemy paths repointed to existing 0x72 sprites.
+- Completed: inventory and menu screens received a focused presentation pass: stable item category glyphs, explicit equipped/stack/charge/comparison details, contextual inventory footer text, clearer pause/help hierarchy, and sectioned character-sheet chrome.
+
 ## Current Strengths
 
 - `Core/` has no Godot dependency and remains suitable for deterministic tests.

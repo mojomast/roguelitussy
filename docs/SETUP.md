@@ -11,6 +11,10 @@ Once the game shell is running, the title screen and pause menu both expose an i
 - Windows PowerShell or another shell capable of running `dotnet`
 - A C#-capable editor such as VS Code or Visual Studio
 
+If .NET is not installed system-wide, a user-local SDK install under `$HOME/.dotnet` is sufficient. Export `DOTNET_ROOT=$HOME/.dotnet` and prepend `$HOME/.dotnet` to `PATH` for the current shell before running `dotnet` commands.
+
+On Linux, Godot 4.4.1 Mono can also be installed user-locally by downloading the official `Godot_v4.4.1-stable_mono_linux_x86_64.zip`, extracting it under `$HOME/.local`, and linking the executable as `$HOME/.local/bin/godot`. Prepend `$HOME/.local/bin` to `PATH` before running headless Godot checks.
+
 ## First-Time Repository Setup
 
 1. Clone the repository.
@@ -38,7 +42,18 @@ Once the game shell is running, the title screen and pause menu both expose an i
    - `ContentDatabase`
 4. Open `Scenes/Main.tscn` if you want to inspect the shell scene directly.
 
+In a fresh headless environment, run an editor import once before the plain startup smoke if imported `.ctex` resources are missing:
+
+```powershell
+godot --headless --editor --path . --quit
+godot --headless --path . --quit
+```
+
 The project starts from `Scenes/Main.tscn`, which hosts `WorldRoot` and `UiRoot`. Most runtime services are attached through the autoloads rather than through a large scene tree.
+
+CI runs both the editorless .NET stub profile and a real Godot 4.4.1 Mono headless import/startup smoke. Keep `.godot/`, `.mono/`, `bin/`, and `obj/` out of commits; Godot import products are regenerated from committed source assets and `.import` files.
+
+When adding or renaming SVG/PNG source art under `Assets/`, run the headless editor import before the startup smoke so Godot can regenerate local import products from committed assets.
 
 ## Using The In-App Developer Workshop
 
@@ -83,6 +98,12 @@ Build the main project using the Godot compatibility stubs:
 dotnet build godotussy.csproj -p:UseGodotStubs=true
 ```
 
+Build the solution, including the custom test project for IDE/structural coverage:
+
+```powershell
+dotnet build godotussy.sln
+```
+
 Build the test project:
 
 ```powershell
@@ -98,8 +119,11 @@ dotnet run --project Tests/godotussy.Tests.csproj
 Run the rendering-focused test compile profile:
 
 ```powershell
+dotnet restore godotussy.csproj -p:UseGodotStubs=true -p:RenderingValidation=true
 dotnet run --project Tests/godotussy.Tests.csproj -p:RenderingValidation=true
 ```
+
+This profile removes persistence implementation files from the main project and skips persistence-dependent test files. `GameManager` uses a no-op save manager only under this compile symbol so rendering and UI validation can run without the save subsystem.
 
 ## Why The Project Builds Without Godot
 

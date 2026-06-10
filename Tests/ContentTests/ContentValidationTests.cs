@@ -1,3 +1,4 @@
+using System.IO;
 using System.Linq;
 using Roguelike.Core;
 using Roguelike.Tests.TestFramework;
@@ -11,6 +12,8 @@ public sealed class ContentValidationTests : ITestSuite
         registry.Add("Content.Loads and validates all JSON", LoadsAndValidatesAllJson);
         registry.Add("Content.Projects contract templates", ProjectsContractTemplates);
         registry.Add("Content.Cross references remain intact", CrossReferencesRemainIntact);
+        registry.Add("Content.Item stats and effects are runtime-supported", ItemStatsAndEffectsAreRuntimeSupported);
+        registry.Add("Content.Authored art paths resolve to committed files", AuthoredArtPathsResolveToCommittedFiles);
         registry.Add("Content.Depth filters stay stable", DepthFiltersStayStable);
     }
 
@@ -27,7 +30,7 @@ public sealed class ContentValidationTests : ITestSuite
         Expect.Equal(2, content.NpcDefinitions.Count, "Expected the full NPC set to load");
         Expect.Equal(9, content.StatusEffects.Count, "Expected the full status effect set to load");
         Expect.True(content.RoomPrefabs.Count >= 10, "Expected at least the baseline room prefab set to load");
-        Expect.Equal(15, content.LootTables.Count, "Expected the full loot table set to load");
+        Expect.Equal(17, content.LootTables.Count, "Expected the full loot table set to load");
     }
 
     private static void ProjectsContractTemplates()
@@ -99,6 +102,24 @@ public sealed class ContentValidationTests : ITestSuite
         }
     }
 
+    private static void ItemStatsAndEffectsAreRuntimeSupported()
+    {
+        var content = LoadContent();
+
+        foreach (var item in content.ItemDefinitions.Values)
+        {
+            foreach (var stat in item.Stats.Keys)
+            {
+                Expect.True(IsRuntimeSupportedStat(stat), $"Item '{item.Id}' stat '{stat}' should be applied by runtime equipment or item-use rules");
+            }
+
+            foreach (var effect in item.Effects)
+            {
+                Expect.False(string.Equals(effect.Type, "passive", System.StringComparison.Ordinal), $"Item '{item.Id}' passive effect should not be authored until runtime support exists");
+            }
+        }
+    }
+
     private static void DepthFiltersStayStable()
     {
         var content = LoadContent();
@@ -116,11 +137,54 @@ public sealed class ContentValidationTests : ITestSuite
         Expect.True(lateEnemies.Contains("wraith"), "Depth 4 enemy pool should include late-game enemies");
     }
 
+    private static void AuthoredArtPathsResolveToCommittedFiles()
+    {
+        var content = LoadContent();
+        foreach (var item in content.ItemDefinitions.Values)
+        {
+            ExpectResPathExists(content, item.SpritePath, $"Item '{item.Id}' sprite_path");
+        }
+
+        foreach (var enemy in content.EnemyDefinitions.Values)
+        {
+            ExpectResPathExists(content, enemy.SpritePath, $"Enemy '{enemy.Id}' sprite_path");
+        }
+
+        foreach (var status in content.StatusEffects.Values)
+        {
+            ExpectResPathExists(content, status.IconPath, $"Status effect '{status.Id}' icon_path");
+        }
+    }
+
     private static ContentLoader LoadContent()
     {
         var content = ContentLoader.LoadFromRepository(throwOnValidationErrors: false);
         content.EnsureValid();
         return content;
+    }
+
+    private static bool IsRuntimeSupportedStat(string stat)
+    {
+        return stat is "damage_min"
+            or "damage_max"
+            or "accuracy"
+            or "speed_modifier"
+            or "crit_chance"
+            or "defense"
+            or "evasion"
+            or "fov_bonus"
+            or "attack"
+            or "hp"
+            or "max_hp";
+    }
+
+    private static void ExpectResPathExists(ContentLoader content, string resPath, string label)
+    {
+        Expect.True(resPath.StartsWith("res://", System.StringComparison.Ordinal), $"{label} should use a res:// path");
+        var relativePath = resPath["res://".Length..].Replace('/', Path.DirectorySeparatorChar);
+        var repositoryRoot = Path.GetFullPath(Path.Combine(content.ContentDirectory, ".."));
+        var filePath = Path.Combine(repositoryRoot, relativePath);
+        Expect.True(File.Exists(filePath), $"{label} should resolve to a committed file: {resPath}");
     }
 
     private static string FormatErrors(ContentLoader content)

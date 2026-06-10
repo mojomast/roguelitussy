@@ -12,6 +12,9 @@ public partial class CharacterSheet : Control
     private GameManager? _gameManager;
     private IContentDatabase? _content;
     private Panel? _panel;
+    private ColorRect? _headerBand;
+    private ColorRect? _bodyCard;
+    private Label? _titleLabel;
     private Label? _label;
 
     private const float PanelWidth = 520f;
@@ -182,7 +185,7 @@ public partial class CharacterSheet : Control
         var inventory = player.GetComponent<InventoryComponent>();
         var character = _gameManager?.CharacterOptions;
         var builder = new StringBuilder();
-        builder.AppendLine("Character Sheet");
+        builder.AppendLine("IDENTITY");
         builder.AppendLine($"Name: {player.Name}");
         if (character is not null)
         {
@@ -199,6 +202,8 @@ public partial class CharacterSheet : Control
             builder.AppendLine($"Appearance: {CapitalizeFirst(identity.AppearanceId)}");
         }
 
+        builder.AppendLine();
+        builder.AppendLine("RUN CONTEXT");
         builder.AppendLine($"Floor: {world.Depth}");
         builder.AppendLine($"Turn: {world.TurnNumber}");
         builder.AppendLine($"Gold: {player.GetComponent<WalletComponent>()?.Gold ?? 0}");
@@ -208,6 +213,8 @@ public partial class CharacterSheet : Control
         var progression = player.GetComponent<ProgressionComponent>();
         if (progression is not null)
         {
+            builder.AppendLine();
+            builder.AppendLine("PROGRESSION");
             builder.AppendLine($"Level: {progression.Level}");
             builder.AppendLine($"XP: {progression.Experience} / {progression.ExperienceToNextLevel}");
             builder.AppendLine($"Unspent Stat Points: {progression.UnspentStatPoints}");
@@ -256,6 +263,7 @@ public partial class CharacterSheet : Control
         }
 
         builder.AppendLine();
+        builder.AppendLine("CORE STATS");
         builder.AppendLine($"HP: {player.Stats.HP} / {player.Stats.MaxHP}");
         builder.AppendLine($"Attack: {player.Stats.Attack}{FormatEquipmentBonus(inventory, EquipSlot.MainHand)}");
         builder.AppendLine($"Defense: {player.Stats.Defense}{FormatEquipmentBonus(inventory, EquipSlot.Body)}");
@@ -268,6 +276,7 @@ public partial class CharacterSheet : Control
         builder.AppendLine($"Crit: {ResolveWeaponCrit(inventory)}%");
         builder.AppendLine($"Gear Bonus: {ResolveEquipmentBonusSummary(inventory)}");
         builder.AppendLine();
+        builder.AppendLine("EQUIPMENT");
         builder.AppendLine($"Weapon: {ResolveEquippedItemName(inventory, EquipSlot.MainHand)}");
         builder.AppendLine($"Off-hand: {ResolveEquippedItemName(inventory, EquipSlot.OffHand)}");
         builder.AppendLine($"Head: {ResolveEquippedItemName(inventory, EquipSlot.Head)}");
@@ -276,7 +285,7 @@ public partial class CharacterSheet : Control
         builder.AppendLine($"Ring: {ResolveEquippedItemName(inventory, EquipSlot.Ring)}");
         builder.AppendLine($"Amulet: {ResolveEquippedItemName(inventory, EquipSlot.Amulet)}");
         builder.AppendLine();
-        builder.AppendLine("Status Effects:");
+        builder.AppendLine("STATUS EFFECTS");
 
         var effects = StatusEffectProcessor.GetEffects(player);
         if (effects.Count == 0)
@@ -427,15 +436,31 @@ public partial class CharacterSheet : Control
             Name = "Panel",
             Size = panelSize,
         };
+        _headerBand = new ColorRect
+        {
+            Name = "HeaderBand",
+            Color = new Color(0.19f, 0.10f, 0.06f, 0.98f),
+        };
+        _bodyCard = new ColorRect
+        {
+            Name = "BodyCard",
+            Color = new Color(0.09f, 0.11f, 0.15f, 0.98f),
+        };
+        _titleLabel = new Label
+        {
+            Name = "TitleLabel",
+            Text = "CHARACTER DOSSIER",
+            Modulate = new Color(1f, 0.92f, 0.79f, 1f),
+        };
         _label = new Label
         {
             Name = "Label",
-            Position = new Vector2(PanelPadding, PanelPadding),
-            Size = new Vector2(
-                Math.Max(0f, panelSize.X - (PanelPadding * 2f)),
-                Math.Max(0f, panelSize.Y - (PanelPadding * 2f))),
+            Modulate = new Color(0.94f, 0.96f, 0.98f, 1f),
         };
-        _panel.AddChild(_label);
+        _bodyCard.AddChild(_label);
+        _panel.AddChild(_headerBand);
+        _panel.AddChild(_bodyCard);
+        _panel.AddChild(_titleLabel);
         AddChild(_panel);
     }
 
@@ -443,7 +468,7 @@ public partial class CharacterSheet : Control
     {
         EnsureVisuals();
 
-        if (_panel is null || _label is null)
+        if (_panel is null || _label is null || _headerBand is null || _bodyCard is null || _titleLabel is null)
         {
             return;
         }
@@ -454,11 +479,22 @@ public partial class CharacterSheet : Control
         Size = viewportSize;
         _panel.Size = panelSize;
         _panel.Position = OverlayLayoutHelper.CenterInViewport(viewportSize, panelSize);
-        _label.Position = new Vector2(PanelPadding, PanelPadding);
-        _label.Size = new Vector2(
+        _headerBand.Position = Vector2.Zero;
+        _headerBand.Size = new Vector2(panelSize.X, 52f);
+        _titleLabel.Position = new Vector2(PanelPadding, 14f);
+        _titleLabel.Size = new Vector2(Math.Max(0f, panelSize.X - (PanelPadding * 2f)), 24f);
+        _bodyCard.Position = new Vector2(PanelPadding, 68f);
+        _bodyCard.Size = new Vector2(
             Math.Max(0f, panelSize.X - (PanelPadding * 2f)),
-            Math.Max(0f, panelSize.Y - (PanelPadding * 2f)));
+            Math.Max(0f, panelSize.Y - 88f));
+        _label.Position = new Vector2(14f, 12f);
+        _label.Size = new Vector2(
+            Math.Max(0f, _bodyCard.Size.X - 28f),
+            Math.Max(0f, _bodyCard.Size.Y - 24f));
         _panel.Visible = Visible;
+        _headerBand.Visible = Visible;
+        _bodyCard.Visible = Visible;
+        _titleLabel.Visible = Visible;
         _label.Visible = Visible;
         _label.Text = SummaryText;
     }

@@ -29,7 +29,7 @@
       "abilities": [],
       "loot_table_id": "rat_loot",
       "tags": ["beast", "early_game"],
-      "sprite_path": "res://Assets/Sprites/enemies/rat.png",
+      "sprite_path": "res://Assets/Sprites/0x72/Imp_Idle_1.png",
       "sprite_atlas_coords": [0, 0]
     },
     {
@@ -59,7 +59,7 @@
       "abilities": [],
       "loot_table_id": "skeleton_loot",
       "tags": ["undead", "mid_game"],
-      "sprite_path": "res://Assets/Sprites/enemies/skeleton.png",
+      "sprite_path": "res://Assets/Sprites/0x72/Skelet_Idle_1.png",
       "sprite_atlas_coords": [1, 0]
     },
     {
@@ -97,7 +97,7 @@
       ],
       "loot_table_id": "goblin_loot",
       "tags": ["goblinoid", "ranged", "early_game"],
-      "sprite_path": "res://Assets/Sprites/enemies/goblin_archer.png",
+      "sprite_path": "res://Assets/Sprites/0x72/Goblin_Idle_1.png",
       "sprite_atlas_coords": [2, 0]
     },
     {
@@ -138,7 +138,7 @@
       ],
       "loot_table_id": "orc_loot",
       "tags": ["orc", "mid_game", "tank"],
-      "sprite_path": "res://Assets/Sprites/enemies/orc_brute.png",
+      "sprite_path": "res://Assets/Sprites/0x72/Ogre_Idle_1.png",
       "sprite_atlas_coords": [3, 0]
     },
     {
@@ -180,7 +180,7 @@
       ],
       "loot_table_id": "wraith_loot",
       "tags": ["undead", "incorporeal", "late_game"],
-      "sprite_path": "res://Assets/Sprites/enemies/wraith.png",
+      "sprite_path": "res://Assets/Sprites/0x72/Ice_Zombie_Idle_1.png",
       "sprite_atlas_coords": [4, 0]
     },
     {
@@ -216,7 +216,7 @@
       ],
       "loot_table_id": "slime_loot",
       "tags": ["slime", "early_game"],
-      "sprite_path": "res://Assets/Sprites/enemies/slime_acid.png",
+      "sprite_path": "res://Assets/Sprites/0x72/Swampy_Idle_1.png",
       "sprite_atlas_coords": [5, 0]
     },
     {
@@ -252,7 +252,7 @@
       ],
       "loot_table_id": "cave_spider_loot",
       "tags": ["beast", "ambush", "early_game"],
-      "sprite_path": "res://Assets/Sprites/enemies/cave_spider.png",
+      "sprite_path": "res://Assets/Sprites/0x72/Wogol_Idle_1.png",
       "sprite_atlas_coords": [6, 0]
     },
     {
@@ -289,7 +289,7 @@
       ],
       "loot_table_id": "skeleton_knight_loot",
       "tags": ["undead", "patrol", "mid_game"],
-      "sprite_path": "res://Assets/Sprites/enemies/skeleton_knight.png",
+      "sprite_path": "res://Assets/Sprites/0x72/Orc_Warrior_Idle_1.png",
       "sprite_atlas_coords": [7, 0]
     },
     {
@@ -326,7 +326,7 @@
       ],
       "loot_table_id": "goblin_shaman_loot",
       "tags": ["goblinoid", "support", "mid_game"],
-      "sprite_path": "res://Assets/Sprites/enemies/goblin_shaman.png",
+      "sprite_path": "res://Assets/Sprites/0x72/Orc_Shaman_Idle_1.png",
       "sprite_atlas_coords": [8, 0]
     },
     {
@@ -364,7 +364,7 @@
       ],
       "loot_table_id": "dark_mage_loot",
       "tags": ["humanoid", "ranged", "caster", "mid_game"],
-      "sprite_path": "res://Assets/Sprites/enemies/dark_mage.png",
+      "sprite_path": "res://Assets/Sprites/0x72/Necromancer_Idle_1.png",
       "sprite_atlas_coords": [9, 0]
     },
     {
@@ -405,7 +405,7 @@
       ],
       "loot_table_id": "shadow_stalker_loot",
       "tags": ["shadow", "ambush", "late_game"],
-      "sprite_path": "res://Assets/Sprites/enemies/shadow_stalker.png",
+      "sprite_path": "res://Assets/Sprites/0x72/Masked_Orc_Idle_1.png",
       "sprite_atlas_coords": [10, 0]
     },
     {
@@ -447,7 +447,7 @@
       ],
       "loot_table_id": "bone_lord_loot",
       "tags": ["undead", "elite", "late_game"],
-      "sprite_path": "res://Assets/Sprites/enemies/bone_lord.png",
+      "sprite_path": "res://Assets/Sprites/0x72/Big_Zombie_Idle_1.png",
       "sprite_atlas_coords": [11, 0]
     },
     {
@@ -488,7 +488,7 @@
       ],
       "loot_table_id": "flame_elemental_loot",
       "tags": ["elemental", "elite", "late_game", "fire"],
-      "sprite_path": "res://Assets/Sprites/enemies/flame_elemental.png",
+      "sprite_path": "res://Assets/Sprites/0x72/Chort_Idle_1.png",
       "sprite_atlas_coords": [12, 0]
     }
   ]

@@ -11,7 +11,6 @@
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(UseGodotStubs)' == 'true'">
-    <BaseIntermediateOutputPath>obj\godotstubs\</BaseIntermediateOutputPath>
     <OutputPath>bin\godotstubs\$(Configuration)\$(TargetFramework)\</OutputPath>
   </PropertyGroup>
 
@@ -36,6 +35,10 @@
   <ItemGroup Condition="'$(RenderingValidation)' == 'true'">
     <Compile Remove="Core\Persistence\**\*.cs" />
   </ItemGroup>
+
+  <PropertyGroup Condition="'$(RenderingValidation)' == 'true'">
+    <DefineConstants>$(DefineConstants);RENDERING_VALIDATION</DefineConstants>
+  </PropertyGroup>
 
   <ItemGroup>
     <None Include="project.godot" />

@@ -13,6 +13,7 @@ public sealed class FOVTests : ITestSuite
         registry.Add("Rendering.FOV blocks tiles behind walls", FovBlocksTilesBehindWalls);
         registry.Add("Rendering.FOV remains symmetric in open space", FovRemainsSymmetric);
         registry.Add("Rendering.WorldView renders map and fog from world state", WorldViewRendersMapAndFog);
+        registry.Add("Rendering.WorldView binding does not mutate world fog flags", WorldViewBindingDoesNotMutateWorldFogFlags);
         registry.Add("Rendering.WorldView applies the default zoomed-out camera framing", WorldViewAppliesDefaultCameraZoom);
         registry.Add("Rendering.WorldArtCatalog uses the 0x72 wall tile", WorldArtCatalogUses0x72WallArt);
         registry.Add("Rendering.WorldArtCatalog selects contextual wall art for exposed edges", WorldArtCatalogSelectsContextualWallArt);
@@ -59,6 +60,7 @@ public sealed class FOVTests : ITestSuite
     {
         var world = CreateRoomWorld();
         world.SetTile(new Position(3, 3), TileType.Wall);
+        world.SetVisible(world.Player.Position, true);
         var view = CreateWorldView(world);
 
         Expect.True(view.FloorLayer.TryGetCell(new Vector2I(2, 2), out var floorCell), "Floor tile should render to the floor layer.");
@@ -67,6 +69,48 @@ public sealed class FOVTests : ITestSuite
         Expect.Equal(new Vector2I(1, 0), wallCell.AtlasCoords, "Wall atlas coordinates should match the wall tile.");
         Expect.Equal(FogTileState.Visible, view.GetFogState(world.Player.Position), "Player tile should be visible after initial render.");
         Expect.Equal(WorldView.ToCanvasPosition(world.Player.Position), view.Camera.Position, "Camera should center on the player after rendering.");
+    }
+
+    private static void WorldViewBindingDoesNotMutateWorldFogFlags()
+    {
+        var world = CreateRoomWorld();
+        var exploredOnly = new Position(1, 1);
+        var visible = world.Player.Position;
+        var hidden = new Position(5, 5);
+
+        world.SetVisible(exploredOnly, true);
+        world.ClearVisibility();
+        world.SetVisible(visible, true);
+
+        var exploredOnlyWasVisible = world.IsVisible(exploredOnly);
+        var exploredOnlyWasExplored = world.IsExplored(exploredOnly);
+        var visibleWasVisible = world.IsVisible(visible);
+        var visibleWasExplored = world.IsExplored(visible);
+        var hiddenWasVisible = world.IsVisible(hidden);
+        var hiddenWasExplored = world.IsExplored(hidden);
+
+        var view = CreateWorldView(world);
+        view.RenderFullMap(world);
+
+        Expect.Equal(exploredOnlyWasVisible, world.IsVisible(exploredOnly),
+            "Binding/rendering WorldView must not recalculate authoritative visible flags.");
+        Expect.Equal(exploredOnlyWasExplored, world.IsExplored(exploredOnly),
+            "Binding/rendering WorldView must preserve authoritative explored flags.");
+        Expect.Equal(visibleWasVisible, world.IsVisible(visible),
+            "WorldView should mirror an already-visible tile without rewriting world state.");
+        Expect.Equal(visibleWasExplored, world.IsExplored(visible),
+            "WorldView should leave explored state for visible tiles owned by WorldState.");
+        Expect.Equal(hiddenWasVisible, world.IsVisible(hidden),
+            "WorldView must not reveal hidden tiles during render.");
+        Expect.Equal(hiddenWasExplored, world.IsExplored(hidden),
+            "WorldView must not mark hidden tiles explored during render.");
+
+        Expect.Equal(FogTileState.Explored, view.GetFogState(exploredOnly),
+            "WorldView should still render explored-only fog from WorldState.");
+        Expect.Equal(FogTileState.Visible, view.GetFogState(visible),
+            "WorldView should still render visible fog from WorldState.");
+        Expect.Equal(FogTileState.Hidden, view.GetFogState(hidden),
+            "WorldView should still render hidden fog from WorldState.");
     }
 
     private static void WorldViewAnimatesMovementAndAttacks()

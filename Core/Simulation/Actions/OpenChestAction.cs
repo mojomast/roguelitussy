@@ -65,7 +65,7 @@ public sealed class OpenChestAction : IAction
                 rolledItemCount += stackCount;
                 var description = DescribeLoot(loader, roll.ItemId, stackCount);
 
-                if (TryAddToInventory(inventory, loader, item))
+                if (TryAddToInventory(world, inventory, loader, item))
                 {
                     stowedDescriptions.Add(description);
                 }
@@ -119,7 +119,7 @@ public sealed class OpenChestAction : IAction
         }
     }
 
-    private static bool TryAddToInventory(InventoryComponent? inventory, ContentLoader loader, ItemInstance item)
+    private static bool TryAddToInventory(WorldState world, InventoryComponent? inventory, ContentLoader loader, ItemInstance item)
     {
         if (inventory is null || !loader.TryGetItemTemplate(item.TemplateId, out var template))
         {
@@ -127,7 +127,7 @@ public sealed class OpenChestAction : IAction
         }
 
         return template.MaxStack > 1
-            ? inventory.AddWithStacking(item, template.MaxStack)
+            ? inventory.AddWithStacking(item, template.MaxStack, world.AllocateItemInstanceId)
             : inventory.Add(item);
     }
 

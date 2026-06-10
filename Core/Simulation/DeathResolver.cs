@@ -37,6 +37,18 @@ public static class DeathResolver
         return new DeathResolution(true, 1, award);
     }
 
+    public static DeathResolution ResolveUnattributedDeath(WorldState world, IEntity victim)
+    {
+        if (world.GetEntity(victim.Id) is null)
+        {
+            return new DeathResolution(false, 0, new ProgressionService.AwardResult(0, 0, Array.Empty<int>()));
+        }
+
+        victim.Stats.HP = 0;
+        world.RemoveEntity(victim.Id);
+        return new DeathResolution(true, 0, new ProgressionService.AwardResult(0, 0, Array.Empty<int>()));
+    }
+
     public static void AppendProgressionLogMessages(ICollection<string> logMessages, string killerName, DeathResolution resolution)
     {
         if (resolution.ProgressionAward.ExperienceGained > 0)

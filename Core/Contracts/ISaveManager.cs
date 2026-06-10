@@ -6,7 +6,11 @@ public interface ISaveManager
 {
     Task<bool> SaveGame(WorldState world, int slotIndex);
 
+    Task<bool> SaveRun(SaveRunSnapshot snapshot, int slotIndex);
+
     Task<WorldState?> LoadGame(int slotIndex);
+
+    Task<SaveRunSnapshot?> LoadRun(int slotIndex);
 
     bool HasSave(int slotIndex);
 

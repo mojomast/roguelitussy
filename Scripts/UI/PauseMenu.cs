@@ -19,8 +19,8 @@ public partial class PauseMenu : MenuBase
     public PauseMenu()
     {
         Name = "PauseMenu";
-        Title = "PAUSED";
-        ConfigureOptions("Resume", "Save Slot 1", "Save Slot 2", "Save Slot 3", "Character Sheet", "Help", "Dev Tools", "Main Menu", "Quit");
+        Title = "RUN PAUSED";
+        ConfigureOptions("Resume Run", "Save: Slot 1", "Save: Slot 2", "Save: Slot 3", "Review Character", "Open Help", "Developer Workshop", "Return to Title", "Quit Game");
         Visible = false;
     }
 
@@ -31,7 +31,18 @@ public partial class PauseMenu : MenuBase
 
     protected override string BuildBodyText()
     {
-        return "Game input is paused while this overlay is open.";
+        return string.Join(
+            "\n",
+            "Expedition command is paused.",
+            "Resume keeps the current turn state intact.",
+            "Save slots preserve active and cached floors.",
+            "Review, Help, and Workshop are safe tools.",
+            "Return to Title or Quit ends this shell session.");
+    }
+
+    protected override string BuildFooterText()
+    {
+        return "Up/Down choose  Enter confirm  H help  T workshop  Esc resume";
     }
 
     protected override void ActivateSelected()

@@ -22,6 +22,7 @@ public static class SaveMigrator
             4 => MigrateV4(root),
             5 => MigrateV5(root),
             6 => MigrateV6(root),
+            7 => MigrateV7(root),
             SaveSerializer.CurrentVersion => JsonSerializer.Deserialize<SaveFileData>(json, SaveSerializer.JsonOptions)
                 ?? throw new InvalidOperationException("Unable to deserialize save data."),
             _ => throw new InvalidOperationException($"Unsupported save version {version}.")
@@ -78,7 +79,7 @@ public static class SaveMigrator
 
         data.Entities = entities;
         data.GroundItems = ReadLegacyGroundItems(root);
-        return data;
+        return FinalizeSingleFloor(data);
     }
 
     private static SaveFileData MigrateV2(JsonElement root)
@@ -89,7 +90,7 @@ public static class SaveMigrator
         data.Explored = ReencodeFlagsV2ToV3(data.Explored, data.Width, data.Height);
         data.Visible = ReencodeFlagsV2ToV3(data.Visible, data.Width, data.Height);
         data.Version = SaveSerializer.CurrentVersion;
-        return data;
+        return FinalizeSingleFloor(data);
     }
 
     private static SaveFileData MigrateV3(JsonElement root)
@@ -98,7 +99,7 @@ public static class SaveMigrator
             ?? throw new InvalidOperationException("Unable to deserialize version 3 save data.");
 
         data.Version = SaveSerializer.CurrentVersion;
-        return data;
+        return FinalizeSingleFloor(data);
     }
 
     private static SaveFileData MigrateV5(JsonElement root)
@@ -107,7 +108,7 @@ public static class SaveMigrator
             ?? throw new InvalidOperationException("Unable to deserialize version 5 save data.");
 
         data.Version = SaveSerializer.CurrentVersion;
-        return data;
+        return FinalizeSingleFloor(data);
     }
 
     private static SaveFileData MigrateV4(JsonElement root)
@@ -116,7 +117,7 @@ public static class SaveMigrator
             ?? throw new InvalidOperationException("Unable to deserialize version 4 save data.");
 
         data.Version = SaveSerializer.CurrentVersion;
-        return data;
+        return FinalizeSingleFloor(data);
     }
 
     private static SaveFileData MigrateV6(JsonElement root)
@@ -126,6 +127,28 @@ public static class SaveMigrator
 
         data.Version = SaveSerializer.CurrentVersion;
         data.CombatRandomState = 0UL;
+        return FinalizeSingleFloor(data);
+    }
+
+    private static SaveFileData MigrateV7(JsonElement root)
+    {
+        var data = JsonSerializer.Deserialize<SaveFileData>(root.GetRawText(), SaveSerializer.JsonOptions)
+            ?? throw new InvalidOperationException("Unable to deserialize version 7 save data.");
+
+        data.Version = SaveSerializer.CurrentVersion;
+        return FinalizeSingleFloor(data);
+    }
+
+    private static SaveFileData FinalizeSingleFloor(SaveFileData data)
+    {
+        data.Version = SaveSerializer.CurrentVersion;
+        if (data.Floors.Count == 0)
+        {
+            data.Floors.Add(SaveSerializer.CreateFloorFromRoot(data));
+        }
+
+        var activeFloor = data.Floors.Find(floor => floor.Depth == data.Depth) ?? data.Floors[0];
+        SaveSerializer.ApplyActiveFloorAliases(data, activeFloor);
         return data;
     }
 

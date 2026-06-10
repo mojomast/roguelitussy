@@ -42,7 +42,7 @@ internal static class UIActionFactory
         return world?.GetEntity(actorId) is null ? null : new WaitAction(actorId);
     }
 
-    public static IAction? CreatePickupAction(IWorldState? world, IContentDatabase? content, EntityId actorId)
+    public static IAction? CreatePickupAction(IWorldState? world, IContentDatabase? content, EntityId actorId, bool autoEquipUpgrades = false)
     {
         if (world is not WorldState mutableWorld || world.GetEntity(actorId) is null)
         {
@@ -68,7 +68,7 @@ internal static class UIActionFactory
             content.TryGetItemTemplate(item.TemplateId, out template);
         }
 
-        return new PickupAction(actorId, template);
+        return new PickupAction(actorId, template, autoEquipUpgrades);
     }
 
     public static IAction? CreateStairsAction(IWorldState? world, EntityId actorId)

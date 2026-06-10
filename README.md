@@ -2,11 +2,12 @@
 
 A deterministic roguelike foundation for Godot 4.4.1 Mono/.NET with a pure C# simulation core, Godot-facing presentation scripts, data-driven content, and a custom .NET test harness.
 
-The current build includes character identity and progression, ability casting, gear-driven combat, role-specific AI, equipment requirements, refreshed CC0 0x72 dungeon art with contextual wall layering, reconciled world-space movement, overlay-aware gameplay chrome, expanded enemy sprite coverage, and broader mid- and late-floor content.
+The current build includes character identity and progression, ability casting, gear-driven combat, role-specific AI, equipment requirements, authoritative GameManager-owned visibility, refreshed CC0 0x72 dungeon art with contextual wall layering, committed SVG item/status icons, clearer menu and inventory presentation, reconciled world-space movement, overlay-aware gameplay chrome, expanded enemy sprite coverage, and broader mid- and late-floor content.
 
 ## Quick Start
 
 1. Install .NET 8 SDK.
+   If a system package is unavailable, the Microsoft user-local installer works for this repo; set `DOTNET_ROOT=$HOME/.dotnet` and put `$HOME/.dotnet` on `PATH` before running the commands below.
 2. Install Godot 4.4.1 Mono/.NET if you want to open or run the game inside the editor.
 3. Build the editorless Godot stub profile:
 
@@ -30,6 +31,7 @@ The current build includes character identity and progression, ability casting, 
 - A pure C# simulation layer for entities, actions, combat, abilities, inventory, AI, generation, and persistence.
 - Godot-side autoloads and presentation scripts for UI, rendering, and debug/editor tooling.
 - Layered 0x72 world rendering with contextual wall caps, trims, and sprite-backed entity presentation for the current enemy roster.
+- SVG-backed item/status icon source art and content-path validation for authored `res://` visuals.
 - An in-app developer workshop for creating room drafts and scaffolding item/enemy content directly from the runtime shell.
 - JSON-driven content for items, enemies, abilities, status effects, loot tables, room prefabs, perks, NPCs, and dialogs.
 - Save/load infrastructure with validation and migration support for progression and identity state.
@@ -79,6 +81,12 @@ Build the editorless stub profile:
 dotnet build godotussy.csproj -p:UseGodotStubs=true
 ```
 
+Build the solution, including the test project for IDE/structural coverage:
+
+```powershell
+dotnet build godotussy.sln
+```
+
 Build the test project:
 
 ```powershell
@@ -94,14 +102,20 @@ dotnet run --project Tests/godotussy.Tests.csproj
 Run the rendering-focused compile profile:
 
 ```powershell
+dotnet restore godotussy.csproj -p:UseGodotStubs=true -p:RenderingValidation=true
 dotnet run --project Tests/godotussy.Tests.csproj -p:RenderingValidation=true
 ```
+
+The rendering validation profile intentionally excludes persistence implementation files and persistence-backed tests so rendering/UI code can compile against the Godot stubs without requiring the full save subsystem in that profile.
 
 Run the game headlessly to validate startup:
 
 ```powershell
+Godot_v4.4.1-stable_mono_linux_x86_64 --headless --editor --path . --quit
 Godot_v4.4.1-stable_mono_linux_x86_64 --headless --path . --quit
 ```
+
+Run the editor import step first in fresh checkouts so ignored Godot import products under `.godot/` are regenerated from committed assets and `.import` files.
 
 ## Notes For Contributors
 

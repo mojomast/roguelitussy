@@ -22,10 +22,11 @@ This repository is organized around a strict split between deterministic simulat
 
 Before opening or shipping a change:
 
-1. Build the solution.
-2. Run the relevant tests, and run the full suite for behavior-changing work.
-3. Update documentation when behavior, workflow, or structure changes.
-4. Keep content IDs and file names stable unless the change explicitly handles migration or reference updates.
+1. Build the solution with `dotnet build godotussy.sln`, and build the editorless stub profile with `dotnet build godotussy.csproj -p:UseGodotStubs=true`.
+2. Run the relevant tests, and run the full harness for behavior-changing work.
+3. For changes to `project.godot`, `Scenes/`, `Assets/`, `Scripts/Autoloads/`, or Godot-facing startup code, run `godot --headless --editor --path . --quit` followed by `godot --headless --path . --quit`.
+4. Update documentation when behavior, workflow, or structure changes.
+5. Keep content IDs and file names stable unless the change explicitly handles migration or reference updates.
 
 ## Common Change Patterns
 
@@ -63,6 +64,7 @@ Before committing, verify:
 - docs still match the implementation
 - no temporary root-level `.cs` files were left behind
 - content changes preserve stable references
+- authored `res://` art paths resolve to committed source assets when content visuals change
 
 ## Documentation Rule
 

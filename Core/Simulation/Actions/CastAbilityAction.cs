@@ -78,7 +78,7 @@ public sealed class CastAbilityAction : IAction
 
         var actor = world.GetEntity(ActorId)!;
         world.CombatResolver ??= new CombatResolver(world.Seed);
-        var rng = new DeterministicRandom(CreateStableSeed(world));
+        var rng = world.CombatResolver;
 
         var outcome = new ActionOutcome
         {
@@ -96,7 +96,7 @@ public sealed class CastAbilityAction : IAction
             switch (effect.Type)
             {
                 case "damage":
-                    var damageTargets = AbilityResolver.FilterByRelation(targets, actor, effect.Filter);
+                    var damageTargets = AbilityResolver.FilterByRelation(targets, actor, ResolveEffectFilter(effect, isHarmful: true));
                     foreach (var target in damageTargets)
                     {
                         if (world.GetEntity(target.Id) is null || !target.IsAlive)
@@ -139,7 +139,7 @@ public sealed class CastAbilityAction : IAction
                         break;
                     }
 
-                    var statusTargets = AbilityResolver.FilterByRelation(targets, actor, effect.Filter);
+                    var statusTargets = AbilityResolver.FilterByRelation(targets, actor, ResolveEffectFilter(effect, IsHarmfulStatus(statusType)));
                     foreach (var target in statusTargets)
                     {
                         if (world.GetEntity(target.Id) is null || !target.IsAlive)
@@ -147,12 +147,12 @@ public sealed class CastAbilityAction : IAction
                             continue;
                         }
 
-                        if (effect.StatusChance < 100 && rng.Next(100) >= effect.StatusChance)
+                        if (effect.StatusChance < 100 && rng.NextRandom(100) >= effect.StatusChance)
                         {
                             continue;
                         }
 
-                        StatusEffectProcessor.ApplyEffect(target, statusType, effect.StatusDuration);
+                        StatusEffectProcessor.ApplyEffect(target, statusType, effect.StatusDuration, sourceEntityId: ActorId);
                         var applied = StatusEffectProcessor.GetEffect(target, statusType);
                         if (applied is not null)
                         {
@@ -208,31 +208,22 @@ public sealed class CastAbilityAction : IAction
 
     public int GetEnergyCost() => Ability.EnergyCost;
 
-    private int CreateStableSeed(WorldState world)
+    private string? ResolveEffectFilter(AbilityEffect effect, bool isHarmful)
     {
-        unchecked
+        if (!string.IsNullOrWhiteSpace(effect.Filter))
         {
-            var hash = 2166136261u;
-            void Add(uint value)
-            {
-                hash ^= value;
-                hash *= 16777619u;
-            }
-
-            Add((uint)world.Seed);
-            Add((uint)world.TurnNumber);
-
-            foreach (var b in ActorId.Value.ToByteArray())
-            {
-                Add(b);
-            }
-
-            foreach (var ch in Ability.AbilityId)
-            {
-                Add(ch);
-            }
-
-            return (int)hash;
+            return effect.Filter;
         }
+
+        return isHarmful && !Ability.Targeting.HitsAllies ? "enemies" : null;
     }
+
+    private static bool IsHarmfulStatus(StatusEffectType type) => type is
+        StatusEffectType.Poisoned or
+        StatusEffectType.Burning or
+        StatusEffectType.Frozen or
+        StatusEffectType.Stunned or
+        StatusEffectType.Weakened or
+        StatusEffectType.Corroded;
+
 }

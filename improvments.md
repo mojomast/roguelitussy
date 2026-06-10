@@ -1,6 +1,8 @@
 # Godotussy Improvement Spec
 
-> Status note (2026-06-09): this file is historical backlog context. Many gap sections below have since been resolved or partially resolved, including identity/progression persistence, runtime ability casting, combat item stats, AI role support, equipment requirements, content expansion, save versioning, and workflow documentation. Treat older "Missing" lists as audit history; confirm against the live code and current docs before starting work.
+> Status note (2026-06-10): this file is historical backlog context. Many gap sections below have since been resolved or partially resolved, including identity/progression persistence, runtime ability casting, combat item stats, AI role support, equipment requirements, content expansion, save versioning, workflow documentation, ability RNG save/load continuation, and sourced status-kill progression attribution. Treat older "Missing" lists as audit history; confirm against the live code and current docs before starting work.
+
+> UI/assets follow-up note (2026-06-10): inventory/menu readability and authored visual-path validation have a first polish pass. Item/status SVG source icons now exist, enemy content paths point at committed 0x72 sprites, and tests audit authored `res://` art paths. Remaining UI work should focus on real focusable inventory slot controls, controller action maps, and optional PNG atlas workflow rather than more text-panel expansion.
 
 ## Purpose
 

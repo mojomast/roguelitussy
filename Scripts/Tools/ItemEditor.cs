@@ -141,7 +141,7 @@ public partial class ItemEditor : Control
             Requirements = new Dictionary<string, int>(),
             Stackable = true,
             MaxStack = 1,
-            SpritePath = "res://Assets/Sprites/items/potion_health.png",
+            SpritePath = "res://Assets/Sprites/items/potion_health.svg",
             SpriteAtlasCoords = new List<int> { 0, 0 },
         };
 
@@ -176,7 +176,7 @@ public partial class ItemEditor : Control
             Abilities = new List<EnemyAbilityReference>(),
             LootTableId = null,
             Tags = new List<string>(),
-            SpritePath = "res://Assets/Sprites/enemies/rat.png",
+            SpritePath = "res://Assets/Sprites/0x72/Imp_Idle_1.png",
             SpriteAtlasCoords = new List<int> { 0, 0 },
         };
 

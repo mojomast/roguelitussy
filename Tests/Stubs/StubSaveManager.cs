@@ -6,20 +6,34 @@ namespace Roguelike.Tests.Stubs;
 
 public sealed class StubSaveManager : ISaveManager
 {
-    private readonly Dictionary<int, WorldState> _slots = new();
+    private const int MetadataVersion = 8;
+    private readonly Dictionary<int, SaveRunSnapshot> _slots = new();
     private readonly Dictionary<int, SaveMetadata> _metadata = new();
 
     public Task<bool> SaveGame(WorldState world, int slotIndex)
     {
-        _slots[slotIndex] = world;
-        _metadata[slotIndex] = new SaveMetadata(slotIndex, world.Depth, world.TurnNumber, world.Player.Name, System.DateTime.UtcNow, 1);
+        return SaveRun(new SaveRunSnapshot(world.Seed, world.Depth, world, new Dictionary<int, WorldState> { [world.Depth] = world }), slotIndex);
+    }
+
+    public Task<bool> SaveRun(SaveRunSnapshot snapshot, int slotIndex)
+    {
+        _slots[slotIndex] = snapshot;
+        _metadata[slotIndex] = new SaveMetadata(slotIndex, snapshot.CurrentFloor, snapshot.ActiveWorld.TurnNumber, snapshot.ActiveWorld.Player.Name, System.DateTime.UtcNow, MetadataVersion);
         return Task.FromResult(true);
     }
 
     public Task<WorldState?> LoadGame(int slotIndex)
     {
-        _slots.TryGetValue(slotIndex, out var world);
-        return Task.FromResult(world);
+        return _slots.TryGetValue(slotIndex, out var snapshot)
+            ? Task.FromResult<WorldState?>(snapshot.ActiveWorld)
+            : Task.FromResult<WorldState?>(null);
+    }
+
+    public Task<SaveRunSnapshot?> LoadRun(int slotIndex)
+    {
+        return _slots.TryGetValue(slotIndex, out var snapshot)
+            ? Task.FromResult<SaveRunSnapshot?>(snapshot)
+            : Task.FromResult<SaveRunSnapshot?>(null);
     }
 
     public bool HasSave(int slotIndex) => _slots.ContainsKey(slotIndex);

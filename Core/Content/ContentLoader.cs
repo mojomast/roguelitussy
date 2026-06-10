@@ -837,6 +837,14 @@ public sealed class ContentLoader : IContentDatabase
                 errors.Add($"Non-stackable item '{id}' cannot declare max_stack greater than 1.");
             }
 
+            foreach (var stat in item.Stats.Keys)
+            {
+                if (!IsAllowedValue(stat, "damage_min", "damage_max", "accuracy", "speed_modifier", "crit_chance", "defense", "evasion", "fov_bonus", "attack", "hp", "max_hp"))
+                {
+                    errors.Add($"Item '{id}' stat '{stat}' is not supported by runtime equipment or item-use rules.");
+                }
+            }
+
             foreach (var (requirement, value) in item.Requirements)
             {
                 if (value < 0)
@@ -896,20 +904,7 @@ public sealed class ContentLoader : IContentDatabase
                         break;
 
                     case "passive":
-                        if (!IsAllowedValue(effect.Action, "regen_hp", "modify_stat"))
-                        {
-                            errors.Add($"Item '{id}' passive effect has invalid action '{effect.Action}'.");
-                        }
-
-                        if (effect.Value is null)
-                        {
-                            errors.Add($"Item '{id}' passive effect must declare a value.");
-                        }
-
-                        if (string.Equals(effect.Action, "modify_stat", StringComparison.Ordinal) && string.IsNullOrWhiteSpace(effect.Stat))
-                        {
-                            errors.Add($"Item '{id}' modify_stat passive must declare a stat.");
-                        }
+                        errors.Add($"Item '{id}' passive effects are not runtime-supported; use supported stats or implement the passive action first.");
                         break;
 
                     default:

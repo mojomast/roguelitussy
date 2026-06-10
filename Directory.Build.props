@@ -1,0 +1,25 @@
+<Project>
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'godotussy' and '$(SolutionDir)' != ''">
+    <UseGodotStubs>true</UseGodotStubs>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'godotussy' and '$(UseGodotStubs)' == 'true' and '$(RenderingValidation)' != 'true'">
+    <BaseIntermediateOutputPath>obj\godotstubs\</BaseIntermediateOutputPath>
+    <MSBuildProjectExtensionsPath>obj\godotstubs\</MSBuildProjectExtensionsPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'godotussy' and '$(UseGodotStubs)' == 'true' and '$(RenderingValidation)' == 'true'">
+    <BaseIntermediateOutputPath>obj\godotstubs-rendering\</BaseIntermediateOutputPath>
+    <MSBuildProjectExtensionsPath>obj\godotstubs-rendering\</MSBuildProjectExtensionsPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'godotussy.Tests' and '$(RenderingValidation)' != 'true'">
+    <BaseIntermediateOutputPath>obj\tests\</BaseIntermediateOutputPath>
+    <MSBuildProjectExtensionsPath>obj\tests\</MSBuildProjectExtensionsPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'godotussy.Tests' and '$(RenderingValidation)' == 'true'">
+    <BaseIntermediateOutputPath>obj\tests-rendering\</BaseIntermediateOutputPath>
+    <MSBuildProjectExtensionsPath>obj\tests-rendering\</MSBuildProjectExtensionsPath>
+  </PropertyGroup>
+</Project>

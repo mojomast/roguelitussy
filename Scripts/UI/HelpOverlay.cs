@@ -20,16 +20,19 @@ public partial class HelpOverlay : MenuBase
     {
         _bodyText = string.Join(
             "\n",
-            "START MENU",
+            "START MENU / FOUNDRY",
             "Up/Down or W/S: move between entries.",
             "Left/Right or +/-: adjust the highlighted creation field.",
             "Enter: confirm or cycle the highlighted entry.  H: toggle help.",
             "",
-            "CHARACTER CREATION",
+            "BUILD AND IDENTITY",
             "Name: cosmetic identity for the run.  Seed: deterministic world generation.",
             "Archetype: starting combat style and loadout.  Origin: small secondary bonus.",
             "Trait: passive perk or bonus.  Training: spend 4 points across VIT/POW/GRD/FIN.",
-            "Stat Preview: updates live as you change selections.");
+            "Stat Preview: updates live as you change selections.",
+            "",
+            "RUN TOOLS",
+            "Dev Tools opens the workshop.  Load Slot entries resume saved expeditions.");
         base.Open();
     }
 
@@ -42,17 +45,20 @@ public partial class HelpOverlay : MenuBase
             "Stairs: Enter.  Inventory: I.  Character sheet: C.  Pause: Esc.  Help: H.",
             "Minimap: M or Tab.  Dev tools: T.  Debug overlay: Q.  Debug console: `.",
             "",
-            "Character Sheet / Level Up",
+            "CHARACTER GROWTH",
             "C toggles the sheet.  With points available: Up/Down selects a stat, Enter/Right/+ spends.",
+            "Level Up choices open as a focused overlay when perk picks are waiting.",
             "",
-            "Developer Workshop",
+            "INVENTORY / SHOPS",
+            "Arrows move selection.  Enter/U/E uses, equips, or unequips.  D drops one from a stack.",
+            "A toggles auto-equip upgrades.  Tab cycles sort and category grouping.",
+            "Rarity is shown by color and text.  Equipment comparison appears automatically for gear.",
+            "Aimed scrolls explain when targeting is required instead of silently consuming input.",
+            "Shops use the same value and weight data.  In dialog or shops: F talks, Tab swaps buy/sell, Enter confirms.",
+            "",
+            "DEVELOPER WORKSHOP",
             "Tab switches rooms, items, enemies, and commands.  Up/Down selects a field.",
-            "Left/Right or +/- adjusts the highlighted field.  Enter applies.  Esc or T closes.",
-            "",
-            "Inventory / Shops",
-            "Arrows move selection.  Enter/U/E uses, equips, or unequips.  D drops.  Tab cycles sort.",
-            "Esc or I closes inventory.  Equipment comparison appears automatically for equippable items.",
-            "Shops use the same value and weight data.  In dialog or shops: F talks, Tab swaps buy/sell, Enter confirms.");
+            "Left/Right or +/- adjusts the highlighted field.  Enter applies.  Esc or T closes.");
         base.Open();
     }
 

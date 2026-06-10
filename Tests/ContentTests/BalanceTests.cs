@@ -13,6 +13,8 @@ public sealed class BalanceTests : ITestSuite
         registry.Add("Content.Early game remains survivable", EarlyGameRemainsSurvivable);
         registry.Add("Content.Floor loot gates high tier items by depth", FloorLootGatesHighTierItemsByDepth);
         registry.Add("Content.Loot resolution is deterministic", LootResolutionIsDeterministic);
+        registry.Add("Content.Health potion loot share is improved", HealthPotionLootShareIsImproved);
+        registry.Add("Content.Default chest loot cannot roll empty", DefaultChestLootCannotRollEmpty);
     }
 
     private static void BudgetsRampPredictably()
@@ -79,6 +81,57 @@ public sealed class BalanceTests : ITestSuite
             .ToArray();
 
         Expect.Equal(string.Join(",", firstRoll), string.Join(",", secondRoll), "Loot rolls must be deterministic for a fixed seed");
+    }
+
+    private static void HealthPotionLootShareIsImproved()
+    {
+        var content = LoadContent();
+
+        Expect.True(
+            GetWeightedShare(content, "floor_loot", "potion_health", depth: 0) >= 0.30,
+            "Early floor loot should make health potions noticeably more common than the old 25% mix.");
+        Expect.True(
+            GetWeightedShare(content, "deep_floor_loot", "potion_health", depth: 4) >= 0.25,
+            "Deep floor loot should make health potions noticeably more common than the old 18% mix.");
+        Expect.True(
+            GetWeightedShare(content, "chest_loot", "potion_health", depth: 0) >= 0.35,
+            "Early generated chests should be a strong source of health potions.");
+        Expect.True(
+            GetWeightedShare(content, "deep_chest_loot", "potion_health", depth: 4) >= 0.30,
+            "Deep generated chests should remain a strong source of health potions.");
+    }
+
+    private static void DefaultChestLootCannotRollEmpty()
+    {
+        var content = LoadContent();
+
+        AssertGuaranteedChestTable(content, "chest_loot", depth: 0);
+        AssertGuaranteedChestTable(content, "deep_chest_loot", depth: 4);
+    }
+
+    private static double GetWeightedShare(ContentLoader content, string tableId, string itemId, int depth)
+    {
+        var entries = LootTableResolver.GetEligibleEntries(content, tableId, depth);
+        var totalWeight = entries.Sum(entry => entry.Weight);
+        var itemWeight = entries
+            .Where(entry => string.Equals(entry.ItemId, itemId, StringComparison.Ordinal))
+            .Sum(entry => entry.Weight);
+
+        return totalWeight == 0 ? 0.0 : (double)itemWeight / totalWeight;
+    }
+
+    private static void AssertGuaranteedChestTable(ContentLoader content, string tableId, int depth)
+    {
+        var entries = LootTableResolver.GetEligibleEntries(content, tableId, depth);
+
+        Expect.True(entries.Count > 0, $"{tableId} should have eligible entries at depth {depth}.");
+        Expect.False(entries.Any(entry => entry.ItemId is null), $"{tableId} should not include no-drop entries.");
+
+        for (var seed = 0; seed < 50; seed++)
+        {
+            var roll = LootTableResolver.RollTable(content, tableId, new Random(seed), depth);
+            Expect.True(roll.Count > 0, $"{tableId} should produce loot for deterministic seed {seed}.");
+        }
     }
 
     private static ContentLoader LoadContent()

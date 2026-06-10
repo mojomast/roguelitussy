@@ -183,7 +183,7 @@
       "entries": [
         {
           "item_id": "potion_health",
-          "weight": 25,
+          "weight": 35,
           "count_min": 1,
           "count_max": 2
         },
@@ -258,6 +258,61 @@
           "weight": 14,
           "count_min": 0,
           "count_max": 0
+        }
+      ]
+    },
+    {
+      "id": "chest_loot",
+      "description": "Guaranteed treasure from generated chests on early dungeon depths.",
+      "rolls": 1,
+      "entries": [
+        {
+          "item_id": "potion_health",
+          "weight": 40,
+          "count_min": 1,
+          "count_max": 2
+        },
+        {
+          "item_id": "potion_haste",
+          "weight": 12,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "scroll_blink",
+          "weight": 12,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "scroll_fireball",
+          "weight": 8,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "sword_iron",
+          "weight": 8,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "shield_wooden",
+          "weight": 8,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "helm_iron",
+          "weight": 6,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "dagger_venom",
+          "weight": 6,
+          "count_min": 1,
+          "count_max": 1
         }
       ]
     },
@@ -521,7 +576,7 @@
       "entries": [
         {
           "item_id": "potion_health",
-          "weight": 18,
+          "weight": 28,
           "count_min": 1,
           "count_max": 2
         },
@@ -608,6 +663,79 @@
           "weight": 14,
           "count_min": 0,
           "count_max": 0
+        }
+      ]
+    },
+    {
+      "id": "deep_chest_loot",
+      "description": "Guaranteed treasure from generated chests on depth 4 and deeper.",
+      "rolls": 1,
+      "entries": [
+        {
+          "item_id": "potion_health",
+          "weight": 36,
+          "count_min": 1,
+          "count_max": 2
+        },
+        {
+          "item_id": "potion_might",
+          "weight": 10,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "potion_haste",
+          "weight": 8,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "scroll_fireball",
+          "weight": 8,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "scroll_phase",
+          "weight": 8,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "battleaxe",
+          "weight": 6,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "longbow",
+          "weight": 6,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "armor_plate",
+          "weight": 5,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "mace_disruption",
+          "weight": 5,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "staff_embers",
+          "weight": 4,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "ring_warding",
+          "weight": 4,
+          "count_min": 1,
+          "count_max": 1
         }
       ]
     }

@@ -20,6 +20,8 @@ public sealed class AbilityTests : ITestSuite
         registry.Add("Simulation.Ability cooldown prevents reuse", CooldownPreventsReuse);
         registry.Add("Simulation.Ability self target applies status", SelfTargetAppliesStatus);
         registry.Add("Simulation.Ability aoe does not hit caster when no self center", AoeNoSelfCenter);
+        registry.Add("Simulation.Ability hits_allies false excludes allies by default", HitsAlliesFalseExcludesAlliesByDefault);
+        registry.Add("Simulation.Ability hits_allies true includes allies by default", HitsAlliesTrueIncludesAlliesByDefault);
         registry.Add("Simulation.Ability kill awards XP and kill credit", AbilityKillAwardsXpAndKills);
         registry.Add("Simulation.Ability multi-kill awards XP and kill credit", AbilityMultiKillAwardsXpAndKills);
         registry.Add("Simulation.Ability does not apply status to killed target", AbilityDoesNotApplyStatusToKilledTarget);
@@ -321,6 +323,67 @@ public sealed class AbilityTests : ITestSuite
         Expect.Equal(ActionResult.Success, outcome.Result, "Ability should succeed");
         Expect.True(world.GetEntity(target.Id) is null, "Killed target should be removed");
         Expect.False(StatusEffectProcessor.HasEffect(target, StatusEffectType.Burning), "Dead/removed target should not receive later status effects");
+    }
+
+    private static void HitsAlliesFalseExcludesAlliesByDefault()
+    {
+        var world = CreateWorld(seed: 0);
+        var caster = CreateActor("Acid Caster", new Position(1, 1), Faction.Enemy, new Stats { HP = 20, MaxHP = 20, Attack = 5, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 100 });
+        var ally = CreateActor("Ally", new Position(2, 1), Faction.Enemy, new Stats { HP = 20, MaxHP = 20, Attack = 5, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 100 });
+        var enemy = CreateActor("Hero", new Position(2, 2), Faction.Player, new Stats { HP = 20, MaxHP = 20, Attack = 5, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 100 });
+        world.Player = enemy;
+        world.AddEntity(caster);
+        world.AddEntity(ally);
+        world.AddEntity(enemy);
+
+        var ability = new AbilityTemplate(
+            "acid_splash",
+            "Acid Splash",
+            "Test harmful status ability.",
+            new AbilityTargeting("aoe_circle", 8, 2, false, false, false, null),
+            1000,
+            null,
+            new AbilityEffect[]
+            {
+                new("apply_status", DamageType.Poison, 0, null, 0.0, "corroded", 100, 3, null, null, 0.0, null),
+            });
+
+        var outcome = new CastAbilityAction(caster.Id, ability, enemy.Position).Execute(world);
+
+        Expect.Equal(ActionResult.Success, outcome.Result, "AoE harmful status should cast successfully");
+        Expect.False(StatusEffectProcessor.HasEffect(caster, StatusEffectType.Corroded), "hits_allies false should exclude caster by default");
+        Expect.False(StatusEffectProcessor.HasEffect(ally, StatusEffectType.Corroded), "hits_allies false should exclude allied entities by default");
+        Expect.True(StatusEffectProcessor.HasEffect(enemy, StatusEffectType.Corroded), "hits_allies false should still affect enemies");
+    }
+
+    private static void HitsAlliesTrueIncludesAlliesByDefault()
+    {
+        var world = CreateWorld(seed: 0);
+        var caster = CreateActor("Mage", new Position(1, 1), Faction.Player, new Stats { HP = 20, MaxHP = 20, Attack = 5, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 100 });
+        var ally = CreateActor("Ally", new Position(2, 1), Faction.Player, new Stats { HP = 20, MaxHP = 20, Attack = 5, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 100 });
+        var enemy = CreateActor("Enemy", new Position(2, 2), Faction.Enemy, new Stats { HP = 20, MaxHP = 20, Attack = 5, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 100 });
+        world.Player = caster;
+        world.AddEntity(caster);
+        world.AddEntity(ally);
+        world.AddEntity(enemy);
+
+        var ability = new AbilityTemplate(
+            "friendly_fire",
+            "Friendly Fire",
+            "Test hits allies damage ability.",
+            new AbilityTargeting("aoe_circle", 8, 2, false, false, true, null),
+            1000,
+            null,
+            new AbilityEffect[]
+            {
+                new("damage", DamageType.Fire, 4, null, 0.0, null, 0, 0, null, null, 0.0, null),
+            });
+
+        var outcome = new CastAbilityAction(caster.Id, ability, enemy.Position).Execute(world);
+
+        Expect.Equal(ActionResult.Success, outcome.Result, "AoE damage should cast successfully");
+        Expect.True(ally.Stats.HP < 20, "hits_allies true should include allied entities by default");
+        Expect.True(enemy.Stats.HP < 20, "hits_allies true should include enemies too");
     }
 
     private static AbilityTemplate CreateDamageAbility(string id, string name, string targetingType, int radius, int damage)

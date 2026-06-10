@@ -144,6 +144,9 @@ public partial class InventoryUI : Control
             case Key.D:
                 SubmitDrop();
                 return true;
+            case Key.A:
+                ToggleAutoEquipUpgrades();
+                return true;
             case Key.Tab:
                 CycleSortMode();
                 return true;
@@ -290,7 +293,12 @@ public partial class InventoryUI : Control
         var inventory = _gameManager?.World?.Player?.GetComponent<InventoryComponent>();
         builder.AppendLine($"Inventory  {_items.Count}/{inventory?.Capacity ?? 0} stacks  {ResolveTotalCarriedItems()} items");
         builder.AppendLine($"Gold: {ResolveGold()}  Weight: {ResolveTotalWeight():0.0}  Value: {ResolveTotalValue()}");
-        builder.AppendLine($"Sort: {CurrentSort}");
+        builder.AppendLine($"Sort: {CurrentSort}  Auto-equip upgrades: {ResolveAutoEquipLabel()}");
+        if (CurrentSort == SortMode.Category)
+        {
+            builder.AppendLine($"Groups: {ResolveCategorySummary()}");
+        }
+
         builder.AppendLine();
         for (var row = 0; row < Rows; row++)
         {
@@ -308,7 +316,7 @@ public partial class InventoryUI : Control
             builder.AppendLine();
         }
 
-        builder.Append("Use: U  Equip: E/Enter  Drop: D  Sort: Tab  Close: I/Esc");
+        builder.Append(ResolveFooterText());
         GridText = builder.ToString().TrimEnd();
         RefreshVisualState();
     }
@@ -334,11 +342,17 @@ public partial class InventoryUI : Control
                 template.Description,
                 $"Category: {template.Category}",
                 $"Slot: {(template.Slot == EquipSlot.None ? "None" : template.Slot.ToString())}",
-                $"Stack: {item.StackCount}",
+                $"Stack: {item.StackCount}/{System.Math.Max(1, template.MaxStack)}",
                 $"Unit Value: {template.Value}",
                 $"Unit Weight: {template.Weight:0.0}",
                 $"Status: {(IsEquipped(item) ? $"Equipped in {ResolveEquippedSlot(item)}" : "Carried")}",
             };
+
+            if (template.MaxCharges > 1)
+            {
+                var remaining = item.CurrentCharges > 0 ? item.CurrentCharges : template.MaxCharges;
+                lines.Add($"Charges: {remaining}/{template.MaxCharges}");
+            }
 
             if (item.StackCount > 1)
             {
@@ -353,10 +367,10 @@ public partial class InventoryUI : Control
 
             if (template.Slot != EquipSlot.None && !IsEquipped(item))
             {
-                var comparison = BuildEquipmentComparison(template);
-                if (!string.IsNullOrEmpty(comparison))
+                var comparison = BuildEquipmentComparisonLines(template);
+                if (comparison.Count > 0)
                 {
-                    lines.Add(comparison);
+                    lines.AddRange(comparison);
                 }
             }
 
@@ -373,17 +387,15 @@ public partial class InventoryUI : Control
                 }
             }
 
-            lines.Add(template.Slot == EquipSlot.None
-                ? "U/Enter: use item"
-                : (IsEquipped(item) ? "E/Enter: unequip" : "E/Enter: equip"));
+            lines.Add(ResolvePrimaryActionHint(template, item));
             lines.Add(item.StackCount > 1 ? "D: drop one from stack" : "D: drop item");
 
             DescriptionText = string.Join("\n", lines);
             DescriptionMarkup = BuildDescriptionMarkup(template, item, lines);
             var tooltipComparison = (template.Slot != EquipSlot.None && !IsEquipped(item))
-                ? BuildEquipmentComparison(template) : null;
+                ? string.Join("\n", BuildEquipmentComparisonLines(template)) : null;
             var tooltipPosition = _tooltip?.ResolveBottomRightPosition(GetViewportRect().Size) ?? new Vector2(840f, 220f);
-            _tooltip?.ShowItemTooltip(template, item, tooltipPosition, tooltipComparison);
+            _tooltip?.ShowItemTooltip(template, item, tooltipPosition, tooltipComparison, IsEquipped(item), ResolveEquippedSlot(item));
             RefreshVisualState();
             return;
         }
@@ -405,6 +417,12 @@ public partial class InventoryUI : Control
 
         SortItems();
         UpdateDescription();
+        UpdateGrid();
+    }
+
+    private void ToggleAutoEquipUpgrades()
+    {
+        _gameManager?.ToggleAutoEquipUpgrades();
         UpdateGrid();
     }
 
@@ -458,18 +476,27 @@ public partial class InventoryUI : Control
 
     private string ResolveSlotToken(ItemInstance item)
     {
-        var marker = IsEquipped(item) ? "*" : string.Empty;
+        var marker = IsEquipped(item) ? "E" : " ";
         var glyph = ResolveSlotGlyph(item);
-        var count = item.StackCount > 1 ? System.Math.Min(item.StackCount, 9).ToString() : string.Empty;
+        var count = item.StackCount > 1 ? $"x{item.StackCount}" : string.Empty;
         var token = $"{marker}{glyph}{count}";
-        return token.PadRight(3);
+        return token.PadRight(7);
     }
 
     private string ResolveSlotGlyph(ItemInstance item)
     {
-        if (_content is not null && _content.TryGetItemTemplate(item.TemplateId, out var template) && !string.IsNullOrWhiteSpace(template.DisplayName))
+        if (_content is not null && _content.TryGetItemTemplate(item.TemplateId, out var template))
         {
-            return template.DisplayName[..1].ToUpperInvariant();
+            return template.Category switch
+            {
+                ItemCategory.Weapon => "⚔",
+                ItemCategory.Armor => "▣",
+                ItemCategory.Scroll => "▤",
+                ItemCategory.Consumable => IsScroll(template) ? "▤" : "!",
+                ItemCategory.Key => "◆",
+                ItemCategory.Misc => "◇",
+                _ => "?",
+            };
         }
 
         return item.TemplateId[..1].ToUpperInvariant();
@@ -507,6 +534,12 @@ public partial class InventoryUI : Control
         }
 
         return item.TemplateId;
+    }
+
+    private static bool IsScroll(ItemTemplate template)
+    {
+        return template.TemplateId.Contains("scroll", System.StringComparison.OrdinalIgnoreCase)
+            || template.DisplayName.Contains("scroll", System.StringComparison.OrdinalIgnoreCase);
     }
 
     private bool TryGetSelectedItem(out ItemInstance item)
@@ -567,6 +600,50 @@ public partial class InventoryUI : Control
         }
 
         return BuildEquipmentComparisonText(template.StatModifiers, equippedModifiers);
+    }
+
+    private IReadOnlyList<string> BuildEquipmentComparisonLines(ItemTemplate template)
+    {
+        var inventory = _gameManager?.World?.Player?.GetComponent<InventoryComponent>();
+        if (inventory is null || _content is null)
+        {
+            return System.Array.Empty<string>();
+        }
+
+        var equipped = inventory.GetEquipped(template.Slot);
+        if (equipped is null || !_content.TryGetItemTemplate(equipped.Item.TemplateId, out var equippedTemplate))
+        {
+            return new[] { $"Compared with {template.Slot}: no item equipped." };
+        }
+
+        var lines = new List<string> { $"Compared with {equippedTemplate.DisplayName}:" };
+        var allKeys = new HashSet<string>(template.StatModifiers.Keys);
+        foreach (var key in equippedTemplate.StatModifiers.Keys)
+        {
+            allKeys.Add(key);
+        }
+
+        var hasDelta = false;
+        foreach (var key in allKeys.OrderBy(key => key, System.StringComparer.Ordinal))
+        {
+            var newValue = template.StatModifiers.TryGetValue(key, out var next) ? next : 0;
+            var oldValue = equippedTemplate.StatModifiers.TryGetValue(key, out var current) ? current : 0;
+            var delta = newValue - oldValue;
+            if (delta == 0)
+            {
+                continue;
+            }
+
+            hasDelta = true;
+            lines.Add($"  {key}: {delta:+#;-#;0}");
+        }
+
+        if (!hasDelta)
+        {
+            lines.Add("  same stats");
+        }
+
+        return lines;
     }
 
     private void EnsureVisuals()
@@ -654,7 +731,12 @@ public partial class InventoryUI : Control
         var inventory = _gameManager?.World?.Player?.GetComponent<InventoryComponent>();
         builder.AppendLine(ItemRarityPresentation.EscapeBBCode($"Inventory  {_items.Count}/{inventory?.Capacity ?? 0} stacks  {ResolveTotalCarriedItems()} items"));
         builder.AppendLine(ItemRarityPresentation.EscapeBBCode($"Gold: {ResolveGold()}  Weight: {ResolveTotalWeight():0.0}  Value: {ResolveTotalValue()}"));
-        builder.AppendLine(ItemRarityPresentation.EscapeBBCode($"Sort: {CurrentSort}"));
+        builder.AppendLine(ItemRarityPresentation.EscapeBBCode($"Sort: {CurrentSort}  Auto-equip upgrades: {ResolveAutoEquipLabel()}"));
+        if (CurrentSort == SortMode.Category)
+        {
+            builder.AppendLine(ItemRarityPresentation.EscapeBBCode($"Groups: {ResolveCategorySummary()}"));
+        }
+
         builder.AppendLine();
         for (var row = 0; row < Rows; row++)
         {
@@ -662,7 +744,7 @@ public partial class InventoryUI : Control
             {
                 var slotIndex = (row * Columns) + column;
                 var selected = slotIndex == SelectedIndex;
-                var label = slotIndex < _items.Count ? ResolveSlotTokenMarkup(_items[slotIndex]) : "   ";
+                var label = slotIndex < _items.Count ? ResolveSlotTokenMarkup(_items[slotIndex]) : "       ";
                 builder.Append(selected ? ">" : " ");
                 builder.Append("[lb]");
                 builder.Append(label);
@@ -672,8 +754,63 @@ public partial class InventoryUI : Control
             builder.AppendLine();
         }
 
-        builder.Append(ItemRarityPresentation.EscapeBBCode("Use: U  Equip: E/Enter  Drop: D  Sort: Tab  Close: I/Esc"));
+        builder.Append(ItemRarityPresentation.EscapeBBCode(ResolveFooterText()));
         return builder.ToString().TrimEnd();
+    }
+
+    private string ResolveAutoEquipLabel() => _gameManager?.AutoEquipUpgradesEnabled == true ? "On" : "Off";
+
+    private string ResolveFooterText()
+    {
+        if (TryGetSelectedItem(out var item)
+            && _content is not null
+            && _content.TryGetItemTemplate(item.TemplateId, out var template))
+        {
+            var primary = template.Slot == EquipSlot.None
+                ? (CanUseFromInventory(template) ? "Enter/U use" : "Aimed item")
+                : (IsEquipped(item) ? "Enter/E unequip" : "Enter/E equip");
+            var drop = item.StackCount > 1 ? "D drop one" : "D drop";
+            return $"{primary}  {drop}  A auto-equip  Tab sort  I/Esc close";
+        }
+
+        return "Arrow keys move  Tab sort  A auto-equip  I/Esc close";
+    }
+
+    private string ResolveCategorySummary()
+    {
+        return string.Join("  ", _items
+            .Select(item => _content is not null && _content.TryGetItemTemplate(item.TemplateId, out var template)
+                ? $"{ResolveSlotGlyph(item)} {template.Category}"
+                : "? Unknown")
+            .Distinct());
+    }
+
+    private string ResolvePrimaryActionHint(ItemTemplate template, ItemInstance item)
+    {
+        if (template.Slot != EquipSlot.None)
+        {
+            return IsEquipped(item) ? "E/Enter: unequip" : "E/Enter: equip";
+        }
+
+        return CanUseFromInventory(template)
+            ? "U/Enter: use item"
+            : "Requires targeting: aim this item from the field before use.";
+    }
+
+    private bool CanUseFromInventory(ItemTemplate template)
+    {
+        if (template.Slot != EquipSlot.None)
+        {
+            return false;
+        }
+
+        if (template.UseEffect is null || !template.UseEffect.StartsWith("cast_ability:", System.StringComparison.OrdinalIgnoreCase) || _content is null)
+        {
+            return true;
+        }
+
+        return _content.TryGetAbilityTemplate(template.UseEffect["cast_ability:".Length..], out var ability)
+            && string.Equals(ability.Targeting.Type, "self", System.StringComparison.OrdinalIgnoreCase);
     }
 
     private static string BuildDescriptionMarkup(ItemTemplate template, ItemInstance item, IReadOnlyList<string> lines)

@@ -17,10 +17,13 @@ public sealed class ActionTests : ITestSuite
         registry.Add("Simulation.Actions attack action rejects same faction targets", AttackActionRejectsSameFaction);
         registry.Add("Simulation.Actions pickup action rejects full inventory", PickupActionRejectsFullInventory);
         registry.Add("Simulation.Actions pickup action merges stacks when bag is full", PickupActionMergesStacksWhenFull);
+        registry.Add("Simulation.Actions pickup auto-equips strict upgrades only when enabled", PickupAutoEquipsStrictUpgradesOnlyWhenEnabled);
+        registry.Add("Simulation.Actions pickup auto-equip respects requirements", PickupAutoEquipRespectsRequirements);
         registry.Add("Simulation.Actions use item heals and consumes potion", UseItemHealsAndConsumes);
         registry.Add("Simulation.Actions toggle equip action changes equipment state", ToggleEquipActionChangesEquipmentState);
         registry.Add("Simulation.Actions drop item places it on the ground", DropItemPlacesGroundItem);
         registry.Add("Simulation.Actions drop item can split a stack", DropItemSplitsStack);
+        registry.Add("Simulation.Actions stack split ids are deterministic", StackSplitIdsAreDeterministic);
         registry.Add("Simulation.Actions open and close door toggles walkability", OpenAndCloseDoorTogglesWalkability);
         registry.Add("Simulation.Actions open door moves through when exit tile is clear", OpenDoorMovesThroughWhenExitTileIsClear);
         registry.Add("Simulation.Actions open chest drops loot and removes chest", OpenChestDropsLootAndRemovesChest);
@@ -203,6 +206,71 @@ public sealed class ActionTests : ITestSuite
         Expect.False(inventory.Contains(item.InstanceId), "Consumed item should be removed from inventory");
     }
 
+    private static void PickupAutoEquipsStrictUpgradesOnlyWhenEnabled()
+    {
+        var world = CreateWorld();
+        var actor = CreateActor("Player", new Position(1, 1), Faction.Player, new Stats { HP = 10, MaxHP = 10, Attack = 4, Defense = 1, Accuracy = 0, Evasion = 0, Speed = 100 });
+        var inventory = actor.GetComponent<InventoryComponent>()!;
+        var oldSword = new ItemInstance { TemplateId = "old_sword", IsIdentified = true };
+        inventory.Add(oldSword);
+        inventory.TryEquip(oldSword, EquipSlot.MainHand, new Dictionary<string, int> { ["attack"] = 1 }, out _);
+        actor.Stats.Attack += 1;
+        world.Player = actor;
+        world.AddEntity(actor);
+
+        var betterSwordTemplate = new ItemTemplate("better_sword", "Better Sword", "Sharper.", ItemCategory.Weapon, EquipSlot.MainHand, new Dictionary<string, int> { ["attack"] = 2 }, string.Empty, -1, 1, "common");
+        world.DropItem(actor.Position, new ItemInstance { TemplateId = "better_sword", IsIdentified = true });
+
+        var disabled = new PickupAction(actor.Id, betterSwordTemplate).Execute(world);
+        Expect.Equal(ActionResult.Success, disabled.Result, "Pickup should still succeed when auto-equip is off.");
+        Expect.Equal(oldSword.InstanceId, inventory.GetEquipped(EquipSlot.MainHand)?.Item.InstanceId ?? EntityId.Invalid, "Auto-equip defaults off and should not replace equipment.");
+        Expect.Equal(5, actor.Stats.Attack, "Stats should not change when auto-equip is disabled.");
+
+        var autoSwordTemplate = new ItemTemplate("auto_sword", "Auto Sword", "Sharper still.", ItemCategory.Weapon, EquipSlot.MainHand, new Dictionary<string, int> { ["attack"] = 2 }, string.Empty, -1, 1, "common");
+        world.DropItem(actor.Position, new ItemInstance { TemplateId = "auto_sword", IsIdentified = true });
+        var autoEquipped = new PickupAction(actor.Id, autoSwordTemplate, autoEquipUpgrades: true).Execute(world);
+        var autoSword = inventory.GetEquipped(EquipSlot.MainHand)?.Item;
+        Expect.Equal(ActionResult.Success, autoEquipped.Result, "Strict upgrade pickup should succeed.");
+        Expect.Equal("auto_sword", autoSword?.TemplateId ?? string.Empty, "Strict upgrades should auto-equip when enabled.");
+        Expect.Equal(6, actor.Stats.Attack, "Auto-equip should replace old modifiers with new modifiers.");
+        Expect.True(autoEquipped.LogMessages.Exists(message => message.Contains("auto-equips Auto Sword")), "Auto-equip should be logged explicitly.");
+
+        var equalTemplate = new ItemTemplate("equal_sword", "Equal Sword", "Same.", ItemCategory.Weapon, EquipSlot.MainHand, new Dictionary<string, int> { ["attack"] = 2 }, string.Empty, -1, 1, "common");
+        world.DropItem(actor.Position, new ItemInstance { TemplateId = "equal_sword", IsIdentified = true });
+        var equal = new PickupAction(actor.Id, equalTemplate, autoEquipUpgrades: true).Execute(world);
+        Expect.Equal(ActionResult.Success, equal.Result, "Equal pickup should succeed.");
+        Expect.Equal(autoSword?.InstanceId ?? EntityId.Invalid, inventory.GetEquipped(EquipSlot.MainHand)?.Item.InstanceId ?? EntityId.Invalid, "Equal equipment must not be auto-equipped.");
+        Expect.Equal(6, actor.Stats.Attack, "Equal equipment should not alter stats.");
+
+        var stackableTemplate = new ItemTemplate("stackable_blade", "Stackable Blade", "Invalid stackable equipment.", ItemCategory.Weapon, EquipSlot.MainHand, new Dictionary<string, int> { ["attack"] = 9 }, string.Empty, -1, 3, "common");
+        world.DropItem(actor.Position, new ItemInstance { TemplateId = "stackable_blade", IsIdentified = true });
+        new PickupAction(actor.Id, stackableTemplate, autoEquipUpgrades: true).Execute(world);
+        Expect.Equal(autoSword?.InstanceId ?? EntityId.Invalid, inventory.GetEquipped(EquipSlot.MainHand)?.Item.InstanceId ?? EntityId.Invalid, "Stackable items must not be auto-equipped.");
+
+        var betterItem = inventory.Items[1];
+        var equip = new ToggleEquipAction(actor.Id, betterItem.InstanceId, betterSwordTemplate).Execute(world);
+        Expect.Equal(ActionResult.Success, equip.Result, "Manual equip should still work for the previously picked upgrade.");
+        Expect.Equal(6, actor.Stats.Attack, "Manual equip and auto-equip use the same stat modifier path.");
+    }
+
+    private static void PickupAutoEquipRespectsRequirements()
+    {
+        var world = CreateWorld();
+        var actor = CreateActor("Player", new Position(1, 1), Faction.Player, new Stats { HP = 10, MaxHP = 10, Attack = 4, Defense = 1, Accuracy = 0, Evasion = 0, Speed = 100 });
+        var inventory = actor.GetComponent<InventoryComponent>()!;
+        world.Player = actor;
+        world.AddEntity(actor);
+
+        var template = new ItemTemplate("heavy_axe", "Heavy Axe", "Too heavy.", ItemCategory.Weapon, EquipSlot.MainHand, new Dictionary<string, int> { ["attack"] = 5 }, string.Empty, -1, 1, "common", Requirements: new Dictionary<string, int> { ["attack"] = 99 });
+        world.DropItem(actor.Position, new ItemInstance { TemplateId = "heavy_axe", IsIdentified = true });
+
+        var outcome = new PickupAction(actor.Id, template, autoEquipUpgrades: true).Execute(world);
+
+        Expect.Equal(ActionResult.Success, outcome.Result, "Requirement-blocked equipment should still be picked up.");
+        Expect.True(inventory.GetEquipped(EquipSlot.MainHand) is null, "Requirement-blocked equipment must not auto-equip.");
+        Expect.Equal(4, actor.Stats.Attack, "Blocked auto-equip should not apply modifiers.");
+    }
+
     private static void ToggleEquipActionChangesEquipmentState()
     {
         var world = CreateWorld();
@@ -277,6 +345,28 @@ public sealed class ActionTests : ITestSuite
         Expect.Equal(1, world.GetItemsAt(actor.Position)[0].StackCount, "The dropped stack should contain only the requested quantity.");
     }
 
+    private static void StackSplitIdsAreDeterministic()
+    {
+        var first = SplitStackInNewWorld();
+        var second = SplitStackInNewWorld();
+
+        Expect.Equal(first, second, "Splitting the same stack in same-seeded worlds should allocate the same dropped stack id.");
+    }
+
+    private static EntityId SplitStackInNewWorld()
+    {
+        var world = CreateWorld(seed: 777);
+        var actor = CreateActor("Player", new Position(1, 1), Faction.Player);
+        var inventory = actor.GetComponent<InventoryComponent>()!;
+        var item = new ItemInstance { TemplateId = "rock", StackCount = 3, IsIdentified = true };
+        inventory.Add(item);
+        world.Player = actor;
+        world.AddEntity(actor);
+
+        new DropItemAction(actor.Id, item.InstanceId, 1).Execute(world);
+        return world.GetItemsAt(actor.Position)[0].InstanceId;
+    }
+
     private static void OpenAndCloseDoorTogglesWalkability()
     {
         var world = CreateWorld();
@@ -326,7 +416,7 @@ public sealed class ActionTests : ITestSuite
 
         var actor = CreateActor("Player", new Position(1, 1), Faction.Player);
         var chest = new Entity("Treasure Chest", new Position(2, 1), new Stats { HP = 1, MaxHP = 1, Attack = 0, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 0 }, Faction.Neutral);
-        chest.SetComponent(new ChestComponent { LootTableId = "floor_loot" });
+        chest.SetComponent(new ChestComponent { LootTableId = "chest_loot" });
 
         world.Player = actor;
         world.AddEntity(actor);
@@ -347,7 +437,7 @@ public sealed class ActionTests : ITestSuite
         var world = CreateWorld(seed: 0);
         var actor = CreateActor("Player", new Position(1, 1), Faction.Player);
         var chest = new Entity("Treasure Chest", new Position(2, 1), new Stats { HP = 1, MaxHP = 1, Attack = 0, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 0 }, Faction.Neutral);
-        chest.SetComponent(new ChestComponent { LootTableId = "floor_loot" });
+        chest.SetComponent(new ChestComponent { LootTableId = "chest_loot" });
         var content = ContentLoader.LoadFromRepository(throwOnValidationErrors: false);
         content.EnsureValid();
         world.ContentDatabase = content;

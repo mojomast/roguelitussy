@@ -65,7 +65,7 @@ public sealed class InventoryComponent
         return _items.Count + stacksNeeded <= Capacity;
     }
 
-    public bool AddWithStacking(ItemInstance item, int maxStack)
+    public bool AddWithStacking(ItemInstance item, int maxStack, Func<EntityId>? idFactory = null)
     {
         if (maxStack <= 1)
         {
@@ -102,7 +102,7 @@ public sealed class InventoryComponent
         while (remaining > 0)
         {
             var stackCount = Math.Min(maxStack, remaining);
-            _items.Add(CloneItem(item, stackCount));
+            _items.Add(CloneItem(item, stackCount, idFactory));
             remaining -= stackCount;
         }
 
@@ -139,7 +139,7 @@ public sealed class InventoryComponent
         return false;
     }
 
-    public bool RemoveQuantity(EntityId instanceId, int quantity, out ItemInstance? item)
+    public bool RemoveQuantity(EntityId instanceId, int quantity, out ItemInstance? item, Func<EntityId>? idFactory = null)
     {
         if (quantity <= 0)
         {
@@ -160,7 +160,7 @@ public sealed class InventoryComponent
         }
 
         existing.StackCount -= quantity;
-        item = CloneItem(existing, quantity);
+        item = CloneItem(existing, quantity, idFactory);
         return true;
     }
 
@@ -218,11 +218,11 @@ public sealed class InventoryComponent
             && left.CurrentCharges == right.CurrentCharges;
     }
 
-    private static ItemInstance CloneItem(ItemInstance source, int stackCount)
+    private static ItemInstance CloneItem(ItemInstance source, int stackCount, Func<EntityId>? idFactory)
     {
         return new ItemInstance
         {
-            InstanceId = EntityId.New(),
+            InstanceId = idFactory?.Invoke() ?? EntityId.New(),
             TemplateId = source.TemplateId,
             CurrentCharges = source.CurrentCharges,
             StackCount = stackCount,

@@ -243,6 +243,19 @@ public partial class GameManager : Node
 
     public EventBus? Bus { get; private set; }
 
+    public bool AutoEquipUpgradesEnabled { get; private set; }
+
+    public void SetAutoEquipUpgradesEnabled(bool enabled)
+    {
+        AutoEquipUpgradesEnabled = enabled;
+    }
+
+    public bool ToggleAutoEquipUpgrades()
+    {
+        AutoEquipUpgradesEnabled = !AutoEquipUpgradesEnabled;
+        return AutoEquipUpgradesEnabled;
+    }
+
     public override void _Ready()
     {
         BindBus(ResolveEventBus());
@@ -309,7 +322,7 @@ public partial class GameManager : Node
             return false;
         }
 
-        var success = SaveManager.SaveGame(World, slot).GetAwaiter().GetResult();
+        var success = SaveManager.SaveRun(CreateSaveRunSnapshot(), slot).GetAwaiter().GetResult();
         Bus?.EmitSaveCompleted(success);
         Bus?.EmitLogMessage(success ? $"Saved slot {slot}." : $"Save failed for slot {slot}.");
         return success;
@@ -327,8 +340,8 @@ public partial class GameManager : Node
         }
 
         CurrentState = GameState.Loading;
-        var world = SaveManager.LoadGame(slot).GetAwaiter().GetResult();
-        if (world is null)
+        var snapshot = SaveManager.LoadRun(slot).GetAwaiter().GetResult();
+        if (snapshot is null)
         {
             CurrentState = GameState.MainMenu;
             Bus?.EmitLoadCompleted(false);
@@ -336,19 +349,37 @@ public partial class GameManager : Node
             return false;
         }
 
-        if (world.Player is not null)
+        Seed = snapshot.Seed;
+        _cachedFloors.Clear();
+        _floorEntrances.Clear();
+        foreach (var pair in snapshot.Floors)
         {
-            Seed = world.Seed;
-            _cachedFloors.Clear();
-            _floorEntrances.Clear();
+            pair.Value.ContentDatabase = Content;
+            _cachedFloors[pair.Key] = pair.Value;
+            RememberFloorEntrances(pair.Value);
         }
 
         Scheduler = new TurnScheduler();
-        LoadWorld(world);
+        LoadWorld(snapshot.ActiveWorld);
         Bus?.EmitLoadCompleted(true);
         Bus?.EmitTurnCompleted();
         Bus?.EmitLogMessage($"Loaded slot {slot}.");
         return true;
+    }
+
+    private SaveRunSnapshot CreateSaveRunSnapshot()
+    {
+        if (World is null)
+        {
+            throw new InvalidOperationException("No active world is available to save.");
+        }
+
+        var floors = new Dictionary<int, WorldState>(_cachedFloors)
+        {
+            [CurrentFloor] = World,
+        };
+
+        return new SaveRunSnapshot(Seed, CurrentFloor, World, floors);
     }
 
     public bool SetMapReveal(bool revealAll)
@@ -479,6 +510,12 @@ public partial class GameManager : Node
 
     public void LoadWorld(WorldState world)
     {
+        if (world.Player is null)
+        {
+            Bus?.EmitLogMessage($"Cannot load floor {world.Depth} because it does not contain an active player.");
+            return;
+        }
+
         world.ContentDatabase = Content;
         RememberFloorEntrances(world);
         World = world;
@@ -864,7 +901,7 @@ public partial class GameManager : Node
                 Generator ?? new DungeonGenerator(),
                 Fov ?? new FOVCalculator(),
                 content,
-                SaveManager ?? new SaveManager(),
+                SaveManager ?? CreateDefaultSaveManager(),
                 Bus);
         }
         catch (Exception ex)
@@ -872,6 +909,36 @@ public partial class GameManager : Node
             Bus?.EmitLogMessage($"Runtime initialization failed: {ex.Message}");
         }
     }
+
+    private static ISaveManager CreateDefaultSaveManager()
+    {
+#if RENDERING_VALIDATION
+        return new RenderingValidationSaveManager();
+#else
+        return new SaveManager();
+#endif
+    }
+
+#if RENDERING_VALIDATION
+    private sealed class RenderingValidationSaveManager : ISaveManager
+    {
+        public System.Threading.Tasks.Task<bool> SaveGame(WorldState world, int slotIndex) => System.Threading.Tasks.Task.FromResult(false);
+
+        public System.Threading.Tasks.Task<bool> SaveRun(SaveRunSnapshot snapshot, int slotIndex) => System.Threading.Tasks.Task.FromResult(false);
+
+        public System.Threading.Tasks.Task<WorldState?> LoadGame(int slotIndex) => System.Threading.Tasks.Task.FromResult<WorldState?>(null);
+
+        public System.Threading.Tasks.Task<SaveRunSnapshot?> LoadRun(int slotIndex) => System.Threading.Tasks.Task.FromResult<SaveRunSnapshot?>(null);
+
+        public bool HasSave(int slotIndex) => false;
+
+        public void DeleteSave(int slotIndex)
+        {
+        }
+
+        public SaveMetadata? GetSaveMetadata(int slotIndex) => null;
+    }
+#endif
 
     private EventBus? ResolveEventBus()
     {
@@ -1552,6 +1619,11 @@ public partial class GameManager : Node
             Bus?.EmitHPChanged(entity.Id, entity.Stats.HP, entity.Stats.MaxHP);
         }
 
+        if (world.Player is null)
+        {
+            return;
+        }
+
         Bus?.EmitInventoryChanged(world.Player.Id);
         if (world.Player.GetComponent<WalletComponent>() is { } wallet)
         {
@@ -1567,6 +1639,12 @@ public partial class GameManager : Node
         }
 
         world.ClearVisibility();
+
+        if (world.Player is null)
+        {
+            Bus?.EmitFovRecalculated();
+            return;
+        }
 
         var player = world.GetEntity(world.Player.Id);
         if (player is null)
@@ -1804,6 +1882,19 @@ public partial class GameManager : Node
             && (Content is not ContentLoader explicitLoader || explicitLoader.LootTables.ContainsKey(explicitLootTableId)))
         {
             return explicitLootTableId;
+        }
+
+        if (Content is ContentLoader loader)
+        {
+            if (depth >= 4 && loader.LootTables.ContainsKey("deep_chest_loot"))
+            {
+                return "deep_chest_loot";
+            }
+
+            if (loader.LootTables.ContainsKey("chest_loot"))
+            {
+                return "chest_loot";
+            }
         }
 
         return ResolveFloorLootTableId(depth);

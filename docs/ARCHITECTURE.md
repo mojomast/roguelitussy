@@ -70,6 +70,7 @@ Key responsibilities:
 - Start and load sessions
 - Route player actions into the simulation loop
 - Bridge combat, progression, equipment, and state changes into `EventBus`
+- Own authoritative visibility/exploration updates for the active `WorldState`
 - Handle save/load requests through `ISaveManager`
 - Emit world snapshots and floor transitions
 - Attach runtime components such as `ProgressionComponent`, `IdentityComponent`, `XpValueComponent`, `AbilitiesComponent`, and `CooldownComponent`
@@ -118,6 +119,7 @@ This keeps authoring utilities on the Godot side while still allowing non-editor
 - New HUD, menu, overlay, or input behavior: `Scripts/UI/`
 - New world animation or renderer: `Scripts/World/`
 - New editor/debug/runtime-authoring utility: `Scripts/Tools/` plus a scene, plugin hook, or `UiRoot` integration if needed
+- New item/status/menu source art: `Assets/Sprites/` plus content-path tests; keep runtime handling soft so art metadata does not become simulation state.
 
 ## Determinism Rules
 

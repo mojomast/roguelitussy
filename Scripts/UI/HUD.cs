@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Text;
 using Godot;
 using Roguelike.Core;
@@ -8,6 +9,8 @@ public partial class HUD : Control
 {
     private Panel? _panel;
     private Label? _headerLabel;
+    private Label? _hpLabel;
+    private ProgressBar? _hpBar;
     private Label? _progressLabel;
     private Label? _statsLabel;
     private Label? _effectsLabel;
@@ -16,6 +19,10 @@ public partial class HUD : Control
     private GameManager? _gameManager;
 
     public string HPText { get; private set; } = "HP: --/--";
+
+    public double HPBarValue { get; private set; }
+
+    public double HPBarMaxValue { get; private set; } = 1d;
 
     public string EnergyText { get; private set; } = "Energy: --";
 
@@ -118,11 +125,10 @@ public partial class HUD : Control
 
     private void OnHPChanged(EntityId entityId, int currentHp, int maxHp)
     {
-        if (_gameManager?.World?.Player.Id == entityId)
+        if (_gameManager?.World?.Player?.Id == entityId)
         {
-            HPText = $"HP: {currentHp}/{maxHp}";
-            UpdateHPColor(currentHp, maxHp);
-            Refresh();
+            UpdateHPState(currentHp, maxHp);
+            UpdateHPVisuals();
         }
     }
 
@@ -158,6 +164,18 @@ public partial class HUD : Control
         var world = _gameManager?.World;
         if (world is null)
         {
+            HPText = "HP: --/--";
+            EnergyText = "Energy: --";
+            FloorText = "Floor: --";
+            TurnText = "Turn: --";
+            LevelText = string.Empty;
+            StatsText = string.Empty;
+            GoldText = string.Empty;
+            StatusEffectsText = string.Empty;
+            MinimapText = MinimapVisible ? "Minimap: 0 explored, 0 visible" : "Minimap hidden";
+            HPColor = Colors.White;
+            HPBarValue = 0d;
+            HPBarMaxValue = 1d;
             UpdateLabels();
             return;
         }
@@ -176,12 +194,13 @@ public partial class HUD : Control
                 ? $"Minimap: 0 explored, 0 visible"
                 : "Minimap hidden";
             HPColor = Colors.White;
+            HPBarValue = 0d;
+            HPBarMaxValue = 1d;
             UpdateLabels();
             return;
         }
 
-        HPText = $"HP: {player.Stats.HP}/{player.Stats.MaxHP}";
-        UpdateHPColor(player.Stats.HP, player.Stats.MaxHP);
+        UpdateHPState(player.Stats.HP, player.Stats.MaxHP);
 
         var energy = _gameManager?.Scheduler is TurnScheduler scheduler
             ? scheduler.GetEnergy(player.Id)
@@ -242,6 +261,14 @@ public partial class HUD : Control
         };
     }
 
+    private void UpdateHPState(int currentHp, int maxHp)
+    {
+        HPText = $"HP: {currentHp}/{maxHp}";
+        HPBarMaxValue = System.Math.Max(1d, maxHp);
+        HPBarValue = System.Math.Clamp((double)currentHp, 0d, HPBarMaxValue);
+        UpdateHPColor(currentHp, maxHp);
+    }
+
     private void EnsureVisualTree()
     {
         if (_panel is not null)
@@ -253,36 +280,106 @@ public partial class HUD : Control
         {
             Name = "Panel",
             Position = new Vector2(12f, 12f),
-            Size = new Vector2(440f, 132f),
         };
         AddChild(_panel);
 
-        _headerLabel = CreateLabel("HeaderLabel", new Vector2(12f, 10f), new Vector2(416f, 18f));
-        _progressLabel = CreateLabel("ProgressLabel", new Vector2(12f, 32f), new Vector2(416f, 18f));
-        _statsLabel = CreateLabel("StatsLabel", new Vector2(12f, 54f), new Vector2(416f, 18f));
-        _effectsLabel = CreateLabel("EffectsLabel", new Vector2(12f, 76f), new Vector2(416f, 18f));
-        _mapLabel = CreateLabel("MapLabel", new Vector2(12f, 98f), new Vector2(416f, 18f));
+        _hpLabel = CreateLabel("HPLabel", new Vector2(12f, 10f), new Vector2(416f, 24f));
+        _hpBar = new ProgressBar
+        {
+            Name = "HPBar",
+            MinValue = 0d,
+            MaxValue = 1d,
+            Value = 0d,
+        };
+        _headerLabel = CreateLabel("HeaderLabel", new Vector2(12f, 46f), new Vector2(416f, 18f));
+        _progressLabel = CreateLabel("ProgressLabel", new Vector2(12f, 68f), new Vector2(416f, 18f));
+        _statsLabel = CreateLabel("StatsLabel", new Vector2(12f, 90f), new Vector2(416f, 18f));
+        _effectsLabel = CreateLabel("EffectsLabel", new Vector2(12f, 112f), new Vector2(416f, 18f));
+        _mapLabel = CreateLabel("MapLabel", new Vector2(12f, 134f), new Vector2(416f, 18f));
 
+        _panel.AddChild(_hpLabel);
+        _panel.AddChild(_hpBar);
         _panel.AddChild(_headerLabel);
         _panel.AddChild(_progressLabel);
         _panel.AddChild(_statsLabel);
         _panel.AddChild(_effectsLabel);
         _panel.AddChild(_mapLabel);
+        ApplyResponsiveLayout();
     }
 
     private void UpdateLabels()
     {
+        ApplyResponsiveLayout();
+        UpdateHPVisuals();
+
         if (_headerLabel is null || _progressLabel is null || _statsLabel is null || _effectsLabel is null || _mapLabel is null)
         {
             return;
         }
 
-        _headerLabel.Text = $"{HPText}  {EnergyText}  {FloorText}  {TurnText}";
-        _headerLabel.Modulate = HPColor;
+        _headerLabel.Text = $"{EnergyText}  {FloorText}  {TurnText}";
+        _headerLabel.Modulate = Colors.White;
         _progressLabel.Text = string.Join("  ", new[] { LevelText, GoldText }.Where(text => !string.IsNullOrWhiteSpace(text)));
         _statsLabel.Text = StatsText;
         _effectsLabel.Text = string.IsNullOrWhiteSpace(StatusEffectsText) ? "Effects: none" : StatusEffectsText;
         _mapLabel.Text = MinimapText;
+    }
+
+    private void UpdateHPVisuals()
+    {
+        EnsureVisualTree();
+
+        if (_hpLabel is not null)
+        {
+            _hpLabel.Text = HPText;
+            _hpLabel.Modulate = HPColor;
+        }
+
+        if (_hpBar is not null)
+        {
+            _hpBar.MinValue = 0d;
+            _hpBar.MaxValue = HPBarMaxValue;
+            _hpBar.Value = HPBarValue;
+            _hpBar.Modulate = HPColor;
+        }
+    }
+
+    private void ApplyResponsiveLayout()
+    {
+        if (_panel is null)
+        {
+            return;
+        }
+
+        var viewportWidth = ResolveViewportWidth();
+        var width = System.Math.Min(440f, System.Math.Max(0f, viewportWidth - 24f));
+        var contentWidth = System.Math.Max(0f, width - 24f);
+        _panel.Position = new Vector2(12f, 12f);
+        _panel.Size = new Vector2(width, 160f);
+
+        SetControlBounds(_hpLabel, 12f, 10f, contentWidth, 24f);
+        SetControlBounds(_hpBar, 12f, 34f, contentWidth, 10f);
+        SetControlBounds(_headerLabel, 12f, 52f, contentWidth, 18f);
+        SetControlBounds(_progressLabel, 12f, 74f, contentWidth, 18f);
+        SetControlBounds(_statsLabel, 12f, 96f, contentWidth, 18f);
+        SetControlBounds(_effectsLabel, 12f, 118f, contentWidth, 18f);
+        SetControlBounds(_mapLabel, 12f, 140f, contentWidth, 18f);
+    }
+
+    private static void SetControlBounds(Control? control, float x, float y, float width, float height)
+    {
+        if (control is null)
+        {
+            return;
+        }
+
+        control.Position = new Vector2(x, y);
+        control.Size = new Vector2(width, height);
+    }
+
+    private float ResolveViewportWidth()
+    {
+        return GetParent() is not null && GetTree() is not null ? GetViewportRect().Size.X : 1280f;
     }
 
     private static string BuildStatsText(IEntity player, ProgressionComponent? progression)

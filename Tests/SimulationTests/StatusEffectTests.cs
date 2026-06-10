@@ -15,6 +15,9 @@ public sealed class StatusEffectTests : ITestSuite
         registry.Add("Simulation.StatusEffects haste changes effective speed", HasteChangesEffectiveSpeed);
         registry.Add("Simulation.StatusEffects removal occurs at zero turns", ExpiresAtZeroTurns);
         registry.Add("Simulation.StatusEffects poison can kill", PoisonCanKill);
+        registry.Add("Simulation.StatusEffects sourced poison kill awards XP", SourcedPoisonKillAwardsXp);
+        registry.Add("Simulation.StatusEffects corroded stacks to authored cap", CorrodedStacksToAuthoredCap);
+        registry.Add("Simulation.StatusEffects burning and frozen remove each other", BurningAndFrozenRemoveEachOther);
     }
 
     private static void PoisonTicksAndExpires()
@@ -112,6 +115,54 @@ public sealed class StatusEffectTests : ITestSuite
         var result = StatusEffectProcessor.Tick(world, actor.Id);
         Expect.True(result.Died, "Ticking poison should report lethal damage");
         Expect.True(world.GetEntity(actor.Id) is null, "Dead entities should be removed from the world");
+    }
+
+    private static void SourcedPoisonKillAwardsXp()
+    {
+        var world = CreateWorld();
+        var attacker = CreateActor();
+        attacker.SetComponent(new ProgressionComponent());
+        var victim = new StubEntity("Victim", new Position(2, 1), Faction.Enemy, stats: new Stats { HP = 2, MaxHP = 2, Attack = 1, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 100 });
+        victim.SetComponent(new XpValueComponent { Value = 9 });
+
+        world.Player = attacker;
+        world.AddEntity(attacker);
+        world.AddEntity(victim);
+        StatusEffectProcessor.ApplyEffect(victim, StatusEffectType.Poisoned, 1, sourceEntityId: attacker.Id);
+
+        var result = StatusEffectProcessor.Tick(world, victim.Id);
+        var progression = attacker.GetComponent<ProgressionComponent>()!;
+
+        Expect.True(result.Died, "Sourced poison should report a kill when lethal");
+        Expect.Equal(1, progression.Kills, "Delayed status kills should increment source kill credit");
+        Expect.Equal(9, progression.Experience, "Delayed status kills should award victim XP to the source");
+        Expect.True(world.GetEntity(victim.Id) is null, "Killed victim should be removed");
+    }
+
+    private static void CorrodedStacksToAuthoredCap()
+    {
+        var actor = CreateActor();
+
+        StatusEffectProcessor.ApplyEffect(actor, StatusEffectType.Corroded, 2);
+        StatusEffectProcessor.ApplyEffect(actor, StatusEffectType.Corroded, 2);
+        StatusEffectProcessor.ApplyEffect(actor, StatusEffectType.Corroded, 2);
+        StatusEffectProcessor.ApplyEffect(actor, StatusEffectType.Corroded, 2);
+
+        Expect.Equal(3, StatusEffectProcessor.GetMagnitude(actor, StatusEffectType.Corroded), "Corroded should stack to the authored max of three");
+    }
+
+    private static void BurningAndFrozenRemoveEachOther()
+    {
+        var actor = CreateActor();
+
+        StatusEffectProcessor.ApplyEffect(actor, StatusEffectType.Frozen, 2);
+        StatusEffectProcessor.ApplyEffect(actor, StatusEffectType.Burning, 2);
+        Expect.False(StatusEffectProcessor.HasEffect(actor, StatusEffectType.Frozen), "Burning should remove frozen on apply");
+        Expect.True(StatusEffectProcessor.HasEffect(actor, StatusEffectType.Burning), "Burning should remain after removing frozen");
+
+        StatusEffectProcessor.ApplyEffect(actor, StatusEffectType.Frozen, 2);
+        Expect.False(StatusEffectProcessor.HasEffect(actor, StatusEffectType.Burning), "Frozen should remove burning on apply");
+        Expect.True(StatusEffectProcessor.HasEffect(actor, StatusEffectType.Frozen), "Frozen should remain after removing burning");
     }
 
     private static WorldState CreateWorld()

@@ -60,7 +60,7 @@ public partial class InputHandler : Node
             Key.Left or Key.A => HandleDirectionalInput(world, playerId, new Position(-1, 0)),
             Key.Right or Key.D => HandleDirectionalInput(world, playerId, new Position(1, 0)),
             Key.Space or Key.Period => Submit(UIActionFactory.CreateWaitAction(world, playerId)),
-            Key.G => Submit(UIActionFactory.CreatePickupAction(world, _gameManager?.Content, playerId)),
+            Key.G => Submit(UIActionFactory.CreatePickupAction(world, _gameManager?.Content, playerId, _gameManager?.AutoEquipUpgradesEnabled == true)),
             Key.Enter or Key.KpEnter => Submit(UIActionFactory.CreateStairsAction(world, playerId)),
             Key.I => Raise(InventoryRequested),
             Key.C => Raise(CharacterSheetRequested),

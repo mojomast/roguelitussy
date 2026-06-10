@@ -33,6 +33,8 @@ Notable action families now in play:
 - cast actions for self, single-target, tile-targeted, and area abilities
 - equip toggles that validate item requirements before mutating inventory state
 
+Inventory UI also exposes a runtime-only auto-equip upgrades toggle. Press `A` while inventory is open to enable or disable it; pickup with `G` honors the current toggle when deciding whether upgrades should be equipped automatically.
+
 ## Progression And Identity
 
 Player-specific long-run state lives in explicit components instead of bloating `Stats`.
@@ -73,7 +75,9 @@ Combat is still resolved inside `Core/Simulation/CombatResolver.cs`, but it is n
 - `CastAbilityAction` and `AbilityResolver` execute ability effects from `abilities.json`
 - supported ability effects currently include damage, apply_status, teleport, and heal_self
 - `CastAbilityAction` performs targeting validation for self, single-target, tile, and area ability shapes before mutating world state.
-- Kills from melee attacks and ability damage both route through the shared `DeathResolver`, so XP, kill counts, level-up log messages, and entity removal stay aligned for those paths. Status ticks, traps, and future environmental deaths still need attribution work.
+- Ability damage and status-chance rolls use the serialized combat RNG stream, so save/load continuation matches uninterrupted simulation for covered ability paths.
+- Harmful area damage/status effects default to enemy-only when `hits_allies` is false and no explicit effect filter is authored; explicit filters and `hits_allies: true` keep their broader behavior.
+- Kills from melee attacks, ability damage, and sourced poison/burning status ticks route through the shared `DeathResolver`, so XP, kill counts, level-up log messages, and entity removal stay aligned for those paths. Traps and future environmental deaths still need attribution work.
 
 The ability pipeline is shared by item casts and AI casts so the runtime rules stay in one place.
 
@@ -92,6 +96,7 @@ The current flow in `DungeonGenerator` is:
 7. Validate the generated level with `LevelValidator`.
 
 Generation retries up to a fixed limit if a connected, valid layout is not produced.
+Generated chests use guaranteed chest loot tables, so chest rewards stay deterministic and content-authored instead of falling back to generic item placement.
 
 ## Rendering And UI Flow
 
@@ -106,9 +111,13 @@ Current presentation-specific behavior worth knowing:
 
 - `WorldArtCatalog` now resolves world and entity art from the imported CC0 0x72 tileset subset under `Assets/Tilesets/0x72/` and `Assets/Sprites/0x72/`.
 - `WorldView` hides the legacy tilemap visuals and scales the imported 16x16 art up to the runtime 40x40 cell size.
+- `WorldView` only mirrors fog/FOV state from the active world; `GameManager`/`WorldState` own authoritative visibility and exploration mutation.
 - `AnimationController` now advances short eased move animations over multiple `_Process(...)` frames instead of snapping movement immediately.
 - `CameraController.DefaultZoom` is `2f`, which is the baseline zoomed-out framing used by `WorldView`.
+- `HUD` presents HP as the primary status readout with a prominent label/bar, while non-HP stats are grouped separately for quick scanning.
 - `MenuBase` now renders menus as separate title, summary, options, and footer regions, and the title-screen-to-workshop handoff temporarily dismisses the main menu so overlays do not stack visually.
+- `MainMenu`, `PauseMenu`, `HelpOverlay`, and `CharacterSheet` now use clearer run/build/tool hierarchy, sectioned body text, and shared dungeon-console chrome so modal screens read as deliberate game surfaces instead of generic panels.
+- `InventoryUI` remains text-driven for low-risk stub testing, but uses stable category glyphs, explicit equipped markers, full stack counts, contextual footers, stack/charge details, and multiline equipment comparisons for faster scanning.
 - `HelpOverlay` keeps its gameplay and title-screen guidance condensed enough to fit inside the menu shell on short viewports, instead of relying on off-screen overflow.
 - `DevToolsWorkbench` windows long mode summaries and action lists against the current viewport so the selected tool action, status line, and controls remain readable on shorter screens.
 
@@ -128,14 +137,18 @@ Persistence lives in `Core/Persistence/`.
 
 ### Current Save Version
 
-The current normalized save version is `7`.
+The current normalized save version is `8`.
 
 Notable details:
 
 - Explored and visible map flags are stored as packed bitfields.
-- Legacy version 1 through version 6 payloads are migrated on load.
-- Progression, identity, inventory/equipment, wallet, NPC, merchant, chest, ability, cooldown, XP value, and AI/template rehydration data round-trip through the normalized save shape where applicable.
+- Legacy version 1 through version 7 payloads are migrated on load.
+- Saves now persist the active floor plus cached inactive floors through a normalized floor list, while retaining active-floor root aliases for compatibility with metadata and existing tooling.
+- Multi-floor validation requires unique floor depths, an active floor payload, and exactly one player entity across all saved floors on the active floor.
+- Persistence tests cover malformed v8 floor payloads for missing active floors, duplicate player entities across floors, and duplicate floor depths; `GameManager` save/load coverage also exercises travel back to a cached inactive floor.
+- Progression, identity, inventory/equipment, wallet, NPC, merchant, chest, ability, cooldown, XP value, AI/template rehydration data, and status-effect source attribution round-trip through the normalized save shape where applicable.
 - `CombatRandomState` is persisted so combat RNG continues deterministically after load instead of restarting from only seed and turn number.
+- `ItemRandomState` is persisted so stack splitting and stack overflow clone IDs continue deterministically after save/load.
 - Save validation checks dimensions, entity IDs, inventory/equipment integrity, persisted component payloads, status effects, and payload sizes.
 
 ### Save Slots

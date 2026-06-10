@@ -49,6 +49,16 @@ public static class AbilityResolver
 
     public static int CalculateAbilityDamage(AbilityEffect effect, IEntity caster, DeterministicRandom rng)
     {
+        return CalculateAbilityDamage(effect, caster, rng.Next(-1, 2));
+    }
+
+    public static int CalculateAbilityDamage(AbilityEffect effect, IEntity caster, CombatResolver rng)
+    {
+        return CalculateAbilityDamage(effect, caster, rng.NextRandom(-1, 2));
+    }
+
+    private static int CalculateAbilityDamage(AbilityEffect effect, IEntity caster, int variance)
+    {
         var baseDamage = effect.BaseValue;
 
         if (!string.IsNullOrEmpty(effect.ScalingStat))
@@ -57,7 +67,6 @@ public static class AbilityResolver
             baseDamage += (int)(statValue * effect.ScalingFactor);
         }
 
-        var variance = rng.Next(-1, 2);
         return Math.Max(1, baseDamage + variance);
     }
 

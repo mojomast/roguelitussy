@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
@@ -21,14 +22,24 @@ public sealed class SaveManager : ISaveManager
 
     public async Task<bool> SaveGame(WorldState world, int slotIndex)
     {
-        if (!SaveSlots.IsValid(slotIndex) || world.Player is null)
+        if (world.Player is null)
+        {
+            return false;
+        }
+
+        return await SaveRun(new SaveRunSnapshot(world.Seed, world.Depth, world, new Dictionary<int, WorldState> { [world.Depth] = world }), slotIndex).ConfigureAwait(false);
+    }
+
+    public async Task<bool> SaveRun(SaveRunSnapshot snapshot, int slotIndex)
+    {
+        if (!SaveSlots.IsValid(slotIndex) || snapshot.ActiveWorld.Player is null)
         {
             return false;
         }
 
         try
         {
-            var data = SaveSerializer.CreateSaveData(world, _utcNow());
+            var data = SaveSerializer.CreateSaveData(snapshot, _utcNow());
             var errors = SaveValidator.Validate(data);
             if (errors.Count > 0)
             {
@@ -52,6 +63,12 @@ public sealed class SaveManager : ISaveManager
 
     public async Task<WorldState?> LoadGame(int slotIndex)
     {
+        var snapshot = await LoadRun(slotIndex).ConfigureAwait(false);
+        return snapshot?.ActiveWorld;
+    }
+
+    public async Task<SaveRunSnapshot?> LoadRun(int slotIndex)
+    {
         if (!SaveSlots.IsValid(slotIndex))
         {
             return null;
@@ -68,7 +85,7 @@ public sealed class SaveManager : ISaveManager
             var json = await File.ReadAllTextAsync(path).ConfigureAwait(false);
             var data = SaveMigrator.MigrateToCurrent(json);
             var errors = SaveValidator.Validate(data);
-            return errors.Count == 0 ? SaveSerializer.ToWorldState(data) : null;
+            return errors.Count == 0 ? SaveSerializer.ToRunSnapshot(data) : null;
         }
         catch
         {

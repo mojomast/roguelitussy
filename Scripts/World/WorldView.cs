@@ -34,7 +34,6 @@ public partial class WorldView : Node2D
     private Node2D _entityLayer = new() { Name = "EntityLayer", ZIndex = EntityLayerZIndex };
     private Node2D _wallCoverLayer = new() { Name = "WallCoverLayer", ZIndex = 40 };
     private Camera2D _camera = new() { Name = "Camera2D" };
-    private readonly FOVCalculator _fov = new();
     private readonly CameraController _cameraController = new();
     private readonly AnimationController _animationController = new();
     private readonly HashSet<Position> _visibleTiles = new();
@@ -189,53 +188,15 @@ public partial class WorldView : Node2D
 
         _entityRenderer.BindWorld(world);
         SnapshotEntities();
-        RecalculateFov();
+        SyncVisibilityFromWorld();
     }
 
     public void RecalculateFov()
     {
-        if (_world is null)
-        {
-            return;
-        }
-
-        if (_world is WorldState mutableWorld)
-        {
-            mutableWorld.ClearVisibility();
-        }
-
-        _visibleTiles.Clear();
-        var player = _world.Player;
-        if (player is null)
-        {
-            SyncVisibilityFromWorld();
-            return;
-        }
-
-        _fov.Compute(
-            player.Position,
-            player.Stats.ViewRadius,
-            pos => !_world.InBounds(pos) || _world.BlocksSight(pos),
-            pos =>
-            {
-                if (_world.InBounds(pos))
-                {
-                    if (_world is WorldState mutable)
-                    {
-                        mutable.SetVisible(pos, true);
-                    }
-
-                    _visibleTiles.Add(pos);
-                    _exploredTiles.Add(pos);
-                }
-            });
-
-        _visibleTiles.Add(player.Position);
-        if (_world is WorldState world)
-        {
-            world.SetVisible(player.Position, true);
-        }
-
+        // Field-of-view ownership lives in the authoritative simulation layer
+        // (GameManager/WorldState). WorldView must only mirror the current
+        // visibility/exploration flags so binding or rendering cannot mutate
+        // saved fog-of-war state.
         SyncVisibilityFromWorld();
     }
 

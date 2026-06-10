@@ -15,6 +15,7 @@ public sealed class WorldState : IWorldState
     private readonly Dictionary<Position, List<ItemInstance>> _groundItems = new();
     private readonly HashSet<Position> _openDoors = new();
     private int _seed;
+    private ulong _itemRandomState;
 
     public int Width { get; private set; }
 
@@ -35,6 +36,7 @@ public sealed class WorldState : IWorldState
         {
             _seed = value;
             CombatResolver = new CombatResolver(value);
+            _itemRandomState = MixItemSeed(value);
         }
     }
 
@@ -46,7 +48,23 @@ public sealed class WorldState : IWorldState
         set => CombatResolver = value == 0UL ? new CombatResolver(Seed) : new CombatResolver(value);
     }
 
+    public ulong ItemRandomState
+    {
+        get => _itemRandomState;
+        set => _itemRandomState = value == 0UL ? MixItemSeed(Seed) : value;
+    }
+
     public IContentDatabase? ContentDatabase { get; set; }
+
+    public EntityId AllocateItemInstanceId()
+    {
+        var first = NextItemRandom();
+        var second = NextItemRandom();
+        Span<byte> bytes = stackalloc byte[16];
+        BitConverter.TryWriteBytes(bytes[..8], first);
+        BitConverter.TryWriteBytes(bytes[8..], second);
+        return new EntityId(new Guid(bytes));
+    }
 
     public void InitGrid(int width, int height)
     {
@@ -309,6 +327,23 @@ public sealed class WorldState : IWorldState
     }
 
     public IReadOnlyDictionary<Position, List<ItemInstance>> GetGroundItems() => _groundItems;
+
+    private ulong NextItemRandom()
+    {
+        _itemRandomState += 0x9E3779B97F4A7C15UL;
+        var value = _itemRandomState;
+        value = (value ^ (value >> 30)) * 0xBF58476D1CE4E5B9UL;
+        value = (value ^ (value >> 27)) * 0x94D049BB133111EBUL;
+        return value ^ (value >> 31);
+    }
+
+    private static ulong MixItemSeed(int seed)
+    {
+        unchecked
+        {
+            return ((ulong)(uint)seed << 32) ^ 0xD1B54A32D192ED03UL;
+        }
+    }
 
     public bool IsVisible(Position pos) => InBounds(pos) && _visible[(pos.Y * Width) + pos.X];
 

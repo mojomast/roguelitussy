@@ -273,12 +273,17 @@ public partial class MainMenu : MenuBase
         var trait = Traits[_traitIndex];
         return string.Join(
             "\n",
+            "EXPEDITION",
             $"Candidate: {NameOptions[_nameIndex]}",
+            $"Seed: {PendingSeed}",
+            "",
+            "BUILD",
             $"Build: {archetype.DisplayName} / {origin.DisplayName} / {trait.DisplayName}",
             $"Identity: {RaceOptions[_raceIndex]} / {GenderOptions[_genderIndex]} / {AppearanceOptions[_appearanceIndex]}",
             $"Training: VIT {_vitalityPoints}  POW {_powerPoints}  GRD {_guardPoints}  FIN {_finessePoints}",
             $"Points Remaining: {RemainingPoints}",
             string.Empty,
+            "READOUT",
             archetype.Summary,
             origin.Summary,
             trait.Summary,

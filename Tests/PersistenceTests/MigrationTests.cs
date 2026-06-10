@@ -10,7 +10,8 @@ public sealed class MigrationTests : ITestSuite
     public void Register(TestRegistry registry)
     {
         registry.Add("Persistence.SaveMigrator migrates v1 saves into current world state", MigratesLegacyV1Save);
-      registry.Add("Persistence.SaveMigrator migrates v2 saves into bit-packed version 3", MigratesV2SaveToV3);
+        registry.Add("Persistence.SaveMigrator migrates v2 saves into bit-packed version 3", MigratesV2SaveToV3);
+        registry.Add("Persistence.SaveMigrator migrates v7 saves into v8 floor payloads", MigratesV7SaveToV8FloorPayload);
     }
 
     private static void MigratesLegacyV1Save()
@@ -136,6 +137,54 @@ public sealed class MigrationTests : ITestSuite
         "viewRadius": 8,
         "energy": 300
       }
+    }
+  ],
+  "groundItems": [],
+  "openDoors": []
+}
+""";
+
+    private static void MigratesV7SaveToV8FloorPayload()
+    {
+        using var sandbox = MigrationSandbox.Create();
+        var manager = new SaveManager(sandbox.DirectoryPath);
+        File.WriteAllText(Path.Combine(sandbox.DirectoryPath, SaveSlots.GetFileName(SaveSlots.Slot1)), Version7SaveJson());
+
+        var run = manager.LoadRun(SaveSlots.Slot1).GetAwaiter().GetResult();
+        Expect.NotNull(run, "Version 7 save should migrate and load as a run snapshot");
+        Expect.Equal(5, run!.CurrentFloor, "Migrated v7 save should preserve active floor depth");
+        Expect.True(run.Floors.ContainsKey(5), "Migrated v7 save should create a single active floor payload");
+        Expect.Equal("V7 Hero", run.ActiveWorld.Player.Name, "Migrated v7 save should restore the player");
+
+        var metadata = manager.GetSaveMetadata(SaveSlots.Slot1);
+        Expect.NotNull(metadata, "Migrated v7 save should expose metadata");
+        Expect.Equal(SaveSerializer.CurrentVersion, metadata!.Version, "Migrated v7 save should report the current normalized version");
+    }
+
+    private static string Version7SaveJson() => """
+{
+  "version": 7,
+  "savedAt": "2026-06-10T10:15:00Z",
+  "seed": 123,
+  "depth": 5,
+  "turnNumber": 77,
+  "combatRandomState": 99,
+  "itemRandomState": 100,
+  "width": 3,
+  "height": 3,
+  "tiles": "AgICAgICAgIC",
+  "explored": "BwA=",
+  "visible": "AgA=",
+  "playerId": "11111111111111111111111111111111",
+  "entities": [
+    {
+      "id": "11111111111111111111111111111111",
+      "name": "V7 Hero",
+      "position": { "x": 1, "y": 1 },
+      "faction": 0,
+      "blocksMovement": true,
+      "blocksSight": false,
+      "stats": { "hp": 10, "maxHP": 10, "attack": 2, "accuracy": 1, "defense": 1, "evasion": 1, "speed": 100, "viewRadius": 8, "energy": 0 }
     }
   ],
   "groundItems": [],

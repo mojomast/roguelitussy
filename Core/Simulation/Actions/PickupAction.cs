@@ -2,15 +2,18 @@ namespace Roguelike.Core;
 
 public sealed class PickupAction : IAction
 {
-    public PickupAction(EntityId actorId, ItemTemplate? template = null)
+    public PickupAction(EntityId actorId, ItemTemplate? template = null, bool autoEquipUpgrades = false)
     {
         ActorId = actorId;
         Template = template;
+        AutoEquipUpgrades = autoEquipUpgrades;
     }
 
     public EntityId ActorId { get; }
 
     public ItemTemplate? Template { get; }
+
+    public bool AutoEquipUpgrades { get; }
 
     public ActionType Type => ActionType.PickupItem;
 
@@ -58,18 +61,21 @@ public sealed class PickupAction : IAction
             return ActionOutcome.Fail(ActionResult.Invalid);
         }
 
-        if (!AddItem(inventory, item))
+        if (!AddItem(world, inventory, item))
         {
             world.DropItem(actor.Position, item);
             return ActionOutcome.Fail(ActionResult.Blocked);
         }
 
-        return new ActionOutcome
+        var outcome = new ActionOutcome
         {
             Result = ActionResult.Success,
             DirtyPositions = { actor.Position },
             LogMessages = { $"{actor.Name} picks up {item.TemplateId}." },
         };
+
+        TryAutoEquip(world, actor, inventory, item, outcome);
+        return outcome;
     }
 
     public int GetEnergyCost() => 500;
@@ -81,10 +87,30 @@ public sealed class PickupAction : IAction
             : inventory.HasSpace;
     }
 
-    private bool AddItem(InventoryComponent inventory, ItemInstance item)
+    private bool AddItem(WorldState world, InventoryComponent inventory, ItemInstance item)
     {
         return Template is not null && Template.MaxStack > 1
-            ? inventory.AddWithStacking(item, Template.MaxStack)
+            ? inventory.AddWithStacking(item, Template.MaxStack, world.AllocateItemInstanceId)
             : inventory.Add(item);
+    }
+
+    private void TryAutoEquip(WorldState world, IEntity actor, InventoryComponent inventory, ItemInstance item, ActionOutcome outcome)
+    {
+        if (!AutoEquipUpgrades
+            || Template is null
+            || Template.Slot == EquipSlot.None
+            || Template.MaxStack > 1
+            || !inventory.Contains(item.InstanceId)
+            || !RequirementValidator.MeetsRequirements(actor, Template)
+            || !EquipmentUpgradeScorer.IsStrictUpgrade(Template, inventory.GetEquipped(Template.Slot)))
+        {
+            return;
+        }
+
+        var equipOutcome = new ToggleEquipAction(actor.Id, item.InstanceId, Template).Execute(world);
+        if (equipOutcome.Result == ActionResult.Success && inventory.GetEquipped(Template.Slot)?.Item.InstanceId == item.InstanceId)
+        {
+            outcome.LogMessages.Add($"{actor.Name} auto-equips {Template.DisplayName}.");
+        }
     }
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace Roguelike.Core;
 
@@ -20,6 +21,17 @@ public static class SaveValidator
             errors.Add("SavedAt timestamp is required.");
         }
 
+        if (string.IsNullOrWhiteSpace(data.PlayerId))
+        {
+            errors.Add("PlayerId is required.");
+        }
+
+        if (data.Floors.Count > 0)
+        {
+            ValidateFloors(data, errors);
+            return errors;
+        }
+
         if (data.Width <= 0 || data.Height <= 0)
         {
             errors.Add("Map dimensions must be positive.");
@@ -37,12 +49,7 @@ public static class SaveValidator
             errors.Add(ex.Message);
         }
 
-        if (string.IsNullOrWhiteSpace(data.PlayerId))
-        {
-            errors.Add("PlayerId is required.");
-        }
-
-        ValidateEntities(data, errors);
+        ValidateEntities(data, errors, requirePlayer: true);
         ValidateGroundItems(data, errors);
         ValidateOpenDoors(data, errors);
 
@@ -66,7 +73,91 @@ public static class SaveValidator
         SaveSerializer.DecodeFlagBytes(payload, width, height);
     }
 
-    private static void ValidateEntities(SaveFileData data, List<string> errors)
+    private static void ValidateFloors(SaveFileData data, List<string> errors)
+    {
+        var depths = new HashSet<int>();
+        var activeFloorFound = false;
+        var activeFloorHasPlayer = false;
+        var playerCount = 0;
+
+        foreach (var floor in data.Floors)
+        {
+            if (!depths.Add(floor.Depth))
+            {
+                errors.Add($"Duplicate floor depth {floor.Depth}.");
+            }
+
+            var floorData = new SaveFileData
+            {
+                Version = data.Version,
+                SavedAt = data.SavedAt,
+                Seed = data.Seed,
+                Depth = floor.Depth,
+                TurnNumber = floor.TurnNumber,
+                CombatRandomState = floor.CombatRandomState,
+                ItemRandomState = floor.ItemRandomState,
+                Width = floor.Width,
+                Height = floor.Height,
+                Tiles = floor.Tiles,
+                Explored = floor.Explored,
+                Visible = floor.Visible,
+                PlayerId = data.PlayerId,
+                Entities = floor.Entities,
+                GroundItems = floor.GroundItems,
+                OpenDoors = floor.OpenDoors,
+            };
+
+            if (floorData.Width <= 0 || floorData.Height <= 0)
+            {
+                errors.Add($"Floor {floor.Depth} map dimensions must be positive.");
+                continue;
+            }
+
+            try
+            {
+                ValidateTiles(floorData, errors);
+                ValidateFlags(floorData.Explored, floorData.Width, floorData.Height, "explored", errors);
+                ValidateFlags(floorData.Visible, floorData.Width, floorData.Height, "visible", errors);
+            }
+            catch (Exception ex) when (ex is FormatException or InvalidDataException or OverflowException)
+            {
+                errors.Add(ex.Message);
+            }
+
+            var floorHasPlayer = floorData.Entities.Any(entity => string.Equals(entity.Id, data.PlayerId, StringComparison.OrdinalIgnoreCase));
+            if (floorHasPlayer)
+            {
+                playerCount++;
+            }
+
+            if (floor.Depth == data.Depth)
+            {
+                activeFloorFound = true;
+                activeFloorHasPlayer = floorHasPlayer;
+            }
+
+            ValidateEntities(floorData, errors, requirePlayer: false);
+            ValidateGroundItems(floorData, errors);
+            ValidateOpenDoors(floorData, errors);
+        }
+
+        if (!activeFloorFound)
+        {
+            errors.Add($"Active floor {data.Depth} is missing from floor payloads.");
+        }
+
+        if (!activeFloorHasPlayer)
+        {
+            errors.Add("PlayerId does not resolve to an entity on the active floor.");
+        }
+
+        if (playerCount != 1)
+        {
+            errors.Add($"PlayerId must appear exactly once across saved floors, found {playerCount}.");
+        }
+    }
+
+    private static void ValidateEntities(SaveFileData data, List<string> errors, bool requirePlayer)
     {
         var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var positions = new HashSet<Position>();
@@ -115,7 +206,7 @@ public static class SaveValidator
             ValidateNewComponentPayloads(entity, errors);
         }
 
-        if (!playerFound)
+        if (requirePlayer && !playerFound)
         {
             errors.Add("PlayerId does not resolve to an entity in the save.");
         }

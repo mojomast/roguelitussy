@@ -31,6 +31,10 @@ public sealed class CombatResolver
 
     public ulong RandomState => _rng.State;
 
+    public int NextRandom(int maxExclusive) => _rng.Next(maxExclusive);
+
+    public int NextRandom(int minInclusive, int maxExclusive) => _rng.Next(minInclusive, maxExclusive);
+
     public int CalculateHitChance(IEntity attacker, IEntity defender, ItemTemplate? weapon = null)
     {
         var hitChance = BaseHitChance + ((attacker.Stats.Attack - defender.Stats.Defense) * 2) + attacker.Stats.Accuracy - defender.Stats.Evasion;
@@ -150,7 +154,7 @@ public sealed class CombatResolver
         return Math.Max(1, rawDamage - reduction);
     }
 
-    public IReadOnlyList<StatusEffectInstance> ProcessOnHitEffects(IEntity defender, ItemTemplate? weapon)
+    public IReadOnlyList<StatusEffectInstance> ProcessOnHitEffects(IEntity defender, ItemTemplate? weapon, EntityId? sourceEntityId = null)
     {
         var applied = new List<StatusEffectInstance>();
         if (weapon?.OnHitEffects is null)
@@ -170,7 +174,7 @@ public sealed class CombatResolver
                 continue;
             }
 
-            StatusEffectProcessor.ApplyEffect(defender, effect.StatusEffect, effect.Duration);
+            StatusEffectProcessor.ApplyEffect(defender, effect.StatusEffect, effect.Duration, sourceEntityId: sourceEntityId);
             var instance = StatusEffectProcessor.GetEffect(defender, effect.StatusEffect);
             if (instance is not null)
             {

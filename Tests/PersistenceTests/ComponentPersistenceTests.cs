@@ -13,7 +13,10 @@ public sealed class ComponentPersistenceTests : ITestSuite
         registry.Add("Persistence.Components preserves XP value", PreservesXpValue);
         registry.Add("Persistence.Components preserves abilities and cooldowns", PreservesAbilitiesAndCooldowns);
         registry.Add("Persistence.Components preserves AI state and brain", PreservesAIStateAndBrain);
+        registry.Add("Persistence.Components preserves status source attribution", PreservesStatusSourceAttribution);
         registry.Add("Persistence.CombatResolver preserves RNG continuation", PreservesCombatRngContinuation);
+        registry.Add("Persistence.CombatResolver preserves ability RNG continuation", PreservesAbilityRngContinuation);
+        registry.Add("Persistence.Inventory preserves stack split id continuation", PreservesStackSplitIdContinuation);
     }
 
     private static void PreservesChestState()
@@ -113,6 +116,23 @@ public sealed class ComponentPersistenceTests : ITestSuite
         Expect.True(restoredEnemy.GetComponent<IBrain>() is PatrolGuardBrain, "Saved brain type should be restored through BrainFactory.");
     }
 
+    private static void PreservesStatusSourceAttribution()
+    {
+        using var sandbox = SaveSandbox.Create();
+        var manager = new SaveManager(sandbox.DirectoryPath, sandbox.Clock);
+        var world = CreateWorld(4, 4);
+        var enemy = CreateEntity("Burning Rat", new Position(1, 0), Faction.Enemy);
+        StatusEffectProcessor.ApplyEffect(enemy, StatusEffectType.Burning, 2, sourceEntityId: world.Player.Id);
+        world.AddEntity(enemy);
+
+        Expect.True(manager.SaveGame(world, SaveSlots.Slot1).GetAwaiter().GetResult(), "Save should succeed with sourced status effects.");
+        var restoredEnemy = manager.LoadGame(SaveSlots.Slot1).GetAwaiter().GetResult()!.GetEntity(enemy.Id)!;
+        var restoredEffect = StatusEffectProcessor.GetEffect(restoredEnemy, StatusEffectType.Burning);
+
+        Expect.NotNull(restoredEffect, "Status effect should survive round-trip.");
+        Expect.Equal(world.Player.Id, restoredEffect!.SourceEntityId ?? EntityId.Invalid, "Status source id should survive round-trip for delayed kill attribution.");
+    }
+
     private static void PreservesCombatRngContinuation()
     {
         using var sandbox = SaveSandbox.Create();
@@ -132,6 +152,59 @@ public sealed class ComponentPersistenceTests : ITestSuite
         Expect.Equal(expected.FinalDamage, actual.FinalDamage, "Saved combat RNG should continue with same final damage.");
         Expect.Equal(expected.IsCritical, actual.IsCritical, "Saved combat RNG should continue with same critical roll.");
         Expect.Equal(expected.IsMiss, actual.IsMiss, "Saved combat RNG should continue with same hit roll.");
+    }
+
+    private static void PreservesAbilityRngContinuation()
+    {
+        using var sandbox = SaveSandbox.Create();
+        var manager = new SaveManager(sandbox.DirectoryPath, sandbox.Clock);
+        var world = CreateWorld(4, 4);
+        var attacker = world.Player;
+        var defender = CreateEntity("Dummy", new Position(1, 0), Faction.Enemy);
+        world.AddEntity(defender);
+        var ability = new AbilityTemplate(
+            "spark",
+            "Spark",
+            "Randomized test damage.",
+            new AbilityTargeting("single", 8, 0, false, false, false, null),
+            1000,
+            null,
+            new AbilityEffect[]
+            {
+                new("damage", DamageType.Lightning, 5, null, 0.0, null, 0, 0, "enemies", null, 0.0, null),
+            });
+
+        new CastAbilityAction(attacker.Id, ability, defender.Position).Execute(world);
+        Expect.True(manager.SaveGame(world, SaveSlots.Slot1).GetAwaiter().GetResult(), "Save should succeed after ability RNG advances.");
+        var expected = new CastAbilityAction(attacker.Id, ability, defender.Position).Execute(world).CombatEvents[0].DamageResults[0];
+        var restored = manager.LoadGame(SaveSlots.Slot1).GetAwaiter().GetResult()!;
+        var actual = new CastAbilityAction(restored.Player.Id, ability, restored.GetEntity(defender.Id)!.Position).Execute(restored).CombatEvents[0].DamageResults[0];
+
+        Expect.Equal(expected.RawDamage, actual.RawDamage, "Saved ability RNG should continue with same raw damage.");
+        Expect.Equal(expected.FinalDamage, actual.FinalDamage, "Saved ability RNG should continue with same final damage.");
+    }
+
+    private static void PreservesStackSplitIdContinuation()
+    {
+        using var sandbox = SaveSandbox.Create();
+        var manager = new SaveManager(sandbox.DirectoryPath, sandbox.Clock);
+        var world = CreateWorld(4, 4);
+        world.Player.SetComponent(new InventoryComponent());
+        var inventory = world.Player.GetComponent<InventoryComponent>()!;
+        var stack = new ItemInstance { TemplateId = "rock", StackCount = 3, IsIdentified = true };
+        inventory.Add(stack);
+
+        Expect.True(manager.SaveGame(world, SaveSlots.Slot1).GetAwaiter().GetResult(), "Save should succeed before a stack split.");
+        var expectedOutcome = new DropItemAction(world.Player.Id, stack.InstanceId, 1).Execute(world);
+        var expectedId = world.GetItemsAt(world.Player.Position)[0].InstanceId;
+
+        var restored = manager.LoadGame(SaveSlots.Slot1).GetAwaiter().GetResult()!;
+        var actualOutcome = new DropItemAction(restored.Player.Id, stack.InstanceId, 1).Execute(restored);
+        var actualId = restored.GetItemsAt(restored.Player.Position)[0].InstanceId;
+
+        Expect.Equal(ActionResult.Success, expectedOutcome.Result, "Uninterrupted split should succeed.");
+        Expect.Equal(ActionResult.Success, actualOutcome.Result, "Loaded split should succeed.");
+        Expect.Equal(expectedId, actualId, "Item id stream should continue identically after save/load.");
     }
 
     private static WorldState CreateWorld(int width, int height)

@@ -19,10 +19,10 @@ The project uses flat JSON documents under `Content/` as the source of truth for
 ## File Roles
 
 - `items.json` defines item metadata, stats, use effects, rarity, requirements, stacking, and visuals.
-- `enemies.json` defines enemy stats, AI type, spawn ranges, abilities, loot, tags, and visuals.
+- `enemies.json` defines enemy stats, AI type, spawn ranges, abilities, loot, tags, and visuals. Current enemy `sprite_path` entries point at committed 0x72 sprites under `Assets/Sprites/0x72/`.
 - `abilities.json` defines targeting, costs, effects, and audiovisual identifiers for abilities.
 - `status_effects.json` defines status effect metadata used by simulation and content references.
-- `loot_tables.json` defines weighted loot outcomes.
+- `loot_tables.json` defines weighted loot outcomes, including guaranteed chest-specific tables and tuned recovery drops such as more available health potions.
 - `room_prefabs.json` defines prefab rooms and the tile legend used to interpret them.
 - `perks.json` defines progression perk metadata and effects.
 - `dialogs.json` defines NPC dialogue graphs.
@@ -73,6 +73,8 @@ When adding an item, provide at least:
 
 Weapon items can now drive live combat behavior through fields such as damage range, crit chance, accuracy, speed modifier, and `on_hit` status effects. Equippable items may also include runtime-enforced `requirements`.
 
+Item `stats` must map to runtime-supported equipment or item-use behavior. Supported authored keys are `damage_min`, `damage_max`, `accuracy`, `speed_modifier`, `crit_chance`, `defense`, `evasion`, `fov_bonus`, `attack`, `hp`, and `max_hp`. Passive item effects are not currently supported by runtime simulation and should not be authored until their action is implemented.
+
 Consumable authoring rules:
 
 - `on_use` healing effects should use the supported heal shape/amount expected by `ContentLoader` so runtime item templates receive a concrete heal value.
@@ -99,7 +101,9 @@ Enemy speed values should stay on the engine's current 100-based scale.
 
 When linking abilities or status effects from other content, make sure the referenced IDs already exist and match exactly.
 
-Supported ability targeting types currently in runtime use are `self`, `single`, `tile`, and `aoe_circle`. Supported effect types currently executed by the runtime are `damage`, `apply_status`, `teleport`, and `heal_self`. Targeting is validated by `CastAbilityAction`; keep content targeting definitions precise so direct casts and item-delegated casts behave the same way.
+Supported ability targeting types currently in runtime use are `self`, `single`, `tile`, and `aoe_circle`. Supported effect types currently executed by the runtime are `damage`, `apply_status`, `teleport`, and `heal_self`. Targeting is validated by `CastAbilityAction`; keep content targeting definitions precise so direct casts and item-delegated casts behave the same way. For harmful area damage or harmful statuses, `hits_allies: false` defaults unfiltered effects to enemies only, while explicit effect filters and `hits_allies: true` preserve broader targeting.
+
+Status-effect runtime behavior currently includes authored corroded stacking up to three stacks and burning/frozen mutual removal on apply. Status effects applied by melee on-hit effects or abilities retain source attribution for delayed poison/burning kill credit and save/load round-trips.
 
 ### Room Prefabs
 
@@ -114,6 +118,10 @@ After changing content:
 3. If you changed loader behavior or schema expectations, update documentation and tests in the same change.
 
 Content validation tests assert the expected item, enemy, loot table, room prefab, ability, and status effect counts, so remember to update those expectations when intentionally expanding the catalog.
+
+Authored item, enemy, and status-effect visual paths are also audited by tests to ensure each `res://` path resolves to a committed source file. Runtime loading remains soft: missing art should not crash content loading, but repository content should keep these paths valid.
+
+Current item and status icons are simple limited-palette SVG source files under `Assets/Sprites/items/` and `Assets/Sprites/ui/`. Keep future SVGs simple, avoid embedded text, and run the Godot headless editor import after changing assets so Godot import metadata/cache can be regenerated locally.
 
 ## Godot Tooling And Content
 

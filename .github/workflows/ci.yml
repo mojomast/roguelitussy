@@ -30,5 +30,40 @@ jobs:
       - name: Run full custom test harness
         run: dotnet run --project Tests/godotussy.Tests.csproj --no-build
 
+      - name: Restore rendering validation profile
+        run: dotnet restore godotussy.csproj -p:UseGodotStubs=true -p:RenderingValidation=true
+
       - name: Run rendering validation profile
         run: dotnet run --project Tests/godotussy.Tests.csproj -p:RenderingValidation=true
+
+  godot-headless:
+    name: Godot 4.4.1 Mono headless import and startup
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install Godot 4.4.1 Mono
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L -o "$RUNNER_TEMP/godot.zip" "https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_mono_linux_x86_64.zip"
+          unzip -q "$RUNNER_TEMP/godot.zip" -d "$RUNNER_TEMP/godot"
+          GODOT_DIR="$RUNNER_TEMP/godot/Godot_v4.4.1-stable_mono_linux_x86_64"
+          chmod +x "$GODOT_DIR/Godot_v4.4.1-stable_mono_linux.x86_64"
+          echo "$GODOT_DIR" >> "$GITHUB_PATH"
+
+      - name: Godot editor import
+        shell: bash
+        run: timeout 180s Godot_v4.4.1-stable_mono_linux.x86_64 --headless --editor --path . --quit
+
+      - name: Godot startup smoke
+        shell: bash
+        run: timeout 120s Godot_v4.4.1-stable_mono_linux.x86_64 --headless --path . --quit

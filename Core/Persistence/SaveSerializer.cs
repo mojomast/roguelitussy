@@ -20,6 +20,8 @@ internal sealed class SaveFileData
 
     public ulong CombatRandomState { get; set; }
 
+    public ulong ItemRandomState { get; set; }
+
     public int Width { get; set; }
 
     public int Height { get; set; }
@@ -31,6 +33,35 @@ internal sealed class SaveFileData
     public string Visible { get; set; } = string.Empty;
 
     public string PlayerId { get; set; } = string.Empty;
+
+    public List<EntitySaveData> Entities { get; set; } = new();
+
+    public List<GroundItemSaveData> GroundItems { get; set; } = new();
+
+    public List<PositionSaveData> OpenDoors { get; set; } = new();
+
+    public List<FloorSaveData> Floors { get; set; } = new();
+}
+
+internal sealed class FloorSaveData
+{
+    public int Depth { get; set; }
+
+    public int TurnNumber { get; set; }
+
+    public ulong CombatRandomState { get; set; }
+
+    public ulong ItemRandomState { get; set; }
+
+    public int Width { get; set; }
+
+    public int Height { get; set; }
+
+    public string Tiles { get; set; } = string.Empty;
+
+    public string Explored { get; set; } = string.Empty;
+
+    public string Visible { get; set; } = string.Empty;
 
     public List<EntitySaveData> Entities { get; set; } = new();
 
@@ -227,6 +258,8 @@ internal sealed class StatusEffectSaveData
     public int RemainingTurns { get; set; }
 
     public int Magnitude { get; set; }
+
+    public string SourceEntityId { get; set; } = string.Empty;
 }
 
 internal sealed class ItemSaveData
@@ -258,7 +291,7 @@ internal sealed class PositionSaveData
 
 public static class SaveSerializer
 {
-    public const int CurrentVersion = 7;
+    public const int CurrentVersion = 8;
 
     internal static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -267,6 +300,7 @@ public static class SaveSerializer
 
     internal static SaveFileData CreateSaveData(WorldState world, DateTime savedAt)
     {
+        var floor = CreateFloorSaveData(world);
         var data = new SaveFileData
         {
             Version = CurrentVersion,
@@ -274,18 +308,44 @@ public static class SaveSerializer
             Seed = world.Seed,
             Depth = world.Depth,
             TurnNumber = world.TurnNumber,
-            CombatRandomState = world.CombatRandomState,
-            Width = world.Width,
-            Height = world.Height,
-            Tiles = EncodeTiles(world.GetRawGrid()),
-            Explored = EncodeFlags(world.GetRawExplored()),
-            Visible = EncodeFlags(ReadVisible(world)),
             PlayerId = world.Player.Id.Value.ToString("N"),
-            Entities = world.Entities.Select(ToSaveData).ToList(),
-            GroundItems = FlattenGroundItems(world).ToList(),
-            OpenDoors = ReadOpenDoors(world).ToList(),
+            Floors = new List<FloorSaveData> { floor },
         };
 
+        ApplyActiveFloorAliases(data, floor);
+        return data;
+    }
+
+    internal static SaveFileData CreateSaveData(SaveRunSnapshot snapshot, DateTime savedAt)
+    {
+        var floors = snapshot.Floors
+            .Values
+            .Concat(new[] { snapshot.ActiveWorld })
+            .GroupBy(world => world.Depth)
+            .Select(group => group.Last())
+            .OrderBy(world => world.Depth)
+            .Select(CreateFloorSaveData)
+            .ToList();
+        var activeFloor = floors.FirstOrDefault(floor => floor.Depth == snapshot.CurrentFloor)
+            ?? CreateFloorSaveData(snapshot.ActiveWorld);
+        if (!floors.Any(floor => floor.Depth == activeFloor.Depth))
+        {
+            floors.Add(activeFloor);
+            floors.Sort((left, right) => left.Depth.CompareTo(right.Depth));
+        }
+
+        var data = new SaveFileData
+        {
+            Version = CurrentVersion,
+            SavedAt = savedAt,
+            Seed = snapshot.Seed,
+            Depth = snapshot.CurrentFloor,
+            TurnNumber = snapshot.ActiveWorld.TurnNumber,
+            PlayerId = snapshot.ActiveWorld.Player.Id.Value.ToString("N"),
+            Floors = floors,
+        };
+
+        ApplyActiveFloorAliases(data, activeFloor);
         return data;
     }
 
@@ -305,63 +365,147 @@ public static class SaveSerializer
 
     internal static WorldState ToWorldState(SaveFileData data)
     {
-        var world = new WorldState();
-        world.InitGrid(data.Width, data.Height);
-        world.Seed = data.Seed;
-        if (data.CombatRandomState != 0UL)
+        var floor = data.Floors.FirstOrDefault(candidate => candidate.Depth == data.Depth);
+        if (floor is not null)
         {
-            world.CombatRandomState = data.CombatRandomState;
+            return ToWorldState(data, floor, requirePlayer: true);
         }
 
-        world.Depth = data.Depth;
-        world.TurnNumber = data.TurnNumber;
+        return ToWorldState(data, CreateFloorFromRoot(data), requirePlayer: true);
+    }
 
-        var tiles = DecodeTiles(data.Tiles, data.Width, data.Height);
+    internal static SaveRunSnapshot ToRunSnapshot(SaveFileData data)
+    {
+        var floorData = data.Floors.Count == 0
+            ? new List<FloorSaveData> { CreateFloorFromRoot(data) }
+            : data.Floors;
+        var floors = floorData.ToDictionary(
+            floor => floor.Depth,
+            floor => ToWorldState(data, floor, requirePlayer: floor.Depth == data.Depth),
+            EqualityComparer<int>.Default);
+        var activeWorld = floors.TryGetValue(data.Depth, out var active)
+            ? active
+            : throw new InvalidDataException("Active floor missing from save data.");
+
+        return new SaveRunSnapshot(data.Seed, data.Depth, activeWorld, floors);
+    }
+
+    private static WorldState ToWorldState(SaveFileData data, FloorSaveData floor, bool requirePlayer)
+    {
+        var world = new WorldState();
+        world.InitGrid(floor.Width, floor.Height);
+        world.Seed = data.Seed;
+        if (floor.CombatRandomState != 0UL)
+        {
+            world.CombatRandomState = floor.CombatRandomState;
+        }
+
+        world.ItemRandomState = floor.ItemRandomState;
+
+        world.Depth = floor.Depth;
+        world.TurnNumber = floor.TurnNumber;
+
+        var tiles = DecodeTiles(floor.Tiles, floor.Width, floor.Height);
         for (var index = 0; index < tiles.Length; index++)
         {
-            world.SetTile(IndexToPosition(index, data.Width), tiles[index]);
+            world.SetTile(IndexToPosition(index, floor.Width), tiles[index]);
         }
 
-        var explored = DecodeFlags(data.Explored, data.Width, data.Height);
+        var explored = DecodeFlags(floor.Explored, floor.Width, floor.Height);
         for (var index = 0; index < explored.Length; index++)
         {
             if (explored[index])
             {
-                world.SetVisible(IndexToPosition(index, data.Width), true);
+                world.SetVisible(IndexToPosition(index, floor.Width), true);
             }
         }
 
         world.ClearVisibility();
 
-        var visible = DecodeFlags(data.Visible, data.Width, data.Height);
+        var visible = DecodeFlags(floor.Visible, floor.Width, floor.Height);
         for (var index = 0; index < visible.Length; index++)
         {
             if (visible[index])
             {
-                world.SetVisible(IndexToPosition(index, data.Width), true);
+                world.SetVisible(IndexToPosition(index, floor.Width), true);
             }
         }
 
-        foreach (var door in data.OpenDoors)
+        foreach (var door in floor.OpenDoors)
         {
             world.SetDoorOpen(new Position(door.X, door.Y), true);
         }
 
-        foreach (var entityData in data.Entities)
+        foreach (var entityData in floor.Entities)
         {
             world.AddEntity(ToEntity(entityData));
         }
 
         var playerId = EntityId.From(data.PlayerId);
-        world.Player = world.GetEntity(playerId) ?? throw new InvalidDataException("Player entity missing from save data.");
+        var player = world.GetEntity(playerId);
+        if (player is not null)
+        {
+            world.Player = player;
+        }
+        else if (requirePlayer)
+        {
+            throw new InvalidDataException("Player entity missing from save data.");
+        }
 
-        foreach (var groundItem in data.GroundItems)
+        foreach (var groundItem in floor.GroundItems)
         {
             world.DropItem(new Position(groundItem.Position.X, groundItem.Position.Y), ToItemInstance(groundItem.Item));
         }
 
         return world;
     }
+
+    internal static FloorSaveData CreateFloorFromRoot(SaveFileData data) => new()
+    {
+        Depth = data.Depth,
+        TurnNumber = data.TurnNumber,
+        CombatRandomState = data.CombatRandomState,
+        ItemRandomState = data.ItemRandomState,
+        Width = data.Width,
+        Height = data.Height,
+        Tiles = data.Tiles,
+        Explored = data.Explored,
+        Visible = data.Visible,
+        Entities = data.Entities,
+        GroundItems = data.GroundItems,
+        OpenDoors = data.OpenDoors,
+    };
+
+    internal static void ApplyActiveFloorAliases(SaveFileData data, FloorSaveData floor)
+    {
+        data.TurnNumber = floor.TurnNumber;
+        data.CombatRandomState = floor.CombatRandomState;
+        data.ItemRandomState = floor.ItemRandomState;
+        data.Width = floor.Width;
+        data.Height = floor.Height;
+        data.Tiles = floor.Tiles;
+        data.Explored = floor.Explored;
+        data.Visible = floor.Visible;
+        data.Entities = floor.Entities;
+        data.GroundItems = floor.GroundItems;
+        data.OpenDoors = floor.OpenDoors;
+    }
+
+    private static FloorSaveData CreateFloorSaveData(WorldState world) => new()
+    {
+        Depth = world.Depth,
+        TurnNumber = world.TurnNumber,
+        CombatRandomState = world.CombatRandomState,
+        ItemRandomState = world.ItemRandomState,
+        Width = world.Width,
+        Height = world.Height,
+        Tiles = EncodeTiles(world.GetRawGrid()),
+        Explored = EncodeFlags(world.GetRawExplored()),
+        Visible = EncodeFlags(ReadVisible(world)),
+        Entities = world.Entities.Select(ToSaveData).ToList(),
+        GroundItems = FlattenGroundItems(world).ToList(),
+        OpenDoors = ReadOpenDoors(world).ToList(),
+    };
 
     internal static byte[] DecodeTileBytes(string base64, int width, int height)
     {
@@ -525,6 +669,7 @@ public static class SaveSerializer
                 Type = (int)effect.Type,
                 RemainingTurns = effect.RemainingTurns,
                 Magnitude = effect.Magnitude,
+                SourceEntityId = effect.SourceEntityId?.Value.ToString("N") ?? string.Empty,
             }).ToList(),
         };
     }
@@ -684,7 +829,8 @@ public static class SaveSerializer
             var statusEffects = new StatusEffectsComponent();
             foreach (var effect in data.StatusEffects.Effects)
             {
-                statusEffects.Add(new StatusEffectInstance((StatusEffectType)effect.Type, effect.RemainingTurns, effect.Magnitude));
+                EntityId? sourceId = string.IsNullOrWhiteSpace(effect.SourceEntityId) ? null : EntityId.From(effect.SourceEntityId);
+                statusEffects.Add(new StatusEffectInstance((StatusEffectType)effect.Type, effect.RemainingTurns, effect.Magnitude, sourceId));
             }
 
             entity.SetComponent(statusEffects);

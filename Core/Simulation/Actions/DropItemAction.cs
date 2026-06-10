@@ -40,7 +40,7 @@ public sealed class DropItemAction : IAction
             ApplyStatModifiers(actor.Stats, equipped.StatModifiers, -1);
         }
 
-        if (!inventory.RemoveQuantity(ItemInstanceId, Quantity, out var item) || item is null)
+        if (!inventory.RemoveQuantity(ItemInstanceId, Quantity, out var item, world.AllocateItemInstanceId) || item is null)
         {
             return ActionOutcome.Fail(ActionResult.Invalid);
         }

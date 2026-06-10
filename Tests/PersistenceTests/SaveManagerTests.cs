@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json.Nodes;
 using Roguelike.Core;
 using Roguelike.Tests.TestFramework;
 
@@ -12,6 +13,10 @@ public sealed class SaveManagerTests : ITestSuite
     public void Register(TestRegistry registry)
     {
         registry.Add("Persistence.SaveManager round-trips full world state", RoundTripRestoresWorldState);
+        registry.Add("Persistence.SaveManager round-trips multi-floor run state", RoundTripRestoresMultiFloorRunState);
+        registry.Add("Persistence.SaveValidator rejects v8 saves missing active floor", RejectsMissingActiveFloor);
+        registry.Add("Persistence.SaveValidator rejects v8 saves with duplicate player across floors", RejectsDuplicatePlayerAcrossFloors);
+        registry.Add("Persistence.SaveValidator rejects v8 saves with duplicate floor depths", RejectsDuplicateFloorDepths);
         registry.Add("Persistence.SaveManager exposes save metadata", MetadataIsAvailableAfterSave);
         registry.Add("Persistence.SaveManager supports autosave slot", AutosaveSlotUsesDedicatedPath);
     }
@@ -48,6 +53,42 @@ public sealed class SaveManagerTests : ITestSuite
         Expect.Equal(SaveSerializer.CurrentVersion, metadata.Version, "Metadata should expose the normalized save version");
     }
 
+    private static void RoundTripRestoresMultiFloorRunState()
+    {
+        using var sandbox = SaveSandbox.Create();
+        var manager = new SaveManager(sandbox.DirectoryPath, sandbox.Clock);
+        var active = CreateWorld();
+        active.Depth = 2;
+        var cached = CreateWorld();
+        cached.Depth = 1;
+        cached.TurnNumber = 44;
+        cached.RemoveEntity(cached.Player.Id);
+        cached.SetVisible(new Position(4, 4), true);
+        cached.DropItem(new Position(3, 3), new ItemInstance
+        {
+            InstanceId = new EntityId(Guid.Parse("dddddddd-dddd-dddd-dddd-dddddddddddd")),
+            TemplateId = "floor_cache_token",
+            StackCount = 2,
+            IsIdentified = true,
+        });
+
+        var floors = new Dictionary<int, WorldState>
+        {
+            [cached.Depth] = cached,
+            [active.Depth] = active,
+        };
+
+        Expect.True(manager.SaveRun(new SaveRunSnapshot(active.Seed, active.Depth, active, floors), SaveSlots.Slot1).GetAwaiter().GetResult(), "SaveManager should persist a multi-floor run snapshot");
+
+        var restored = manager.LoadRun(SaveSlots.Slot1).GetAwaiter().GetResult();
+        Expect.NotNull(restored, "SaveManager should load the saved run snapshot");
+        Expect.Equal(active.Depth, restored!.CurrentFloor, "Loaded run should preserve the active floor");
+        Expect.Equal(WorldSignature(active), WorldSignature(restored.ActiveWorld), "Loaded active floor should match the saved active floor");
+        Expect.True(restored.Floors.TryGetValue(cached.Depth, out var restoredCached), "Loaded run should include cached inactive floors");
+        Expect.Equal(WorldSignatureWithoutPlayer(cached), WorldSignatureWithoutPlayer(restoredCached!), "Loaded cached floor should match saved inactive floor state");
+        Expect.True(restoredCached!.GetEntity(active.Player.Id) is null, "Inactive floor should not contain a duplicate player entity");
+    }
+
     private static void AutosaveSlotUsesDedicatedPath()
     {
         using var sandbox = SaveSandbox.Create();
@@ -60,6 +101,52 @@ public sealed class SaveManagerTests : ITestSuite
 
         manager.DeleteSave(SaveSlots.Autosave);
         Expect.False(manager.HasSave(SaveSlots.Autosave), "Deleting the autosave slot should remove the save file");
+    }
+
+    private static void RejectsMissingActiveFloor()
+    {
+        using var sandbox = SaveSandbox.Create();
+        var manager = new SaveManager(sandbox.DirectoryPath, sandbox.Clock);
+        var path = WriteValidMultiFloorSave(manager, sandbox);
+        var root = LoadSaveJson(path);
+        root["depth"] = 99;
+        File.WriteAllText(path, root.ToJsonString());
+
+        Expect.True(manager.LoadRun(SaveSlots.Slot1).GetAwaiter().GetResult() is null, "A v8 run save missing the active floor should not load.");
+        Expect.True(manager.GetSaveMetadata(SaveSlots.Slot1) is null, "Malformed floor payloads should not expose metadata.");
+    }
+
+    private static void RejectsDuplicatePlayerAcrossFloors()
+    {
+        using var sandbox = SaveSandbox.Create();
+        var manager = new SaveManager(sandbox.DirectoryPath, sandbox.Clock);
+        var path = WriteValidMultiFloorSave(manager, sandbox);
+        var root = LoadSaveJson(path);
+        var floors = root["floors"]!.AsArray();
+        var activeFloor = floors.First(floor => (int)floor!["depth"]! == 2)!.AsObject();
+        var cachedFloor = floors.First(floor => (int)floor!["depth"]! == 1)!.AsObject();
+        var activePlayer = activeFloor["entities"]!.AsArray().First(entity => (string)entity!["id"]! == (string)root["playerId"]!)!.DeepClone().AsObject();
+        activePlayer["position"]!["x"] = 4;
+        activePlayer["position"]!["y"] = 4;
+        cachedFloor["entities"]!.AsArray().Add(activePlayer);
+        File.WriteAllText(path, root.ToJsonString());
+
+        Expect.True(manager.LoadRun(SaveSlots.Slot1).GetAwaiter().GetResult() is null, "A v8 run save with duplicate players across floors should not load.");
+        Expect.True(manager.GetSaveMetadata(SaveSlots.Slot1) is null, "Duplicate-player floor payloads should not expose metadata.");
+    }
+
+    private static void RejectsDuplicateFloorDepths()
+    {
+        using var sandbox = SaveSandbox.Create();
+        var manager = new SaveManager(sandbox.DirectoryPath, sandbox.Clock);
+        var path = WriteValidMultiFloorSave(manager, sandbox);
+        var root = LoadSaveJson(path);
+        var floors = root["floors"]!.AsArray();
+        floors[1]!["depth"] = (int)floors[0]!["depth"]!;
+        File.WriteAllText(path, root.ToJsonString());
+
+        Expect.True(manager.LoadRun(SaveSlots.Slot1).GetAwaiter().GetResult() is null, "A v8 run save with duplicate floor depths should not load.");
+        Expect.True(manager.GetSaveMetadata(SaveSlots.Slot1) is null, "Duplicate-depth floor payloads should not expose metadata.");
     }
 
     private static WorldState CreateWorld()
@@ -142,6 +229,29 @@ public sealed class SaveManagerTests : ITestSuite
         return world;
     }
 
+    private static string WriteValidMultiFloorSave(SaveManager manager, SaveSandbox sandbox)
+    {
+        var active = CreateWorld();
+        active.Depth = 2;
+        var cached = CreateWorld();
+        cached.Depth = 1;
+        cached.RemoveEntity(cached.Player.Id);
+        var floors = new Dictionary<int, WorldState>
+        {
+            [cached.Depth] = cached,
+            [active.Depth] = active,
+        };
+
+        Expect.True(manager.SaveRun(new SaveRunSnapshot(active.Seed, active.Depth, active, floors), SaveSlots.Slot1).GetAwaiter().GetResult(),
+            "Test setup should write a valid multi-floor save.");
+        return Path.Combine(sandbox.DirectoryPath, SaveSlots.GetFileName(SaveSlots.Slot1));
+    }
+
+    private static JsonObject LoadSaveJson(string path)
+    {
+        return JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+    }
+
     private static string WorldSignature(WorldState world)
     {
         var parts = new List<string>
@@ -160,6 +270,23 @@ public sealed class SaveManagerTests : ITestSuite
         };
 
         return string.Join("|", parts);
+    }
+
+    private static string WorldSignatureWithoutPlayer(WorldState world)
+    {
+        return string.Join("|", new[]
+        {
+            $"seed={world.Seed}",
+            $"depth={world.Depth}",
+            $"turn={world.TurnNumber}",
+            $"size={world.Width}x{world.Height}",
+            $"tiles={TileSignature(world)}",
+            $"explored={FlagSignature(world, explored: true)}",
+            $"visible={FlagSignature(world, explored: false)}",
+            $"doors={DoorSignature(world)}",
+            $"entities={EntitySignature(world)}",
+            $"ground={GroundItemSignature(world)}",
+        });
     }
 
     private static string TileSignature(WorldState world)

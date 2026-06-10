@@ -13,6 +13,7 @@ public sealed class UISmokeTests : ITestSuite
     {
         registry.Add("UI.GameManager new game generates a populated floor", GameManagerGeneratesPopulatedFloor);
         registry.Add("UI.GameManager floor travel preserves run state", GameManagerPreservesRunStateAcrossFloors);
+        registry.Add("UI.GameManager save load travel back restores inactive floor", GameManagerSaveLoadTravelBackRestoresInactiveFloor);
         registry.Add("UI.GameManager floor travel succeeds when arrival stair is occupied", GameManagerFloorTravelFindsNearbyArrival);
         registry.Add("UI.GameManager floor travel restores mutated arrival stairs", GameManagerFloorTravelRepairsMutatedArrivalTile);
         registry.Add("UI.HUD updates from bus and exposes keyboard toggles", HudUpdatesFromBus);
@@ -20,8 +21,12 @@ public sealed class UISmokeTests : ITestSuite
         registry.Add("UI.MainMenu character creation affects the starting run", MainMenuCharacterCreationAffectsStartingRun);
         registry.Add("UI.GameManager enemy turns resolve after player action", GameManagerEnemyTurnsResolveAfterPlayerAction);
         registry.Add("UI.Inventory keyboard navigation emits concrete actions", InventoryEmitsConcreteActions);
+        registry.Add("UI.Inventory exposes auto-equip toggle state", InventoryExposesAutoEquipToggleState);
         registry.Add("UI.Inventory and tooltip surface item rarity", InventorySurfacesItemRarity);
+        registry.Add("UI.Inventory uses category glyphs and full stack details", InventoryUsesCategoryGlyphsAndStackDetails);
         registry.Add("UI.Help overlay opens from menu and gameplay", HelpOverlayOpensFromMenuAndGameplay);
+        registry.Add("UI.Pause menu groups run actions without changing routing", PauseMenuGroupsRunActions);
+        registry.Add("UI.Character sheet uses sectioned visual chrome", CharacterSheetUsesSectionedVisualChrome);
         registry.Add("UI.CombatLog escapes BBCode and reacts to combat events", CombatLogReactsToEvents);
         registry.Add("UI.CombatLog exposes a live console panel", CombatLogExposesLiveConsolePanel);
         registry.Add("UI.Chest interactions report loot to the combat log", ChestInteractionsReportLootToCombatLog);
@@ -97,6 +102,39 @@ public sealed class UISmokeTests : ITestSuite
         Expect.True(gameManager.World.GetEntity(enemyId) is null, "Floor-local mutations should persist when revisiting a cached floor.");
     }
 
+    private static void GameManagerSaveLoadTravelBackRestoresInactiveFloor()
+    {
+        var saveManager = new StubSaveManager();
+        var gameManager = new GameManager();
+        var bus = new EventBus();
+        var content = new StubContentDatabase();
+        gameManager.AttachServices(new WorldState(), new TurnScheduler(), new StubGenerator(), new FOVCalculator(), content, saveManager, bus);
+        gameManager.StartNewGame(8128);
+
+        var player = gameManager.World!.Player;
+        var removedEnemy = gameManager.World.Entities.First(entity => entity.Id != player.Id);
+        gameManager.World.RemoveEntity(removedEnemy.Id);
+        gameManager.World.DropItem(new Position(3, 3), new ItemInstance { TemplateId = "floor_cache_token", StackCount = 2, IsIdentified = true });
+        gameManager.World.MoveEntity(player.Id, new Position(8, 8));
+
+        var descendOutcome = gameManager.ProcessPlayerAction(new DescendAction(player.Id));
+        Expect.Equal(ActionResult.Success, descendOutcome.Result, "Descending should create a cached inactive starting floor.");
+        Expect.Equal(1, gameManager.World!.Depth, "The saved run should be active on the lower floor.");
+        Expect.True(gameManager.SaveToSlot(1), "Saving after floor travel should persist the run snapshot.");
+
+        var loaded = new GameManager();
+        var loadedBus = new EventBus();
+        loaded.AttachServices(new WorldState(), new TurnScheduler(), new StubGenerator(), new FOVCalculator(), content, saveManager, loadedBus);
+
+        Expect.True(loaded.LoadFromSlot(1), "Loading a multi-floor run snapshot should succeed.");
+        Expect.Equal(1, loaded.World!.Depth, "Loaded run should resume on the active saved floor.");
+        Expect.True(loaded.TravelToFloor(0), "Loaded run should be able to travel back to the cached inactive floor.");
+        Expect.Equal(0, loaded.World!.Depth, "Traveling back should restore the original floor depth.");
+        Expect.True(loaded.World.GetEntity(removedEnemy.Id) is null, "Inactive floor entity removals should survive save/load.");
+        Expect.True(loaded.World.GetItemsAt(new Position(3, 3)).Any(item => item.TemplateId == "floor_cache_token"), "Inactive floor ground items should survive save/load.");
+        Expect.Equal(1, loaded.World.Entities.Count(entity => entity.Id == loaded.World.Player.Id), "Returning to the cached floor should not duplicate the player.");
+    }
+
     private static void HudUpdatesFromBus()
     {
         var context = CreateContext();
@@ -126,6 +164,18 @@ public sealed class UISmokeTests : ITestSuite
         Expect.True(hud.LevelText.Contains("XP: 24/40"), "HUD should expose level progression and experience.");
         Expect.Equal(Colors.Red.R, hud.HPColor.R, "Low HP should switch the HUD into the red threshold");
         Expect.True(hud.Children.Count > 0 && hud.Children[0] is Panel, "HUD should create a visible panel container.");
+        var panel = (Panel)hud.Children[0];
+        var hpLabel = FindChild<Label>(panel, "HPLabel");
+        var hpBar = FindChild<ProgressBar>(panel, "HPBar");
+        var headerLabel = FindChild<Label>(panel, "HeaderLabel");
+        Expect.NotNull(hpLabel, "HUD should dedicate a primary label to HP.");
+        Expect.NotNull(hpBar, "HUD should dedicate a progress bar to HP.");
+        Expect.NotNull(headerLabel, "HUD should keep non-HP status in its own label.");
+        Expect.Equal("HP: 25/100", hpLabel!.Text, "Dedicated HP label should mirror the HP snapshot text.");
+        Expect.Equal(100d, hpBar!.MaxValue, "HP bar should use max HP as its range.");
+        Expect.Equal(25d, hpBar.Value, "HP bar should use current HP as its value.");
+        Expect.False(headerLabel!.Text.Contains("HP:"), "Energy/Floor/Turn label should not duplicate HP text.");
+        Expect.Equal(Colors.White.G, headerLabel.Modulate.G, "Energy/Floor/Turn label should not inherit the HP danger tint.");
 
         var before = hud.MinimapText;
         hud.ToggleMinimap();
@@ -285,6 +335,23 @@ public sealed class UISmokeTests : ITestSuite
         Expect.Equal(1, (dropped as DropItemAction)?.Quantity ?? 0, "Dropping a stack from the UI should default to a one-item split-drop.");
     }
 
+    private static void InventoryExposesAutoEquipToggleState()
+    {
+        var context = CreateContext(new ItemInstance { TemplateId = "sword_iron", IsIdentified = true });
+        var inventory = new InventoryUI();
+        inventory.Bind(context.GameManager, context.Bus, context.Content, new Tooltip());
+
+        inventory.Open();
+
+        Expect.False(context.GameManager.AutoEquipUpgradesEnabled, "Auto-equip upgrades should default off.");
+        Expect.True(inventory.GridText.Contains("Auto-equip upgrades: Off"), "Inventory should show the disabled auto-equip state.");
+
+        inventory.HandleKey(Key.A);
+
+        Expect.True(context.GameManager.AutoEquipUpgradesEnabled, "Inventory hotkey should toggle auto-equip upgrades on.");
+        Expect.True(inventory.GridText.Contains("Auto-equip upgrades: On"), "Inventory should refresh the visible auto-equip state.");
+    }
+
     private static void InventorySurfacesItemRarity()
     {
         WithViewportSize(new Vector2(640f, 360f), viewportSize =>
@@ -300,12 +367,33 @@ public sealed class UISmokeTests : ITestSuite
             inventory.Open();
 
             Expect.True(inventory.DescriptionText.Contains("Rarity: Rare"), "Inventory descriptions should expose the selected item's rarity tier.");
+            Expect.True(inventory.DescriptionText.Contains("Requires targeting"), "Aimed consumables should explain why they cannot fire directly from the inventory.");
             Expect.True(inventory.GridMarkup.Contains("[color="), "Inventory grid markup should colorize loot by rarity.");
+            Expect.True(inventory.GridText.Contains("▤"), "Scrolls should use a stable category glyph instead of a display-name initial.");
             Expect.True(tooltip.BodyText.Contains("Rarity: Rare"), "Item tooltips should expose rarity details.");
+            Expect.True(tooltip.BodyText.Contains("Status: Carried"), "Item tooltips should expose carried/equipped state.");
             Expect.True(tooltip.TitleMarkup.Contains("[color="), "Item tooltip titles should be colorized by rarity.");
             Expect.Equal(new Vector2(viewportSize.X - tooltip.Size.X - 24f, viewportSize.Y - tooltip.Size.Y - 24f), tooltip.ScreenPosition,
                 "Inventory comparison and detail tooltips should anchor to the bottom-right corner of the viewport.");
         });
+    }
+
+    private static void InventoryUsesCategoryGlyphsAndStackDetails()
+    {
+        var context = CreateContext(new ItemInstance { TemplateId = "potion_health", StackCount = 12, IsIdentified = true });
+        var inventory = new InventoryUI();
+        inventory.Bind(context.GameManager, context.Bus, context.Content, new Tooltip());
+
+        inventory.Open();
+
+        Expect.True(inventory.GridText.Contains("!x12"), "Inventory slots should show category glyphs and uncapped stack counts.");
+        Expect.True(inventory.DescriptionText.Contains("Stack: 12/"), "Inventory details should show current and max stack counts.");
+        Expect.True(inventory.GridText.Contains("D drop one"), "Inventory footer should explain stack drop behavior for stacked items.");
+
+        inventory.HandleKey(Key.Tab);
+
+        Expect.True(inventory.GridText.Contains("Groups:"), "Category sorting should expose readable category grouping context.");
+        Expect.True(inventory.GridText.Contains("! Consumable"), "Category grouping should use the same stable glyph language as slots.");
     }
 
     private static void MainMenuCharacterCreationAffectsStartingRun()
@@ -386,6 +474,40 @@ public sealed class UISmokeTests : ITestSuite
         root._UnhandledInput(new InputEventKey { Pressed = true, PhysicalKeycode = Key.Enter });
         root._UnhandledInput(new InputEventKey { Pressed = true, PhysicalKeycode = Key.H });
         Expect.True(root.HelpOverlay.Visible, "Help should also open during gameplay.");
+    }
+
+    private static void PauseMenuGroupsRunActions()
+    {
+        var bus = new EventBus();
+        var menu = new PauseMenu();
+        menu.Bind(bus);
+        menu.Open();
+
+        Expect.True(menu.MenuText.Contains("Resume Run"), "Pause menu should label the primary return action clearly.");
+        Expect.True(menu.MenuText.Contains("Save: Slot 1"), "Pause menu should group save choices with explicit labels.");
+        Expect.True(menu.MenuText.Contains("Review Character"), "Pause menu should identify review tools separately from save actions.");
+        Expect.True(menu.MenuText.Contains("Expedition command is paused"), "Pause menu body should explain the current modal state.");
+    }
+
+    private static void CharacterSheetUsesSectionedVisualChrome()
+    {
+        var context = CreateContext();
+        var root = new Control();
+        var sheet = new CharacterSheet();
+        root.AddChild(sheet);
+        sheet.Bind(context.GameManager, context.Bus, context.Content);
+        sheet.Open();
+
+        Expect.True(sheet.SummaryText.Contains("IDENTITY"), "Character sheet should section identity data.");
+        Expect.True(sheet.SummaryText.Contains("CORE STATS"), "Character sheet should section core stats.");
+        Expect.True(sheet.SummaryText.Contains("EQUIPMENT"), "Character sheet should section equipment data.");
+        var panel = FindChild<Panel>(sheet, "Panel");
+        var header = panel is null ? null : FindChild<ColorRect>(panel, "HeaderBand");
+        var body = panel is null ? null : FindChild<ColorRect>(panel, "BodyCard");
+        var title = panel is null ? null : FindChild<Label>(panel, "TitleLabel");
+        Expect.NotNull(header, "Character sheet should render a header band.");
+        Expect.NotNull(body, "Character sheet should render a body card.");
+        Expect.NotNull(title, "Character sheet should render an explicit title label.");
     }
 
     private static void CombatLogReactsToEvents()

@@ -36,7 +36,7 @@ public partial class Tooltip : Control
     }
 
     public void ShowItemTooltip(ItemTemplate template, ItemInstance instance, Vector2 screenPos,
-        string? comparisonText = null)
+        string? comparisonText = null, bool equipped = false, string equippedSlot = "None")
     {
         TitleText = template.DisplayName;
         TitleMarkup = ItemRarityPresentation.WrapWithColor(template.DisplayName, template.Rarity);
@@ -57,10 +57,8 @@ public partial class Tooltip : Control
             lines.Add($"Charges: {remaining}/{template.MaxCharges}");
         }
 
-        if (instance.StackCount > 1)
-        {
-            lines.Add($"Stack: {instance.StackCount}");
-        }
+        lines.Add($"Stack: {instance.StackCount}/{System.Math.Max(1, template.MaxStack)}");
+        lines.Add(equipped ? $"Status: Equipped in {equippedSlot}" : "Status: Carried");
 
         lines.Add($"Category: {template.Category}");
 
