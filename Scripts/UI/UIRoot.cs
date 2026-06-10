@@ -404,6 +404,7 @@ public partial class UIRoot : CanvasLayer
         ShopUI.Close();
         Tooltip.Hide();
         CombatLog.RefreshConsole();
+        UpdateLevelUpOverlay();
         RefreshInputGate();
     }
 

@@ -49,6 +49,7 @@ public sealed class UISmokeTests : ITestSuite
         registry.Add("UI.UIRoot resolves named autoloads from the viewport", UIRootResolvesNamedViewportAutoloads);
         registry.Add("UI.UIRoot accepts numpad enter on the title screen", UIRootAcceptsNumpadEnter);
         registry.Add("UI.UIRoot ignores repeated key echo events", UIRootIgnoresEchoedKeys);
+        registry.Add("UI.UIRoot load reopens pending perk choices", UIRootLoadReopensPendingPerkChoices);
         registry.Add("UI.UIRoot routes keyboard between title, overlays, and gameplay", UIRootRoutesKeyboard);
     }
 
@@ -948,6 +949,24 @@ public sealed class UISmokeTests : ITestSuite
 
         Expect.Equal(GameManager.GameState.MainMenu, context.GameManager.CurrentState, "Echoed key events should not retrigger gameplay actions.");
         Expect.True(root.MainMenu.Visible, "Echoed title-screen inputs should be ignored instead of dismissing the main menu.");
+    }
+
+    private static void UIRootLoadReopensPendingPerkChoices()
+    {
+        var context = CreateContext();
+        context.GameManager.LoadWorld(context.World);
+
+        var root = new UIRoot();
+        root.BindServices(context.GameManager, context.Bus, context.Content);
+
+        Expect.False(root.LevelUpOverlay.Visible, "The level-up overlay should start closed when no perk choice is pending.");
+
+        context.Player.SetComponent(new ProgressionComponent { Level = 2, UnspentPerkChoices = 1 });
+        Expect.True(context.GameManager.GetAvailablePerkChoices().Count > 0, "Test setup should expose at least one available perk choice.");
+
+        context.Bus.EmitLoadCompleted(true);
+
+        Expect.True(root.LevelUpOverlay.Visible, "A successful load should reopen saved pending perk choices.");
     }
 
     private static void UIRootRoutesKeyboard()

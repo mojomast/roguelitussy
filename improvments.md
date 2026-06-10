@@ -8,6 +8,8 @@
 
 > Consumable stack follow-up note (2026-06-10): stacked consumables and scrolls now consume one item per successful use, leaving the remaining stack in inventory.
 
+> Progression/mechanics follow-up note (2026-06-10): save/load now restores visible pending perk choices by reopening the level-up overlay, and pickup stack merging now resolves item templates from Core content state instead of depending on UI callers. Larger audited follow-ups remain: aimed item targeting UI, finite perk offer pools, authored status metadata runtime use, AI parameter projection, and trap/lock-door room hooks.
+
 ## Purpose
 
 This document is the current-state improvement spec for turning the existing project into a more complete, playable roguelike. It is intentionally written for parallel subagents. It replaces vague backlog work with concrete, codebase-specific workstreams, ordering, file targets, and acceptance criteria.

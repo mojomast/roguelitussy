@@ -10,6 +10,7 @@ The current game already supports:
 - unspent stat points
 - level-gated equipment requirements
 - save/load for run progression
+- reopening pending perk choices after loading a run
 
 That is a workable foundation, but it is still a narrow "kill things, get bigger numbers" model. The next pass should make progression shape playstyle, recovery, and decision-making across a run without collapsing the tension that makes a dungeon crawler work.
 
@@ -225,6 +226,8 @@ Recommended interaction model:
 - when a level-up happens, automatic rewards apply immediately
 - perk choices become pending
 - player can resolve them immediately or on the next safe turn
+
+Current implementation note: pending perk choices are persisted and the level-up overlay is reopened after load when choices are available. The future three-option offer draft described above is still roadmap work; current choices are drawn from the unlocked, unselected perk list.
 
 ### Phase 4: Rework Stat Points
 

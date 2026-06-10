@@ -50,6 +50,7 @@ godot --headless --path . --quit
 - Completed: v8 saves now carry optional content version/hash metadata for warning-only load diagnostics when runtime JSON content differs from the saved run; legacy/migrated saves still load with unknown content metadata.
 - Completed: neutral chests are protected from mob targeting and melee validation, chest-open logs now explicitly list found loot and where it went, and long inventory/dialog/shop/tooltip UI content is windowed or clamped.
 - Completed: stacked consumables and scrolls now consume exactly one item per successful use instead of deleting the whole stack.
+- Completed: loading a save with pending perk choices reopens the level-up overlay, and Core pickup actions now resolve stack metadata from world content instead of relying on UI-supplied templates.
 - Deferred: per-item chest loot selection needs persistent chest contents for safe leave-behind semantics; current v8-compatible behavior remains atomic open with inventory stow plus ground spill.
 
 ## Current Strengths

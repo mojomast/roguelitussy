@@ -34,9 +34,10 @@ Notable action families now in play:
 - equip toggles that validate item requirements before mutating inventory state
 
 Stacked consumables and scrolls consume one item from the stack per successful use; the remaining stack stays in inventory.
-Inventory UI also exposes a runtime-only auto-equip upgrades toggle. Press `A` while inventory is open to enable or disable it; pickup with `G` honors the current toggle when deciding whether upgrades should be equipped automatically.
+Core pickup actions resolve stack metadata from the world's content database when needed, so stack merging and capacity checks do not depend on the UI pre-supplying an item template. Inventory UI also exposes a runtime-only auto-equip upgrades toggle. Press `A` while inventory is open to enable or disable it; pickup with `G` honors the current toggle when deciding whether upgrades should be equipped automatically.
 
 Neutral entities, including treasure chests and NPCs, are not valid melee targets. Enemy AI ignores neutral entities when acquiring targets, so mobs do not path to, attack, or destroy containers.
+The player can swap places with adjacent neutral NPCs by moving into them; this keeps NPCs non-hostile while preventing them from permanently blocking tight corridors.
 
 ## Progression And Identity
 
@@ -47,6 +48,7 @@ Player-specific long-run state lives in explicit components instead of bloating 
 - `XpValueComponent` tags enemies with deterministic XP rewards loaded from content.
 
 XP is awarded on kill, level thresholds are deterministic, level-ups grant baseline stat growth plus unspent points, and progression/identity data are persisted with saves.
+Loading a run with pending perk choices reopens the level-up overlay when choices are available, so saved progression decisions remain visible after resume.
 
 The planned expansion path for progression is documented in `docs/PROGRESSION.md`.
 

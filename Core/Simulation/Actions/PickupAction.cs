@@ -37,7 +37,7 @@ public sealed class PickupAction : IAction
             return ActionResult.Invalid;
         }
 
-        if (!CanAccept(inventory, firstGroundItem))
+        if (!CanAccept(mutableWorld, inventory, firstGroundItem))
         {
             return ActionResult.Blocked;
         }
@@ -61,7 +61,8 @@ public sealed class PickupAction : IAction
             return ActionOutcome.Fail(ActionResult.Invalid);
         }
 
-        if (!AddItem(world, inventory, item))
+        var template = ResolveTemplate(world, item);
+        if (!AddItem(world, inventory, item, template))
         {
             world.DropItem(actor.Position, item);
             return ActionOutcome.Fail(ActionResult.Blocked);
@@ -74,43 +75,56 @@ public sealed class PickupAction : IAction
             LogMessages = { $"{actor.Name} picks up {item.TemplateId}." },
         };
 
-        TryAutoEquip(world, actor, inventory, item, outcome);
+        TryAutoEquip(world, actor, inventory, item, template, outcome);
         return outcome;
     }
 
     public int GetEnergyCost() => 500;
 
-    private bool CanAccept(InventoryComponent inventory, ItemInstance item)
+    private bool CanAccept(WorldState world, InventoryComponent inventory, ItemInstance item)
     {
-        return Template is not null && Template.MaxStack > 1
-            ? inventory.CanAccept(item, Template.MaxStack)
+        var template = ResolveTemplate(world, item);
+        return template is not null && template.MaxStack > 1
+            ? inventory.CanAccept(item, template.MaxStack)
             : inventory.HasSpace;
     }
 
-    private bool AddItem(WorldState world, InventoryComponent inventory, ItemInstance item)
+    private bool AddItem(WorldState world, InventoryComponent inventory, ItemInstance item, ItemTemplate? template)
     {
-        return Template is not null && Template.MaxStack > 1
-            ? inventory.AddWithStacking(item, Template.MaxStack, world.AllocateItemInstanceId)
+        return template is not null && template.MaxStack > 1
+            ? inventory.AddWithStacking(item, template.MaxStack, world.AllocateItemInstanceId)
             : inventory.Add(item);
     }
 
-    private void TryAutoEquip(WorldState world, IEntity actor, InventoryComponent inventory, ItemInstance item, ActionOutcome outcome)
+    private ItemTemplate? ResolveTemplate(WorldState world, ItemInstance item)
+    {
+        if (Template is not null && Template.TemplateId == item.TemplateId)
+        {
+            return Template;
+        }
+
+        return world.ContentDatabase is not null && world.ContentDatabase.TryGetItemTemplate(item.TemplateId, out var template)
+            ? template
+            : null;
+    }
+
+    private void TryAutoEquip(WorldState world, IEntity actor, InventoryComponent inventory, ItemInstance item, ItemTemplate? template, ActionOutcome outcome)
     {
         if (!AutoEquipUpgrades
-            || Template is null
-            || Template.Slot == EquipSlot.None
-            || Template.MaxStack > 1
+            || template is null
+            || template.Slot == EquipSlot.None
+            || template.MaxStack > 1
             || !inventory.Contains(item.InstanceId)
-            || !RequirementValidator.MeetsRequirements(actor, Template)
-            || !EquipmentUpgradeScorer.IsStrictUpgrade(Template, inventory.GetEquipped(Template.Slot)))
+            || !RequirementValidator.MeetsRequirements(actor, template)
+            || !EquipmentUpgradeScorer.IsStrictUpgrade(template, inventory.GetEquipped(template.Slot)))
         {
             return;
         }
 
-        var equipOutcome = new ToggleEquipAction(actor.Id, item.InstanceId, Template).Execute(world);
-        if (equipOutcome.Result == ActionResult.Success && inventory.GetEquipped(Template.Slot)?.Item.InstanceId == item.InstanceId)
+        var equipOutcome = new ToggleEquipAction(actor.Id, item.InstanceId, template).Execute(world);
+        if (equipOutcome.Result == ActionResult.Success && inventory.GetEquipped(template.Slot)?.Item.InstanceId == item.InstanceId)
         {
-            outcome.LogMessages.Add($"{actor.Name} auto-equips {Template.DisplayName}.");
+            outcome.LogMessages.Add($"{actor.Name} auto-equips {template.DisplayName}.");
         }
     }
 }

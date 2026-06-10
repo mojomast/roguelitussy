@@ -10,6 +10,7 @@ public sealed class ActionTests : ITestSuite
     public void Register(TestRegistry registry)
     {
         registry.Add("Simulation.Actions move action executes on open floor", MoveActionExecutesOnOpenFloor);
+        registry.Add("Simulation.Actions move action swaps neutral NPCs", MoveActionSwapsNeutralNpcs);
         registry.Add("Simulation.Actions move action rejects walls and blockers", MoveActionRejectsWallsAndBlockers);
         registry.Add("Simulation.Actions move action prevents corner cutting", MoveActionPreventsCornerCutting);
         registry.Add("Simulation.Actions attack action damages adjacent enemies", AttackActionDamagesAdjacentEnemies);
@@ -18,6 +19,7 @@ public sealed class ActionTests : ITestSuite
         registry.Add("Simulation.Actions attack action rejects neutral chest targets", AttackActionRejectsNeutralChestTargets);
         registry.Add("Simulation.Actions pickup action rejects full inventory", PickupActionRejectsFullInventory);
         registry.Add("Simulation.Actions pickup action merges stacks when bag is full", PickupActionMergesStacksWhenFull);
+        registry.Add("Simulation.Actions pickup action resolves stack template from content", PickupActionResolvesStackTemplateFromContent);
         registry.Add("Simulation.Actions pickup auto-equips strict upgrades only when enabled", PickupAutoEquipsStrictUpgradesOnlyWhenEnabled);
         registry.Add("Simulation.Actions pickup auto-equip respects requirements", PickupAutoEquipRespectsRequirements);
         registry.Add("Simulation.Actions use item heals and consumes potion", UseItemHealsAndConsumes);
@@ -46,6 +48,26 @@ public sealed class ActionTests : ITestSuite
 
         Expect.Equal(ActionResult.Success, outcome.Result, "Move action should succeed on open floor");
         Expect.Equal(new Position(2, 1), actor.Position, "Move action should update the actor position");
+    }
+
+    private static void MoveActionSwapsNeutralNpcs()
+    {
+        var world = CreateWorld();
+        var player = CreateActor("Player", new Position(1, 1), Faction.Player);
+        var npc = new Entity("Guide", new Position(2, 1), new Stats { HP = 1, MaxHP = 1, Attack = 0, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 100 }, Faction.Neutral);
+        npc.SetComponent(new NpcComponent { TemplateId = "guide", Role = "advisor", DialogueId = "guide_intro" });
+
+        world.Player = player;
+        world.AddEntity(player);
+        world.AddEntity(npc);
+
+        var outcome = new MoveAction(player.Id, new Position(1, 0)).Execute(world);
+
+        Expect.Equal(ActionResult.Success, outcome.Result, "Moving into a neutral NPC should execute the validated swap.");
+        Expect.Equal(new Position(2, 1), player.Position, "Player should move into the NPC's previous tile.");
+        Expect.Equal(new Position(1, 1), npc.Position, "NPC should move into the player's previous tile.");
+        Expect.Equal(player.Id, world.GetEntityAt(new Position(2, 1))?.Id ?? EntityId.Invalid, "Position index should track the swapped player.");
+        Expect.Equal(npc.Id, world.GetEntityAt(new Position(1, 1))?.Id ?? EntityId.Invalid, "Position index should track the swapped NPC.");
     }
 
     private static void MoveActionRejectsWallsAndBlockers()
@@ -194,6 +216,28 @@ public sealed class ActionTests : ITestSuite
         Expect.Equal(1, inventory.Items.Count, "Merging a pickup should avoid creating a second stack.");
         Expect.Equal(3, inventory.Items[0].StackCount, "The carried stack should absorb the picked-up item.");
         Expect.False(world.HasGroundItems(actor.Position), "Merged pickups should remove the source item from the ground.");
+    }
+
+    private static void PickupActionResolvesStackTemplateFromContent()
+    {
+        var world = CreateWorld();
+        world.ContentDatabase = new StubContentDatabase();
+        var actor = CreateActor("Player", new Position(1, 1), Faction.Player);
+        var inventory = new InventoryComponent(1);
+        inventory.Add(new ItemInstance { TemplateId = "potion_health", StackCount = 2, IsIdentified = true });
+        actor.SetComponent(inventory);
+
+        world.Player = actor;
+        world.AddEntity(actor);
+        world.DropItem(actor.Position, new ItemInstance { TemplateId = "potion_health", StackCount = 1, IsIdentified = true });
+
+        var action = new PickupAction(actor.Id);
+        var outcome = action.Execute(world);
+
+        Expect.Equal(ActionResult.Success, outcome.Result, "Pickup should resolve stack metadata from world content without a caller-supplied template.");
+        Expect.Equal(1, inventory.Items.Count, "Resolved stack pickups should avoid creating a second stack.");
+        Expect.Equal(3, inventory.Items[0].StackCount, "Resolved stack pickups should merge into the carried stack.");
+        Expect.False(world.HasGroundItems(actor.Position), "Merged content-resolved pickups should remove the source ground item.");
     }
 
     private static void UseItemHealsAndConsumes()
