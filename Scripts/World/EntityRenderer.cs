@@ -292,7 +292,6 @@ public sealed class EntityRenderer
         return new AtlasTexture
         {
             Atlas = texture,
-            ResourcePath = texture.ResourcePath,
             Region = new Rect2(new Vector2(0f, 8f), new Vector2(16f, 20f)),
         };
     }

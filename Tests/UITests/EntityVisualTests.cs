@@ -81,7 +81,7 @@ public sealed class EntityVisualTests : ITestSuite
         var updatedTexture = (Texture2D)updatedBody.Texture!;
         var updatedModulate = updatedBody.Modulate;
 
-        Expect.False(initialTexture.ResourcePath == updatedTexture.ResourcePath,
+        Expect.False(GetTextureSourcePath(initialTexture) == GetTextureSourcePath(updatedTexture),
             "Updating the identity component should refresh the base portrait selection.");
         Expect.True(initialModulate.R != updatedModulate.R || initialModulate.G != updatedModulate.G || initialModulate.B != updatedModulate.B,
             "Updating the identity component should refresh the body tint even without extra world overlays.");
@@ -120,7 +120,7 @@ public sealed class EntityVisualTests : ITestSuite
 
         var vanguardSprite = (Texture2D)vanguardTexture!;
         var skirmisherSprite = (Texture2D)skirmisherTexture!;
-        Expect.False(vanguardSprite.ResourcePath == skirmisherSprite.ResourcePath,
+        Expect.False(GetTextureSourcePath(vanguardSprite) == GetTextureSourcePath(skirmisherSprite),
             "Different builds should no longer share the same base portrait file.");
     }
 
@@ -186,6 +186,15 @@ public sealed class EntityVisualTests : ITestSuite
             "Cropped tall portraits should sit lower in the tile so the sprite clears the north wall lip in gameplay.");
         Expect.Equal(1.4f, body.Scale.Y,
             "Cropped tall portraits should scale to the tighter gameplay height budget so they no longer clip into the top wall.");
+        Expect.True(string.IsNullOrEmpty(atlas.ResourcePath),
+            "Runtime atlas wrappers should not claim the imported PNG resource path because Godot treats that as a duplicate loaded resource.");
+    }
+
+    private static string GetTextureSourcePath(Texture2D texture)
+    {
+        return texture is AtlasTexture { Atlas: Texture2D atlas }
+            ? atlas.ResourcePath
+            : texture.ResourcePath;
     }
 
     private static void EntityRendererHonorsBoundWorldVisibilityDuringStaleCacheUpdates()
