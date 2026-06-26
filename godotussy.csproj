@@ -6,12 +6,12 @@
     <LangVersion>12</LangVersion>
     <RootNamespace>Godotussy</RootNamespace>
     <AssemblyName>godotussy</AssemblyName>
-    <DisableImplicitGodotGeneratorReferences>true</DisableImplicitGodotGeneratorReferences>
-    <DisableImplicitGodotSharpReferences>true</DisableImplicitGodotSharpReferences>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(UseGodotStubs)' == 'true'">
     <OutputPath>bin\godotstubs\$(Configuration)\$(TargetFramework)\</OutputPath>
+    <DisableImplicitGodotGeneratorReferences>true</DisableImplicitGodotGeneratorReferences>
+    <DisableImplicitGodotSharpReferences>true</DisableImplicitGodotSharpReferences>
   </PropertyGroup>
 
   <ItemGroup>
@@ -25,11 +25,6 @@
   <ItemGroup Condition="'$(UseGodotStubs)' == 'true'">
     <Compile Include="Addons\roguelike_tools\RoguelikeToolsPlugin.cs" />
     <Compile Include="Compat\Godot\GodotStubs.cs" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(UseGodotStubs)' != 'true'">
-    <PackageReference Include="Godot.SourceGenerators" Version="4.4.1" PrivateAssets="all" />
-    <PackageReference Include="GodotSharp" Version="4.4.1" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(RenderingValidation)' == 'true'">
