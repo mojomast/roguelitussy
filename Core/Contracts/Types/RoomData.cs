@@ -5,4 +5,5 @@ public sealed record RoomData(
     int Y,
     int Width,
     int Height,
-    Position Center);
+    Position Center,
+    IReadOnlyList<string>? Tags = null);

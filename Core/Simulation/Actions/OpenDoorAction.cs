@@ -27,11 +27,23 @@ public sealed class OpenDoorAction : IAction
             return ActionResult.Invalid;
         }
 
-        return world.GetTile(DoorPosition) == TileType.Door
-            && !mutableWorld.IsDoorOpen(DoorPosition)
-            && world.GetEntityAt(DoorPosition) is null
-            ? ActionResult.Success
-            : ActionResult.Blocked;
+        var tile = world.GetTile(DoorPosition);
+        if (tile == TileType.Door)
+        {
+            return !mutableWorld.IsDoorOpen(DoorPosition) && world.GetEntityAt(DoorPosition) is null
+                ? ActionResult.Success
+                : ActionResult.Blocked;
+        }
+
+        if (tile == TileType.LockedDoor)
+        {
+            var inventory = actor.GetComponent<InventoryComponent>();
+            return inventory is not null && inventory.Items.Any(item => item.TemplateId == "dungeon_key")
+                ? ActionResult.Success
+                : ActionResult.Blocked;
+        }
+
+        return ActionResult.Blocked;
     }
 
     public ActionOutcome Execute(WorldState world)
@@ -44,6 +56,19 @@ public sealed class OpenDoorAction : IAction
 
         var actor = world.GetEntity(ActorId)!;
         var from = actor.Position;
+        var tile = world.GetTile(DoorPosition);
+
+        if (tile == TileType.LockedDoor)
+        {
+            var inventory = actor.GetComponent<InventoryComponent>();
+            if (inventory is null || !inventory.TryConsumeOne("dungeon_key", out _))
+            {
+                return ActionOutcome.Fail(ActionResult.Blocked);
+            }
+
+            world.SetTile(DoorPosition, TileType.Door);
+        }
+
         var destination = ResolveDestination(world, from, DoorPosition);
 
         world.SetDoorOpen(DoorPosition, true);

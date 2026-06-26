@@ -25,6 +25,8 @@ public sealed class ActionOutcome
 
     public List<Position> DirtyPositions { get; init; } = new();
 
+    public List<(EntityId EntityId, StatusEffectType EffectType)> ExpiredStatusEffects { get; init; } = new();
+
     public static ActionOutcome Fail(ActionResult reason) => new() { Result = reason };
 
     public static ActionOutcome Ok() => new() { Result = ActionResult.Success };

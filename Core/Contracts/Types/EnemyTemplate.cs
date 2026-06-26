@@ -11,4 +11,7 @@ public sealed record EnemyTemplate(
     int MaxDepth,
     int SpawnWeight,
     string? LootTableId,
-    int XpValue);
+    int GoldMin,
+    int GoldMax,
+    int XpValue,
+    AIParameters AIParameters);

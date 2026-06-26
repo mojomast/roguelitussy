@@ -173,7 +173,7 @@ public partial class LevelUpOverlay : Control
             var marker = index == _selectedIndex ? ">>" : "  ";
             var emphasisOpen = index == _selectedIndex ? "[b]" : string.Empty;
             var emphasisClose = index == _selectedIndex ? "[/b]" : string.Empty;
-            builder.AppendLine($"{emphasisOpen}{ItemRarityPresentation.EscapeBBCode($"{marker} {choices[index].DisplayName}")}{emphasisClose} [i]{ItemRarityPresentation.EscapeBBCode($"(Lv {choices[index].UnlockLevel})") }[/i]");
+            builder.AppendLine($"{emphasisOpen}{ItemRarityPresentation.EscapeBBCode($"{marker} {choices[index].DisplayName}")}{emphasisClose} [i]{ItemRarityPresentation.EscapeBBCode($"(Lv {choices[index].UnlockLevel})")}[/i]");
         }
 
         builder.AppendLine();
@@ -188,7 +188,7 @@ public partial class LevelUpOverlay : Control
         }
 
         builder.AppendLine();
-        builder.Append($"[i]{ItemRarityPresentation.EscapeBBCode("Up/Down: choose    Enter/Right: confirm") }[/i]");
+        builder.Append($"[i]{ItemRarityPresentation.EscapeBBCode("Up/Down: choose    Enter/Right: confirm")}[/i]");
         return builder.ToString().TrimEnd();
     }
 

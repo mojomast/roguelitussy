@@ -18,11 +18,13 @@ public sealed class EntityRenderer
     private readonly HashSet<Position> _visibleTiles = new();
     private Node2D _layer;
     private IWorldState? _world;
+    private IContentDatabase? _content;
 
-    public EntityRenderer(Node2D? layer = null, AnimationController? animationController = null)
+    public EntityRenderer(Node2D? layer = null, AnimationController? animationController = null, IContentDatabase? content = null)
     {
         _layer = layer ?? new Node2D { Name = "EntityLayer" };
         _animationController = animationController ?? new AnimationController();
+        _content = content;
     }
 
     public Node2D Layer => _layer;
@@ -39,6 +41,11 @@ public sealed class EntityRenderer
     public void BindWorld(IWorldState world)
     {
         _world = world;
+        if (world is WorldState mutableWorld)
+        {
+            _content = mutableWorld.ContentDatabase;
+        }
+
         SyncEntities(world.Entities);
     }
 
@@ -71,6 +78,7 @@ public sealed class EntityRenderer
 
         var root = spriteRoot!;
         ApplyAppearance(entity, root);
+        SyncStatusOverlays(entity, root);
         if (!isExisting || !_animationController.IsMoveAnimating(entity.Id))
         {
             root.Position = WorldView.ToCanvasPosition(entity.Position);
@@ -79,6 +87,142 @@ public sealed class EntityRenderer
         root.Modulate = Colors.White;
         _lastKnownPositions[entity.Id] = entity.Position;
     }
+
+    public void RefreshStatusOverlays(EntityId entityId)
+    {
+        var entity = _world?.GetEntity(entityId);
+        if (entity is null || !_sprites.TryGetValue(entityId, out var spriteRoot))
+        {
+            return;
+        }
+
+        SyncStatusOverlays(entity, spriteRoot);
+    }
+
+    private void SyncStatusOverlays(IEntity entity, Node2D spriteRoot)
+    {
+        var container = GetOrCreateChild<Node2D>(spriteRoot, "StatusOverlay");
+        var effectsComponent = entity.GetComponent<StatusEffectsComponent>();
+        var effects = effectsComponent?.Effects ?? Array.Empty<StatusEffectInstance>();
+        var desired = new Dictionary<string, StatusEffectInstance>();
+        foreach (var effect in effects)
+        {
+            var statusId = StatusEffectIdFromType(effect.Type);
+            if (!string.IsNullOrWhiteSpace(statusId))
+            {
+                desired[statusId] = effect;
+            }
+        }
+
+        foreach (var child in container.GetChildren().ToArray())
+        {
+            if (child is not Sprite2D sprite || string.IsNullOrWhiteSpace(sprite.Name))
+            {
+                continue;
+            }
+
+            if (!desired.ContainsKey(sprite.Name.ToString()))
+            {
+                container.RemoveChild(sprite);
+                sprite.QueueFree();
+            }
+        }
+
+        var index = 0;
+        foreach (var (statusId, effect) in desired)
+        {
+            if (_content?.TryGetStatusEffect(statusId, out var definition) != true || definition is null)
+            {
+                continue;
+            }
+
+            var icon = GetOrCreateChild<Sprite2D>(container, statusId);
+            icon.Texture = LoadStatusIcon(definition.IconPath);
+            icon.Modulate = ParseTint(definition.ColorTint);
+            icon.Position = new Vector2(index * 10f, -6f);
+            icon.Scale = new Vector2(0.5f, 0.5f);
+            icon.ZIndex = 10;
+            index++;
+        }
+    }
+
+    private static Texture2D? LoadStatusIcon(string iconPath)
+    {
+        if (string.IsNullOrWhiteSpace(iconPath))
+        {
+            return null;
+        }
+
+        try
+        {
+            return GD.Load<Texture2D>(iconPath);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static Color ParseTint(string colorTint)
+    {
+        if (string.IsNullOrWhiteSpace(colorTint))
+        {
+            return Colors.White;
+        }
+
+        var parsed = ParseHtmlColor(colorTint);
+        return parsed ?? Colors.White;
+    }
+
+    private static Color? ParseHtmlColor(string value)
+    {
+        var span = value.AsSpan().Trim();
+        if (span.Length > 0 && span[0] == '#')
+        {
+            span = span[1..];
+        }
+
+        if (span.Length == 6 && TryParseHexByte(span[..2], out var r6) && TryParseHexByte(span[2..4], out var g6) && TryParseHexByte(span[4..6], out var b6))
+        {
+            return new Color(r6 / 255f, g6 / 255f, b6 / 255f, 1f);
+        }
+
+        if (span.Length == 8 && TryParseHexByte(span[..2], out var r8) && TryParseHexByte(span[2..4], out var g8) && TryParseHexByte(span[4..6], out var b8) && TryParseHexByte(span[6..8], out var a8))
+        {
+            return new Color(r8 / 255f, g8 / 255f, b8 / 255f, a8 / 255f);
+        }
+
+        return null;
+    }
+
+    private static bool TryParseHexByte(ReadOnlySpan<char> chars, out byte value)
+    {
+        value = 0;
+        if (chars.Length != 2)
+        {
+            return false;
+        }
+
+        return byte.TryParse(chars, System.Globalization.NumberStyles.HexNumber, null, out value);
+    }
+
+    private static string? StatusEffectIdFromType(StatusEffectType type) => type switch
+    {
+        StatusEffectType.Poisoned => "poisoned",
+        StatusEffectType.Burning => "burning",
+        StatusEffectType.Frozen => "frozen",
+        StatusEffectType.Stunned => "stunned",
+        StatusEffectType.Hasted => "haste",
+        StatusEffectType.Invisible => null,
+        StatusEffectType.Regenerating => "regenerating",
+        StatusEffectType.Weakened => "weakened",
+        StatusEffectType.Shielded => "shielded",
+        StatusEffectType.Empowered => "empowered",
+        StatusEffectType.Corroded => "corroded",
+        StatusEffectType.Phased => "phased",
+        StatusEffectType.Flying => "flying",
+        _ => null,
+    };
 
     public void AnimateMove(EntityId entityId, Position targetPosition)
     {

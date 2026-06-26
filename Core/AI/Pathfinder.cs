@@ -5,7 +5,7 @@ namespace Roguelike.Core;
 
 public sealed class Pathfinder : IPathfinder
 {
-    public IReadOnlyList<Position> FindPath(Position start, Position goal, IWorldState world, int maxLength = 50)
+    public IReadOnlyList<Position> FindPath(Position start, Position goal, IWorldState world, int maxLength = 50, bool phaseThroughWalls = false)
     {
         if (maxLength < 0 || !world.InBounds(start) || !world.InBounds(goal))
         {
@@ -31,7 +31,7 @@ public sealed class Pathfinder : IPathfinder
                 return ReconstructPath(cameFrom, current);
             }
 
-            foreach (var neighbor in GetNeighbors(current, goal, world))
+            foreach (var neighbor in GetNeighbors(current, goal, world, phaseThroughWalls))
             {
                 var nextCost = costs[current] + 1;
                 if (nextCost > maxLength)
@@ -53,12 +53,12 @@ public sealed class Pathfinder : IPathfinder
         return Array.Empty<Position>();
     }
 
-    public bool HasPath(Position start, Position goal, IWorldState world, int maxLength = 50)
+    public bool HasPath(Position start, Position goal, IWorldState world, int maxLength = 50, bool phaseThroughWalls = false)
     {
-        return start == goal || FindPath(start, goal, world, maxLength).Count > 0;
+        return start == goal || FindPath(start, goal, world, maxLength, phaseThroughWalls).Count > 0;
     }
 
-    public IReadOnlyDictionary<Position, int> GetReachable(Position origin, int range, IWorldState world)
+    public IReadOnlyDictionary<Position, int> GetReachable(Position origin, int range, IWorldState world, bool phaseThroughWalls = false)
     {
         var reachable = new Dictionary<Position, int>();
         if (range < 0 || !world.InBounds(origin))
@@ -79,7 +79,7 @@ public sealed class Pathfinder : IPathfinder
                 continue;
             }
 
-            foreach (var neighbor in GetNeighbors(current, Position.Invalid, world))
+            foreach (var neighbor in GetNeighbors(current, Position.Invalid, world, phaseThroughWalls))
             {
                 if (reachable.ContainsKey(neighbor))
                 {
@@ -94,12 +94,12 @@ public sealed class Pathfinder : IPathfinder
         return reachable;
     }
 
-    private static IEnumerable<Position> GetNeighbors(Position current, Position goal, IWorldState world)
+    private static IEnumerable<Position> GetNeighbors(Position current, Position goal, IWorldState world, bool phaseThroughWalls)
     {
         foreach (var delta in Position.AllDirections)
         {
             var next = current + delta;
-            if (!IsTraversable(next, goal, world))
+            if (!IsTraversable(next, goal, world, phaseThroughWalls))
             {
                 continue;
             }
@@ -108,7 +108,7 @@ public sealed class Pathfinder : IPathfinder
             {
                 var adjacentX = current.Offset(delta.X, 0);
                 var adjacentY = current.Offset(0, delta.Y);
-                if (!IsTraversable(adjacentX, goal, world) && !IsTraversable(adjacentY, goal, world))
+                if (!IsTraversable(adjacentX, goal, world, phaseThroughWalls) && !IsTraversable(adjacentY, goal, world, phaseThroughWalls))
                 {
                     continue;
                 }
@@ -118,21 +118,21 @@ public sealed class Pathfinder : IPathfinder
         }
     }
 
-    private static bool IsTraversable(Position pos, Position goal, IWorldState world)
+    private static bool IsTraversable(Position pos, Position goal, IWorldState world, bool phaseThroughWalls)
     {
         if (!world.InBounds(pos))
         {
             return false;
         }
 
-        if (world.IsWalkable(pos))
+        if (phaseThroughWalls || world.IsWalkable(pos))
         {
             return true;
         }
 
         if (goal != Position.Invalid && pos == goal && world.GetEntityAt(pos) is not null)
         {
-            return world.GetTile(pos) is TileType.Floor or TileType.StairsDown or TileType.StairsUp;
+            return world.GetTile(pos) is TileType.Floor or TileType.StairsDown or TileType.StairsUp or TileType.Trap;
         }
 
         return false;

@@ -197,6 +197,30 @@
       "color_tint": "#88CCFF88"
     },
     {
+      "id": "shielded",
+      "name": "Shielded",
+      "description": "A protective barrier increases defense.",
+      "icon_path": "res://Assets/Sprites/ui/status_shield.svg",
+      "duration_type": "turns",
+      "default_duration": 3,
+      "stackable": true,
+      "max_stacks": 3,
+      "refreshable": true,
+      "tick_timing": "none",
+      "tick_effects": [],
+      "stat_modifiers": [
+        {
+          "stat": "defense",
+          "operation": "add",
+          "value": 3
+        }
+      ],
+      "flags": [],
+      "on_apply_effects": [],
+      "on_expire_effects": [],
+      "color_tint": "#4488FF88"
+    },
+    {
       "id": "phased",
       "name": "Phased",
       "description": "Incorporeal. Can move through walls.",

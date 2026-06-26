@@ -143,10 +143,10 @@ public partial class GameManager : Node
 
         public IEntity? GetNextActor() => _consumed || _world is null ? null : _world.GetEntity(_actorId);
 
-        public void ConsumeEnergy(EntityId actorId, int cost)
+        public StatusTickResult? ConsumeEnergy(EntityId actorId, int cost)
         {
             _consumed = true;
-            _inner.ConsumeEnergy(actorId, cost);
+            return _inner.ConsumeEnergy(actorId, cost);
         }
 
         public void EndRound(WorldState world)
@@ -158,6 +158,16 @@ public partial class GameManager : Node
         public void Register(IEntity entity) => _inner.Register(entity);
 
         public void Unregister(EntityId id) => _inner.Unregister(id);
+
+        public int GetOrder(EntityId actorId) => _inner.GetOrder(actorId);
+
+        public int NextOrder
+        {
+            get => _inner.NextOrder;
+            set => _inner.NextOrder = value;
+        }
+
+        public void AttachWorld(WorldState world) => _inner.AttachWorld(world);
     }
 
     private sealed class NextActorScheduler : ITurnScheduler
@@ -192,10 +202,10 @@ public partial class GameManager : Node
 
         public IEntity? GetNextActor() => _consumed ? null : _nextActor;
 
-        public void ConsumeEnergy(EntityId actorId, int cost)
+        public StatusTickResult? ConsumeEnergy(EntityId actorId, int cost)
         {
             _consumed = true;
-            _inner.ConsumeEnergy(actorId, cost);
+            return _inner.ConsumeEnergy(actorId, cost);
         }
 
         public void EndRound(WorldState world)
@@ -207,6 +217,16 @@ public partial class GameManager : Node
         public void Register(IEntity entity) => _inner.Register(entity);
 
         public void Unregister(EntityId id) => _inner.Unregister(id);
+
+        public int GetOrder(EntityId actorId) => _inner.GetOrder(actorId);
+
+        public int NextOrder
+        {
+            get => _inner.NextOrder;
+            set => _inner.NextOrder = value;
+        }
+
+        public void AttachWorld(WorldState world) => _inner.AttachWorld(world);
     }
 
     private readonly GameLoop _gameLoop = new();
@@ -340,7 +360,7 @@ public partial class GameManager : Node
         }
 
         CurrentState = GameState.Loading;
-        var snapshot = SaveManager.LoadRun(slot).GetAwaiter().GetResult();
+        var snapshot = SaveManager.LoadRun(slot, Content).GetAwaiter().GetResult();
         if (snapshot is null)
         {
             CurrentState = GameState.MainMenu;
@@ -350,6 +370,26 @@ public partial class GameManager : Node
         }
 
         WarnIfContentMetadataDiffers(slot);
+
+        var savedOptions = snapshot.CharacterOptions;
+        CharacterOptions = new CharacterCreationOptions(
+            savedOptions.Name,
+            savedOptions.Archetype,
+            savedOptions.Origin,
+            savedOptions.Trait,
+            savedOptions.BonusMaxHp,
+            savedOptions.BonusAttack,
+            savedOptions.BonusDefense,
+            savedOptions.BonusAccuracy,
+            savedOptions.BonusEvasion,
+            savedOptions.BonusSpeed,
+            savedOptions.BonusViewRadius,
+            savedOptions.InventoryCapacityBonus,
+            savedOptions.StartingItemTemplateIds,
+            savedOptions.EquippedItemTemplateIds,
+            savedOptions.RaceId,
+            savedOptions.GenderId,
+            savedOptions.AppearanceId);
 
         Seed = snapshot.Seed;
         _cachedFloors.Clear();
@@ -401,12 +441,56 @@ public partial class GameManager : Node
             throw new InvalidOperationException("No active world is available to save.");
         }
 
+        SyncSchedulerStateToWorld(World);
+
         var floors = new Dictionary<int, WorldState>(_cachedFloors)
         {
             [CurrentFloor] = World,
         };
 
-        return new SaveRunSnapshot(Seed, CurrentFloor, World, floors);
+        var options = CharacterOptions;
+        var characterOptions = new CharacterOptionsSaveData
+        {
+            Name = options.Name,
+            Archetype = options.Archetype,
+            Origin = options.Origin,
+            Trait = options.Trait,
+            RaceId = options.RaceId,
+            GenderId = options.GenderId,
+            AppearanceId = options.AppearanceId,
+            BonusMaxHp = options.BonusMaxHp,
+            BonusAttack = options.BonusAttack,
+            BonusDefense = options.BonusDefense,
+            BonusAccuracy = options.BonusAccuracy,
+            BonusEvasion = options.BonusEvasion,
+            BonusSpeed = options.BonusSpeed,
+            BonusViewRadius = options.BonusViewRadius,
+            InventoryCapacityBonus = options.InventoryCapacityBonus,
+            StartingItemTemplateIds = new List<string>(options.StartingItemTemplateIds),
+            EquippedItemTemplateIds = new List<string>(options.EquippedItemTemplateIds),
+        };
+
+        return new SaveRunSnapshot(Seed, CurrentFloor, World, floors, characterOptions);
+    }
+
+    private void SyncSchedulerStateToWorld(WorldState world)
+    {
+        if (Scheduler is null)
+        {
+            return;
+        }
+
+        world.SchedulerOrders.Clear();
+        foreach (var entity in world.Entities)
+        {
+            var order = Scheduler.GetOrder(entity.Id);
+            if (order != 0)
+            {
+                world.SchedulerOrders[entity.Id] = order;
+            }
+        }
+
+        world.SchedulerNextOrder = Scheduler.NextOrder;
     }
 
     public bool SetMapReveal(bool revealAll)
@@ -548,7 +632,13 @@ public partial class GameManager : Node
         World = world;
         CurrentFloor = world.Depth;
         CurrentState = GameState.Playing;
+        Scheduler?.AttachWorld(world);
         RegisterWorldEntities(world);
+        if (Scheduler is not null)
+        {
+            Scheduler.NextOrder = world.SchedulerNextOrder;
+        }
+
         RecalculatePlayerVisibility(world);
         Bus?.EmitLevelGenerated(world.Depth, world.Width, world.Height);
         Bus?.EmitFloorChanged(CurrentFloor);
@@ -780,6 +870,7 @@ public partial class GameManager : Node
         var inventoryBefore = SnapshotInventory(actorBefore?.GetComponent<InventoryComponent>());
         var equipmentBefore = SnapshotEquipment(actorBefore?.GetComponent<InventoryComponent>());
         var progressionBefore = SnapshotProgression(actorBefore);
+        var walletBefore = SnapshotWallet(actorBefore);
 
         Bus?.EmitTurnStarted(World.TurnNumber + 1);
 
@@ -831,8 +922,16 @@ public partial class GameManager : Node
 
             foreach (var effect in combatEvent.StatusEffectsApplied)
             {
-                Bus?.EmitStatusEffectApplied(action.ActorId, effect);
+                var affectedId = combatEvent.AffectedTargetId.IsValid
+                    ? combatEvent.AffectedTargetId
+                    : action.ActorId;
+                Bus?.EmitStatusEffectApplied(affectedId, effect);
             }
+        }
+
+        foreach (var (entityId, effectType) in outcome.ExpiredStatusEffects)
+        {
+            Bus?.EmitStatusEffectRemoved(entityId, effectType);
         }
 
         var changedFloor = false;
@@ -851,6 +950,7 @@ public partial class GameManager : Node
             RecalculatePlayerVisibility(World);
             EmitStateDelta(action, actorPositionBefore, entityPositionsBefore, inventoryBefore, equipmentBefore, outcome.DirtyPositions, playerId);
             EmitProgressionChanges(playerId, progressionBefore);
+            EmitWalletChanges(playerId, walletBefore);
         }
 
         foreach (var message in outcome.LogMessages)
@@ -882,6 +982,7 @@ public partial class GameManager : Node
             Bus.PlayerActionSubmitted -= OnPlayerActionSubmitted;
             Bus.SaveRequested -= OnSaveRequested;
             Bus.LoadRequested -= OnLoadRequested;
+            HazardProcessor.TrapTriggered -= OnTrapTriggered;
         }
 
         Bus = eventBus;
@@ -893,6 +994,42 @@ public partial class GameManager : Node
         Bus.PlayerActionSubmitted += OnPlayerActionSubmitted;
         Bus.SaveRequested += OnSaveRequested;
         Bus.LoadRequested += OnLoadRequested;
+        HazardProcessor.TrapTriggered += OnTrapTriggered;
+    }
+
+    private void OnTrapTriggered(EntityId victimId, string trapTemplateId)
+    {
+        if (World is null || Bus is null)
+        {
+            return;
+        }
+
+        var victim = World.GetEntity(victimId);
+        if (victim is null)
+        {
+            return;
+        }
+
+        var trapEntity = World.Entities.FirstOrDefault(e =>
+            e.Position == victim.Position &&
+            e.GetComponent<TrapComponent>() is { } tc &&
+            tc.TemplateId == trapTemplateId);
+        var trapComponent = trapEntity?.GetComponent<TrapComponent>();
+        var damage = 0;
+        var statusEffect = string.Empty;
+        if (Content?.TryGetTrapTemplate(trapTemplateId, out var template) == true)
+        {
+            damage = template.DamageMax;
+            statusEffect = template.StatusEffect ?? string.Empty;
+        }
+
+        Bus.EmitTrapTriggered(new TrapTriggeredEventArgs(
+            victimId,
+            victim.Position,
+            trapTemplateId,
+            damage,
+            statusEffect,
+            trapComponent?.IsArmed == false));
     }
 
     private void OnPlayerActionSubmitted(IAction action)
@@ -953,9 +1090,9 @@ public partial class GameManager : Node
 
         public System.Threading.Tasks.Task<bool> SaveRun(SaveRunSnapshot snapshot, int slotIndex) => System.Threading.Tasks.Task.FromResult(false);
 
-        public System.Threading.Tasks.Task<WorldState?> LoadGame(int slotIndex) => System.Threading.Tasks.Task.FromResult<WorldState?>(null);
+        public System.Threading.Tasks.Task<WorldState?> LoadGame(int slotIndex, IContentDatabase? content = null) => System.Threading.Tasks.Task.FromResult<WorldState?>(null);
 
-        public System.Threading.Tasks.Task<SaveRunSnapshot?> LoadRun(int slotIndex) => System.Threading.Tasks.Task.FromResult<SaveRunSnapshot?>(null);
+        public System.Threading.Tasks.Task<SaveRunSnapshot?> LoadRun(int slotIndex, IContentDatabase? content = null) => System.Threading.Tasks.Task.FromResult<SaveRunSnapshot?>(null);
 
         public bool HasSave(int slotIndex) => false;
 
@@ -1054,6 +1191,75 @@ public partial class GameManager : Node
 
         SpawnAuthoredNpcs(world, level.NpcSpawns ?? Array.Empty<NpcSpawnData>());
         SpawnNpcs(world, rng);
+        SpawnTraps(world, level, rng);
+        SpawnKeys(world, level, rng);
+    }
+
+    private void SpawnKeys(WorldState world, LevelData level, Random rng)
+    {
+        var keySpawns = level.KeySpawns ?? Array.Empty<Position>();
+        foreach (var position in keySpawns)
+        {
+            if (!world.InBounds(position))
+            {
+                continue;
+            }
+
+            if (Content is null || !Content.TryGetItemTemplate("dungeon_key", out var template))
+            {
+                continue;
+            }
+
+            var key = new ItemInstance
+            {
+                InstanceId = EntityId.NewSeeded(rng),
+                TemplateId = template.TemplateId,
+                StackCount = 1,
+                IsIdentified = true,
+            };
+
+            world.DropItem(position, key);
+        }
+    }
+
+    private void SpawnTraps(WorldState world, LevelData level, Random rng)
+    {
+        var trapSpawns = level.TrapSpawnDetails ?? Array.Empty<TrapSpawnData>();
+        foreach (var spawn in trapSpawns)
+        {
+            if (!world.InBounds(spawn.Position))
+            {
+                continue;
+            }
+
+            var templateId = spawn.TrapId;
+            if (string.IsNullOrWhiteSpace(templateId) || Content is null || !Content.TryGetTrapTemplate(templateId, out var template))
+            {
+                continue;
+            }
+
+            world.SetTile(spawn.Position, TileType.Trap);
+            world.AddEntity(CreateTrapEntity(template, spawn.Position, rng));
+        }
+    }
+
+    private Entity CreateTrapEntity(TrapTemplate template, Position spawn, Random rng)
+    {
+        var trap = new Entity(
+            template.DisplayName,
+            spawn,
+            new Stats { HP = 1, MaxHP = 1, Attack = 0, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 0, ViewRadius = 0 },
+            Faction.Neutral,
+            blocksMovement: false,
+            blocksSight: false,
+            id: EntityId.NewSeeded(rng));
+        trap.SetComponent(new TrapComponent
+        {
+            TemplateId = template.TemplateId,
+            IsArmed = true,
+            IsRevealed = false,
+        });
+        return trap;
     }
 
     private static void AttachAbilities(Entity enemy, EnemyTemplate template, IContentDatabase content)
@@ -1098,6 +1304,7 @@ public partial class GameManager : Node
             id: EntityId.NewSeeded(rng));
         enemy.SetComponent<IBrain>(BrainFactory.Create(template));
         enemy.SetComponent(new XpValueComponent { Value = template.XpValue });
+        enemy.SetComponent(new EnemyComponent { TemplateId = template.TemplateId });
         AttachAbilities(enemy, template, Content!);
         return enemy;
     }
@@ -1837,6 +2044,26 @@ public partial class GameManager : Node
         {
             Bus.EmitProgressionChanged(playerId);
         }
+    }
+
+    private static int SnapshotWallet(IEntity? entity) =>
+        entity?.GetComponent<WalletComponent>()?.Gold ?? 0;
+
+    private void EmitWalletChanges(EntityId playerId, int goldBefore)
+    {
+        if (World is null || Bus is null)
+        {
+            return;
+        }
+
+        var player = World.GetEntity(playerId);
+        var wallet = player?.GetComponent<WalletComponent>();
+        if (wallet is null || wallet.Gold == goldBefore)
+        {
+            return;
+        }
+
+        Bus.EmitCurrencyChanged(playerId, wallet.Gold);
     }
 
     private static HashSet<EntityId> SnapshotInventory(InventoryComponent? inventory)

@@ -24,6 +24,15 @@ public static class Expect
         }
     }
 
+    public static void NotEqual<T>(T expected, T actual, string message)
+        where T : notnull
+    {
+        if (EqualityComparer<T>.Default.Equals(expected, actual))
+        {
+            throw new InvalidOperationException($"{message}. Expected values to differ but both were: {actual}.");
+        }
+    }
+
     public static void NotNull<T>(T? value, string message)
         where T : class
     {

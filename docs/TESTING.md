@@ -47,6 +47,20 @@ The rendering profile defines `RENDERING_VALIDATION`, excludes `Core/Persistence
 
 Do not run the full harness and rendering-validation harness in parallel from the same checkout. They use different build profiles for the Godot-facing project and should be run sequentially to avoid shared output races.
 
+## Continuous Integration Checks
+
+The repository workflow at `.github/workflows/ci.yml` runs on every push and pull request, and also supports `workflow_dispatch` plus a weekly Sunday schedule. The .NET job performs:
+
+- SDK pinning via `global.json` (`8.0.0` with `latestFeature` roll-forward).
+- NuGet package caching.
+- JSON syntax validation for all files under `Content/`.
+- `dotnet format --verify-no-changes godotussy.sln`.
+- `dotnet build godotussy.sln`.
+- The editorless stub build, test build, full harness, and rendering-validation profile.
+- Artifact upload of `bin/`, `obj/`, and Godot cache directories on failure.
+
+A second job downloads and caches Godot 4.4.1 Mono, runs a headless editor import, and runs a headless startup smoke test. The Godot version is centralized in a single workflow environment variable.
+
 ## Godot Headless Smoke
 
 CI also runs a real Godot 4.4.1 Mono headless check in addition to the editorless .NET stub profile.

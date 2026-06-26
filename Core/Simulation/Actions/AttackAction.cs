@@ -70,7 +70,7 @@ public sealed class AttackAction : IAction
 
         if (damage.IsMiss)
         {
-            outcome.CombatEvents.Add(new CombatEvent(world.TurnNumber, Type, new[] { damage }, System.Array.Empty<StatusEffectInstance>()));
+            outcome.CombatEvents.Add(new CombatEvent(world.TurnNumber, Type, new[] { damage }, System.Array.Empty<StatusEffectInstance>(), TargetId));
             outcome.LogMessages.Add(weaponName is not null
                 ? $"{actor.Name} swings {weaponName} at {target.Name} but misses."
                 : $"{actor.Name} misses {target.Name}.");
@@ -90,7 +90,7 @@ public sealed class AttackAction : IAction
             }
         }
 
-        outcome.CombatEvents.Add(new CombatEvent(world.TurnNumber, Type, new[] { damage }, statusEffectsApplied));
+        outcome.CombatEvents.Add(new CombatEvent(world.TurnNumber, Type, new[] { damage }, statusEffectsApplied, TargetId));
 
         if (damage.IsKill || target.Stats.HP <= 0)
         {
@@ -99,6 +99,7 @@ public sealed class AttackAction : IAction
             outcome.LogMessages.Add(weaponName is not null
                 ? $"{actor.Name} kills {target.Name} with {weaponName} for {damage.FinalDamage} damage."
                 : $"{actor.Name} kills {target.Name} for {damage.FinalDamage} damage.");
+            DeathResolver.AppendLootLogMessages(outcome.LogMessages, death);
             return outcome;
         }
 

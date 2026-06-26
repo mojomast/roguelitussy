@@ -59,6 +59,8 @@ Enemy decision-making lives in `Core/AI/`.
 - `BrainFactory` maps configured brain identifiers to concrete `IBrain` implementations.
 - Utility/state helpers live alongside the brains.
 - Brains use `IPathfinder` and world data to choose `IAction` instances.
+- Enemy `ai_params` from content now override the base `AIProfile` per template; recognized keys are `flee_hp_pct`, `aggro_range`, `wander_when_idle`, `preferred_range`, `min_range`, `patrol_radius`, `support_range`, and `phase_through_walls`.
+- Save/load rehydrates the brain from the persisted `EnemyComponent.TemplateId` through the content database, so authored `ai_params` survive after loading.
 
 Current built-in brain types include:
 
@@ -82,7 +84,7 @@ Combat is still resolved inside `Core/Simulation/CombatResolver.cs`, but it is n
 - `CastAbilityAction` performs targeting validation for self, single-target, tile, and area ability shapes before mutating world state.
 - Ability damage and status-chance rolls use the serialized combat RNG stream, so save/load continuation matches uninterrupted simulation for covered ability paths.
 - Harmful area damage/status effects default to enemy-only when `hits_allies` is false and no explicit effect filter is authored; explicit filters and `hits_allies: true` keep their broader behavior.
-- Kills from melee attacks, ability damage, and sourced poison/burning status ticks route through the shared `DeathResolver`, so XP, kill counts, level-up log messages, and entity removal stay aligned for those paths. Traps and future environmental deaths still need attribution work.
+- Kills from melee attacks, ability damage, sourced poison/burning status ticks, and trap hazards route through the shared `DeathResolver`, so XP, kill counts, level-up log messages, deterministic loot drops, gold awards, and entity removal stay aligned for those paths. Trap kills are currently unattributed (no XP/kill credit), matching environmental hazard design.
 
 The ability pipeline is shared by item casts and AI casts so the runtime rules stay in one place.
 
@@ -95,14 +97,13 @@ The current flow in `DungeonGenerator` is:
 1. Derive a repeatable attempt seed from the world seed, floor depth, and retry index.
 2. Initialize the map as walls.
 3. Build a BSP tree.
-4. Place rooms.
-5. Stitch them with corridors.
-6. Place stairs, enemies, and items.
-7. Validate the generated level with `LevelValidator`.
+4. Place rooms (prefab `^` tiles become `TileType.Trap`).
+5. Stitch rooms with corridors.
+6. Collect trap spawn details from `^` tiles and explicit `type: "trap"` spawn points.
+7. Place stairs, enemies, and items (trap positions are excluded from spawn rolls).
+8. Validate the generated level with `LevelValidator`, including trap reachability.
 
-Generation retries up to a fixed limit if a connected, valid layout is not produced.
-Generated chests use guaranteed chest loot tables, so chest rewards stay deterministic and content-authored instead of falling back to generic item placement.
-Opening a chest is currently atomic: the chest rolls deterministic loot, stows anything that fits in the opener's inventory, spills overflow to the floor, logs an explicit `Loot found:` summary, and removes the opened chest entity.
+Traps are walkable but hazardous stationary features. Authored trap definitions live in `Content/traps.json`; each room `trap_id` must reference a known trap. `LevelData` exposes `TrapSpawnDetails` so `GameManager.PopulateWorld` can instantiate trap entities.
 
 ## Rendering And UI Flow
 
@@ -124,8 +125,10 @@ Current presentation-specific behavior worth knowing:
 - `MenuBase` now renders menus as separate title, summary, options, and footer regions, and the title-screen-to-workshop handoff temporarily dismisses the main menu so overlays do not stack visually. Shared UI chrome uses a dark gothic stone/iron palette with gold trim, parchment text, and blood-red HP accents across menus, HUD, inventory, tooltips, combat log, character sheet, and minimap.
 - `MainMenu`, `PauseMenu`, `HelpOverlay`, and `CharacterSheet` now use clearer run/build/tool hierarchy, sectioned body text, and shared dungeon-console chrome so modal screens read as deliberate game surfaces instead of generic panels.
 - `InventoryUI` remains text-driven for low-risk stub testing, but uses stable category glyphs, rarity-colored item tokens, gold selected-slot framing, explicit equipped markers, full stack counts, contextual footers, stack/charge details, and multiline equipment comparisons for faster scanning.
+- Aimed scrolls (`scroll_fireball`, `scroll_blink`) are flagged `RequiresTargetSelection`; selecting one enters `TargetingOverlay` mode where directional keys move the cursor, Enter confirms, and Escape cancels. `WorldView` mirrors the cursor and AoE preview from EventBus events without mutating world state.
 - `Minimap` remains a non-modal gameplay overlay, but uses a darker framed map treatment with ember/gold player and stair cues and subdued etched explored/visible tile colors.
 - Long text-driven UI surfaces now window or clamp overflow: inventory pages beyond its visible grid, shop and dialog option lists keep the selected row visible with ellipses, and tooltip bodies cap long content instead of rendering beyond the panel.
+- Status effects are now visible in the HUD and on entity sprites. `EventBus.StatusEffectApplied` and `StatusEffectRemoved` drive immediate refreshes. `EntityRenderer` adds a `StatusOverlay` child per entity, populating it with `Sprite2D` icons looked up from `status_effects.json` `icon_path` and tinted with `color_tint`. `HUD` renders the same icons in a horizontal status badge row with remaining-turn labels.
 - `HelpOverlay` keeps its gameplay and title-screen guidance condensed enough to fit inside the menu shell on short viewports, instead of relying on off-screen overflow.
 - `DevToolsWorkbench` windows long mode summaries and action lists against the current viewport so the selected tool action, status line, and controls remain readable on shorter screens.
 
@@ -145,21 +148,33 @@ Persistence lives in `Core/Persistence/`.
 
 ### Current Save Version
 
-The current normalized save version is `8`.
+The current normalized save version is `12`.
 
 Notable details:
 
 - Explored and visible map flags are stored as packed bitfields.
-- Legacy version 1 through version 7 payloads are migrated on load.
+- Legacy version 1 through version 11 payloads are migrated on load.
 - Saves now persist the active floor plus cached inactive floors through a normalized floor list, while retaining active-floor root aliases for compatibility with metadata and existing tooling.
 - New saves include optional content metadata (`contentVersion` and a deterministic content hash) so load flows can warn when the authored JSON set differs from the one that created the save.
 - Multi-floor validation requires unique floor depths, an active floor payload, and exactly one player entity across all saved floors on the active floor.
-- Persistence tests cover malformed v8 floor payloads for missing active floors, duplicate player entities across floors, and duplicate floor depths; `GameManager` save/load coverage also exercises travel back to a cached inactive floor.
-- Progression, identity, inventory/equipment, wallet, NPC, merchant, chest, ability, cooldown, XP value, AI/template rehydration data, and status-effect source attribution round-trip through the normalized save shape where applicable.
-- `CombatRandomState` is persisted so combat RNG continues deterministically after load instead of restarting from only seed and turn number.
-- `ItemRandomState` is persisted so stack splitting and stack overflow clone IDs continue deterministically after save/load.
+- Persistence tests cover malformed v8/v9 floor payloads for missing active floors, duplicate player entities across floors, and duplicate floor depths; `GameManager` save/load coverage also exercises travel back to a cached inactive floor.
+- Progression, identity, inventory/equipment, wallet, NPC, merchant, chest, ability, cooldown, XP value, AI/template rehydration data, enemy template identity, scheduler actor order, status-effect source attribution, character creation options, and trap component state (`TrapComponent` on trap entities) round-trip through the normalized save shape where applicable.
+- `CombatRandomState` and `ItemRandomState` are persisted and rehydrated atomically through `WorldState.RehydrateRandomStates` so RNG continuation matches uninterrupted simulation with no transient intermediate state.
+- Deterministic replay regression tests prove that fixed action sequences produce identical traces after save/load at turn boundaries.
 - Content metadata is warning-only: legacy or migrated saves with missing metadata still load, and hash/version mismatches emit a runtime log warning instead of failing validation.
-- Save validation checks dimensions, entity IDs, inventory/equipment integrity, persisted component payloads, status effects, and payload sizes.
+- Save validation checks dimensions, entity IDs, inventory/equipment integrity, persisted component payloads, status effects, payload sizes, and trap entity consistency (an entity with a `TrapComponent` must sit on a `Trap` tile and have a non-empty template id).
+
+### Traps
+
+Traps are entities with `TrapComponent` placed on `TileType.Trap` tiles during `GameManager.PopulateWorld`. When an entity enters a trap tile, `MoveAction` invokes `HazardProcessor.OnEntityEnteredTile`, which resolves the trap template, checks configured avoid flags (e.g., `phased`, `flying`), rolls damage/status deterministically via `CombatResolver`, applies damage, and routes kills through `DeathResolver.ResolveUnattributedDeath`. Successful triggers append `CombatEvent`s and log messages to the action outcome, disarm and reveal the trap, and raise `HazardProcessor.TrapTriggered`; `GameManager` forwards this to `EventBus.TrapTriggered` so the combat log/animation layer can react.
+
+`TrapComponent` is the single source of truth for trap state (`TemplateId`, `IsArmed`, `IsRevealed`, `TriggerCount`). It is serialized as part of the owning entity's save payload and restored on load, so trap entities survive save/load round trips and continue to trigger correctly. Legacy v10/v11 standalone trap arrays are migrated into trap entities by `SaveMigrator`.
+
+The rendering layer treats `TileType.Trap` as a visible floor tile with a trap marker, and `Minimap` colors trap tiles distinctly.
+
+### Locked Doors
+
+Locked doors are represented by `TileType.LockedDoor`. During generation, `DungeonGenerator.PlaceLockedDoorsAndKeys` selects connecting door positions leading into rooms flagged as locked (e.g., arenas, vaults) and converts them to `LockedDoor` tiles; it then places a `dungeon_key` item in a reachable non-locked room. `OpenDoorAction` validates that the actor is adjacent to a `LockedDoor` tile and has at least one `dungeon_key` in their inventory, consumes one key, and changes the tile to `TileType.OpenDoor`. Locked doors block movement and sight until opened. The change is persisted as map tiles and ground items, so locked state and key consumption survive save/load without a dedicated door component.
 
 ### Save Slots
 

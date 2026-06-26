@@ -12,6 +12,7 @@ public sealed class ContentValidationTests : ITestSuite
         registry.Add("Content.Loads and validates all JSON", LoadsAndValidatesAllJson);
         registry.Add("Content.Projects contract templates", ProjectsContractTemplates);
         registry.Add("Content.Cross references remain intact", CrossReferencesRemainIntact);
+        registry.Add("Content.Enemy gold ranges are valid", EnemyGoldRangesAreValid);
         registry.Add("Content.Item stats and effects are runtime-supported", ItemStatsAndEffectsAreRuntimeSupported);
         registry.Add("Content.Authored art paths resolve to committed files", AuthoredArtPathsResolveToCommittedFiles);
         registry.Add("Content.Depth filters stay stable", DepthFiltersStayStable);
@@ -22,15 +23,16 @@ public sealed class ContentValidationTests : ITestSuite
         var content = LoadContent();
 
         Expect.True(content.IsValid, FormatErrors(content));
-        Expect.Equal(22, content.ItemDefinitions.Count, "Expected the full item set to load");
+        Expect.Equal(23, content.ItemDefinitions.Count, "Expected the full item set to load");
         Expect.Equal(13, content.EnemyDefinitions.Count, "Expected the full enemy set to load");
-        Expect.Equal(8, content.AbilityDefinitions.Count, "Expected the full ability set to load");
+        Expect.Equal(9, content.AbilityDefinitions.Count, "Expected the full ability set to load");
         Expect.Equal(4, content.PerkDefinitions.Count, "Expected the initial perk set to load");
         Expect.Equal(2, content.DialogueDefinitions.Count, "Expected the full dialog set to load");
         Expect.Equal(2, content.NpcDefinitions.Count, "Expected the full NPC set to load");
-        Expect.Equal(9, content.StatusEffects.Count, "Expected the full status effect set to load");
+        Expect.Equal(10, content.StatusEffects.Count, "Expected the full status effect set to load");
         Expect.True(content.RoomPrefabs.Count >= 10, "Expected at least the baseline room prefab set to load");
         Expect.Equal(17, content.LootTables.Count, "Expected the full loot table set to load");
+        Expect.Equal(1, content.TrapDefinitions.Count, "Expected the baseline trap set to load");
     }
 
     private static void ProjectsContractTemplates()
@@ -47,6 +49,7 @@ public sealed class ContentValidationTests : ITestSuite
         Expect.Equal("melee_rusher", orc.BrainType, "Enemy AI types should map onto the frozen brain identifiers");
         Expect.Equal(35, orc.BaseStats.MaxHP, "Enemy HP should map into the base stats block");
         Expect.Equal(80, orc.BaseStats.Speed, "Enemy speed should respect the engine-scale contract");
+        Expect.True(orc.GoldMin >= 0 && orc.GoldMin <= orc.GoldMax, "Enemy gold range should project into the contract surface");
 
         Expect.True(content.TryGetNpcTemplate("quartermaster_vale", out var vendor), "Quartermaster Vale should project into the NPC surface");
         Expect.True(vendor.IsMerchant, "Quartermaster Vale should project merchant stock");
@@ -57,6 +60,9 @@ public sealed class ContentValidationTests : ITestSuite
 
         Expect.True(content.TryGetDialogueTemplate("merchant_intro", out var dialog), "Merchant intro dialog should project into the dialogue surface");
         Expect.True(dialog.Nodes.ContainsKey(dialog.StartNodeId), "Dialog templates should retain their start node");
+
+        Expect.True(content.TryGetTrapTemplate("spike_trap", out var spikeTrap), "Spike trap should project into the trap surface");
+        Expect.Equal("spike_trap", spikeTrap?.AbilityId ?? string.Empty, "Trap templates should preserve their referenced ability");
     }
 
     private static void CrossReferencesRemainIntact()
@@ -98,6 +104,23 @@ public sealed class ContentValidationTests : ITestSuite
             foreach (var stock in npc.Stock)
             {
                 Expect.True(content.ItemDefinitions.ContainsKey(stock.ItemId), $"Npc '{npc.Id}' stock should reference a known item");
+            }
+        }
+
+        foreach (var trap in content.TrapDefinitions.Values)
+        {
+            Expect.True(content.AbilityDefinitions.ContainsKey(trap.AbilityId!), $"Trap '{trap.Id}' should reference a known ability");
+        }
+
+        foreach (var room in content.RoomPrefabs.Values)
+        {
+            foreach (var spawnPoint in room.SpawnPoints)
+            {
+                if (string.Equals(spawnPoint.Type, "trap", System.StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrWhiteSpace(spawnPoint.TrapId))
+                {
+                    Expect.True(content.TrapDefinitions.ContainsKey(spawnPoint.TrapId), $"Room '{room.Id}' trap spawn should reference a known trap");
+                }
             }
         }
     }
@@ -153,6 +176,23 @@ public sealed class ContentValidationTests : ITestSuite
         foreach (var status in content.StatusEffects.Values)
         {
             ExpectResPathExists(content, status.IconPath, $"Status effect '{status.Id}' icon_path");
+        }
+
+        foreach (var trap in content.TrapDefinitions.Values)
+        {
+            ExpectResPathExists(content, trap.SpritePath, $"Trap '{trap.Id}' sprite_path");
+        }
+    }
+
+    private static void EnemyGoldRangesAreValid()
+    {
+        var content = LoadContent();
+
+        foreach (var enemy in content.EnemyDefinitions.Values)
+        {
+            Expect.True(enemy.GoldMin >= 0, $"Enemy '{enemy.Id}' gold_min must be non-negative");
+            Expect.True(enemy.GoldMax >= 0, $"Enemy '{enemy.Id}' gold_max must be non-negative");
+            Expect.True(enemy.GoldMin <= enemy.GoldMax, $"Enemy '{enemy.Id}' gold_min must not exceed gold_max");
         }
     }
 

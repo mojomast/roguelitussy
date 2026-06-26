@@ -14,6 +14,8 @@ public sealed class StatusTickResult
     public DeathResolver.DeathResolution? Death { get; init; }
 
     public IReadOnlyList<StatusEffectType> ExpiredEffects { get; init; } = Array.Empty<StatusEffectType>();
+
+    public IReadOnlyList<string> LogMessages { get; init; } = Array.Empty<string>();
 }
 
 public static class StatusEffectProcessor
@@ -52,6 +54,33 @@ public static class StatusEffectProcessor
         return entity.Stats.Speed;
     }
 
+    public static int GetEffectiveSpeed(IEntity entity, IContentDatabase db)
+    {
+        var speed = (double)entity.Stats.Speed;
+        var hasModifier = false;
+
+        foreach (var effect in GetEffects(entity))
+        {
+            if (!TryGetDefinition(effect.Type, db, out var definition))
+            {
+                continue;
+            }
+
+            foreach (var modifier in definition!.StatModifiers)
+            {
+                if (!string.Equals(modifier.Stat, "speed", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                hasModifier = true;
+                speed = ApplyStatModifier(speed, modifier);
+            }
+        }
+
+        return hasModifier ? (int)Math.Round(speed) : entity.Stats.Speed;
+    }
+
     public static bool ApplyEffect(IEntity entity, StatusEffectType type, int duration, int magnitude = 1, EntityId? sourceEntityId = null)
     {
         if (type == StatusEffectType.None || duration <= 0 || magnitude <= 0)
@@ -77,6 +106,45 @@ public static class StatusEffectProcessor
             var current = component[existingIndex];
             var nextMagnitude = stackable ? Math.Min(maxStacks, current.Magnitude + magnitude) : Math.Max(current.Magnitude, magnitude);
             var refreshed = new StatusEffectInstance(type, Math.Max(current.RemainingTurns, duration), nextMagnitude, sourceEntityId ?? current.SourceEntityId);
+            component.Replace(existingIndex, refreshed);
+            return true;
+        }
+
+        component.Add(new StatusEffectInstance(type, duration, Math.Min(maxStacks, magnitude), sourceEntityId));
+        return true;
+    }
+
+    public static bool ApplyEffect(IEntity entity, StatusEffectType type, IContentDatabase db, int duration, int magnitude = 1, EntityId? sourceEntityId = null)
+    {
+        if (type == StatusEffectType.None || duration <= 0 || magnitude <= 0)
+        {
+            return false;
+        }
+
+        if (!TryGetDefinition(type, db, out var definition))
+        {
+            return ApplyEffect(entity, type, duration, magnitude, sourceEntityId);
+        }
+
+        ApplyLifecycleEffects(entity, type, definition!);
+
+        var component = entity.GetComponent<StatusEffectsComponent>();
+        if (component is null)
+        {
+            component = new StatusEffectsComponent();
+            entity.SetComponent(component);
+        }
+
+        var existingIndex = component.FindIndex(type);
+        var stackable = definition.Stackable;
+        var maxStacks = definition.MaxStacks ?? 1;
+
+        if (existingIndex >= 0)
+        {
+            var current = component[existingIndex];
+            var nextMagnitude = stackable ? Math.Min(maxStacks, current.Magnitude + magnitude) : Math.Max(current.Magnitude, magnitude);
+            var nextDuration = definition.Refreshable ? Math.Max(current.RemainingTurns, duration) : current.RemainingTurns;
+            var refreshed = new StatusEffectInstance(type, nextDuration, nextMagnitude, sourceEntityId ?? current.SourceEntityId);
             component.Replace(existingIndex, refreshed);
             return true;
         }
@@ -147,12 +215,20 @@ public static class StatusEffectProcessor
         entity.Stats.HP = Math.Min(entity.Stats.HP, entity.Stats.MaxHP);
         var died = entity.Stats.HP <= 0;
         DeathResolver.DeathResolution? death = null;
+        var logMessages = new List<string>();
         if (died)
         {
             var killer = lethalSourceId is { } sourceId ? world.GetEntity(sourceId) : null;
             death = killer is null
                 ? DeathResolver.ResolveUnattributedDeath(world, entity)
                 : DeathResolver.ResolveKill(world, killer, entity);
+
+            var killerName = killer?.Name ?? "Something";
+            DeathResolver.AppendDeathLogMessages(logMessages, killerName, entity.Name, death);
+
+            // TODO(ITM-1): TurnScheduler and GameLoop currently discard these log messages
+            // because ITurnScheduler.ConsumeEnergy returns void. Add a log sink to the scheduler
+            // interface or flush StatusTickResult.LogMessages into the round outcome.
         }
 
         return new StatusTickResult
@@ -162,7 +238,127 @@ public static class StatusEffectProcessor
             Died = died,
             Death = death,
             ExpiredEffects = expired,
+            LogMessages = logMessages,
         };
+    }
+
+    public static StatusTickResult Tick(WorldState world, EntityId entityId, IContentDatabase db)
+    {
+        var entity = world.GetEntity(entityId);
+        if (entity is null)
+        {
+            return new StatusTickResult();
+        }
+
+        var component = entity.GetComponent<StatusEffectsComponent>();
+        if (component is null || component.Count == 0)
+        {
+            return new StatusTickResult();
+        }
+
+        var damageTaken = 0;
+        var healingDone = 0;
+        var expired = new List<StatusEffectType>();
+        EntityId? lethalSourceId = null;
+
+        for (var index = component.Count - 1; index >= 0; index--)
+        {
+            var effect = component[index];
+            if (TryGetDefinition(effect.Type, db, out var definition))
+            {
+                foreach (var tickEffect in definition!.TickEffects)
+                {
+                    switch (tickEffect.Type)
+                    {
+                        case "damage":
+                            var damage = tickEffect.Value * effect.Magnitude;
+                            damageTaken += damage;
+                            entity.Stats.HP -= damage;
+                            lethalSourceId = entity.Stats.HP <= 0 ? effect.SourceEntityId : lethalSourceId;
+                            break;
+                        case "heal":
+                            var heal = tickEffect.Value * effect.Magnitude;
+                            var healed = Math.Min(heal, Math.Max(0, entity.Stats.MaxHP - entity.Stats.HP));
+                            healingDone += healed;
+                            entity.Stats.HP += healed;
+                            break;
+                    }
+                }
+            }
+
+            var remaining = effect.RemainingTurns - 1;
+            if (remaining <= 0)
+            {
+                expired.Add(effect.Type);
+                component.RemoveAt(index);
+            }
+            else
+            {
+                component.Replace(index, effect with { RemainingTurns = remaining });
+            }
+        }
+
+        entity.Stats.HP = Math.Min(entity.Stats.HP, entity.Stats.MaxHP);
+        var died = entity.Stats.HP <= 0;
+        DeathResolver.DeathResolution? death = null;
+        var logMessages = new List<string>();
+        if (died)
+        {
+            var killer = lethalSourceId is { } sourceId ? world.GetEntity(sourceId) : null;
+            death = killer is null
+                ? DeathResolver.ResolveUnattributedDeath(world, entity)
+                : DeathResolver.ResolveKill(world, killer, entity);
+
+            var killerName = killer?.Name ?? "Something";
+            DeathResolver.AppendDeathLogMessages(logMessages, killerName, entity.Name, death);
+
+            // TODO(ITM-1): TurnScheduler and GameLoop currently discard these log messages
+            // because ITurnScheduler.ConsumeEnergy returns void. Add a log sink to the scheduler
+            // interface or flush StatusTickResult.LogMessages into the round outcome.
+        }
+
+        return new StatusTickResult
+        {
+            DamageTaken = damageTaken,
+            HealingDone = healingDone,
+            Died = died,
+            Death = death,
+            ExpiredEffects = expired,
+            LogMessages = logMessages,
+        };
+    }
+
+    public static bool HasFlag(IEntity entity, string flag)
+    {
+        return flag switch
+        {
+            "skip_turn" => HasEffect(entity, StatusEffectType.Stunned) || HasEffect(entity, StatusEffectType.Frozen),
+            "phase_through_walls" => HasEffect(entity, StatusEffectType.Phased),
+            "immune_physical" => HasEffect(entity, StatusEffectType.Phased),
+            "flying" => HasEffect(entity, StatusEffectType.Flying),
+            _ => false,
+        };
+    }
+
+    public static bool HasFlag(IEntity entity, string flag, IContentDatabase db)
+    {
+        foreach (var effect in GetEffects(entity))
+        {
+            if (!TryGetDefinition(effect.Type, db, out var definition))
+            {
+                continue;
+            }
+
+            foreach (var authoredFlag in definition!.Flags)
+            {
+                if (string.Equals(authoredFlag, flag, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     public static bool TryParseStatusEffect(string value, out StatusEffectType type)
@@ -218,6 +414,10 @@ public static class StatusEffectProcessor
             case "phased":
                 type = StatusEffectType.Phased;
                 return true;
+            case "flying":
+            case "fly":
+                type = StatusEffectType.Flying;
+                return true;
             default:
                 type = StatusEffectType.None;
                 return false;
@@ -238,7 +438,6 @@ public static class StatusEffectProcessor
 
     private static void ApplyLifecycleEffects(IEntity entity, StatusEffectType type)
     {
-        // Mirrors the currently authored status lifecycle metadata until status definitions are data-driven at runtime.
         if (type == StatusEffectType.Burning)
         {
             RemoveEffect(entity, StatusEffectType.Frozen);
@@ -248,6 +447,71 @@ public static class StatusEffectProcessor
             RemoveEffect(entity, StatusEffectType.Burning);
         }
     }
+
+    private static void ApplyLifecycleEffects(IEntity entity, StatusEffectType type, StatusEffectDefinition definition)
+    {
+        foreach (var effect in definition.OnApplyEffects)
+        {
+            if (string.Equals(effect.Type, "remove_status", StringComparison.Ordinal)
+                && !string.IsNullOrWhiteSpace(effect.StatusId)
+                && TryParseStatusEffect(effect.StatusId, out var statusType))
+            {
+                RemoveEffect(entity, statusType);
+            }
+        }
+    }
+
+    private static double ApplyStatModifier(double value, StatusStatModifierDefinition modifier)
+    {
+        var operation = modifier.Operation;
+        if (string.Equals(operation, "add", StringComparison.OrdinalIgnoreCase))
+        {
+            return value + modifier.Value;
+        }
+
+        if (string.Equals(operation, "multiply", StringComparison.OrdinalIgnoreCase))
+        {
+            return value * modifier.Value;
+        }
+
+        if (string.Equals(operation, "set", StringComparison.OrdinalIgnoreCase))
+        {
+            return modifier.Value;
+        }
+
+        return value;
+    }
+
+    private static bool TryGetDefinition(StatusEffectType type, IContentDatabase? db, out StatusEffectDefinition definition)
+    {
+        var id = GetStatusEffectId(type);
+        if (id is not null && db is not null && db.TryGetStatusEffect(id, out var fromDb))
+        {
+            definition = fromDb;
+            return true;
+        }
+
+        definition = null!;
+        return false;
+    }
+
+    private static string? GetStatusEffectId(StatusEffectType type) => type switch
+    {
+        StatusEffectType.Poisoned => "poisoned",
+        StatusEffectType.Burning => "burning",
+        StatusEffectType.Frozen => "frozen",
+        StatusEffectType.Stunned => "stunned",
+        StatusEffectType.Hasted => "haste",
+        StatusEffectType.Invisible => null,
+        StatusEffectType.Regenerating => "regenerating",
+        StatusEffectType.Weakened => "weakened",
+        StatusEffectType.Shielded => "shielded",
+        StatusEffectType.Empowered => "empowered",
+        StatusEffectType.Corroded => "corroded",
+        StatusEffectType.Phased => "phased",
+        StatusEffectType.Flying => "flying",
+        _ => null,
+    };
 
     private static string Normalize(string value) => value.Trim().Replace("_", string.Empty).Replace("-", string.Empty).ToLowerInvariant();
 }

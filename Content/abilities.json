@@ -238,6 +238,28 @@
       ],
       "animation": "acid_burst",
       "sfx": "acid_sizzle"
+    },
+    {
+      "id": "spike_trap",
+      "name": "Spike Trap",
+      "description": "Sharp iron spikes spring from the floor, impaling whoever steps on the tile.",
+      "targeting": {
+        "type": "single",
+        "range": 0,
+        "requires_los": false
+      },
+      "costs": {
+        "energy": 100
+      },
+      "effects": [
+        {
+          "type": "damage",
+          "damage_type": "physical",
+          "base_value": 8
+        }
+      ],
+      "animation": "trap_spring",
+      "sfx": "trap_click"
     }
   ]
 }

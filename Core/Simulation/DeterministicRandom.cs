@@ -42,6 +42,15 @@ public sealed class DeterministicRandom
         return minInclusive + Next(maxExclusive - minInclusive);
     }
 
+    public ulong Peek()
+    {
+        var previousState = State;
+        State = unchecked((State * Multiplier) + Increment);
+        var value = State;
+        State = previousState;
+        return value;
+    }
+
     private ulong NextUInt64()
     {
         State = unchecked((State * Multiplier) + Increment);

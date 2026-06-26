@@ -166,6 +166,33 @@ public sealed class InventoryComponent
 
     public bool IsEquipped(EntityId instanceId) => _equipped.Values.Any(entry => entry.Item.InstanceId == instanceId);
 
+    public bool TryConsumeOne(string templateId, out ItemInstance? consumed)
+    {
+        for (var i = 0; i < _items.Count; i++)
+        {
+            if (!string.Equals(_items[i].TemplateId, templateId, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var item = _items[i];
+            if (item.StackCount > 1)
+            {
+                item.StackCount--;
+                consumed = CloneItem(item, 1, null);
+                consumed.StackCount = 1;
+                return true;
+            }
+
+            _items.RemoveAt(i);
+            consumed = item;
+            return true;
+        }
+
+        consumed = null;
+        return false;
+    }
+
     public EquippedItem? GetEquipped(EquipSlot slot) => _equipped.TryGetValue(slot, out var equipped) ? equipped : null;
 
     public bool TryEquip(ItemInstance item, EquipSlot slot, IReadOnlyDictionary<string, int> statModifiers, out EquippedItem? previous)

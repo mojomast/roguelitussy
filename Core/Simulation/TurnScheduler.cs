@@ -67,14 +67,21 @@ public sealed class TurnScheduler : ITurnScheduler
 
             if (ready.Length > 0)
             {
-                var actor = _currentWorld.GetEntity(ready[0]);
-                if (actor is not null && actor.IsAlive)
+                var actorId = ready[0];
+                var actor = _currentWorld.GetEntity(actorId);
+                if (actor is null || !actor.IsAlive)
                 {
-                    return actor;
+                    _actors.Remove(actorId);
+                    continue;
                 }
 
-                _actors.Remove(ready[0]);
-                continue;
+                if (StatusEffectProcessor.HasFlag(actor, "skip_turn"))
+                {
+                    ConsumeEnergy(actorId, 1000);
+                    continue;
+                }
+
+                return actor;
             }
 
             AdvanceTime(_currentWorld);
@@ -83,11 +90,11 @@ public sealed class TurnScheduler : ITurnScheduler
         return null;
     }
 
-    public void ConsumeEnergy(EntityId actorId, int cost)
+    public StatusTickResult? ConsumeEnergy(EntityId actorId, int cost)
     {
         if (!_actors.TryGetValue(actorId, out var actor))
         {
-            return;
+            return null;
         }
 
         actor.Energy -= Math.Max(0, cost);
@@ -98,11 +105,14 @@ public sealed class TurnScheduler : ITurnScheduler
             if (tickResult.Died)
             {
                 _actors.Remove(actorId);
-                return;
+                return tickResult;
             }
 
             actor.BaseSpeed = entity.Stats.Speed;
+            return tickResult;
         }
+
+        return null;
     }
 
     public void EndRound(WorldState world)
@@ -120,8 +130,29 @@ public sealed class TurnScheduler : ITurnScheduler
             return;
         }
 
-        _actors[entity.Id] = new ActorState(entity.Stats.Energy, _nextOrder++, entity.Stats.Speed);
+        var order = _nextOrder;
+        if (_currentWorld?.SchedulerOrders.TryGetValue(entity.Id, out var savedOrder) == true)
+        {
+            order = savedOrder;
+            _currentWorld.SchedulerOrders.Remove(entity.Id);
+        }
+        else
+        {
+            _nextOrder++;
+        }
+
+        _actors[entity.Id] = new ActorState(entity.Stats.Energy, order, entity.Stats.Speed);
     }
+
+    public int GetOrder(EntityId actorId) => _actors.TryGetValue(actorId, out var actor) ? actor.Order : 0;
+
+    public int NextOrder
+    {
+        get => _nextOrder;
+        set => _nextOrder = value;
+    }
+
+    public void AttachWorld(WorldState world) => _currentWorld = world;
 
     public void Unregister(EntityId id)
     {

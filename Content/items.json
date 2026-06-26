@@ -524,6 +524,23 @@
       "max_stack": 5,
       "sprite_path": "res://Assets/Sprites/items/potion_might.svg",
       "sprite_atlas_coords": [5, 2]
+    },
+    {
+      "id": "dungeon_key",
+      "name": "Dungeon Key",
+      "description": "A heavy iron key that opens locked doors.",
+      "type": "key",
+      "slot": "none",
+      "stats": {},
+      "effects": [],
+      "rarity": "common",
+      "value": 10,
+      "weight": 0.2,
+      "requirements": {},
+      "stackable": true,
+      "max_stack": 10,
+      "sprite_path": "res://Assets/Sprites/items/dungeon_key.svg",
+      "sprite_atlas_coords": [6, 2]
     }
   ]
 }

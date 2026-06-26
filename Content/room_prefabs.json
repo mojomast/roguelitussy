@@ -21,7 +21,9 @@
       "name": "Shadowed Hall",
       "tags": [
         "combat",
-        "ambush"
+        "ambush",
+        "crypt",
+        "magma"
       ],
       "width": 11,
       "height": 9,
@@ -81,7 +83,9 @@
       "tags": [
         "combat",
         "elite",
-        "open"
+        "open",
+        "crypt",
+        "magma"
       ],
       "width": 13,
       "height": 11,
@@ -130,7 +134,8 @@
       "name": "Boss Arena",
       "tags": [
         "boss",
-        "guaranteed"
+        "guaranteed",
+        "magma"
       ],
       "width": 15,
       "height": 13,
@@ -212,7 +217,10 @@
       "tags": [
         "combat",
         "ambush",
-        "narrow"
+        "narrow",
+        "prison",
+        "crypt",
+        "magma"
       ],
       "width": 11,
       "height": 7,
@@ -268,7 +276,10 @@
       "id": "corridor_h",
       "name": "Horizontal Corridor",
       "tags": [
-        "corridor"
+        "corridor",
+        "prison",
+        "crypt",
+        "magma"
       ],
       "width": 7,
       "height": 3,
@@ -301,7 +312,8 @@
       "id": "custom_room_1",
       "name": "Custom Room 1",
       "tags": [
-        "custom"
+        "custom",
+        "prison"
       ],
       "width": 20,
       "height": 20,
@@ -364,7 +376,8 @@
       "id": "custom_room_2",
       "name": "Custom Room 2",
       "tags": [
-        "custom"
+        "custom",
+        "prison"
       ],
       "width": 22,
       "height": 21,
@@ -429,7 +442,9 @@
       "name": "Flooded Passage",
       "tags": [
         "hazard",
-        "mid_game"
+        "mid_game",
+        "crypt",
+        "magma"
       ],
       "width": 9,
       "height": 7,
@@ -480,7 +495,9 @@
       "tags": [
         "loot",
         "caster",
-        "mid_game"
+        "mid_game",
+        "crypt",
+        "magma"
       ],
       "width": 11,
       "height": 9,
@@ -550,7 +567,8 @@
       "id": "new_room",
       "name": "New Room",
       "tags": [
-        "custom"
+        "custom",
+        "prison"
       ],
       "width": 21,
       "height": 8,
@@ -578,7 +596,8 @@
       "name": "Starting Chamber",
       "tags": [
         "start",
-        "guaranteed"
+        "guaranteed",
+        "prison"
       ],
       "width": 9,
       "height": 9,
@@ -620,7 +639,10 @@
       "name": "Treasure Vault",
       "tags": [
         "loot",
-        "rare"
+        "rare",
+        "prison",
+        "crypt",
+        "magma"
       ],
       "width": 7,
       "height": 7,
@@ -678,7 +700,10 @@
       "tags": [
         "loot",
         "combat",
-        "dead_end"
+        "dead_end",
+        "prison",
+        "crypt",
+        "magma"
       ],
       "width": 9,
       "height": 9,
@@ -744,6 +769,343 @@
       "item_quality_bonus": 3,
       "enemy_count_bonus": null,
       "lock_doors_on_enter": false
+    },
+    {
+      "id": "prison_block",
+      "name": "Prison Block",
+      "tags": [
+        "prison",
+        "combat"
+      ],
+      "width": 11,
+      "height": 7,
+      "min_depth": 1,
+      "max_depth": 99,
+      "layout": [
+        "###########",
+        "#S........#",
+        "#.........#",
+        "+....S....+",
+        "#.........#",
+        "#........I#",
+        "###########"
+      ],
+      "doors": [
+        {
+          "x": 0,
+          "y": 3,
+          "direction": "west"
+        },
+        {
+          "x": 10,
+          "y": 3,
+          "direction": "east"
+        }
+      ],
+      "spawn_points": [
+        {
+          "x": 1,
+          "y": 1,
+          "type": "enemy",
+          "trap_id": null
+        },
+        {
+          "x": 5,
+          "y": 3,
+          "type": "enemy",
+          "trap_id": null
+        },
+        {
+          "x": 9,
+          "y": 5,
+          "type": "item",
+          "trap_id": null
+        }
+      ],
+      "fixed_entities": [],
+      "item_quality_bonus": null,
+      "enemy_count_bonus": 1,
+      "lock_doors_on_enter": false
+    },
+    {
+      "id": "prison_yard",
+      "name": "Prison Yard",
+      "tags": [
+        "prison",
+        "open"
+      ],
+      "width": 13,
+      "height": 7,
+      "min_depth": 1,
+      "max_depth": 99,
+      "layout": [
+        "#############",
+        "#...........#",
+        "#...........#",
+        "+....S......+",
+        "#...........#",
+        "#...........#",
+        "#############"
+      ],
+      "doors": [
+        {
+          "x": 0,
+          "y": 3,
+          "direction": "west"
+        },
+        {
+          "x": 12,
+          "y": 3,
+          "direction": "east"
+        }
+      ],
+      "spawn_points": [
+        {
+          "x": 5,
+          "y": 3,
+          "type": "enemy",
+          "trap_id": null
+        }
+      ],
+      "fixed_entities": [],
+      "item_quality_bonus": null,
+      "enemy_count_bonus": null,
+      "lock_doors_on_enter": false
+    },
+    {
+      "id": "crypt_niche",
+      "name": "Crypt Niche",
+      "tags": [
+        "crypt",
+        "loot",
+        "dead_end"
+      ],
+      "width": 9,
+      "height": 6,
+      "min_depth": 4,
+      "max_depth": 99,
+      "layout": [
+        "#########",
+        "#..I.I..#",
+        "#.......#",
+        "#..C.C..#",
+        "#.......#",
+        "####+####"
+      ],
+      "doors": [
+        {
+          "x": 4,
+          "y": 5,
+          "direction": "south"
+        }
+      ],
+      "spawn_points": [
+        {
+          "x": 2,
+          "y": 1,
+          "type": "item",
+          "trap_id": null
+        },
+        {
+          "x": 6,
+          "y": 1,
+          "type": "item",
+          "trap_id": null
+        },
+        {
+          "x": 3,
+          "y": 3,
+          "type": "chest",
+          "trap_id": null
+        },
+        {
+          "x": 5,
+          "y": 3,
+          "type": "chest",
+          "trap_id": null
+        }
+      ],
+      "fixed_entities": [],
+      "item_quality_bonus": 1,
+      "enemy_count_bonus": null,
+      "lock_doors_on_enter": false
+    },
+    {
+      "id": "crypt_hall",
+      "name": "Crypt Hall",
+      "tags": [
+        "crypt",
+        "combat"
+      ],
+      "width": 11,
+      "height": 7,
+      "min_depth": 4,
+      "max_depth": 99,
+      "layout": [
+        "###########",
+        "#S........#",
+        "#.#.#.#.#.#",
+        "+.........+",
+        "#.#.#.#.#.#",
+        "#........S#",
+        "###########"
+      ],
+      "doors": [
+        {
+          "x": 0,
+          "y": 3,
+          "direction": "west"
+        },
+        {
+          "x": 10,
+          "y": 3,
+          "direction": "east"
+        }
+      ],
+      "spawn_points": [
+        {
+          "x": 1,
+          "y": 1,
+          "type": "enemy",
+          "trap_id": null
+        },
+        {
+          "x": 9,
+          "y": 5,
+          "type": "enemy",
+          "trap_id": null
+        }
+      ],
+      "fixed_entities": [],
+      "item_quality_bonus": null,
+      "enemy_count_bonus": 1,
+      "lock_doors_on_enter": false
+    },
+    {
+      "id": "magma_pit",
+      "name": "Magma Pit",
+      "tags": [
+        "magma",
+        "hazard"
+      ],
+      "width": 12,
+      "height": 7,
+      "min_depth": 7,
+      "max_depth": 99,
+      "layout": [
+        "############",
+        "#...^....^.#",
+        "#..........#",
+        "+^........^+",
+        "#..........#",
+        "#...^....^.#",
+        "############"
+      ],
+      "doors": [
+        {
+          "x": 0,
+          "y": 3,
+          "direction": "west"
+        },
+        {
+          "x": 11,
+          "y": 3,
+          "direction": "east"
+        }
+      ],
+      "spawn_points": [
+        {
+          "x": 4,
+          "y": 1,
+          "type": "trap",
+          "trap_id": "spike_trap"
+        },
+        {
+          "x": 9,
+          "y": 1,
+          "type": "trap",
+          "trap_id": "spike_trap"
+        },
+        {
+          "x": 1,
+          "y": 3,
+          "type": "trap",
+          "trap_id": "spike_trap"
+        },
+        {
+          "x": 10,
+          "y": 3,
+          "type": "trap",
+          "trap_id": "spike_trap"
+        },
+        {
+          "x": 4,
+          "y": 5,
+          "type": "trap",
+          "trap_id": "spike_trap"
+        },
+        {
+          "x": 9,
+          "y": 5,
+          "type": "trap",
+          "trap_id": "spike_trap"
+        }
+      ],
+      "fixed_entities": [],
+      "item_quality_bonus": null,
+      "enemy_count_bonus": null,
+      "lock_doors_on_enter": false
+    },
+    {
+      "id": "magma_forge",
+      "name": "Magma Forge",
+      "tags": [
+        "magma",
+        "combat"
+      ],
+      "width": 13,
+      "height": 7,
+      "min_depth": 7,
+      "max_depth": 99,
+      "layout": [
+        "#############",
+        "#...........#",
+        "#.....S.....#",
+        "+...........+",
+        "#.....I.....#",
+        "#...........#",
+        "#############"
+      ],
+      "doors": [
+        {
+          "x": 0,
+          "y": 3,
+          "direction": "west"
+        },
+        {
+          "x": 12,
+          "y": 3,
+          "direction": "east"
+        }
+      ],
+      "spawn_points": [
+        {
+          "x": 6,
+          "y": 2,
+          "type": "enemy",
+          "trap_id": null
+        },
+        {
+          "x": 6,
+          "y": 4,
+          "type": "item",
+          "trap_id": null
+        }
+      ],
+      "fixed_entities": [],
+      "item_quality_bonus": 1,
+      "enemy_count_bonus": 1,
+      "lock_doors_on_enter": true
     }
   ]
 }

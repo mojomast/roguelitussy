@@ -12,4 +12,7 @@ public sealed record LevelData(
     IReadOnlyList<EnemySpawnData>? EnemySpawnDetails = null,
     IReadOnlyList<ItemSpawnData>? ItemSpawnDetails = null,
     IReadOnlyList<ChestSpawnData>? ChestSpawnDetails = null,
-    IReadOnlyList<NpcSpawnData>? NpcSpawns = null);
+    IReadOnlyList<NpcSpawnData>? NpcSpawns = null,
+    IReadOnlyList<TrapSpawnData>? TrapSpawnDetails = null,
+    IReadOnlyList<Position>? LockedDoors = null,
+    IReadOnlyList<Position>? KeySpawns = null);

@@ -18,11 +18,14 @@ public sealed record RoomPrefab(
     IReadOnlyList<RoomPrefabFixedEntity>? DefinedFixedEntities = null,
     int? ItemQualityBonus = null,
     int? EnemyCountBonus = null,
-    bool LockDoorsOnEnter = false)
+    bool LockDoorsOnEnter = false,
+    IReadOnlyList<string>? DefinedTags = null)
 {
     public IReadOnlyList<RoomPrefabSpawnPoint> SpawnPoints { get; } = DefinedSpawnPoints ?? Array.Empty<RoomPrefabSpawnPoint>();
 
     public IReadOnlyList<RoomPrefabFixedEntity> FixedEntities { get; } = DefinedFixedEntities ?? Array.Empty<RoomPrefabFixedEntity>();
+
+    public IReadOnlyList<string> Tags { get; } = DefinedTags ?? Array.Empty<string>();
 
     public bool HasWalkableTiles => GetWalkableOffsets().Count > 0;
 
@@ -36,7 +39,8 @@ public sealed record RoomPrefab(
     {
         return Rows[y][x] switch
         {
-            '.' or 'P' or 'S' or 'I' or 'C' or '<' or '>' or '^' => TileType.Floor,
+            '.' or 'P' or 'S' or 'I' or 'C' or '<' or '>' => TileType.Floor,
+            '^' => TileType.Trap,
             '+' => TileType.Door,
             '~' => TileType.Water,
             '#' => TileType.Wall,

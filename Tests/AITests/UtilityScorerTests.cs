@@ -11,6 +11,8 @@ public sealed class UtilityScorerTests : ITestSuite
         registry.Add("AI.Utility scorer prefers attacks over waiting when adjacent", AttackOutscoresWaitingWhenAdjacent);
         registry.Add("AI.Utility scorer prefers escape moves while fleeing", FleeMovesOutscoreApproachMoves);
         registry.Add("AI.Utility scorer prefers patrol moves that progress toward patrol targets", PatrolMovesPreferProgress);
+        registry.Add("AI.Utility scorer retreats when kiter is inside preferred range", KiterRetreatsWhenInsidePreferredRange);
+        registry.Add("AI.Utility scorer rewards support moves toward ally clusters", SupportMovesRewardAllyClustering);
     }
 
     private static void AttackOutscoresWaitingWhenAdjacent()
@@ -62,6 +64,48 @@ public sealed class UtilityScorerTests : ITestSuite
         var backwardScore = UtilityScorer.ScoreAction(new MoveAction(self.Id, new Position(-1, 0)), self, null, memory.PatrolTarget, world, memory, AIProfiles.PatrolGuard, pathfinder);
 
         Expect.True(forwardScore > backwardScore, "Patrol scoring should reward moves that reduce distance to the patrol target");
+    }
+
+    private static void KiterRetreatsWhenInsidePreferredRange()
+    {
+        var world = CreateWorld();
+        var pathfinder = new Pathfinder();
+        var profile = AIProfiles.RangedKiter with { PreferredRange = 4 };
+        var self = new StubEntity("Archer", new Position(3, 3), Faction.Enemy, stats: new Stats { HP = 10, MaxHP = 10, Attack = 4, Defense = 1, Accuracy = 0, Evasion = 0, Speed = 100, ViewRadius = 8 });
+        var target = new StubEntity("Player", new Position(4, 3), Faction.Player, stats: new Stats { HP = 20, MaxHP = 20, Attack = 4, Defense = 1, Accuracy = 0, Evasion = 0, Speed = 100, ViewRadius = 8 });
+        var memory = new AIStateComponent { State = AIState.Attack };
+
+        world.Player = target;
+        world.AddEntity(target);
+        world.AddEntity(self);
+
+        var retreatScore = UtilityScorer.ScoreAction(new MoveAction(self.Id, new Position(-1, 0)), self, target, target.Position, world, memory, profile, pathfinder);
+        var approachScore = UtilityScorer.ScoreAction(new MoveAction(self.Id, new Position(1, 0)), self, target, target.Position, world, memory, profile, pathfinder);
+
+        Expect.True(retreatScore > approachScore, "Kiter inside preferred range should favor retreating to maintain distance");
+    }
+
+    private static void SupportMovesRewardAllyClustering()
+    {
+        var world = CreateWorld();
+        var pathfinder = new Pathfinder();
+        var self = new StubEntity("Shaman", new Position(1, 1), Faction.Enemy, stats: new Stats { HP = 10, MaxHP = 10, Attack = 2, Defense = 1, Accuracy = 0, Evasion = 0, Speed = 100, ViewRadius = 8 });
+        var ally1 = new StubEntity("Goblin", new Position(3, 1), Faction.Enemy, stats: new Stats { HP = 10, MaxHP = 10, Attack = 4, Defense = 1, Accuracy = 0, Evasion = 0, Speed = 100, ViewRadius = 8 });
+        var ally2 = new StubEntity("Goblin", new Position(3, 2), Faction.Enemy, stats: new Stats { HP = 10, MaxHP = 10, Attack = 4, Defense = 1, Accuracy = 0, Evasion = 0, Speed = 100, ViewRadius = 8 });
+        var target = new StubEntity("Player", new Position(0, 0), Faction.Player, stats: new Stats { HP = 20, MaxHP = 20, Attack = 4, Defense = 1, Accuracy = 0, Evasion = 0, Speed = 100, ViewRadius = 8 });
+        var memory = new AIStateComponent { State = AIState.Idle };
+
+        world.Player = target;
+        world.AddEntity(target);
+        world.AddEntity(self);
+        world.AddEntity(ally1);
+        world.AddEntity(ally2);
+
+        var profile = AIProfiles.Support;
+        var towardScore = UtilityScorer.ScoreAction(new MoveAction(self.Id, new Position(1, 0)), self, target, target.Position, world, memory, profile, pathfinder);
+        var awayScore = UtilityScorer.ScoreAction(new MoveAction(self.Id, new Position(-1, 0)), self, target, target.Position, world, memory, profile, pathfinder);
+
+        Expect.True(towardScore > awayScore, "Support scoring should reward moves that cluster with allies");
     }
 
     private static WorldState CreateWorld()

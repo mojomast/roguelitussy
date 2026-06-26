@@ -15,7 +15,8 @@ public static class RoomPrefabLibrary
                 "#...#",
                 "#...#",
                 "#####",
-            }),
+            },
+            DefinedTags: new[] { "prison", "crypt", "magma", "generic" }),
         new RoomPrefab(
             "long_hall",
             new[]
@@ -23,7 +24,8 @@ public static class RoomPrefabLibrary
                 "#######",
                 "#.....#",
                 "#######",
-            }),
+            },
+            DefinedTags: new[] { "prison", "crypt", "magma", "generic" }),
         new RoomPrefab(
             "wide_hall",
             new[]
@@ -35,7 +37,8 @@ public static class RoomPrefabLibrary
                 "#...#",
                 "#...#",
                 "#####",
-            }),
+            },
+            DefinedTags: new[] { "prison", "crypt", "magma", "generic" }),
         new RoomPrefab(
             "octagon",
             new[]
@@ -47,7 +50,8 @@ public static class RoomPrefabLibrary
                 "##.....##",
                 "###...###",
                 "#########",
-            }),
+            },
+            DefinedTags: new[] { "crypt", "magma", "generic" }),
         new RoomPrefab(
             "pillars",
             new[]
@@ -59,7 +63,8 @@ public static class RoomPrefabLibrary
                 "#.#.#.#",
                 "#.....#",
                 "#######",
-            }),
+            },
+            DefinedTags: new[] { "crypt", "magma", "generic" }),
         new RoomPrefab(
             "chapel",
             new[]
@@ -70,7 +75,8 @@ public static class RoomPrefabLibrary
                 "#.......#",
                 "#...+...#",
                 "#########",
-            }),
+            },
+            DefinedTags: new[] { "crypt", "magma", "generic" }),
     };
 
     public static IReadOnlyList<RoomPrefab> GetDefaultPrefabs() => DefaultPrefabs;

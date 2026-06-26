@@ -29,7 +29,15 @@ public sealed class GameLoop
             if (validation != ActionResult.Success)
             {
                 outcome.LogMessages.Add($"{actor.Name}: action {action.Type} failed ({validation})");
-                scheduler.ConsumeEnergy(actor.Id, action.GetEnergyCost());
+                var failedTick = scheduler.ConsumeEnergy(actor.Id, action.GetEnergyCost());
+                if (failedTick?.ExpiredEffects.Count > 0)
+                {
+                    foreach (var expired in failedTick.ExpiredEffects)
+                    {
+                        outcome.ExpiredStatusEffects.Add((actor.Id, expired));
+                    }
+                }
+
                 continue;
             }
 
@@ -37,7 +45,14 @@ public sealed class GameLoop
             outcome.CombatEvents.AddRange(actionOutcome.CombatEvents);
             outcome.LogMessages.AddRange(actionOutcome.LogMessages);
             outcome.DirtyPositions.AddRange(actionOutcome.DirtyPositions);
-            scheduler.ConsumeEnergy(actor.Id, action.GetEnergyCost());
+            var tickResult = scheduler.ConsumeEnergy(actor.Id, action.GetEnergyCost());
+            if (tickResult?.ExpiredEffects.Count > 0)
+            {
+                foreach (var expired in tickResult.ExpiredEffects)
+                {
+                    outcome.ExpiredStatusEffects.Add((actor.Id, expired));
+                }
+            }
         }
 
         scheduler.EndRound(world);

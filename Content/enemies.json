@@ -28,6 +28,8 @@
       "spawn_weight": 15,
       "abilities": [],
       "loot_table_id": "rat_loot",
+      "gold_min": 1,
+      "gold_max": 3,
       "tags": ["beast", "early_game"],
       "sprite_path": "res://Assets/Sprites/0x72/Imp_Idle_1.png",
       "sprite_atlas_coords": [0, 0]
@@ -58,6 +60,8 @@
       "spawn_weight": 10,
       "abilities": [],
       "loot_table_id": "skeleton_loot",
+      "gold_min": 2,
+      "gold_max": 5,
       "tags": ["undead", "mid_game"],
       "sprite_path": "res://Assets/Sprites/0x72/Skelet_Idle_1.png",
       "sprite_atlas_coords": [1, 0]
@@ -78,10 +82,11 @@
       },
       "ai_type": "ranged_kite",
       "ai_params": {
-        "preferred_range": 5,
+        "preferred_range": 4,
         "flee_hp_pct": 20,
         "min_range": 3,
         "aggro_range": 10,
+        "group_aggro_range": 6,
         "wander_when_idle": true
       },
       "faction": "Enemy",
@@ -96,6 +101,8 @@
         }
       ],
       "loot_table_id": "goblin_loot",
+      "gold_min": 2,
+      "gold_max": 4,
       "tags": ["goblinoid", "ranged", "early_game"],
       "sprite_path": "res://Assets/Sprites/0x72/Goblin_Idle_1.png",
       "sprite_atlas_coords": [2, 0]
@@ -137,6 +144,8 @@
         }
       ],
       "loot_table_id": "orc_loot",
+      "gold_min": 5,
+      "gold_max": 10,
       "tags": ["orc", "mid_game", "tank"],
       "sprite_path": "res://Assets/Sprites/0x72/Ogre_Idle_1.png",
       "sprite_atlas_coords": [3, 0]
@@ -179,6 +188,8 @@
         }
       ],
       "loot_table_id": "wraith_loot",
+      "gold_min": 4,
+      "gold_max": 8,
       "tags": ["undead", "incorporeal", "late_game"],
       "sprite_path": "res://Assets/Sprites/0x72/Ice_Zombie_Idle_1.png",
       "sprite_atlas_coords": [4, 0]
@@ -215,6 +226,8 @@
         }
       ],
       "loot_table_id": "slime_loot",
+      "gold_min": 1,
+      "gold_max": 3,
       "tags": ["slime", "early_game"],
       "sprite_path": "res://Assets/Sprites/0x72/Swampy_Idle_1.png",
       "sprite_atlas_coords": [5, 0]
@@ -251,6 +264,8 @@
         }
       ],
       "loot_table_id": "cave_spider_loot",
+      "gold_min": 1,
+      "gold_max": 4,
       "tags": ["beast", "ambush", "early_game"],
       "sprite_path": "res://Assets/Sprites/0x72/Wogol_Idle_1.png",
       "sprite_atlas_coords": [6, 0]
@@ -288,6 +303,8 @@
         }
       ],
       "loot_table_id": "skeleton_knight_loot",
+      "gold_min": 3,
+      "gold_max": 6,
       "tags": ["undead", "patrol", "mid_game"],
       "sprite_path": "res://Assets/Sprites/0x72/Orc_Warrior_Idle_1.png",
       "sprite_atlas_coords": [7, 0]
@@ -311,6 +328,7 @@
         "flee_hp_pct": 30,
         "aggro_range": 9,
         "support_range": 6,
+        "group_aggro_range": 6,
         "wander_when_idle": true
       },
       "faction": "Enemy",
@@ -325,6 +343,8 @@
         }
       ],
       "loot_table_id": "goblin_shaman_loot",
+      "gold_min": 2,
+      "gold_max": 5,
       "tags": ["goblinoid", "support", "mid_game"],
       "sprite_path": "res://Assets/Sprites/0x72/Orc_Shaman_Idle_1.png",
       "sprite_atlas_coords": [8, 0]
@@ -363,6 +383,8 @@
         }
       ],
       "loot_table_id": "dark_mage_loot",
+      "gold_min": 3,
+      "gold_max": 7,
       "tags": ["humanoid", "ranged", "caster", "mid_game"],
       "sprite_path": "res://Assets/Sprites/0x72/Necromancer_Idle_1.png",
       "sprite_atlas_coords": [9, 0]
@@ -404,6 +426,8 @@
         }
       ],
       "loot_table_id": "shadow_stalker_loot",
+      "gold_min": 4,
+      "gold_max": 9,
       "tags": ["shadow", "ambush", "late_game"],
       "sprite_path": "res://Assets/Sprites/0x72/Masked_Orc_Idle_1.png",
       "sprite_atlas_coords": [10, 0]
@@ -446,6 +470,8 @@
         }
       ],
       "loot_table_id": "bone_lord_loot",
+      "gold_min": 10,
+      "gold_max": 20,
       "tags": ["undead", "elite", "late_game"],
       "sprite_path": "res://Assets/Sprites/0x72/Big_Zombie_Idle_1.png",
       "sprite_atlas_coords": [11, 0]
@@ -487,6 +513,8 @@
         }
       ],
       "loot_table_id": "flame_elemental_loot",
+      "gold_min": 6,
+      "gold_max": 12,
       "tags": ["elemental", "elite", "late_game", "fire"],
       "sprite_path": "res://Assets/Sprites/0x72/Chort_Idle_1.png",
       "sprite_atlas_coords": [12, 0]

@@ -4,6 +4,14 @@ using Roguelike.Core;
 
 namespace Godotussy;
 
+public sealed record TrapTriggeredEventArgs(
+    EntityId VictimId,
+    Position Position,
+    string TrapId,
+    int Damage,
+    string StatusEffect,
+    bool Disarmed);
+
 public partial class EventBus : Node
 {
     public event Action<int>? TurnStarted;
@@ -37,6 +45,12 @@ public partial class EventBus : Node
     public event Action<EntityId, int>? LeveledUp;
     public event Action<EntityId>? ProgressionChanged;
     public event Action<EntityId, int>? CurrencyChanged;
+    public event Action<string>? TargetingModeEntered;
+    public event Action<string>? TargetingModeExited;
+    public event Action<Position, bool>? TargetingCursorMoved;
+    public event Action<IReadOnlyList<Position>, bool>? TargetingPreviewChanged;
+
+    public event Action<TrapTriggeredEventArgs>? TrapTriggered;
 
     public void EmitTurnStarted(int turnNumber) => TurnStarted?.Invoke(turnNumber);
 
@@ -105,4 +119,14 @@ public partial class EventBus : Node
     public void EmitProgressionChanged(EntityId entityId) => ProgressionChanged?.Invoke(entityId);
 
     public void EmitCurrencyChanged(EntityId entityId, int gold) => CurrencyChanged?.Invoke(entityId, gold);
+
+    public void EmitTargetingModeEntered(string kind) => TargetingModeEntered?.Invoke(kind);
+
+    public void EmitTargetingModeExited(string reason) => TargetingModeExited?.Invoke(reason);
+
+    public void EmitTargetingCursorMoved(Position position, bool isValid) => TargetingCursorMoved?.Invoke(position, isValid);
+
+    public void EmitTargetingPreviewChanged(IReadOnlyList<Position> tiles, bool isValid) => TargetingPreviewChanged?.Invoke(tiles, isValid);
+
+    public void EmitTrapTriggered(TrapTriggeredEventArgs args) => TrapTriggered?.Invoke(args);
 }

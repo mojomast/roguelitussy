@@ -24,6 +24,7 @@ public sealed class ContentLoader : IContentDatabase
         "status_effects.json",
         "room_prefabs.json",
         "loot_tables.json",
+        "traps.json",
     };
 
     private static readonly Regex StableIdPattern = new("^[a-z0-9_]+$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
@@ -70,6 +71,10 @@ public sealed class ContentLoader : IContentDatabase
 
     public IReadOnlyDictionary<string, LootTableDefinition> LootTables { get; }
 
+    public IReadOnlyDictionary<string, TrapDefinition> TrapDefinitions { get; }
+
+    public IReadOnlyDictionary<string, TrapTemplate> TrapTemplates { get; }
+
     public IReadOnlyDictionary<string, string> TileLegend { get; }
 
     public IReadOnlyList<string> ValidationErrors { get; }
@@ -87,6 +92,7 @@ public sealed class ContentLoader : IContentDatabase
         SortedDictionary<string, StatusEffectDefinition> statusEffects,
         SortedDictionary<string, RoomPrefabDefinition> roomPrefabs,
         SortedDictionary<string, LootTableDefinition> lootTables,
+        SortedDictionary<string, TrapDefinition> trapDefinitions,
         SortedDictionary<string, string> tileLegend,
         SortedDictionary<string, ItemTemplate> itemTemplates,
         SortedDictionary<string, EnemyTemplate> enemyTemplates,
@@ -94,6 +100,7 @@ public sealed class ContentLoader : IContentDatabase
         SortedDictionary<string, PerkTemplate> perkTemplates,
         SortedDictionary<string, NpcTemplate> npcTemplates,
         SortedDictionary<string, DialogueTemplate> dialogueTemplates,
+        SortedDictionary<string, TrapTemplate> trapTemplates,
         string contentHash,
         IReadOnlyList<string> validationErrors)
     {
@@ -109,6 +116,7 @@ public sealed class ContentLoader : IContentDatabase
         StatusEffects = new ReadOnlyDictionary<string, StatusEffectDefinition>(statusEffects);
         RoomPrefabs = new ReadOnlyDictionary<string, RoomPrefabDefinition>(roomPrefabs);
         LootTables = new ReadOnlyDictionary<string, LootTableDefinition>(lootTables);
+        TrapDefinitions = new ReadOnlyDictionary<string, TrapDefinition>(trapDefinitions);
         TileLegend = new ReadOnlyDictionary<string, string>(tileLegend);
         ItemTemplates = new ReadOnlyDictionary<string, ItemTemplate>(itemTemplates);
         EnemyTemplates = new ReadOnlyDictionary<string, EnemyTemplate>(enemyTemplates);
@@ -116,6 +124,7 @@ public sealed class ContentLoader : IContentDatabase
         PerkTemplates = new ReadOnlyDictionary<string, PerkTemplate>(perkTemplates);
         NpcTemplates = new ReadOnlyDictionary<string, NpcTemplate>(npcTemplates);
         DialogueTemplates = new ReadOnlyDictionary<string, DialogueTemplate>(dialogueTemplates);
+        TrapTemplates = new ReadOnlyDictionary<string, TrapTemplate>(trapTemplates);
         ValidationErrors = validationErrors;
     }
 
@@ -136,6 +145,7 @@ public sealed class ContentLoader : IContentDatabase
         var statusEffects = ReadDocument<StatusEffectsDocument>(Path.Combine(fullDirectory, "status_effects.json"));
         var rooms = ReadDocument<RoomPrefabsDocument>(Path.Combine(fullDirectory, "room_prefabs.json"));
         var lootTables = ReadDocument<LootTablesDocument>(Path.Combine(fullDirectory, "loot_tables.json"));
+        var traps = ReadDocument<TrapsDocument>(Path.Combine(fullDirectory, "traps.json"));
 
         var itemDefinitions = BuildLookup(items.Items, item => item.Id, "item");
         var enemyDefinitions = BuildLookup(enemies.Enemies, enemy => enemy.Id, "enemy");
@@ -146,12 +156,13 @@ public sealed class ContentLoader : IContentDatabase
         var statusDefinitions = BuildLookup(statusEffects.StatusEffects, effect => effect.Id, "status effect");
         var roomDefinitions = BuildLookup(rooms.Rooms, room => room.Id, "room prefab");
         var lootDefinitions = BuildLookup(lootTables.LootTables, table => table.Id, "loot table");
+        var trapDefinitions = BuildLookup(traps.Traps, trap => trap.Id, "trap");
         var tileLegend = new SortedDictionary<string, string>(rooms.TileLegend, StringComparer.Ordinal);
 
         var itemTemplates = new SortedDictionary<string, ItemTemplate>(StringComparer.Ordinal);
         foreach (var definition in itemDefinitions.Values)
         {
-            itemTemplates[definition.Id] = BuildItemTemplate(definition);
+            itemTemplates[definition.Id] = BuildItemTemplate(definition, abilityDefinitions);
         }
 
         var enemyTemplates = new SortedDictionary<string, EnemyTemplate>(StringComparer.Ordinal);
@@ -184,6 +195,12 @@ public sealed class ContentLoader : IContentDatabase
             npcTemplates[definition.Id] = BuildNpcTemplate(definition);
         }
 
+        var trapTemplates = new SortedDictionary<string, TrapTemplate>(StringComparer.Ordinal);
+        foreach (var definition in trapDefinitions.Values)
+        {
+            trapTemplates[definition.Id] = BuildTrapTemplate(definition);
+        }
+
         var validationErrors = Validate(
             items,
             enemies,
@@ -194,6 +211,7 @@ public sealed class ContentLoader : IContentDatabase
             statusEffects,
             rooms,
             lootTables,
+            traps,
             itemDefinitions,
             enemyDefinitions,
             abilityDefinitions,
@@ -203,6 +221,7 @@ public sealed class ContentLoader : IContentDatabase
             statusDefinitions,
             roomDefinitions,
             lootDefinitions,
+            trapDefinitions,
             tileLegend);
 
         validationErrors.AddRange(DifficultyScaler.ValidateBalance(itemDefinitions, enemyDefinitions, lootDefinitions));
@@ -219,6 +238,7 @@ public sealed class ContentLoader : IContentDatabase
             statusDefinitions,
             roomDefinitions,
             lootDefinitions,
+            trapDefinitions,
             tileLegend,
             itemTemplates,
             enemyTemplates,
@@ -226,6 +246,7 @@ public sealed class ContentLoader : IContentDatabase
             perkTemplates,
             npcTemplates,
             dialogueTemplates,
+            trapTemplates,
             contentHash,
             validationErrors.AsReadOnly());
 
@@ -318,6 +339,20 @@ public sealed class ContentLoader : IContentDatabase
         return found;
     }
 
+    public bool TryGetStatusEffect(string statusId, out StatusEffectDefinition definition)
+    {
+        var found = StatusEffects.TryGetValue(statusId, out var statusEffect);
+        definition = statusEffect!;
+        return found;
+    }
+
+    public bool TryGetTrapTemplate(string templateId, out TrapTemplate template)
+    {
+        var found = TrapTemplates.TryGetValue(templateId, out var trapTemplate);
+        template = trapTemplate!;
+        return found;
+    }
+
     public IReadOnlyList<ItemTemplate> GetAvailableItems(int depth)
     {
         return ItemDefinitions.Values
@@ -398,7 +433,7 @@ public sealed class ContentLoader : IContentDatabase
         return lookup;
     }
 
-    private static ItemTemplate BuildItemTemplate(ItemDefinition item)
+    private static ItemTemplate BuildItemTemplate(ItemDefinition item, IReadOnlyDictionary<string, AbilityDefinition> abilities)
     {
         var slot = ParseEquipSlot(item.Slot);
         var category = MapItemCategory(item.Type, slot);
@@ -419,6 +454,16 @@ public sealed class ContentLoader : IContentDatabase
             ? (IReadOnlyDictionary<string, int>)new System.Collections.ObjectModel.ReadOnlyDictionary<string, int>(new SortedDictionary<string, int>(item.Requirements, StringComparer.OrdinalIgnoreCase))
             : null;
 
+        var requiresTargetSelection = false;
+        if (useEffect is not null && useEffect.StartsWith("cast_ability:", StringComparison.OrdinalIgnoreCase))
+        {
+            var abilityId = useEffect["cast_ability:".Length..];
+            if (abilities.TryGetValue(abilityId, out var ability))
+            {
+                requiresTargetSelection = !string.Equals(ability.Targeting.Type, "self", StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
         return new ItemTemplate(
             item.Id,
             item.Name,
@@ -438,7 +483,8 @@ public sealed class ContentLoader : IContentDatabase
             onHitEffects,
             requirements,
             item.Value,
-            item.Weight);
+            item.Weight,
+            requiresTargetSelection);
     }
 
     private static DialogueTemplate BuildDialogueTemplate(DialogueDefinition dialogue)
@@ -480,6 +526,28 @@ public sealed class ContentLoader : IContentDatabase
             merchantOffers);
     }
 
+    private static TrapTemplate BuildTrapTemplate(TrapDefinition trap)
+    {
+        _ = TryParseDamageType(trap.DamageType, out var damageType);
+        var avoidFlags = trap.AvoidFlags.Count > 0 ? (IReadOnlyList<string>)trap.AvoidFlags.AsReadOnly() : null;
+        var spriteAtlasCoords = trap.SpriteAtlasCoords.Count > 0 ? (IReadOnlyList<int>)trap.SpriteAtlasCoords.AsReadOnly() : null;
+        return new TrapTemplate(
+            trap.Id,
+            trap.Name,
+            trap.Description,
+            Math.Max(0, trap.DamageMin),
+            Math.Max(0, trap.DamageMax),
+            damageType,
+            string.IsNullOrWhiteSpace(trap.StatusEffect) ? null : trap.StatusEffect,
+            Math.Max(0, trap.StatusDuration),
+            Math.Max(1, trap.StatusMagnitude),
+            avoidFlags,
+            Math.Clamp(trap.TriggerChance, 0, 100),
+            string.IsNullOrWhiteSpace(trap.AbilityId) ? null : trap.AbilityId,
+            trap.SpritePath,
+            spriteAtlasCoords);
+    }
+
     private static IReadOnlyList<WeaponOnHitEffect>? BuildOnHitEffects(List<ItemEffectDefinition> effects)
     {
         List<WeaponOnHitEffect>? onHit = null;
@@ -516,6 +584,8 @@ public sealed class ContentLoader : IContentDatabase
             ViewRadius = enemy.Stats.FovRange,
         };
 
+        var aiParameters = BuildAIParameters(enemy.AiParams);
+
         return new EnemyTemplate(
             enemy.Id,
             enemy.Name,
@@ -527,7 +597,103 @@ public sealed class ContentLoader : IContentDatabase
             enemy.MaxDepth,
             enemy.SpawnWeight,
             enemy.LootTableId,
-            enemy.Stats.XpValue);
+            enemy.GoldMin,
+            enemy.GoldMax,
+            enemy.Stats.XpValue,
+            aiParameters);
+    }
+
+    private static AIParameters BuildAIParameters(Dictionary<string, JsonElement> aiParams)
+    {
+        var parameters = new AIParameters();
+        if (aiParams.Count == 0)
+        {
+            return parameters;
+        }
+
+        foreach (var (key, value) in aiParams)
+        {
+            switch (key)
+            {
+                case "flee_hp_pct":
+                    if (value.TryGetSingle(out var fleeHpPct))
+                    {
+                        parameters = parameters with { FleeHpPct = fleeHpPct };
+                    }
+                    else if (value.TryGetInt32(out var fleeHpPctInt))
+                    {
+                        parameters = parameters with { FleeHpPct = fleeHpPctInt };
+                    }
+
+                    break;
+
+                case "aggro_range":
+                    if (value.TryGetInt32(out var aggroRange) && aggroRange > 0)
+                    {
+                        parameters = parameters with { AggroRange = aggroRange };
+                    }
+
+                    break;
+
+                case "wander_when_idle":
+                    if (value.ValueKind == JsonValueKind.True || value.ValueKind == JsonValueKind.False)
+                    {
+                        parameters = parameters with { WanderWhenIdle = value.GetBoolean() };
+                    }
+
+                    break;
+
+                case "preferred_range":
+                    if (value.TryGetInt32(out var preferredRange) && preferredRange > 0)
+                    {
+                        parameters = parameters with { PreferredRange = preferredRange };
+                    }
+
+                    break;
+
+                case "min_range":
+                    if (value.TryGetInt32(out var minRange) && minRange > 0)
+                    {
+                        parameters = parameters with { MinRange = minRange };
+                    }
+
+                    break;
+
+                case "patrol_radius":
+                    if (value.TryGetInt32(out var patrolRadius) && patrolRadius > 0)
+                    {
+                        parameters = parameters with { PatrolRadius = patrolRadius };
+                    }
+
+                    break;
+
+                case "support_range":
+                    if (value.TryGetInt32(out var supportRange) && supportRange > 0)
+                    {
+                        parameters = parameters with { SupportRange = supportRange };
+                    }
+
+                    break;
+
+                case "group_aggro_range":
+                    if (value.TryGetInt32(out var groupAggroRange) && groupAggroRange > 0)
+                    {
+                        parameters = parameters with { GroupAggroRange = groupAggroRange };
+                    }
+
+                    break;
+
+                case "phase_through_walls":
+                    if (value.ValueKind == JsonValueKind.True || value.ValueKind == JsonValueKind.False)
+                    {
+                        parameters = parameters with { PhaseThroughWalls = value.GetBoolean() };
+                    }
+
+                    break;
+            }
+        }
+
+        return parameters;
     }
 
     private static AbilityTemplate BuildAbilityTemplate(AbilityDefinition ability)
@@ -715,6 +881,7 @@ public sealed class ContentLoader : IContentDatabase
             "armor" => ItemCategory.Armor,
             "consumable" => slot == EquipSlot.None ? ItemCategory.Consumable : ItemCategory.Scroll,
             "accessory" => ItemCategory.Misc,
+            "key" => ItemCategory.Key,
             _ => ItemCategory.Misc,
         };
     }
@@ -764,6 +931,7 @@ public sealed class ContentLoader : IContentDatabase
         StatusEffectsDocument statusEffects,
         RoomPrefabsDocument rooms,
         LootTablesDocument lootTables,
+        TrapsDocument traps,
         IReadOnlyDictionary<string, ItemDefinition> itemDefinitions,
         IReadOnlyDictionary<string, EnemyDefinition> enemyDefinitions,
         IReadOnlyDictionary<string, AbilityDefinition> abilityDefinitions,
@@ -773,6 +941,7 @@ public sealed class ContentLoader : IContentDatabase
         IReadOnlyDictionary<string, StatusEffectDefinition> statusDefinitions,
         IReadOnlyDictionary<string, RoomPrefabDefinition> roomDefinitions,
         IReadOnlyDictionary<string, LootTableDefinition> lootDefinitions,
+        IReadOnlyDictionary<string, TrapDefinition> trapDefinitions,
         IReadOnlyDictionary<string, string> tileLegend)
     {
         var errors = new List<string>();
@@ -786,6 +955,7 @@ public sealed class ContentLoader : IContentDatabase
         ValidateHeader(statusEffects.Schema, statusEffects.Version, "roguelike-status-effects-v1", "status_effects.json", errors);
         ValidateHeader(rooms.Schema, rooms.Version, "roguelike-room-prefabs-v1", "room_prefabs.json", errors);
         ValidateHeader(lootTables.Schema, lootTables.Version, "roguelike-loot-tables-v1", "loot_tables.json", errors);
+        ValidateHeader(traps.Schema, traps.Version, "roguelike-traps-v1", "traps.json", errors);
 
         ValidateItems(itemDefinitions, abilityDefinitions, statusDefinitions, errors);
         ValidateEnemies(enemyDefinitions, abilityDefinitions, lootDefinitions, errors);
@@ -794,8 +964,9 @@ public sealed class ContentLoader : IContentDatabase
         ValidateDialogs(dialogueDefinitions, errors);
         ValidateNpcs(npcDefinitions, dialogueDefinitions, itemDefinitions, errors);
         ValidateStatusEffects(statusDefinitions, errors);
-        ValidateRooms(roomDefinitions, enemyDefinitions, itemDefinitions, npcDefinitions, lootDefinitions, tileLegend, errors);
+        ValidateRooms(roomDefinitions, enemyDefinitions, itemDefinitions, npcDefinitions, lootDefinitions, trapDefinitions, tileLegend, errors);
         ValidateLootTables(lootDefinitions, itemDefinitions, errors);
+        ValidateTraps(trapDefinitions, abilityDefinitions, errors);
 
         return errors;
     }
@@ -844,7 +1015,7 @@ public sealed class ContentLoader : IContentDatabase
                 errors.Add($"Item '{id}' must define exactly two sprite atlas coordinates.");
             }
 
-            if (!IsAllowedValue(item.Type, "weapon", "armor", "consumable", "accessory"))
+            if (!IsAllowedValue(item.Type, "weapon", "armor", "consumable", "accessory", "key"))
             {
                 errors.Add($"Item '{id}' has unknown type '{item.Type}'.");
             }
@@ -932,6 +1103,33 @@ public sealed class ContentLoader : IContentDatabase
                             && (string.IsNullOrWhiteSpace(effect.AbilityId) || !abilities.ContainsKey(effect.AbilityId)))
                         {
                             errors.Add($"Item '{id}' cast_ability effect references unknown ability '{effect.AbilityId}'.");
+                        }
+
+                        if (string.Equals(effect.Action, "cast_ability", StringComparison.Ordinal)
+                            && !string.IsNullOrWhiteSpace(effect.AbilityId)
+                            && abilities.TryGetValue(effect.AbilityId, out var ability))
+                        {
+                            var itemTarget = effect.Target;
+                            if (string.Equals(itemTarget, "self", StringComparison.OrdinalIgnoreCase)
+                                && !string.Equals(ability.Targeting.Type, "self", StringComparison.OrdinalIgnoreCase))
+                            {
+                                errors.Add($"Item '{id}' cast_ability:self effect references ability '{effect.AbilityId}' whose targeting.type is '{ability.Targeting.Type}'; must be 'self'.");
+                            }
+                            else if (string.Equals(itemTarget, "aimed", StringComparison.OrdinalIgnoreCase))
+                            {
+                                if (string.Equals(ability.Targeting.Type, "self", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    errors.Add($"Item '{id}' cast_ability:aimed effect references ability '{effect.AbilityId}' whose targeting.type is 'self'; must be one of single/tile/aoe_circle.");
+                                }
+                                else if (IsAllowedValue(ability.Targeting.Type, "aoe_line", "aoe_cone"))
+                                {
+                                    errors.Add($"Item '{id}' cast_ability:aimed effect references ability '{effect.AbilityId}' whose targeting.type '{ability.Targeting.Type}' is not yet supported for item targeting.");
+                                }
+                                else if (!IsAllowedValue(ability.Targeting.Type, "single", "tile", "aoe_circle"))
+                                {
+                                    errors.Add($"Item '{id}' cast_ability:aimed effect references ability '{effect.AbilityId}' with unsupported targeting.type '{ability.Targeting.Type}'.");
+                                }
+                            }
                         }
                         break;
 
@@ -1064,6 +1262,88 @@ public sealed class ContentLoader : IContentDatabase
                 errors.Add($"Enemy '{id}' has unknown ai_type '{enemy.AiType}'.");
             }
 
+            foreach (var (key, value) in enemy.AiParams)
+            {
+                switch (key)
+                {
+                    case "flee_hp_pct":
+                        if (!IsNumeric(value) || GetNumeric(value) is < 0 or > 100)
+                        {
+                            errors.Add($"Enemy '{id}' ai_params.flee_hp_pct must be a number between 0 and 100.");
+                        }
+
+                        break;
+
+                    case "aggro_range":
+                        if (!value.TryGetInt32(out var aggroRange) || aggroRange <= 0)
+                        {
+                            errors.Add($"Enemy '{id}' ai_params.aggro_range must be a positive integer.");
+                        }
+
+                        break;
+
+                    case "wander_when_idle":
+                        if (value.ValueKind != JsonValueKind.True && value.ValueKind != JsonValueKind.False)
+                        {
+                            errors.Add($"Enemy '{id}' ai_params.wander_when_idle must be a boolean.");
+                        }
+
+                        break;
+
+                    case "preferred_range":
+                        if (!value.TryGetInt32(out var preferredRange) || preferredRange <= 0)
+                        {
+                            errors.Add($"Enemy '{id}' ai_params.preferred_range must be a positive integer.");
+                        }
+
+                        break;
+
+                    case "min_range":
+                        if (!value.TryGetInt32(out var minRange) || minRange <= 0)
+                        {
+                            errors.Add($"Enemy '{id}' ai_params.min_range must be a positive integer.");
+                        }
+
+                        break;
+
+                    case "patrol_radius":
+                        if (!value.TryGetInt32(out var patrolRadius) || patrolRadius <= 0)
+                        {
+                            errors.Add($"Enemy '{id}' ai_params.patrol_radius must be a positive integer.");
+                        }
+
+                        break;
+
+                    case "support_range":
+                        if (!value.TryGetInt32(out var supportRange) || supportRange <= 0)
+                        {
+                            errors.Add($"Enemy '{id}' ai_params.support_range must be a positive integer.");
+                        }
+
+                        break;
+
+                    case "group_aggro_range":
+                        if (!value.TryGetInt32(out var groupAggroRange) || groupAggroRange <= 0)
+                        {
+                            errors.Add($"Enemy '{id}' ai_params.group_aggro_range must be a positive integer.");
+                        }
+
+                        break;
+
+                    case "phase_through_walls":
+                        if (value.ValueKind != JsonValueKind.True && value.ValueKind != JsonValueKind.False)
+                        {
+                            errors.Add($"Enemy '{id}' ai_params.phase_through_walls must be a boolean.");
+                        }
+
+                        break;
+
+                    default:
+                        errors.Add($"Enemy '{id}' ai_params contains unrecognized key '{key}'.");
+                        break;
+                }
+            }
+
             foreach (var ability in enemy.Abilities)
             {
                 if (string.IsNullOrWhiteSpace(ability.AbilityId) || !abilities.ContainsKey(ability.AbilityId))
@@ -1085,6 +1365,21 @@ public sealed class ContentLoader : IContentDatabase
             if (!string.IsNullOrWhiteSpace(enemy.LootTableId) && !lootTables.ContainsKey(enemy.LootTableId))
             {
                 errors.Add($"Enemy '{id}' references unknown loot table '{enemy.LootTableId}'.");
+            }
+
+            if (enemy.GoldMin < 0)
+            {
+                errors.Add($"Enemy '{id}' gold_min cannot be negative.");
+            }
+
+            if (enemy.GoldMax < 0)
+            {
+                errors.Add($"Enemy '{id}' gold_max cannot be negative.");
+            }
+
+            if (enemy.GoldMin > enemy.GoldMax)
+            {
+                errors.Add($"Enemy '{id}' gold_min cannot exceed gold_max.");
             }
         }
     }
@@ -1391,6 +1686,7 @@ public sealed class ContentLoader : IContentDatabase
         IReadOnlyDictionary<string, ItemDefinition> items,
         IReadOnlyDictionary<string, NpcDefinition> npcs,
         IReadOnlyDictionary<string, LootTableDefinition> lootTables,
+        IReadOnlyDictionary<string, TrapDefinition> traps,
         IReadOnlyDictionary<string, string> tileLegend,
         ICollection<string> errors)
     {
@@ -1455,6 +1751,19 @@ public sealed class ContentLoader : IContentDatabase
                 if (!IsWithin(room, spawnPoint.X, spawnPoint.Y))
                 {
                     errors.Add($"Room '{id}' spawn point at ({spawnPoint.X},{spawnPoint.Y}) is out of bounds.");
+                    continue;
+                }
+
+                if (string.Equals(spawnPoint.Type, "trap", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (string.IsNullOrWhiteSpace(spawnPoint.TrapId))
+                    {
+                        errors.Add($"Room '{id}' trap spawn point at ({spawnPoint.X},{spawnPoint.Y}) is missing trap_id.");
+                    }
+                    else if (!traps.ContainsKey(spawnPoint.TrapId))
+                    {
+                        errors.Add($"Room '{id}' trap spawn point at ({spawnPoint.X},{spawnPoint.Y}) references unknown trap '{spawnPoint.TrapId}'.");
+                    }
                 }
             }
 
@@ -1556,6 +1865,31 @@ public sealed class ContentLoader : IContentDatabase
         }
     }
 
+    private static void ValidateTraps(
+        IReadOnlyDictionary<string, TrapDefinition> traps,
+        IReadOnlyDictionary<string, AbilityDefinition> abilities,
+        ICollection<string> errors)
+    {
+        foreach (var (id, trap) in traps)
+        {
+            ValidateStableId(id, "Trap", errors);
+            ValidateRequiredText(trap.Name!, $"Trap '{id}' name", errors);
+            ValidateRequiredText(trap.Description!, $"Trap '{id}' description", errors);
+            ValidateRequiredText(trap.AbilityId!, $"Trap '{id}' ability_id", errors);
+            ValidateRequiredText(trap.SpritePath!, $"Trap '{id}' sprite_path", errors);
+
+            if (string.IsNullOrWhiteSpace(trap.AbilityId) || !abilities.ContainsKey(trap.AbilityId))
+            {
+                errors.Add($"Trap '{id}' references unknown ability '{trap.AbilityId}'.");
+            }
+
+            if (trap.SpriteAtlasCoords.Count != 2)
+            {
+                errors.Add($"Trap '{id}' must define exactly two sprite atlas coordinates.");
+            }
+        }
+    }
+
     private static void ValidateStableId(string id, string kind, ICollection<string> errors)
     {
         if (!StableIdPattern.IsMatch(id))
@@ -1575,6 +1909,26 @@ public sealed class ContentLoader : IContentDatabase
     private static bool IsAllowedValue(string? candidate, params string[] allowedValues)
     {
         return candidate is not null && allowedValues.Contains(candidate, StringComparer.Ordinal);
+    }
+
+    private static bool IsNumeric(JsonElement element)
+    {
+        return element.ValueKind == JsonValueKind.Number;
+    }
+
+    private static float GetNumeric(JsonElement element)
+    {
+        if (element.TryGetSingle(out var single))
+        {
+            return single;
+        }
+
+        if (element.TryGetInt32(out var integer))
+        {
+            return integer;
+        }
+
+        return float.NaN;
     }
 
     private static bool TryParseDamageType(string? damageType, out DamageType parsed)

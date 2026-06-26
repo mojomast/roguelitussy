@@ -57,6 +57,9 @@ public static class WorldArtCatalog
                     AppendIfLoaded(layers, wallOverlayPath);
                 }
                 break;
+            case TileType.Trap:
+                AppendIfLoaded(layers, ResolveFloorPath(position, allowCracks: true));
+                break;
         }
 
         return layers;
@@ -90,6 +93,7 @@ public static class WorldArtCatalog
             TileType.StairsDown => "DN",
             TileType.Door when isDoorOpen => "//",
             TileType.Door => "[]",
+            TileType.Trap => "^",
             _ => null,
         };
     }
@@ -371,7 +375,7 @@ public static class WorldArtCatalog
 
     private static bool ShouldDrawBoundaryTrim(IWorldState? world, Position position, TileType tileType)
     {
-        if (tileType is not (TileType.Floor or TileType.StairsUp or TileType.StairsDown or TileType.Door))
+        if (tileType is not (TileType.Floor or TileType.StairsUp or TileType.StairsDown or TileType.Door or TileType.Trap))
         {
             return false;
         }

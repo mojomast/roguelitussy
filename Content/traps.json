@@ -1,0 +1,18 @@
+{
+  "$schema": "roguelike-traps-v1",
+  "version": 1,
+  "traps": [
+    {
+      "id": "spike_trap",
+      "name": "Spike Trap",
+      "description": "Sharp iron spikes hidden in the floor impale whoever steps on the tile.",
+      "ability_id": "spike_trap",
+      "damage_min": 5,
+      "damage_max": 10,
+      "damage_type": "physical",
+      "sprite_path": "res://Assets/Sprites/objects/trap_spikes.svg",
+      "sprite_atlas_coords": [0, 0],
+      "avoid_flags": ["phased", "flying"]
+    }
+  ]
+}

@@ -12,6 +12,9 @@ public sealed class MigrationTests : ITestSuite
         registry.Add("Persistence.SaveMigrator migrates v1 saves into current world state", MigratesLegacyV1Save);
         registry.Add("Persistence.SaveMigrator migrates v2 saves into bit-packed version 3", MigratesV2SaveToV3);
         registry.Add("Persistence.SaveMigrator migrates v7 saves into v8 floor payloads", MigratesV7SaveToV8FloorPayload);
+        registry.Add("Persistence.SaveMigrator migrates v8 saves into current version", MigratesV8SaveToCurrent);
+        registry.Add("Persistence.SaveMigrator migrates v9 saves into v10 with default character options", MigratesV9SaveToV10CharacterOptions);
+        registry.Add("Persistence.SaveMigrator migrates v10 saves into v12 with trap entities", MigratesV10SaveToV12TrapEntities);
     }
 
     private static void MigratesLegacyV1Save()
@@ -184,6 +187,153 @@ public sealed class MigrationTests : ITestSuite
     {
       "id": "11111111111111111111111111111111",
       "name": "V7 Hero",
+      "position": { "x": 1, "y": 1 },
+      "faction": 0,
+      "blocksMovement": true,
+      "blocksSight": false,
+      "stats": { "hp": 10, "maxHP": 10, "attack": 2, "accuracy": 1, "defense": 1, "evasion": 1, "speed": 100, "viewRadius": 8, "energy": 0 }
+    }
+  ],
+  "groundItems": [],
+  "openDoors": []
+}
+""";
+
+    private static void MigratesV8SaveToCurrent()
+    {
+        using var sandbox = MigrationSandbox.Create();
+        var manager = new SaveManager(sandbox.DirectoryPath);
+        File.WriteAllText(Path.Combine(sandbox.DirectoryPath, SaveSlots.GetFileName(SaveSlots.Slot1)), Version8SaveJson());
+
+        var run = manager.LoadRun(SaveSlots.Slot1).GetAwaiter().GetResult();
+        Expect.NotNull(run, "Version 8 save should migrate and load as a run snapshot");
+        Expect.Equal(3, run!.CurrentFloor, "Migrated v8 save should preserve active floor depth");
+        Expect.True(run.Floors.ContainsKey(3), "Migrated v8 save should create a single active floor payload");
+        Expect.Equal("V8 Hero", run.ActiveWorld.Player.Name, "Migrated v8 save should restore the player");
+
+        var metadata = manager.GetSaveMetadata(SaveSlots.Slot1);
+        Expect.NotNull(metadata, "Migrated v8 save should expose metadata");
+        Expect.Equal(SaveSerializer.CurrentVersion, metadata!.Version, "Migrated v8 save should report the current normalized version");
+    }
+
+    private static void MigratesV9SaveToV10CharacterOptions()
+    {
+        using var sandbox = MigrationSandbox.Create();
+        var manager = new SaveManager(sandbox.DirectoryPath);
+        File.WriteAllText(Path.Combine(sandbox.DirectoryPath, SaveSlots.GetFileName(SaveSlots.Slot1)), Version9SaveJson());
+
+        var run = manager.LoadRun(SaveSlots.Slot1).GetAwaiter().GetResult();
+        Expect.NotNull(run, "Version 9 save should migrate and load as a run snapshot");
+        Expect.Equal(4, run!.CurrentFloor, "Migrated v9 save should preserve active floor depth");
+        Expect.True(run.Floors.ContainsKey(4), "Migrated v9 save should create a single active floor payload");
+        Expect.Equal("V9 Hero", run.ActiveWorld.Player.Name, "Migrated v9 save should restore the player");
+        Expect.Equal("Vanguard", run.CharacterOptions.Archetype, "Migrated v9 save should default to Vanguard archetype");
+        Expect.Equal("human", run.CharacterOptions.RaceId, "Migrated v9 save should default to human race");
+
+        var metadata = manager.GetSaveMetadata(SaveSlots.Slot1);
+        Expect.NotNull(metadata, "Migrated v9 save should expose metadata");
+        Expect.Equal(SaveSerializer.CurrentVersion, metadata!.Version, "Migrated v9 save should report the current normalized version");
+    }
+
+    private static void MigratesV10SaveToV12TrapEntities()
+    {
+        using var sandbox = MigrationSandbox.Create();
+        var manager = new SaveManager(sandbox.DirectoryPath);
+        File.WriteAllText(Path.Combine(sandbox.DirectoryPath, SaveSlots.GetFileName(SaveSlots.Slot1)), Version10SaveJson());
+
+        var run = manager.LoadRun(SaveSlots.Slot1).GetAwaiter().GetResult();
+        Expect.NotNull(run, "Version 10 save should migrate and load as a run snapshot");
+        Expect.Equal(5, run!.CurrentFloor, "Migrated v10 save should preserve active floor depth");
+        Expect.True(run.Floors.ContainsKey(5), "Migrated v10 save should create a single active floor payload");
+        Expect.Equal("V10 Hero", run.ActiveWorld.Player.Name, "Migrated v10 save should restore the player");
+        Expect.Equal(0, run.ActiveWorld.Entities.Count(entity => entity.GetComponent<TrapComponent>() is not null), "Migrated v10 save should default traps to empty");
+
+        var metadata = manager.GetSaveMetadata(SaveSlots.Slot1);
+        Expect.NotNull(metadata, "Migrated v10 save should expose metadata");
+        Expect.Equal(SaveSerializer.CurrentVersion, metadata!.Version, "Migrated v10 save should report the current normalized version");
+    }
+
+    private static string Version8SaveJson() => """
+{
+  "version": 8,
+  "savedAt": "2026-06-10T10:15:00Z",
+  "seed": 123,
+  "depth": 3,
+  "turnNumber": 42,
+  "combatRandomState": 99,
+  "itemRandomState": 100,
+  "width": 3,
+  "height": 3,
+  "tiles": "AgICAgICAgIC",
+  "explored": "BwA=",
+  "visible": "AgA=",
+  "playerId": "11111111111111111111111111111111",
+  "entities": [
+    {
+      "id": "11111111111111111111111111111111",
+      "name": "V8 Hero",
+      "position": { "x": 1, "y": 1 },
+      "faction": 0,
+      "blocksMovement": true,
+      "blocksSight": false,
+      "stats": { "hp": 10, "maxHP": 10, "attack": 2, "accuracy": 1, "defense": 1, "evasion": 1, "speed": 100, "viewRadius": 8, "energy": 0 }
+    }
+  ],
+  "groundItems": [],
+  "openDoors": []
+}
+""";
+
+    private static string Version10SaveJson() => """
+    {
+      "version": 10,
+      "savedAt": "2026-06-10T10:15:00Z",
+      "seed": 123,
+      "depth": 5,
+      "turnNumber": 44,
+      "combatRandomState": 99,
+      "itemRandomState": 100,
+      "width": 3,
+      "height": 3,
+      "tiles": "AgICAgICAgIC",
+      "explored": "BwA=",
+      "visible": "AgA=",
+      "playerId": "11111111111111111111111111111111",
+      "entities": [
+        {
+          "id": "11111111111111111111111111111111",
+          "name": "V10 Hero",
+          "position": { "x": 1, "y": 1 },
+          "faction": 0,
+          "blocksMovement": true,
+          "blocksSight": false,
+          "stats": { "hp": 10, "maxHP": 10, "attack": 2, "accuracy": 1, "defense": 1, "evasion": 1, "speed": 100, "viewRadius": 8, "energy": 0 }
+        }
+      ],
+      "groundItems": [],
+      "openDoors": []
+    }
+    """;
+
+    private static string Version9SaveJson() => """
+{
+  "version": 9,
+  "savedAt": "2026-06-10T10:15:00Z",
+  "seed": 123,
+  "depth": 4,
+  "turnNumber": 43,
+  "combatRandomState": 99,
+  "itemRandomState": 100,
+  "width": 3,
+  "height": 3,
+  "tiles": "AgICAgICAgIC",
+  "explored": "BwA=",
+  "visible": "AgA=",
+  "playerId": "11111111111111111111111111111111",
+  "entities": [
+    {
+      "id": "11111111111111111111111111111111",
+      "name": "V9 Hero",
       "position": { "x": 1, "y": 1 },
       "faction": 0,
       "blocksMovement": true,

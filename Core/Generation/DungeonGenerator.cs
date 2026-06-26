@@ -9,6 +9,7 @@ public sealed class DungeonGenerator : IGenerator
     private const int MaxGenerationAttempts = 10;
     private const int MaxEnemies = 20;
     private const int MaxItems = 10;
+    private const int MinThemePrefabMatches = 4;
 
     private sealed record FixedEntityCollections(
         List<EnemySpawnData> EnemySpawns,
@@ -30,7 +31,9 @@ public sealed class DungeonGenerator : IGenerator
             InitializeWorld(world, mapSize.Width, mapSize.Height, seed, depth);
 
             var tree = BSPNode.Create(mapSize.Width, mapSize.Height, rng);
-            var rooms = RoomPlacer.PlaceRooms(tree, world, rng, prefabs);
+            var themeTag = ResolveThemeForDepth(depth);
+            var useTheme = !string.IsNullOrWhiteSpace(themeTag) && HasEnoughThemeMatches(prefabs, themeTag, tree);
+            var rooms = RoomPlacer.PlaceRooms(tree, world, rng, prefabs, useTheme ? themeTag : null);
             CorridorBuilder.Stitch(tree, world, rng);
             DoorSanitizer.Normalize(world);
 
@@ -61,6 +64,8 @@ public sealed class DungeonGenerator : IGenerator
             var chestSpawnDetails = CollectChestSpawnDetails(rooms, occupied, fixedEntities.ChestSpawns);
             var forcedEnemySpawns = CollectEnemySpawnDetails(rooms, occupied, fixedEntities.EnemySpawns, "enemy", "enemy_boss");
             var forcedItemSpawns = CollectItemSpawnDetails(rooms, occupied, fixedEntities.ItemSpawns, "item");
+            var trapSpawnDetails = CollectTrapSpawnDetails(rooms, occupied);
+            var (lockedDoors, keySpawns) = PlaceLockedDoorsAndKeys(world, rooms, playerSpawn, rng, occupied);
             var enemySpawnDetails = PlaceEnemySpawns(rooms, startRoom, depth, rng, occupied, forcedEnemySpawns);
             var itemSpawnDetails = PlaceItemSpawns(rooms, depth, rng, occupied, forcedItemSpawns);
 
@@ -80,7 +85,10 @@ public sealed class DungeonGenerator : IGenerator
                 enemySpawnDetails,
                 itemSpawnDetails,
                 chestSpawnDetails,
-                fixedEntities.NpcSpawns);
+                fixedEntities.NpcSpawns,
+                trapSpawnDetails,
+                lockedDoors,
+                keySpawns);
             if (LevelValidator.Validate(world, level).Count == 0)
             {
                 return level;
@@ -121,6 +129,43 @@ public sealed class DungeonGenerator : IGenerator
         }
 
         return (100, 60);
+    }
+
+    private static string? ResolveThemeForDepth(int depth)
+    {
+        var floor = depth <= 0 ? 1 : depth;
+        return floor switch
+        {
+            <= 3 => "prison",
+            <= 6 => "crypt",
+            _ => "magma",
+        };
+    }
+
+    private static bool HasEnoughThemeMatches(IReadOnlyList<RoomPrefab> prefabs, string themeTag, BSPNode tree)
+    {
+        var leaves = tree.Leaves().ToList();
+        var usableCount = 0;
+
+        for (var i = 0; i < prefabs.Count; i++)
+        {
+            if (!prefabs[i].Tags.Contains(themeTag))
+            {
+                continue;
+            }
+
+            for (var j = 0; j < leaves.Count; j++)
+            {
+                var leaf = leaves[j];
+                if (prefabs[i].FitsWithin(leaf.Width - (RoomPlacer.LeafPadding * 2), leaf.Height - (RoomPlacer.LeafPadding * 2)))
+                {
+                    usableCount++;
+                    break;
+                }
+            }
+        }
+
+        return usableCount >= MinThemePrefabMatches;
     }
 
     private static int MixSeed(int seed, int depth, int attempt)
@@ -276,6 +321,138 @@ public sealed class DungeonGenerator : IGenerator
         throw new InvalidOperationException("No unoccupied walkable tiles remain for spawn placement.");
     }
 
+    private static (List<Position> LockedDoors, List<Position> KeySpawns) PlaceLockedDoorsAndKeys(
+        WorldState world,
+        IReadOnlyList<RoomPlacement> rooms,
+        Position playerSpawn,
+        Random rng,
+        HashSet<Position> occupied)
+    {
+        var lockedDoors = new List<Position>();
+        var lockableRooms = new HashSet<RoomPlacement>();
+
+        foreach (var room in rooms)
+        {
+            if (room.Prefab is { LockDoorsOnEnter: true } || room.Room.Tags?.Contains("locked") == true)
+            {
+                lockableRooms.Add(room);
+            }
+        }
+
+        if (lockableRooms.Count == 0)
+        {
+            return (lockedDoors, new List<Position>());
+        }
+
+        for (var y = 0; y < world.Height; y++)
+        {
+            for (var x = 0; x < world.Width; x++)
+            {
+                var position = new Position(x, y);
+                if (world.GetTile(position) != TileType.Door)
+                {
+                    continue;
+                }
+
+                var adjacentRooms = new HashSet<RoomPlacement>();
+                foreach (var delta in Position.AllDirections)
+                {
+                    var neighbor = position + delta;
+                    if (!world.InBounds(neighbor) || !world.IsWalkable(neighbor))
+                    {
+                        continue;
+                    }
+
+                    foreach (var room in rooms)
+                    {
+                        if (room.Contains(neighbor))
+                        {
+                            adjacentRooms.Add(room);
+                            break;
+                        }
+                    }
+                }
+
+                if (adjacentRooms.Any(room => lockableRooms.Contains(room)))
+                {
+                    world.SetTile(position, TileType.LockedDoor);
+                    lockedDoors.Add(position);
+                }
+            }
+        }
+
+        var reachable = ComputeReachablePositions(world, playerSpawn);
+        var keyCandidates = new List<Position>();
+        foreach (var room in rooms)
+        {
+            if (lockableRooms.Contains(room))
+            {
+                continue;
+            }
+
+            foreach (var tile in room.WalkableTiles)
+            {
+                if (reachable.Contains(tile) && !occupied.Contains(tile) && world.GetTile(tile) == TileType.Floor)
+                {
+                    keyCandidates.Add(tile);
+                }
+            }
+        }
+
+        var keySpawns = new List<Position>();
+        if (keyCandidates.Count > 0)
+        {
+            var keyPosition = keyCandidates[rng.Next(keyCandidates.Count)];
+            occupied.Add(keyPosition);
+            keySpawns.Add(keyPosition);
+        }
+
+        return (lockedDoors, keySpawns);
+    }
+
+    private static HashSet<Position> ComputeReachablePositions(WorldState world, Position origin)
+    {
+        var reachable = new HashSet<Position>();
+        var queue = new Queue<Position>();
+
+        if (!world.InBounds(origin))
+        {
+            return reachable;
+        }
+
+        queue.Enqueue(origin);
+        reachable.Add(origin);
+
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            foreach (var delta in Position.Cardinals)
+            {
+                var neighbor = current + delta;
+                if (!world.InBounds(neighbor) || reachable.Contains(neighbor))
+                {
+                    continue;
+                }
+
+                var tile = world.GetTile(neighbor);
+                if (tile is TileType.Wall or TileType.LockedDoor or TileType.Void)
+                {
+                    continue;
+                }
+
+                if (!world.IsWalkable(neighbor))
+                {
+                    continue;
+                }
+
+                reachable.Add(neighbor);
+                queue.Enqueue(neighbor);
+            }
+        }
+
+        return reachable;
+    }
+
     private static IReadOnlyList<RoomPrefab> ResolvePrefabs(WorldState world, int depth)
     {
         if (world.ContentDatabase is not ContentLoader loader || loader.RoomPrefabs.Count == 0)
@@ -293,7 +470,8 @@ public sealed class DungeonGenerator : IGenerator
                 room.FixedEntities.Select(fixedEntity => new RoomPrefabFixedEntity(fixedEntity.X, fixedEntity.Y, fixedEntity.EntityType, fixedEntity.TemplateId)).ToArray(),
                 room.ItemQualityBonus,
                 room.EnemyCountBonus,
-                room.LockDoorsOnEnter))
+                room.LockDoorsOnEnter,
+                room.Tags.AsReadOnly()))
             .ToArray();
 
         return prefabs.Length > 0 ? prefabs : RoomPrefabLibrary.GetDefaultPrefabs();
@@ -392,6 +570,46 @@ public sealed class DungeonGenerator : IGenerator
                 if (occupied.Add(placement.Position))
                 {
                     spawns.Add(new ChestSpawnData(placement.Position, placement.SpawnPoint.ReferenceId));
+                }
+            }
+        }
+
+        return spawns;
+    }
+
+    private static List<TrapSpawnData> CollectTrapSpawnDetails(
+        IReadOnlyList<RoomPlacement> rooms,
+        HashSet<Position> occupied)
+    {
+        var spawns = new List<TrapSpawnData>();
+
+        foreach (var room in rooms)
+        {
+            if (room.Prefab is null)
+            {
+                continue;
+            }
+
+            for (var y = 0; y < room.Prefab.Height; y++)
+            {
+                for (var x = 0; x < room.Prefab.Width; x++)
+                {
+                    if (room.Prefab.GetTileType(x, y) == TileType.Trap)
+                    {
+                        var position = new Position(room.Origin.X + x, room.Origin.Y + y);
+                        if (occupied.Add(position))
+                        {
+                            spawns.Add(new TrapSpawnData(position));
+                        }
+                    }
+                }
+            }
+
+            foreach (var placement in room.GetSpawnPlacements("trap"))
+            {
+                if (occupied.Add(placement.Position))
+                {
+                    spawns.Add(new TrapSpawnData(placement.Position, placement.SpawnPoint.ReferenceId));
                 }
             }
         }

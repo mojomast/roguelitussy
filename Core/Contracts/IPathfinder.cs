@@ -4,9 +4,9 @@ namespace Roguelike.Core;
 
 public interface IPathfinder
 {
-    IReadOnlyList<Position> FindPath(Position start, Position goal, IWorldState world, int maxLength = 50);
+    IReadOnlyList<Position> FindPath(Position start, Position goal, IWorldState world, int maxLength = 50, bool phaseThroughWalls = false);
 
-    bool HasPath(Position start, Position goal, IWorldState world, int maxLength = 50);
+    bool HasPath(Position start, Position goal, IWorldState world, int maxLength = 50, bool phaseThroughWalls = false);
 
-    IReadOnlyDictionary<Position, int> GetReachable(Position origin, int range, IWorldState world);
+    IReadOnlyDictionary<Position, int> GetReachable(Position origin, int range, IWorldState world, bool phaseThroughWalls = false);
 }

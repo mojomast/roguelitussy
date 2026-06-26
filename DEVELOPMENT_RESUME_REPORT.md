@@ -35,6 +35,75 @@ dotnet run --project Tests/godotussy.Tests.csproj -p:RenderingValidation=true
 godot --headless --path . --quit
 ```
 
+### Follow-up Status - 2026-06-26
+
+- Completed: hardened RNG rehydration order with `WorldState.RehydrateRandomStates` so combat and item RNG states are restored atomically without transient public setter calls.
+- Completed: added `DeterministicRandom.Peek()` for non-consuming RNG state inspection.
+- Completed: added deterministic replay regression tests (`Tests/PersistenceTests/DeterminismTests.cs`) that prove fixed move/attack/wait sequences produce identical traces after save/load at turn 3 and turn 7.
+- Completed: updated `docs/SYSTEMS.md` save version to 9 and documented atomic RNG rehydration plus replay regression coverage.
+- Completed: marked SAV-3 and SAV-4 done in `docs/IMPROVEMENT_SUGGESTIONS.md`.
+
+### Follow-up Status - Wave 1 Persistence
+
+- Completed: SAV-1 — added `EnemyComponent { TemplateId }`, attached in `GameManager.CreateEnemyEntity`, and round-tripped through v9 save data with validation and migration.
+- Completed: SAV-2 — added `SchedulerOrder` per actor and `SchedulerNextOrder` per floor, staged through `WorldState.SchedulerOrders`, and restored during `GameManager.RegisterWorldEntities` so energy tie-break order survives save/load.
+- Completed: bumped normalized save version to `9` and added `SaveMigrator.MigrateV8` for legacy save compatibility.
+- Completed: added persistence tests for enemy template identity and scheduler actor order.
+- Verification: stub build, test project build, full harness, and rendering-validation profile all pass with zero failures.
+
+### Follow-up Status - Wave 1 Status/Combat
+
+- Completed: STA-1 — `StatusEffectProcessor` now resolves `tick_effects`, `stat_modifiers`, stacking/refresh rules, and `on_apply_effects` from authored `StatusEffectDefinition`s via `IContentDatabase`.
+- Completed: STA-3 / COM-1 — authored status flags are now honored: `skip_turn` skips the actor's turn in `TurnScheduler`, `phase_through_walls` lets actors move through walls in `MoveAction`, and `immune_physical` nullifies physical damage in `CombatResolver`.
+- Completed: added `shielded` status effect to `Content/status_effects.json` with a matching `status_shield.svg` asset so `CombatResolver` armor code has authored data.
+- Completed: added `StatusEffects` lookup and `TryGetStatusEffect` to `IContentDatabase` and `ContentLoader`.
+- Completed: added data-driven and flag-honoring tests in `Tests/SimulationTests/StatusEffectTests.cs`.
+- Verification: stub build and test project build pass with zero warnings. Custom harness run passes all new status/combat tests plus existing status tests. 15 unrelated pre-existing UI test failures remain and are outside the status/combat workstream.
+
+### Follow-up Status - ITM-1 Enemy Loot And Gold
+
+- Completed: `EnemyTemplate` and `EnemyDefinition` now carry `LootTableId`, `GoldMin`, and `GoldMax` mapped through `ContentLoader.BuildEnemyTemplate`.
+- Completed: `DeathResolver.ResolveKill` rolls the victim's loot table with a deterministic seed (world seed, depth, position, turn, and victim id) and drops items at the corpse position; unattributed deaths also drop loot.
+- Completed: `DeathResolver.ResolveKill` awards rolled gold from the enemy's `gold_min`/`gold_max` range to the killer's `WalletComponent` when present.
+- Completed: `AttackAction`, `CastAbilityAction`, and `StatusEffectProcessor` now include loot/gold messages in their respective death log outputs.
+- Completed: `Tests/SimulationTests/DeathResolverTests.cs` covers deterministic loot drops, gold range compliance, and ground placement.
+- Completed: `Tests/ContentTests/ContentValidationTests.cs` validates `gold_min <= gold_max` for every enemy.
+- Decision: `EnemyComponent` was not extended with `LootTableId`/`GoldMin`/`GoldMax`; loot and gold are derived from the persisted `TemplateId` at death time to avoid a save-format bump.
+- Deferred: `EventBus.EmitCurrencyChanged` when player gold changes from enemy death requires a `GameManager` change; a TODO is left in `DeathResolver` with the exact integration point.
+- Deferred: `StatusTickResult.LogMessages` are generated but not yet flushed to the combat log because `ITurnScheduler.ConsumeEnergy` returns void; a TODO is left in `StatusEffectProcessor`.
+- Documentation: `docs/CONTENT.md` now documents enemy `gold_min`/`gold_max`; `docs/IMPROVEMENT_SUGGESTIONS.md` marks ITM-1 done.
+- Verification: builds and tests could not be executed in this environment because `dotnet` is not available.
+
+### Follow-up Status - Wave 2 Itemization And Targeting
+
+- Completed: ITM-1 — `DeathResolver.ResolveKill` rolls enemy loot tables and awards gold to the killer's `WalletComponent`; loot/gold are derived from the persisted `EnemyComponent.TemplateId` so save format stays at v9.
+- Completed: ITM-1 integration — `GameManager.ProcessPlayerAction` snapshots the player wallet and emits `EventBus.EmitCurrencyChanged` when enemy-death gold changes it.
+- Completed: ABI-1 / ITM-5 — added `TargetingOverlay` owned by `UIRoot`; selecting an aimed scroll from `InventoryUI` enters targeting mode, moves a cursor with directional keys, confirms with Enter, and cancels with Escape.
+- Completed: ABI-1 / ITM-5 — `UIActionFactory.CreateUseItemAction` accepts an optional `Position? target`, and `UseItemAction` routes aimed scrolls through the existing `CastAbilityAction` validation/execution path.
+- Completed: ABI-1 / ITM-5 — `WorldView` renders targeting cursor and AoE preview tiles from EventBus events without mutating `WorldState`.
+- Completed: ABI-1 / ITM-5 — `ContentLoader.ValidateItems` now rejects `cast_ability` items whose declared target (`self`/`aimed`) does not match the referenced ability's `targeting.type`.
+- Completed: added `ItemTemplate.RequiresTargetSelection` derived flag so `InventoryUI` can distinguish self-targeted scrolls from aimed ones.
+- Completed: added `Tests/SimulationTests/DeathResolverTests.cs`, extended `Tests/SimulationTests/ItemAbilityRuntimeTests.cs`, and added `Tests/UITests/TargetingOverlayTests.cs`.
+- Documentation: `docs/IMPROVEMENT_SUGGESTIONS.md` marks ITM-1, ITM-5, and ABI-1 done.
+- Verification: stub build, test project build, full harness (300 tests), and rendering-validation profile (261 tests) all pass with zero failures.
+
+### Follow-up Status - Wave 3 AI And Character Save
+
+- Completed: AI-1 — `EnemyTemplate` carries `AIParameters` parsed from `EnemyDefinition.AiParams`; `ContentLoader.ValidateEnemies` recognizes all authored keys (`flee_hp_pct`, `aggro_range`, `wander_when_idle`, `preferred_range`, `min_range`, `patrol_radius`, `support_range`, `phase_through_walls`) and rejects unknown keys.
+- Completed: AI-1 — `BrainFactory.Create(EnemyTemplate)` builds a runtime `AIProfile` from the base brain-type profile overridden by authored `ai_params`; brain subclasses accept profile injection.
+- Completed: AI-1 — `AIBrain`, `UtilityScorer`, `AIStateManager`, and `Pathfinder` honor all recognized `ai_params`; `phase_through_walls` applies a permanent `Phased` status on the entity.
+- Completed: AI-1 — `Content/enemies.json` goblin archer `preferred_range` changed to `4`; `Tests/AITests/AIParamsTests.cs` covers every recognized key and the concrete goblin-archer range-4 stop behavior.
+- Completed: AI-1 save/load integration — `SaveSerializer`, `SaveManager`, and `GameManager` now pass `IContentDatabase` through load paths; brains rehydrate from the persisted `EnemyComponent.TemplateId`, so authored `ai_params` survive after loading.
+- Completed: CHR-1 — `SaveRunSnapshot` carries a `CharacterOptionsSaveData` DTO; `SaveSerializer` serializes/deserializes it at save version 10; `SaveMigrator.MigrateV9` supplies default options for legacy saves.
+- Completed: CHR-1 — `GameManager` maps `CharacterCreationOptions` into the snapshot on save and reconstructs it from the snapshot during `LoadFromSlot`; `Tests/PersistenceTests/SaveManagerTests.cs` round-trips archetype/race and other options.
+- Completed: GEN-1 — authored traps and hazard tiles. `TileType.Trap` is walkable; `^` in `room_prefabs.json` maps to `TileType.Trap`; `DungeonGenerator` collects `^` tiles and explicit `type: "trap"` spawn points into `LevelData.TrapSpawnDetails`, marks trap positions occupied before enemy/item placement, and `LevelValidator` confirms reachability. `GameManager.PopulateWorld` spawns trap entities from `TrapSpawnDetails`.
+- Completed: GEN-1 — `MoveAction` invokes `HazardProcessor.OnEntityEnteredTile` after every successful position change (normal move, phased move, NPC swap). `HazardProcessor` resolves trap templates, respects `avoid_flags` (`phased`, `flying`), rolls damage/status with `CombatResolver`, applies damage, routes kills through `DeathResolver.ResolveUnattributedDeath`, appends `CombatEvent`s/log messages, disarms/reveals traps, and raises `EventBus.TrapTriggered` via `GameManager`.
+- Completed: GEN-1 — `Content/traps.json` defines `spike_trap` with direct damage and optional `ability_id`; `ContentLoader` validates trap/ability cross-references and room `trap_id` references. `Assets/Sprites/objects/trap_spikes.svg` added.
+- Completed: GEN-1 save/load — save version bumped to `12`; `TrapComponent` is the single source of truth for trap state and is serialized as part of the owning entity; legacy v10/v11 standalone `Traps` arrays are migrated into trap entities by `SaveMigrator`; `SaveValidator` rejects trap entities on non-`Trap` tiles or with missing template ids.
+- Completed: GEN-1 rendering — `WorldView`, `WorldArtCatalog`, and `Minimap` handle `TileType.Trap` (floor + marker, distinct minimap color).
+- Documentation: `docs/IMPROVEMENT_SUGGESTIONS.md` marks AI-1, CHR-1, and GEN-1 done; `docs/SYSTEMS.md` documents trap generation, trigger rules, persistence, and rendering; `docs/CONTENT.md` documents trap authoring schema; `docs/PROGRESSION.md` notes trap kills are unattributed.
+- Verification: stub build, test project build, full harness (332 tests), and rendering-validation profile (287 tests) all pass with zero failures.
+
 ### Follow-up Status - 2026-06-10
 
 - Completed: local .NET 8 SDK installed under `$HOME/.dotnet`; stub build, test project build, full harness, and rendering validation now run in this environment.
@@ -53,6 +122,57 @@ godot --headless --path . --quit
 - Completed: loading a save with pending perk choices reopens the level-up overlay, and Core pickup actions now resolve stack metadata from world content instead of relying on UI-supplied templates.
 - Completed: UI chrome received an incremental Diablo II-inspired pass in Godot-facing scripts only: shared gothic palette, gold/parchment menu and sheet chrome, blood-red HUD HP styling, rarity-tinted inventory/tooltip text, muted combat log frame, and darker framed minimap colors. Core simulation behavior was not changed.
 - Deferred: per-item chest loot selection needs persistent chest contents for safe leave-behind semantics; current v8-compatible behavior remains atomic open with inventory stow plus ground spill.
+
+### Follow-up Status - GEN-1 Trap Persistence and Rendering
+
+- Completed: added `TileType.Trap` to the dungeon tile enum so authored trap tiles have a distinct simulation type.
+- Completed: added `TrapComponent` as the single source of truth for trap state (`TemplateId`, `IsArmed`, `IsRevealed`, `TriggerCount`) and removed the redundant `WorldState._traps` / `TrapState` dictionary.
+- Completed: `SaveSerializer` persists `TrapComponent` as part of the owning entity and restores it on load; bumped normalized save version to `12`.
+- Completed: `SaveMigrator.MigrateV11` converts legacy v10/v11 standalone `Traps` arrays into trap entities with `TrapComponent`; `SaveMigrator.MigrateV10` was updated to perform the same conversion so legacy v10 saves load correctly under version 12.
+- Completed: `SaveValidator` validates trap entities (must sit on a `Trap` tile and have a non-empty template id) and allows non-blocking trap entities to share tiles with other entities.
+- Completed: added persistence tests for trap component round-trip, multi-floor trap entities, v10/v11 migration to trap entities, validator tile consistency, and post-load trap triggering.
+- Documentation: updated `docs/SYSTEMS.md` to save version `12` and revised the Traps persistence subsection to describe entity-owned `TrapComponent`.
+
+
+
+- Completed: `AIParameters` record added and projected from `EnemyDefinition.AiParams` into `EnemyTemplate` by `ContentLoader.BuildEnemyTemplate`.
+- Completed: `ContentLoader.ValidateEnemies` recognizes and validates all authored keys: `flee_hp_pct`, `aggro_range`, `wander_when_idle`, `preferred_range`, `min_range`, `patrol_radius`, `support_range`, `phase_through_walls`; unknown keys are rejected.
+- Completed: `AIProfiles.ForTemplate` builds a runtime `AIProfile` from the base brain-type profile overridden by authored `ai_params`.
+- Completed: `BrainFactory.Create(EnemyTemplate)` uses the template-derived profile; brain subclasses accept profile injection.
+- Completed: `AIBrain` honors `aggro_range` for target detection, `phase_through_walls` by applying a permanent `Phased` status on first decision, and routes the phasing flag through `IPathfinder`.
+- Completed: `UtilityScorer` honors `preferred_range`, `min_range`, and `support_range` for movement and support-ability scoring.
+- Completed: `Pathfinder` supports a `phaseThroughWalls` flag for wall-passing path queries.
+- Completed: `Content/enemies.json` goblin archer `preferred_range` changed to `4`; `Tests/AITests/AIParamsTests.cs` covers every recognized key and the concrete goblin-archer range-4 behavior.
+- Completed: save/load brain rehydration from template — `SaveSerializer`, `SaveManager`, and `GameManager` now pass `IContentDatabase` through load paths, and `BrainFactory.Create(EnemyTemplate)` is used when an `EnemyComponent.TemplateId` is present, so authored `ai_params` survive after loading.
+- Documentation: `docs/CONTENT.md` documents `ai_params`; `docs/IMPROVEMENT_SUGGESTIONS.md` and `docs/ARCHITECTURE.md` mark AI-1 done and remove the stale save/load rehydration gap.
+- Verification: stub build, test project build, full harness (313 tests), and rendering-validation profile (272 tests) all pass with zero failures.
+
+### Follow-up Status - GEN-2 Themed Floor Sets
+
+- Completed: `RoomPrefab` now exposes `Tags` and `RoomPrefabDefinition.Tags` is projected into runtime prefabs by `DungeonGenerator.ResolvePrefabs`.
+- Completed: `DungeonGenerator` maps depth to theme (`prison` for depths 1–3, `crypt` for depths 4–6, `magma` for depth 7+) and enables theme-preference filtering when at least four theme-matching prefabs fit the generated BSP leaves.
+- Completed: `RoomPlacer.PlaceRooms` accepts an optional `themeTag`; per leaf it prefers fitting prefabs carrying the theme and falls back to all fitting prefabs when no theme match fits that leaf.
+- Completed: `RoomData` carries an optional `Tags` list so placed-room metadata survives in `LevelData` for tests and diagnostics.
+- Completed: `Content/room_prefabs.json` assigns theme tags to existing rooms and adds six new theme-specific rooms (`prison_block`, `prison_yard`, `crypt_niche`, `crypt_hall`, `magma_pit`, `magma_forge`).
+- Completed: `Tests/GenerationTests/DungeonGeneratorTests.cs` adds `FloorThemeConstrainsPrefabSelection` (majority-theme assertion plus determinism) and `FallbackWhenThemeHasFewMatchingPrefabs` (connectivity under thin theme coverage).
+- Documentation: `docs/CONTENT.md` documents the depth-to-theme mapping and tag authoring convention; `improvments.md` notes GEN-2 theme filtering is implemented.
+- Verification: stub build and test project build pass; full harness and rendering-validation profile each have one pre-existing failure in `AI.Ability support brain prefers buffing allies` unrelated to generation changes.
+
+### Follow-up Status - Wave 4 Simulation And Generation Polish
+
+- Completed: trap state reconciliation. `TrapComponent` is now the single source of truth for trap state (`TemplateId`, `IsArmed`, `IsRevealed`, `TriggerCount`); the redundant `WorldState._traps` / `TrapState` runtime dictionary was removed. Save version bumped to `12`; legacy v10/v11 standalone trap arrays migrate into trap entities via `SaveMigrator.MigrateV11` (and `MigrateV10` updated for the same conversion). `SaveValidator` enforces trap entities sit on `TileType.Trap` tiles and carry a non-empty template id.
+- Completed: GEN-2 themed floor sets. `RoomPrefab.Tags` and `RoomData.Tags` are projected from content; `DungeonGenerator` maps depth to theme (`prison` 1–3, `crypt` 4–6, `magma` 7+) and prefers theme-matching prefabs when at least four fit the BSP leaves, falling back to all valid prefabs otherwise. Six new themed rooms added to `Content/room_prefabs.json` and covered by generation tests.
+- Completed: GEN-4 locked doors and keys. Added `TileType.LockedDoor`; `DungeonGenerator.PlaceLockedDoorsAndKeys` converts connecting doors for rooms with `lock_doors_on_enter: true` into locked doors and places a `dungeon_key` item in a reachable non-locked room. `OpenDoorAction` consumes one key from the actor's inventory and unlocks the door permanently. Locked state persists as map tiles and ground items.
+- Completed: STA-4 / UI-3 status visuals. HUD renders a status badge row; `EntityRenderer` attaches status icon children to entity sprites; `EventBus.StatusEffectApplied` payload now carries the correct target id; `StatusEffectRemoved` is emitted when a status expires or is cleared.
+- Completed: STA-5 status event payloads. `StatusEffectApplied` and `StatusEffectRemoved` events correctly identify the affected entity and are consumed by HUD/entity renderer updates.
+- Completed: AI-2 ambush behavior. `AmbushBrain` waits while the player is visible but not adjacent, prefers wall/door-adjacent tiles when idle, and switches to `AttackAction` when the player becomes adjacent.
+- Completed: AI-3 ranged kiting. `AIProfile.MinRange` is consumed from authored `min_range`; `RangedKiterBrain`/`UtilityScorer` penalize moves that do not increase distance when inside minimum range, using Chebyshev distance for range comparisons.
+- Completed: AI-4 support behavior. `SupportBrain` selects nearest/most-damaged same-faction ally as a secondary objective, penalizes moves that block allied ranged attackers, and uses `FilterByRelation` to avoid harmful AoE casts that would hit allies unless `hits_allies` is true.
+- Completed: AI-5 group aggro propagation. `AIStateComponent` carries `AlertPosition` and `AlertTurn`; when an enemy enters `Chase`/`Attack`, same-faction allies within `AlertRadius` with no target enter `Chase` toward the alert position; alerts decay after a few turns.
+- Completed: CI/workflow hardening. Added `global.json` pinning SDK `8.0.0` with `latestFeature` roll-forward; updated `.github/workflows/ci.yml` with solution build, `dotnet format --verify-no-changes`, JSON syntax validation, NuGet and Godot caching, scheduled triggers, and failure artifact upload. Applied `dotnet format` across the solution.
+- Completed: `dungeon_key` item and `dungeon_key.svg` asset added; content validation expected item count updated from 22 to 23.
+- Completed: documentation updates. `docs/SYSTEMS.md` now documents locked doors; `docs/CONTENT.md` documents `lock_doors_on_enter`, theme tags, and `dungeon_key`; `docs/IMPROVEMENT_SUGGESTIONS.md` marks GEN-2, GEN-4, STA-4, STA-5, AI-2, AI-3, AI-4, AI-5, UI-3, and TST-5 done.
+- Verification: 346 tests pass in the full harness; 299 tests pass in the rendering-validation profile. One pre-existing CS0109 warning in `Scripts/UI/Tooltip.cs` remains unresolved to avoid unrelated changes.
 
 ## Current Strengths
 
@@ -199,28 +319,31 @@ Resume action:
 
 Either add the referenced assets, repoint content to existing assets, or treat those fields as metadata and prevent runtime loading. Add a resource existence validation test for `res://` paths. The current Godot stubs can mask missing resources by returning generic objects.
 
-### 8. Workflow and CI are not ready for confident resumption
+### 8. Workflow and CI are hardened
 
-Confirmed workflow issues:
+Confirmed workflow state:
 
-- No `.github/workflows` CI files were found.
-- `godotussy.sln` includes only `godotussy.csproj`, not `Tests/godotussy.Tests.csproj`.
-- The canonical editorless build command is ambiguous because stubs are gated behind `UseGodotStubs=true`.
-- Docs previously carried conflicting exact test counts instead of deferring to the harness output.
-- Docs previously said Godot 4.4, while packages pin 4.4.1.
+- `.github/workflows/ci.yml` exists and runs on push, pull request, `workflow_dispatch`, and a weekly Sunday schedule.
+- CI pins the .NET SDK via `global.json` (`8.0.0` with `latestFeature` roll-forward).
+- CI caches NuGet packages and the Godot 4.4.1 Mono download with `actions/cache@v4`.
+- CI validates JSON syntax for all files under `Content/`, verifies formatting with `dotnet format --verify-no-changes`, builds the full solution, builds the Godot stub profile, runs the full custom test harness, and runs the rendering validation profile.
+- A second CI job performs a real Godot 4.4.1 Mono headless editor import and startup smoke test.
+- `godotussy.sln` includes both `godotussy.csproj` and `Tests/godotussy.Tests.csproj`.
+- The canonical editorless build command remains `dotnet build godotussy.csproj -p:UseGodotStubs=true`.
+
+Known remaining workflow gaps:
+
+- Build warnings are not yet treated as errors in CI.
+- The repository currently fails `dotnet format --verify-no-changes`; code needs a one-time formatting pass before the new CI check will be green.
 
 Relevant files:
 
-- `godotussy.sln:6`
-- `godotussy.csproj:1-47`
-- `Tests/godotussy.Tests.csproj:1-21`
+- `.github/workflows/ci.yml`
+- `global.json`
+- `godotussy.sln`
 - `README.md`
-- `docs/SETUP.md`
 - `docs/TESTING.md`
-
-Resume action:
-
-Add CI and clarify docs before major feature work. At minimum, CI should build the stub profile and run the custom test harness.
+- `docs/IMPROVEMENT_SUGGESTIONS.md`
 
 ## Medium-Priority Findings
 
@@ -238,14 +361,14 @@ Goal: know whether the repository is currently green.
 
 - Install .NET 8 SDK and Godot 4.4.1 Mono/.NET.
 - Run the verification commands listed above.
-- Add a minimal CI workflow for stub build and tests.
-- Add `Tests/godotussy.Tests.csproj` to the solution or document that solution build is not full validation.
-- Add or update `global.json` if a specific .NET SDK feature band is expected.
+- Add a minimal CI workflow for stub build and tests. Status: completed; CI now also validates formatting, JSON syntax, solution build, and caches NuGet/Godot.
+- Add `Tests/godotussy.Tests.csproj` to the solution or document that solution build is not full validation. Status: completed; the solution already includes the test project.
+- Add or update `global.json` if a specific .NET SDK feature band is expected. Status: completed; `global.json` pins `8.0.0` with `latestFeature` roll-forward.
 
 Acceptance criteria:
 
-- CI runs on every push/PR.
-- README setup commands match what CI runs.
+- CI runs on every push/PR, `workflow_dispatch`, and weekly schedule.
+- README and testing docs list the same commands CI runs, including formatting and JSON syntax checks.
 - Test count documentation is accurate.
 
 ### Phase 1: Persistence Correctness

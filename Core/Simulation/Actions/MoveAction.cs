@@ -35,7 +35,9 @@ public sealed class MoveAction : IAction
             return ActionResult.Blocked;
         }
 
-        if (Math.Abs(Delta.X) == 1 && Math.Abs(Delta.Y) == 1)
+        var phased = StatusEffectProcessor.HasFlag(actor, "phase_through_walls");
+
+        if (!phased && Math.Abs(Delta.X) == 1 && Math.Abs(Delta.Y) == 1)
         {
             var adjacentX = actor.Position.Offset(Delta.X, 0);
             var adjacentY = actor.Position.Offset(0, Delta.Y);
@@ -46,12 +48,12 @@ public sealed class MoveAction : IAction
         }
 
         var occupant = world.GetEntityAt(target);
-        if (occupant is not null)
+        if (occupant is not null && occupant.BlocksMovement)
         {
             return CanSwapWith(actor, occupant) ? ActionResult.Success : ActionResult.Blocked;
         }
 
-        if (!world.IsWalkable(target))
+        if (!phased && !world.IsWalkable(target))
         {
             return ActionResult.Blocked;
         }
@@ -70,6 +72,7 @@ public sealed class MoveAction : IAction
         var actor = world.GetEntity(ActorId)!;
         var from = actor.Position;
         var target = from + Delta;
+        var phased = StatusEffectProcessor.HasFlag(actor, "phase_through_walls");
 
         if (world.GetEntityAt(target) is { } occupant)
         {
@@ -78,12 +81,31 @@ public sealed class MoveAction : IAction
                 return ActionOutcome.Fail(ActionResult.Blocked);
             }
 
-            return new ActionOutcome
+            var swapOutcome = new ActionOutcome
             {
                 Result = ActionResult.Success,
                 DirtyPositions = { from, target },
                 LogMessages = { $"{actor.Name} swaps places with {occupant.Name}." },
             };
+
+            HazardProcessor.OnEntityEnteredTile(world, actor, swapOutcome);
+            HazardProcessor.OnEntityEnteredTile(world, occupant, swapOutcome);
+            return swapOutcome;
+        }
+
+        if (phased && !world.IsWalkable(target))
+        {
+            actor.Position = target;
+            world.UpdateEntityPosition(ActorId, from, target);
+            var phasedOutcome = new ActionOutcome
+            {
+                Result = ActionResult.Success,
+                DirtyPositions = { from, target },
+                LogMessages = { $"{actor.Name} moves to {target}." },
+            };
+
+            HazardProcessor.OnEntityEnteredTile(world, actor, phasedOutcome);
+            return phasedOutcome;
         }
 
         if (!world.MoveEntity(ActorId, target))
@@ -91,12 +113,15 @@ public sealed class MoveAction : IAction
             return ActionOutcome.Fail(ActionResult.Blocked);
         }
 
-        return new ActionOutcome
+        var outcome = new ActionOutcome
         {
             Result = ActionResult.Success,
             DirtyPositions = { from, target },
             LogMessages = { $"{actor.Name} moves to {target}." },
         };
+
+        HazardProcessor.OnEntityEnteredTile(world, actor, outcome);
+        return outcome;
     }
 
     public int GetEnergyCost() => 1000;

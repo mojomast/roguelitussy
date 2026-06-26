@@ -1,6 +1,8 @@
 # Godotussy Improvement Spec
 
-> Status note (2026-06-10): this file is historical backlog context. Many gap sections below have since been resolved or partially resolved, including identity/progression persistence, runtime ability casting, combat item stats, AI role support, equipment requirements, content expansion, save versioning, workflow documentation, ability RNG save/load continuation, and sourced status-kill progression attribution. Treat older "Missing" lists as audit history; confirm against the live code and current docs before starting work.
+> **Note (2026-06-26):** A fresh, actionable suggestions document has been created at `docs/IMPROVEMENT_SUGGESTIONS.md`. It is organized by topic with IDs, target files, acceptance criteria, and implementation waves for worker subagents. This file remains as historical backlog context; prefer the new document for current work planning.
+
+> Status note (2026-06-26): this file is historical backlog context. Many gap sections below have since been resolved or partially resolved, including identity/progression persistence, runtime ability casting, combat item stats, AI role support, equipment requirements, content expansion, save versioning, workflow documentation, ability RNG save/load continuation, sourced status-kill progression attribution, AI parameter projection, and character creation option persistence. Treat older "Missing" lists as audit history; confirm against the live code and current docs before starting work.
 
 > UI/assets follow-up note (2026-06-10): inventory/menu readability and authored visual-path validation have a first polish pass. Item/status SVG source icons now exist, enemy content paths point at committed 0x72 sprites, and tests audit authored `res://` art paths. Remaining UI work should focus on real focusable inventory slot controls, controller action maps, and optional PNG atlas workflow rather than more text-panel expansion.
 
@@ -10,7 +12,11 @@
 
 > Consumable stack follow-up note (2026-06-10): stacked consumables and scrolls now consume one item per successful use, leaving the remaining stack in inventory.
 
-> Progression/mechanics follow-up note (2026-06-10): save/load now restores visible pending perk choices by reopening the level-up overlay, and pickup stack merging now resolves item templates from Core content state instead of depending on UI callers. Larger audited follow-ups remain: aimed item targeting UI, finite perk offer pools, authored status metadata runtime use, AI parameter projection, and trap/lock-door room hooks.
+> Progression/mechanics follow-up note (2026-06-26): save/load restores visible pending perk choices by reopening the level-up overlay, pickup stack merging resolves item templates from Core content state, AI parameter projection now drives runtime enemy behavior from `ai_params`, character creation options round-trip through saves, and save/load brain rehydration preserves authored AI profiles. Larger audited follow-ups remain: finite perk offer pools and trap/lock-door room hooks. Aimed item targeting UI is implemented (ITM-5 / ABI-1).
+
+> Progression/mechanics follow-up note (2026-06-26): save/load restores visible pending perk choices by reopening the level-up overlay, pickup stack merging resolves item templates from Core content state, AI parameter projection now drives runtime enemy behavior from `ai_params`, character creation options round-trip through saves, and save/load brain rehydration preserves authored AI profiles. Larger audited follow-ups remain: finite perk offer pools and trap/lock-door room hooks. Aimed item targeting UI is implemented (ITM-5 / ABI-1).
+
+> Wave 4 follow-up note (2026-06-26): trap state has been reconciled onto `TrapComponent` as the single source of truth (save version 12); themed floor sets (`prison`/`crypt`/`magma` tag filtering, GEN-2) and locked doors with key placement (GEN-4) are implemented; status visuals are wired into HUD and entity renderer (STA-4/UI-3) with corrected event payloads and removal emissions (STA-5); ambush, ranged kiting, support, and group aggro AI behaviors are live (AI-2 through AI-5); CI is hardened with SDK pinning, formatting, JSON validation, caching, and failure artifacts. Remaining high-value work is still finite perk pools, build warnings-as-errors (one CS0109 warning remains), and broad content expansion only after the current authored systems stay green.
 
 ## Purpose
 
@@ -171,7 +177,7 @@ Current state:
 
 - enemy set is small
 - items and abilities exist but not all are fully surfaced in combat or AI
-- room prefabs and generation are solid but encounter variety can still repeat quickly
+- room prefabs now use theme tags (`prison`, `crypt`, `magma`) and depth-based filtering, but encounter variety can still repeat quickly
 
 Missing:
 
@@ -458,7 +464,7 @@ Scope:
 - add more enemies for each tactical role
 - add more weapons and armor that actually interact with the expanded combat model
 - add more ability-driven encounters and elites
-- expand room prefab tags to support varied encounter pacing
+- expand room prefab tags to support varied encounter pacing (theme tags `prison`/`crypt`/`magma` and depth filtering are implemented; expand functional tags and theme-specific rooms)
 
 Likely files:
 

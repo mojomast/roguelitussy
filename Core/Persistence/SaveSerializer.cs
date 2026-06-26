@@ -26,6 +26,8 @@ internal sealed class SaveFileData
 
     public ulong ItemRandomState { get; set; }
 
+    public int SchedulerNextOrder { get; set; }
+
     public int Width { get; set; }
 
     public int Height { get; set; }
@@ -45,6 +47,8 @@ internal sealed class SaveFileData
     public List<PositionSaveData> OpenDoors { get; set; } = new();
 
     public List<FloorSaveData> Floors { get; set; } = new();
+
+    public CharacterOptionsSaveData CharacterOptions { get; set; } = new();
 }
 
 internal sealed class FloorSaveData
@@ -56,6 +60,8 @@ internal sealed class FloorSaveData
     public ulong CombatRandomState { get; set; }
 
     public ulong ItemRandomState { get; set; }
+
+    public int SchedulerNextOrder { get; set; }
 
     public int Width { get; set; }
 
@@ -115,11 +121,33 @@ internal sealed class EntitySaveData
     public AIStateSaveData? AIState { get; set; }
 
     public string BrainType { get; set; } = string.Empty;
+
+    public EnemySaveData? Enemy { get; set; }
+
+    public TrapSaveData? Trap { get; set; }
+
+    public int SchedulerOrder { get; set; }
+}
+
+internal sealed class EnemySaveData
+{
+    public string TemplateId { get; set; } = string.Empty;
 }
 
 internal sealed class ChestSaveData
 {
     public string LootTableId { get; set; } = string.Empty;
+}
+
+internal sealed class TrapSaveData
+{
+    public string TemplateId { get; set; } = string.Empty;
+
+    public bool IsArmed { get; set; } = true;
+
+    public bool IsRevealed { get; set; }
+
+    public int TriggerCount { get; set; }
 }
 
 internal sealed class XpValueSaveData
@@ -295,14 +323,14 @@ internal sealed class PositionSaveData
 
 public static class SaveSerializer
 {
-    public const int CurrentVersion = 8;
+    public const int CurrentVersion = 12;
 
     internal static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = true,
     };
 
-    internal static SaveFileData CreateSaveData(WorldState world, DateTime savedAt)
+    internal static SaveFileData CreateSaveData(WorldState world, DateTime savedAt, CharacterOptionsSaveData? characterOptions = null)
     {
         var floor = CreateFloorSaveData(world);
         var data = new SaveFileData
@@ -316,6 +344,7 @@ public static class SaveSerializer
             TurnNumber = world.TurnNumber,
             PlayerId = world.Player.Id.Value.ToString("N"),
             Floors = new List<FloorSaveData> { floor },
+            CharacterOptions = characterOptions ?? new CharacterOptionsSaveData(),
         };
 
         ApplyActiveFloorAliases(data, floor);
@@ -351,6 +380,7 @@ public static class SaveSerializer
             TurnNumber = snapshot.ActiveWorld.TurnNumber,
             PlayerId = snapshot.ActiveWorld.Player.Id.Value.ToString("N"),
             Floors = floors,
+            CharacterOptions = snapshot.CharacterOptions,
         };
 
         ApplyActiveFloorAliases(data, activeFloor);
@@ -371,47 +401,46 @@ public static class SaveSerializer
         return new SaveMetadata(slotIndex, data.Depth, data.TurnNumber, playerName, data.SavedAt, data.Version, data.ContentVersion, data.ContentHash);
     }
 
-    internal static WorldState ToWorldState(SaveFileData data)
+    internal static WorldState ToWorldState(SaveFileData data) => ToWorldState(data, null);
+
+    internal static WorldState ToWorldState(SaveFileData data, IContentDatabase? content)
     {
         var floor = data.Floors.FirstOrDefault(candidate => candidate.Depth == data.Depth);
         if (floor is not null)
         {
-            return ToWorldState(data, floor, requirePlayer: true);
+            return ToWorldState(data, floor, requirePlayer: true, content);
         }
 
-        return ToWorldState(data, CreateFloorFromRoot(data), requirePlayer: true);
+        return ToWorldState(data, CreateFloorFromRoot(data), requirePlayer: true, content);
     }
 
-    internal static SaveRunSnapshot ToRunSnapshot(SaveFileData data)
+    internal static SaveRunSnapshot ToRunSnapshot(SaveFileData data) => ToRunSnapshot(data, null);
+
+    internal static SaveRunSnapshot ToRunSnapshot(SaveFileData data, IContentDatabase? content)
     {
         var floorData = data.Floors.Count == 0
             ? new List<FloorSaveData> { CreateFloorFromRoot(data) }
             : data.Floors;
         var floors = floorData.ToDictionary(
             floor => floor.Depth,
-            floor => ToWorldState(data, floor, requirePlayer: floor.Depth == data.Depth),
+            floor => ToWorldState(data, floor, requirePlayer: floor.Depth == data.Depth, content),
             EqualityComparer<int>.Default);
         var activeWorld = floors.TryGetValue(data.Depth, out var active)
             ? active
             : throw new InvalidDataException("Active floor missing from save data.");
 
-        return new SaveRunSnapshot(data.Seed, data.Depth, activeWorld, floors);
+        return new SaveRunSnapshot(data.Seed, data.Depth, activeWorld, floors, data.CharacterOptions ?? new CharacterOptionsSaveData());
     }
 
-    private static WorldState ToWorldState(SaveFileData data, FloorSaveData floor, bool requirePlayer)
+    private static WorldState ToWorldState(SaveFileData data, FloorSaveData floor, bool requirePlayer, IContentDatabase? content = null)
     {
         var world = new WorldState();
         world.InitGrid(floor.Width, floor.Height);
-        world.Seed = data.Seed;
-        if (floor.CombatRandomState != 0UL)
-        {
-            world.CombatRandomState = floor.CombatRandomState;
-        }
-
-        world.ItemRandomState = floor.ItemRandomState;
+        world.RehydrateRandomStates(data.Seed, floor.CombatRandomState, floor.ItemRandomState);
 
         world.Depth = floor.Depth;
         world.TurnNumber = floor.TurnNumber;
+        world.SchedulerNextOrder = floor.SchedulerNextOrder;
 
         var tiles = DecodeTiles(floor.Tiles, floor.Width, floor.Height);
         for (var index = 0; index < tiles.Length; index++)
@@ -446,7 +475,15 @@ public static class SaveSerializer
 
         foreach (var entityData in floor.Entities)
         {
-            world.AddEntity(ToEntity(entityData));
+            world.AddEntity(ToEntity(entityData, content));
+        }
+
+        foreach (var entityData in floor.Entities)
+        {
+            if (entityData.SchedulerOrder != 0)
+            {
+                world.SchedulerOrders[EntityId.From(entityData.Id)] = entityData.SchedulerOrder;
+            }
         }
 
         var playerId = EntityId.From(data.PlayerId);
@@ -474,6 +511,7 @@ public static class SaveSerializer
         TurnNumber = data.TurnNumber,
         CombatRandomState = data.CombatRandomState,
         ItemRandomState = data.ItemRandomState,
+        SchedulerNextOrder = data.SchedulerNextOrder,
         Width = data.Width,
         Height = data.Height,
         Tiles = data.Tiles,
@@ -489,6 +527,7 @@ public static class SaveSerializer
         data.TurnNumber = floor.TurnNumber;
         data.CombatRandomState = floor.CombatRandomState;
         data.ItemRandomState = floor.ItemRandomState;
+        data.SchedulerNextOrder = floor.SchedulerNextOrder;
         data.Width = floor.Width;
         data.Height = floor.Height;
         data.Tiles = floor.Tiles;
@@ -505,12 +544,13 @@ public static class SaveSerializer
         TurnNumber = world.TurnNumber,
         CombatRandomState = world.CombatRandomState,
         ItemRandomState = world.ItemRandomState,
+        SchedulerNextOrder = world.SchedulerNextOrder,
         Width = world.Width,
         Height = world.Height,
         Tiles = EncodeTiles(world.GetRawGrid()),
         Explored = EncodeFlags(world.GetRawExplored()),
         Visible = EncodeFlags(ReadVisible(world)),
-        Entities = world.Entities.Select(ToSaveData).ToList(),
+        Entities = world.Entities.Select(entity => ToSaveData(entity, world)).ToList(),
         GroundItems = FlattenGroundItems(world).ToList(),
         OpenDoors = ReadOpenDoors(world).ToList(),
     };
@@ -539,7 +579,7 @@ public static class SaveSerializer
         return bytes;
     }
 
-    private static EntitySaveData ToSaveData(IEntity entity)
+    private static EntitySaveData ToSaveData(IEntity entity, WorldState world)
     {
         var inventory = entity.GetComponent<InventoryComponent>();
         var statusEffects = entity.GetComponent<StatusEffectsComponent>();
@@ -554,6 +594,8 @@ public static class SaveSerializer
         var cooldowns = entity.GetComponent<CooldownComponent>();
         var aiState = entity.GetComponent<AIStateComponent>();
         var brain = entity.GetComponent<IBrain>();
+        var enemy = entity.GetComponent<EnemyComponent>();
+        var trap = entity.GetComponent<TrapComponent>();
 
         return new EntitySaveData
         {
@@ -647,6 +689,18 @@ public static class SaveSerializer
                 TargetId = aiState.TargetId.IsValid ? aiState.TargetId.Value.ToString("N") : string.Empty,
             },
             BrainType = brain is null ? string.Empty : ToBrainType(brain),
+            Enemy = enemy is null ? null : new EnemySaveData
+            {
+                TemplateId = enemy.TemplateId,
+            },
+            Trap = trap is null ? null : new TrapSaveData
+            {
+                TemplateId = trap.TemplateId,
+                IsArmed = trap.IsArmed,
+                IsRevealed = trap.IsRevealed,
+                TriggerCount = trap.TriggerCount,
+            },
+            SchedulerOrder = world.SchedulerOrders.TryGetValue(entity.Id, out var schedulerOrder) ? schedulerOrder : 0,
         };
     }
 
@@ -789,7 +843,9 @@ public static class SaveSerializer
         return flags;
     }
 
-    private static IEntity ToEntity(EntitySaveData data)
+    private static IEntity ToEntity(EntitySaveData data) => ToEntity(data, null);
+
+    private static IEntity ToEntity(EntitySaveData data, IContentDatabase? content)
     {
         var entity = new Entity(
             data.Name,
@@ -956,7 +1012,24 @@ public static class SaveSerializer
 
         if (!string.IsNullOrWhiteSpace(data.BrainType))
         {
-            entity.SetComponent<IBrain>(BrainFactory.Create(data.BrainType));
+            var brain = TryCreateBrainFromTemplate(data, content) ?? BrainFactory.Create(data.BrainType);
+            entity.SetComponent<IBrain>(brain);
+        }
+
+        if (data.Enemy is not null)
+        {
+            entity.SetComponent(new EnemyComponent { TemplateId = data.Enemy.TemplateId });
+        }
+
+        if (data.Trap is not null)
+        {
+            entity.SetComponent(new TrapComponent
+            {
+                TemplateId = data.Trap.TemplateId,
+                IsArmed = data.Trap.IsArmed,
+                IsRevealed = data.Trap.IsRevealed,
+                TriggerCount = data.Trap.TriggerCount,
+            });
         }
 
         return entity;
@@ -972,6 +1045,21 @@ public static class SaveSerializer
         MeleeRusherBrain => "melee_rusher",
         _ => string.Empty,
     };
+
+    private static IBrain? TryCreateBrainFromTemplate(EntitySaveData data, IContentDatabase? content)
+    {
+        if (content is null || data.Enemy is null || string.IsNullOrWhiteSpace(data.Enemy.TemplateId))
+        {
+            return null;
+        }
+
+        if (!content.TryGetEnemyTemplate(data.Enemy.TemplateId, out var template))
+        {
+            return null;
+        }
+
+        return BrainFactory.Create(template);
+    }
 
     private static ItemInstance ToItemInstance(ItemSaveData data)
     {

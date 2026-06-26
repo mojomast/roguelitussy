@@ -13,6 +13,7 @@ Read these files before making non-trivial changes:
 - `docs/CONTRIBUTING.md`
 - `docs/CONTENT.md`
 - `improvments.md`
+- `docs/IMPROVEMENT_SUGGESTIONS.md`
 
 ## Project Boundaries
 
@@ -159,3 +160,96 @@ Every completed feature or fix must update relevant documentation.
 - Do not use destructive git commands such as `git reset --hard` or `git checkout --` unless explicitly requested.
 - Do not commit unless explicitly asked.
 - Before finalizing, summarize changed files, tests run, verification gaps, and remaining risks.
+
+## Repository Wiring Guide
+
+A concise map of how the major pieces connect. Read this to orient yourself before editing.
+
+### Layer overview
+
+```
+Content/ (JSON)  -->  Core/Content/ContentLoader.cs  -->  IContentDatabase  -->  Core/Simulation
+                                                              |
+Scripts/ (Godot)  -->  GameManager (autoload)  -->  WorldState / GameLoop / Actions
+   |                           |
+   v                           v
+UIRoot / WorldView  <--  EventBus  <--  GameManager.ProcessPlayerAction
+```
+
+- **Core/**: pure C#, no `using Godot`. Authoritative state, rules, actions, generation, persistence, content loading.
+- **Scripts/**: Godot autoloads, UI, world rendering, input, debug tools.
+- **Content/**: JSON definitions for items, enemies, abilities, statuses, loot tables, rooms, perks, NPCs, dialogs.
+- **Tests/**: custom .NET console harness (`Tests/Program.cs`) — not NUnit/xUnit.
+
+### Core simulation
+
+- **WorldState** (`Core/Contracts/WorldState.cs`) is the authoritative grid + entity index + RNG-state holder.
+- **Entity** (`Core/Simulation/Entity.cs`) is a component bag: `InventoryComponent`, `StatusEffectsComponent`, `ProgressionComponent`, `CooldownComponent`, `AbilitiesComponent`, `XpValueComponent`, `ChestComponent`, etc.
+- **IAction** (`Core/Contracts/IAction.cs`) is the supported way to mutate gameplay state. Implementations live in `Core/Simulation/Actions/`.
+- **GameLoop** (`Core/Simulation/GameLoop.cs`) processes one round: runs every ready actor via `TurnScheduler`, then ticks cooldowns.
+- **TurnScheduler** (`Core/Simulation/TurnScheduler.cs`) is energy-based (`EnergyThreshold = 1000`) and also ticks status effects inside `ConsumeEnergy`.
+
+### Action flow (one player turn)
+
+1. `UIRoot._UnhandledInput` (`Scripts/UI/UIRoot.cs`) routes keys.
+2. `InputHandler.HandleKey` maps keys to semantic actions.
+3. `UIActionFactory` builds an `IAction` (move, attack, use item, etc.).
+4. `EventBus.EmitPlayerActionSubmitted(action)` is raised.
+5. `GameManager.OnPlayerActionSubmitted` receives it and calls `ProcessPlayerAction(action)`.
+6. `GameManager.ProcessPlayerAction` validates, executes the player action, then runs `GameLoop.ProcessRound` for enemy responses.
+7. Actions mutate `WorldState` and return `ActionOutcome` with `CombatEvent`s and log messages.
+8. `GameManager` emits `EventBus` events (`TurnStarted`, `DamageDealt`, `EntityDied`, `InventoryChanged`, etc.).
+9. `WorldView`, `HUD`, `CombatLog`, and other UI subscribe and refresh.
+
+### Combat and death
+
+- **CombatResolver** (`Core/Simulation/CombatResolver.cs`) owns a deterministic RNG and computes hit/crit/damage/armor/on-hit effects.
+- **DeathResolver** (`Core/Simulation/DeathResolver.cs`) is the shared kill handler: zeroes HP, increments kills, awards XP via `ProgressionService.AwardExperience`, and removes the entity.
+- Deaths are triggered from `AttackAction`, `CastAbilityAction`, and `StatusEffectProcessor.Tick`.
+
+### Items, abilities, and status effects
+
+- Content JSON is projected into `ItemTemplate`, `AbilityTemplate`, etc.
+- `UseItemAction` (`Core/Simulation/Actions/UseItemAction.cs`) handles `heal`, `apply_status`, `cast_ability`, `cure`, and stat modifiers.
+- `CastAbilityAction` (`Core/Simulation/Actions/CastAbilityAction.cs`) resolves targets via `AbilityResolver` and applies damage/status/teleport/heal_self effects.
+- `StatusEffectProcessor` (`Core/Simulation/StatusEffectProcessor.cs`) hardcodes most status behavior at the moment; `Content/status_effects.json` is largely descriptive.
+- **Known gap**: targeted scrolls (`cast_ability:` with non-`self` targeting) cannot be used from the normal UI because `UIActionFactory.CreateUseItemAction` returns `null` for them.
+
+### Content pipeline
+
+- `ContentLoader.LoadFromDirectory`/`LoadFromRepository` reads the nine required JSON files, validates cross-references, builds templates, and computes a deterministic content hash.
+- Runtime code accesses content through `IContentDatabase` / the Godot autoload `ContentDatabase`.
+- Asset paths in content (`res://Assets/Sprites/...`) are validated by `Tests/ContentTests/ContentValidationTests`.
+
+### Persistence
+
+- `SaveManager` / `SaveSerializer` / `SaveMigrator` implement JSON save/load (current version 8).
+- Saves include: map tiles, explored/visible flags, entities + components, ground items, open doors, RNG states, multi-floor cache.
+- `GameManager.SaveToSlot` / `LoadFromSlot` are the Godot-facing entry points.
+- RNG states restored: `CombatRandomState` and `ItemRandomState`.
+- **Known gaps**: enemy template identity is not saved (brain is recreated generically), and `TurnScheduler` actor order is not persisted.
+
+### Godot facade and presentation
+
+- **GameManager** (`Scripts/Autoloads/GameManager.cs`) autoload owns services, content, save/load, floor travel, and turn processing. Treat it as a facade; avoid adding more responsibilities.
+- **EventBus** (`Scripts/Autoloads/EventBus.cs`) is a C# event bus for simulation-to-UI notifications.
+- **UIRoot** constructs and binds all UI controllers.
+- **WorldView** mirrors `WorldState` each turn; it does not compute FOV, only copies visibility flags.
+- **EntityRenderer** creates sprites per entity using `WorldArtCatalog` / `PlayerVisualCatalog`.
+- Debug tools (`DebugCommandProcessor`, `DevToolsWorkbench`) mutate `WorldState` directly for authoring convenience; normal gameplay must use `IAction`s.
+
+### Determinism
+
+- `DeterministicRandom` (`Core/Simulation/DeterministicRandom.cs`) is a serializable LCG.
+- `CombatResolver` owns the combat RNG; `WorldState` exposes `CombatRandomState`.
+- `WorldState.AllocateItemInstanceId` uses a separate `ItemRandomState`.
+- Generation and chest loot use `System.Random` seeded from world values; they are deterministic but separate streams.
+
+### Common pitfalls for agents
+
+- Do not add `using Godot` in `Core/`.
+- Do not mutate `WorldState` directly from `Scripts/` except in debug/tooling code.
+- New gameplay mutations must be `IAction`s routed through `GameManager.ProcessPlayerAction`.
+- Any new status/item/ability effect needs both runtime implementation and content-driven tests.
+- Save format changes require updating `SaveSerializer.CurrentVersion`, migration, and tests.
+- Update docs per the "Documentation Requirements" section above.

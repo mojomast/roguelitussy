@@ -6,4 +6,9 @@ public sealed class RangedKiterBrain : AIBrain
         : base(AIProfiles.RangedKiter)
     {
     }
+
+    public RangedKiterBrain(AIProfile profile)
+        : base(profile)
+    {
+    }
 }

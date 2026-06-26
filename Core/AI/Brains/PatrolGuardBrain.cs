@@ -6,4 +6,9 @@ public sealed class PatrolGuardBrain : AIBrain
         : base(AIProfiles.PatrolGuard)
     {
     }
+
+    public PatrolGuardBrain(AIProfile profile)
+        : base(profile)
+    {
+    }
 }

@@ -43,6 +43,11 @@ public partial class WorldView : Node2D
     private readonly Dictionary<Position, string> _tileMarkers = new();
     private readonly Dictionary<Position, Node> _wallCovers = new();
     private readonly EntityRenderer _entityRenderer;
+    private readonly Node2D _targetingLayer = new() { Name = "TargetingLayer", ZIndex = 100 };
+    private readonly HashSet<Position> _targetingPreviewTiles = new();
+    private Position _targetingCursorPosition = new(-1, -1);
+    private bool _targetingActive;
+    private bool _targetingCursorValid;
     private bool _loggedRenderRevision;
 
     private EventBus? _eventBus;
@@ -137,6 +142,12 @@ public partial class WorldView : Node2D
             _eventBus.EntitySpawned -= OnEntitySpawned;
             _eventBus.EntityRemoved -= OnEntityRemoved;
             _eventBus.TileChanged -= OnTileChanged;
+            _eventBus.TargetingModeEntered -= OnTargetingModeEntered;
+            _eventBus.TargetingModeExited -= OnTargetingModeExited;
+            _eventBus.TargetingCursorMoved -= OnTargetingCursorMoved;
+            _eventBus.TargetingPreviewChanged -= OnTargetingPreviewChanged;
+            _eventBus.StatusEffectApplied -= OnStatusEffectApplied;
+            _eventBus.StatusEffectRemoved -= OnStatusEffectRemoved;
         }
 
         _eventBus = eventBus;
@@ -153,6 +164,12 @@ public partial class WorldView : Node2D
         _eventBus.EntitySpawned += OnEntitySpawned;
         _eventBus.EntityRemoved += OnEntityRemoved;
         _eventBus.TileChanged += OnTileChanged;
+        _eventBus.TargetingModeEntered += OnTargetingModeEntered;
+        _eventBus.TargetingModeExited += OnTargetingModeExited;
+        _eventBus.TargetingCursorMoved += OnTargetingCursorMoved;
+        _eventBus.TargetingPreviewChanged += OnTargetingPreviewChanged;
+        _eventBus.StatusEffectApplied += OnStatusEffectApplied;
+        _eventBus.StatusEffectRemoved += OnStatusEffectRemoved;
     }
 
     private GameManager? ResolveGameManager()
@@ -247,6 +264,10 @@ public partial class WorldView : Node2D
                 break;
             case TileType.Lava:
                 _floorLayer.SetCell(cellPosition, 0, new Vector2I(7, 0));
+                _wallLayer.EraseCell(cellPosition);
+                break;
+            case TileType.Trap:
+                _floorLayer.SetCell(cellPosition, 0, new Vector2I(0, 0));
                 _wallLayer.EraseCell(cellPosition);
                 break;
             case TileType.Wall:
@@ -782,8 +803,14 @@ public partial class WorldView : Node2D
             AddChild(_wallCoverLayer);
         }
 
+        if (_targetingLayer.GetParent() is null)
+        {
+            AddChild(_targetingLayer);
+        }
+
         _entityLayer.ZIndex = EntityLayerZIndex;
         _wallCoverLayer.ZIndex = 40;
+        _targetingLayer.ZIndex = 100;
     }
 
     private static void AddTrimRect(Node2D container, string name, Vector2 position, Vector2 size, Color color, int zIndex)
@@ -848,6 +875,16 @@ public partial class WorldView : Node2D
         _entitySnapshot.Remove(entityId);
     }
 
+    private void OnStatusEffectApplied(EntityId entityId, StatusEffectInstance effect)
+    {
+        _entityRenderer.RefreshStatusOverlays(entityId);
+    }
+
+    private void OnStatusEffectRemoved(EntityId entityId, StatusEffectType effectType)
+    {
+        _entityRenderer.RefreshStatusOverlays(entityId);
+    }
+
     private void AnimateEntityMovesFromSnapshot()
     {
         if (_world is null)
@@ -875,6 +912,96 @@ public partial class WorldView : Node2D
         foreach (var entity in _world.Entities)
         {
             _entitySnapshot[entity.Id] = entity.Position;
+        }
+    }
+
+    private void OnTargetingModeEntered(string kind)
+    {
+        _targetingActive = true;
+        _targetingCursorValid = false;
+    }
+
+    private void OnTargetingModeExited(string reason)
+    {
+        _targetingActive = false;
+        _targetingCursorPosition = new(-1, -1);
+        _targetingPreviewTiles.Clear();
+        ClearTargetingVisuals();
+    }
+
+    private void OnTargetingCursorMoved(Position position, bool isValid)
+    {
+        _targetingCursorPosition = position;
+        _targetingCursorValid = isValid;
+        RenderTargetingVisuals();
+    }
+
+    private void OnTargetingPreviewChanged(IReadOnlyList<Position> tiles, bool isValid)
+    {
+        _targetingPreviewTiles.Clear();
+        foreach (var tile in tiles)
+        {
+            _targetingPreviewTiles.Add(tile);
+        }
+
+        _targetingCursorValid = isValid;
+        RenderTargetingVisuals();
+    }
+
+    private void ClearTargetingVisuals()
+    {
+        foreach (var child in _targetingLayer.GetChildren().ToArray())
+        {
+            if (child is Node node)
+            {
+                _targetingLayer.RemoveChild(node);
+                node.QueueFree();
+            }
+        }
+    }
+
+    private void RenderTargetingVisuals()
+    {
+        ClearTargetingVisuals();
+        if (!_targetingActive || _world is null)
+        {
+            return;
+        }
+
+        var previewColor = _targetingCursorValid
+            ? new Color(0.9f, 0.4f, 0.1f, 0.35f)
+            : new Color(0.9f, 0.1f, 0.1f, 0.35f);
+        var cursorColor = _targetingCursorValid
+            ? new Color(0.95f, 0.85f, 0.2f, 0.85f)
+            : new Color(0.95f, 0.15f, 0.15f, 0.85f);
+
+        foreach (var position in _targetingPreviewTiles)
+        {
+            if (!_world.InBounds(position))
+            {
+                continue;
+            }
+
+            var tile = new ColorRect
+            {
+                Name = $"Preview_{position.X}_{position.Y}",
+                Position = new Vector2(position.X * TileSize, position.Y * TileSize),
+                Size = new Vector2(TileSize, TileSize),
+                Color = previewColor,
+            };
+            _targetingLayer.AddChild(tile);
+        }
+
+        if (_world.InBounds(_targetingCursorPosition))
+        {
+            var cursor = new ColorRect
+            {
+                Name = $"Cursor_{_targetingCursorPosition.X}_{_targetingCursorPosition.Y}",
+                Position = new Vector2(_targetingCursorPosition.X * TileSize, _targetingCursorPosition.Y * TileSize),
+                Size = new Vector2(TileSize, TileSize),
+                Color = cursorColor,
+            };
+            _targetingLayer.AddChild(cursor);
         }
     }
 }

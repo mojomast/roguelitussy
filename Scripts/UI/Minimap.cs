@@ -228,6 +228,7 @@ public partial class Minimap : Control
             TileType.StairsUp => UiStyle.GoldTrim(1f),
             TileType.Water => new Color(0.12f, 0.38f, 0.75f, 1f),
             TileType.Lava => new Color(0.82f, 0.32f, 0.12f, 1f),
+            TileType.Trap => new Color(0.72f, 0.18f, 0.28f, 1f),
             _ => new Color(0.08f, 0.08f, 0.1f, 1f),
         };
 

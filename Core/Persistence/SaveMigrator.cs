@@ -23,6 +23,10 @@ public static class SaveMigrator
             5 => MigrateV5(root),
             6 => MigrateV6(root),
             7 => MigrateV7(root),
+            8 => MigrateV8(root),
+            9 => MigrateV9(root),
+            10 => MigrateV10(root),
+            11 => MigrateV11(root),
             SaveSerializer.CurrentVersion => JsonSerializer.Deserialize<SaveFileData>(json, SaveSerializer.JsonOptions)
                 ?? throw new InvalidOperationException("Unable to deserialize save data."),
             _ => throw new InvalidOperationException($"Unsupported save version {version}.")
@@ -137,6 +141,156 @@ public static class SaveMigrator
 
         data.Version = SaveSerializer.CurrentVersion;
         return FinalizeSingleFloor(data);
+    }
+
+    private static SaveFileData MigrateV8(JsonElement root)
+    {
+        var data = JsonSerializer.Deserialize<SaveFileData>(root.GetRawText(), SaveSerializer.JsonOptions)
+            ?? throw new InvalidOperationException("Unable to deserialize version 8 save data.");
+
+        data.Version = SaveSerializer.CurrentVersion;
+        return FinalizeSingleFloor(data);
+    }
+
+    private static SaveFileData MigrateV9(JsonElement root)
+    {
+        var data = JsonSerializer.Deserialize<SaveFileData>(root.GetRawText(), SaveSerializer.JsonOptions)
+            ?? throw new InvalidOperationException("Unable to deserialize version 9 save data.");
+
+        data.Version = SaveSerializer.CurrentVersion;
+        data.CharacterOptions ??= new CharacterOptionsSaveData();
+        return FinalizeSingleFloor(data);
+    }
+
+    private static SaveFileData MigrateV10(JsonElement root)
+    {
+        var data = JsonSerializer.Deserialize<SaveFileData>(root.GetRawText(), SaveSerializer.JsonOptions)
+            ?? throw new InvalidOperationException("Unable to deserialize version 10 save data.");
+
+        data.Version = SaveSerializer.CurrentVersion;
+        var result = FinalizeSingleFloor(data);
+        ConvertLegacyTrapsToEntities(result, root);
+        return result;
+    }
+
+    private static SaveFileData MigrateV11(JsonElement root)
+    {
+        var data = JsonSerializer.Deserialize<SaveFileData>(root.GetRawText(), SaveSerializer.JsonOptions)
+            ?? throw new InvalidOperationException("Unable to deserialize version 11 save data.");
+
+        data.Version = SaveSerializer.CurrentVersion;
+        var result = FinalizeSingleFloor(data);
+        ConvertLegacyTrapsToEntities(result, root);
+        return result;
+    }
+
+    private static void ConvertLegacyTrapsToEntities(SaveFileData data, JsonElement root)
+    {
+        var floorTrapPositions = new Dictionary<int, HashSet<Position>>();
+
+        if (root.TryGetProperty("floors", out var floors) && floors.ValueKind == JsonValueKind.Array)
+        {
+            for (var index = 0; index < floors.GetArrayLength() && index < data.Floors.Count; index++)
+            {
+                var floor = floors[index];
+                if (!floor.TryGetProperty("traps", out var traps) || traps.ValueKind != JsonValueKind.Array)
+                {
+                    continue;
+                }
+
+                var floorData = data.Floors[index];
+                var seen = floorTrapPositions[index] = new HashSet<Position>(floorData.Entities.Select(entity => new Position(entity.Position.X, entity.Position.Y)));
+                foreach (var trap in traps.EnumerateArray())
+                {
+                    var entity = LegacyTrapToEntity(trap);
+                    var position = new Position(entity.Position.X, entity.Position.Y);
+                    if (seen.Add(position))
+                    {
+                        floorData.Entities.Add(entity);
+                    }
+                }
+            }
+        }
+
+        if (root.TryGetProperty("traps", out var rootTraps) && rootTraps.ValueKind == JsonValueKind.Array)
+        {
+            var activeFloorIndex = data.Floors.FindIndex(floor => floor.Depth == data.Depth);
+            if (activeFloorIndex < 0)
+            {
+                activeFloorIndex = 0;
+            }
+
+            if (activeFloorIndex < data.Floors.Count)
+            {
+                var activeFloor = data.Floors[activeFloorIndex];
+                if (!floorTrapPositions.TryGetValue(activeFloorIndex, out var seen))
+                {
+                    seen = new HashSet<Position>(activeFloor.Entities.Select(entity => new Position(entity.Position.X, entity.Position.Y)));
+                    floorTrapPositions[activeFloorIndex] = seen;
+                }
+
+                foreach (var trap in rootTraps.EnumerateArray())
+                {
+                    var entity = LegacyTrapToEntity(trap);
+                    var position = new Position(entity.Position.X, entity.Position.Y);
+                    if (seen.Add(position))
+                    {
+                        activeFloor.Entities.Add(entity);
+                    }
+                }
+            }
+        }
+    }
+
+    private static EntitySaveData LegacyTrapToEntity(JsonElement trap)
+    {
+        var (x, y) = ReadLegacyTrapPosition(trap);
+        var trapId = TryGetString(trap, "trapId") ?? string.Empty;
+        var disarmed = TryGetBoolean(trap, "disarmed") ?? false;
+        var triggered = TryGetBoolean(trap, "triggered") ?? false;
+
+        return new EntitySaveData
+        {
+            Id = CreateStableEntityId($"trap:{x}:{y}:{trapId}"),
+            Name = string.IsNullOrWhiteSpace(trapId) ? "Trap" : trapId,
+            Position = new PositionSaveData { X = x, Y = y },
+            Faction = (int)Faction.Neutral,
+            BlocksMovement = false,
+            BlocksSight = false,
+            Stats = new StatsSaveData
+            {
+                HP = 1,
+                MaxHP = 1,
+                Attack = 0,
+                Accuracy = 0,
+                Defense = 0,
+                Evasion = 0,
+                Speed = 0,
+                ViewRadius = 0,
+                Energy = 0,
+            },
+            Trap = new TrapSaveData
+            {
+                TemplateId = trapId,
+                IsArmed = !triggered && !disarmed,
+                IsRevealed = triggered,
+                TriggerCount = triggered ? 1 : 0,
+            },
+        };
+    }
+
+    private static (int X, int Y) ReadLegacyTrapPosition(JsonElement trap)
+    {
+        if (trap.TryGetProperty("position", out var position) && position.ValueKind == JsonValueKind.Object)
+        {
+            var x = TryGetInt(position, "x") ?? 0;
+            var y = TryGetInt(position, "y") ?? 0;
+            return (x, y);
+        }
+
+        var fallbackX = TryGetInt(trap, "x") ?? 0;
+        var fallbackY = TryGetInt(trap, "y") ?? 0;
+        return (fallbackX, fallbackY);
     }
 
     private static SaveFileData FinalizeSingleFloor(SaveFileData data)
@@ -400,6 +554,16 @@ public static class SaveMigrator
         }
 
         throw new InvalidOperationException($"Missing required string property '{propertyName}'.");
+    }
+
+    private static string? TryGetString(JsonElement element, string propertyName)
+    {
+        if (element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.String)
+        {
+            return property.GetString();
+        }
+
+        return null;
     }
 
     private static bool? TryGetBoolean(JsonElement element, string propertyName)

@@ -6,4 +6,9 @@ public sealed class FleeingBrain : AIBrain
         : base(AIProfiles.Fleeing)
     {
     }
+
+    public FleeingBrain(AIProfile profile)
+        : base(profile)
+    {
+    }
 }

@@ -8,9 +8,9 @@ public interface ISaveManager
 
     Task<bool> SaveRun(SaveRunSnapshot snapshot, int slotIndex);
 
-    Task<WorldState?> LoadGame(int slotIndex);
+    Task<WorldState?> LoadGame(int slotIndex, IContentDatabase? content = null);
 
-    Task<SaveRunSnapshot?> LoadRun(int slotIndex);
+    Task<SaveRunSnapshot?> LoadRun(int slotIndex, IContentDatabase? content = null);
 
     bool HasSave(int slotIndex);
 

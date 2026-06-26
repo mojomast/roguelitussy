@@ -115,6 +115,63 @@ public sealed class NpcsDocument
     public List<NpcDefinition> Npcs { get; set; } = new();
 }
 
+public sealed class TrapsDocument
+{
+    [JsonPropertyName("$schema")]
+    public string Schema { get; set; } = string.Empty;
+
+    [JsonPropertyName("version")]
+    public int Version { get; set; }
+
+    [JsonPropertyName("traps")]
+    public List<TrapDefinition> Traps { get; set; } = new();
+}
+
+public sealed class TrapDefinition
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = string.Empty;
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("description")]
+    public string Description { get; set; } = string.Empty;
+
+    [JsonPropertyName("ability_id")]
+    public string? AbilityId { get; set; }
+
+    [JsonPropertyName("sprite_path")]
+    public string SpritePath { get; set; } = string.Empty;
+
+    [JsonPropertyName("sprite_atlas_coords")]
+    public List<int> SpriteAtlasCoords { get; set; } = new();
+
+    [JsonPropertyName("damage_min")]
+    public int DamageMin { get; set; }
+
+    [JsonPropertyName("damage_max")]
+    public int DamageMax { get; set; }
+
+    [JsonPropertyName("damage_type")]
+    public string DamageType { get; set; } = "Physical";
+
+    [JsonPropertyName("status_effect")]
+    public string? StatusEffect { get; set; }
+
+    [JsonPropertyName("status_duration")]
+    public int StatusDuration { get; set; }
+
+    [JsonPropertyName("status_magnitude")]
+    public int StatusMagnitude { get; set; } = 1;
+
+    [JsonPropertyName("avoid_flags")]
+    public List<string> AvoidFlags { get; set; } = new();
+
+    [JsonPropertyName("trigger_chance")]
+    public int TriggerChance { get; set; } = 100;
+}
+
 public sealed class ItemDefinition
 {
     [JsonPropertyName("id")]
@@ -233,6 +290,12 @@ public sealed class EnemyDefinition
 
     [JsonPropertyName("loot_table_id")]
     public string? LootTableId { get; set; }
+
+    [JsonPropertyName("gold_min")]
+    public int GoldMin { get; set; }
+
+    [JsonPropertyName("gold_max")]
+    public int GoldMax { get; set; }
 
     [JsonPropertyName("tags")]
     public List<string> Tags { get; set; } = new();

@@ -14,7 +14,11 @@ public sealed class SaveManagerTests : ITestSuite
     public void Register(TestRegistry registry)
     {
         registry.Add("Persistence.SaveManager round-trips full world state", RoundTripRestoresWorldState);
+        registry.Add("Persistence.SaveManager round-trips trap tiles and state", RoundTripRestoresTrapTilesAndState);
         registry.Add("Persistence.SaveManager round-trips multi-floor run state", RoundTripRestoresMultiFloorRunState);
+        registry.Add("Persistence.SaveManager round-trips multi-floor trap state", RoundTripRestoresMultiFloorTrapState);
+        registry.Add("Persistence.SaveManager trap still triggers after save/load round-trip", TrapStillTriggersAfterSaveLoadRoundTrip);
+        registry.Add("Persistence.SaveManager round-trips character options", RoundTripRestoresCharacterOptions);
         registry.Add("Persistence.SaveValidator rejects v8 saves missing active floor", RejectsMissingActiveFloor);
         registry.Add("Persistence.SaveValidator rejects v8 saves with duplicate player across floors", RejectsDuplicatePlayerAcrossFloors);
         registry.Add("Persistence.SaveValidator rejects v8 saves with duplicate floor depths", RejectsDuplicateFloorDepths);
@@ -36,6 +40,19 @@ public sealed class SaveManagerTests : ITestSuite
         var restored = manager.LoadGame(SaveSlots.Slot1).GetAwaiter().GetResult();
         Expect.NotNull(restored, "SaveManager should load the saved world");
         Expect.Equal(WorldSignature(original), WorldSignature(restored!), "Loaded world should match the saved world signature");
+    }
+
+    private static void RoundTripRestoresTrapTilesAndState()
+    {
+        using var sandbox = SaveSandbox.Create();
+        var manager = new SaveManager(sandbox.DirectoryPath, sandbox.Clock);
+        var original = CreateWorld();
+
+        Expect.True(manager.SaveGame(original, SaveSlots.Slot1).GetAwaiter().GetResult(), "SaveManager should persist trap state");
+        var restored = manager.LoadGame(SaveSlots.Slot1).GetAwaiter().GetResult();
+        Expect.NotNull(restored, "SaveManager should load trap state");
+        Expect.Equal(TileSignature(original), TileSignature(restored!), "Trap tiles should survive round-trip");
+        Expect.Equal(TrapSignature(original), TrapSignature(restored!), "Trap state should survive round-trip");
     }
 
     private static void MetadataIsAvailableAfterSave()
@@ -143,18 +160,145 @@ public sealed class SaveManagerTests : ITestSuite
         Expect.True(restoredCached!.GetEntity(active.Player.Id) is null, "Inactive floor should not contain a duplicate player entity");
     }
 
-    private static void AutosaveSlotUsesDedicatedPath()
+    private static void RoundTripRestoresMultiFloorTrapState()
+    {
+        using var sandbox = SaveSandbox.Create();
+        var manager = new SaveManager(sandbox.DirectoryPath, sandbox.Clock);
+        var active = CreateWorld();
+        active.Depth = 2;
+        var cached = CreateWorld();
+        cached.Depth = 1;
+        cached.RemoveEntity(cached.Player.Id);
+        var floors = new Dictionary<int, WorldState>
+        {
+            [cached.Depth] = cached,
+            [active.Depth] = active,
+        };
+
+        Expect.True(manager.SaveRun(new SaveRunSnapshot(active.Seed, active.Depth, active, floors), SaveSlots.Slot1).GetAwaiter().GetResult(),
+            "SaveManager should persist a multi-floor run snapshot with traps");
+
+        var restored = manager.LoadRun(SaveSlots.Slot1).GetAwaiter().GetResult();
+        Expect.NotNull(restored, "SaveManager should load the saved run snapshot with traps");
+        Expect.True(restored!.Floors.TryGetValue(active.Depth, out var restoredActive), "Loaded run should include the active floor");
+        Expect.True(restored.Floors.TryGetValue(cached.Depth, out var restoredCached), "Loaded run should include cached inactive floors");
+        Expect.Equal(TrapSignature(active), TrapSignature(restoredActive!), "Active floor trap state should survive round-trip");
+        Expect.Equal(TrapSignature(cached), TrapSignature(restoredCached!), "Cached floor trap state should survive round-trip");
+    }
+
+    private static void TrapStillTriggersAfterSaveLoadRoundTrip()
+    {
+        using var sandbox = SaveSandbox.Create();
+        var manager = new SaveManager(sandbox.DirectoryPath, sandbox.Clock);
+        var world = new WorldState();
+        world.InitGrid(5, 5);
+        world.Seed = 1234;
+        for (var y = 0; y < world.Height; y++)
+        {
+            for (var x = 0; x < world.Width; x++)
+            {
+                world.SetTile(new Position(x, y), TileType.Floor);
+            }
+        }
+
+        world.SetTile(new Position(2, 2), TileType.Trap);
+        var trap = new Entity(
+            "spike_trap",
+            new Position(2, 2),
+            new Stats { HP = 1, MaxHP = 1, Attack = 0, Accuracy = 0, Defense = 0, Evasion = 0, Speed = 0, ViewRadius = 0, Energy = 0 },
+            Faction.Neutral,
+            blocksMovement: false,
+            blocksSight: false,
+            id: new EntityId(Guid.Parse("33333333-3333-3333-3333-333333333333")));
+        trap.SetComponent(new TrapComponent
+        {
+            TemplateId = "spike_trap",
+            IsArmed = true,
+            IsRevealed = false,
+            TriggerCount = 0,
+        });
+        world.AddEntity(trap);
+
+        var player = new Entity(
+            "Hero",
+            new Position(2, 1),
+            new Stats { HP = 100, MaxHP = 100, Attack = 5, Accuracy = 7, Defense = 3, Evasion = 2, Speed = 110, ViewRadius = 9, Energy = 650 },
+            Faction.Player,
+            id: new EntityId(Guid.Parse("11111111-1111-1111-1111-111111111111")));
+        world.Player = player;
+        world.AddEntity(player);
+
+        Expect.True(manager.SaveGame(world, SaveSlots.Slot1).GetAwaiter().GetResult(), "Save should persist trap state");
+        var loaded = manager.LoadGame(SaveSlots.Slot1).GetAwaiter().GetResult();
+        Expect.NotNull(loaded, "Saved world with trap should load again");
+        loaded!.ContentDatabase = new StubContentDatabase();
+
+        var loadedPlayer = loaded.Player;
+        var loadedTrap = loaded.GetEntity(trap.Id)!;
+        var startHp = loadedPlayer.Stats.HP;
+
+        var outcome = new MoveAction(loadedPlayer.Id, new Position(0, 1)).Execute(loaded);
+        Expect.Equal(ActionResult.Success, outcome.Result, "Move onto trap tile should succeed after load");
+        Expect.Equal(new Position(2, 2), loadedPlayer.Position, "Player should end on trap tile after load");
+        Expect.True(loadedPlayer.Stats.HP < startHp, "Trap should damage player after save/load round-trip");
+        Expect.False(loadedTrap.GetComponent<TrapComponent>()!.IsArmed, "Trap should be disarmed after triggering post-load");
+        Expect.True(loadedTrap.GetComponent<TrapComponent>()!.IsRevealed, "Trap should be revealed after triggering post-load");
+    }
+
+    private static void RoundTripRestoresCharacterOptions()
     {
         using var sandbox = SaveSandbox.Create();
         var manager = new SaveManager(sandbox.DirectoryPath, sandbox.Clock);
         var world = CreateWorld();
+        var options = new CharacterOptionsSaveData
+        {
+            Name = "Eldric",
+            Archetype = "Skirmisher",
+            Origin = "Scout",
+            Trait = "Quartermaster",
+            RaceId = "elf",
+            GenderId = "male",
+            AppearanceId = "veteran",
+            BonusMaxHp = 5,
+            BonusAttack = 2,
+            BonusDefense = 1,
+            BonusAccuracy = 3,
+            BonusEvasion = 4,
+            BonusSpeed = 5,
+            BonusViewRadius = 1,
+            InventoryCapacityBonus = 2,
+            StartingItemTemplateIds = new List<string> { "potion_health", "scroll_fireball" },
+            EquippedItemTemplateIds = new List<string> { "iron_sword" },
+        };
 
-        Expect.True(manager.SaveGame(world, SaveSlots.Autosave).GetAwaiter().GetResult(), "Autosave slot should save successfully");
-        Expect.True(manager.HasSave(SaveSlots.Autosave), "Autosave slot should report an existing save");
-        Expect.True(File.Exists(Path.Combine(sandbox.DirectoryPath, "autosave.json")), "Autosave should use the dedicated autosave file name");
+        var floors = new Dictionary<int, WorldState>
+        {
+            [world.Depth] = world,
+        };
 
-        manager.DeleteSave(SaveSlots.Autosave);
-        Expect.False(manager.HasSave(SaveSlots.Autosave), "Deleting the autosave slot should remove the save file");
+        Expect.True(manager.SaveRun(new SaveRunSnapshot(world.Seed, world.Depth, world, floors, options), SaveSlots.Slot1).GetAwaiter().GetResult(),
+            "SaveManager should persist a run snapshot with character options");
+
+        var restored = manager.LoadRun(SaveSlots.Slot1).GetAwaiter().GetResult();
+        Expect.NotNull(restored, "SaveManager should load the saved run snapshot");
+        var restoredOptions = restored!.CharacterOptions;
+        Expect.Equal(options.Archetype, restoredOptions.Archetype, "Loaded archetype should match saved archetype");
+        Expect.Equal(options.RaceId, restoredOptions.RaceId, "Loaded race id should match saved race id");
+        Expect.Equal(options.Name, restoredOptions.Name, "Loaded name should match saved name");
+        Expect.Equal(options.Origin, restoredOptions.Origin, "Loaded origin should match saved origin");
+        Expect.Equal(options.Trait, restoredOptions.Trait, "Loaded trait should match saved trait");
+        Expect.Equal(options.GenderId, restoredOptions.GenderId, "Loaded gender id should match saved gender id");
+        Expect.Equal(options.AppearanceId, restoredOptions.AppearanceId, "Loaded appearance id should match saved appearance id");
+        Expect.Equal(options.BonusMaxHp, restoredOptions.BonusMaxHp, "Loaded bonus max HP should match");
+        Expect.Equal(options.BonusAttack, restoredOptions.BonusAttack, "Loaded bonus attack should match");
+        Expect.Equal(options.BonusDefense, restoredOptions.BonusDefense, "Loaded bonus defense should match");
+        Expect.Equal(options.BonusAccuracy, restoredOptions.BonusAccuracy, "Loaded bonus accuracy should match");
+        Expect.Equal(options.BonusEvasion, restoredOptions.BonusEvasion, "Loaded bonus evasion should match");
+        Expect.Equal(options.BonusSpeed, restoredOptions.BonusSpeed, "Loaded bonus speed should match");
+        Expect.Equal(options.BonusViewRadius, restoredOptions.BonusViewRadius, "Loaded bonus view radius should match");
+        Expect.Equal(options.InventoryCapacityBonus, restoredOptions.InventoryCapacityBonus, "Loaded inventory capacity bonus should match");
+        Expect.Equal(string.Join(",", options.StartingItemTemplateIds), string.Join(",", restoredOptions.StartingItemTemplateIds), "Loaded starting items should match");
+        Expect.Equal(string.Join(",", options.EquippedItemTemplateIds), string.Join(",", restoredOptions.EquippedItemTemplateIds), "Loaded equipped items should match");
     }
 
     private static void RejectsMissingActiveFloor()
@@ -203,6 +347,20 @@ public sealed class SaveManagerTests : ITestSuite
         Expect.True(manager.GetSaveMetadata(SaveSlots.Slot1) is null, "Duplicate-depth floor payloads should not expose metadata.");
     }
 
+    private static void AutosaveSlotUsesDedicatedPath()
+    {
+        using var sandbox = SaveSandbox.Create();
+        var manager = new SaveManager(sandbox.DirectoryPath, sandbox.Clock);
+        var world = CreateWorld();
+
+        Expect.True(manager.SaveGame(world, SaveSlots.Autosave).GetAwaiter().GetResult(), "Autosave slot should save successfully");
+        Expect.True(manager.HasSave(SaveSlots.Autosave), "Autosave slot should report an existing save");
+        Expect.True(File.Exists(Path.Combine(sandbox.DirectoryPath, "autosave.json")), "Autosave should use the dedicated autosave file name");
+
+        manager.DeleteSave(SaveSlots.Autosave);
+        Expect.False(manager.HasSave(SaveSlots.Autosave), "Deleting the autosave slot should remove the save file");
+    }
+
     private static WorldState CreateWorld()
     {
         var world = new WorldState();
@@ -223,6 +381,23 @@ public sealed class SaveManagerTests : ITestSuite
         world.SetTile(new Position(5, 4), TileType.StairsDown);
         world.SetTile(new Position(4, 2), TileType.Door);
         world.SetDoorOpen(new Position(4, 2), true);
+        world.SetTile(new Position(2, 3), TileType.Trap);
+        var trap = new Entity(
+            "spike_trap",
+            new Position(2, 3),
+            new Stats { HP = 1, MaxHP = 1, Attack = 0, Accuracy = 0, Defense = 0, Evasion = 0, Speed = 0, ViewRadius = 0, Energy = 0 },
+            Faction.Neutral,
+            blocksMovement: false,
+            blocksSight: false,
+            id: new EntityId(Guid.Parse("33333333-3333-3333-3333-333333333333")));
+        trap.SetComponent(new TrapComponent
+        {
+            TemplateId = "spike_trap",
+            IsArmed = true,
+            IsRevealed = false,
+            TriggerCount = 0,
+        });
+        world.AddEntity(trap);
         world.SetVisible(new Position(1, 1), true);
         world.SetVisible(new Position(2, 1), true);
         world.SetVisible(new Position(3, 3), true);
@@ -318,6 +493,7 @@ public sealed class SaveManagerTests : ITestSuite
             $"explored={FlagSignature(world, explored: true)}",
             $"visible={FlagSignature(world, explored: false)}",
             $"doors={DoorSignature(world)}",
+            $"traps={TrapSignature(world)}",
             $"entities={EntitySignature(world)}",
             $"ground={GroundItemSignature(world)}",
             $"player={world.Player.Id.Value:N}",
@@ -338,6 +514,7 @@ public sealed class SaveManagerTests : ITestSuite
             $"explored={FlagSignature(world, explored: true)}",
             $"visible={FlagSignature(world, explored: false)}",
             $"doors={DoorSignature(world)}",
+            $"traps={TrapSignature(world)}",
             $"entities={EntitySignature(world)}",
             $"ground={GroundItemSignature(world)}",
         });
@@ -389,6 +566,20 @@ public sealed class SaveManagerTests : ITestSuite
             }
         }
 
+        return string.Join(";", values);
+    }
+
+    private static string TrapSignature(WorldState world)
+    {
+        var values = world.Entities
+            .Where(entity => entity.GetComponent<TrapComponent>() is not null)
+            .OrderBy(entity => entity.Position.Y)
+            .ThenBy(entity => entity.Position.X)
+            .Select(entity =>
+            {
+                var trap = entity.GetComponent<TrapComponent>()!;
+                return $"{entity.Position.X},{entity.Position.Y},{trap.TemplateId},{(trap.IsArmed ? 0 : 1)},{(trap.IsRevealed ? 1 : 0)},{trap.TriggerCount}";
+            });
         return string.Join(";", values);
     }
 

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text.Json.Nodes;
 using Roguelike.Core;
 using Roguelike.Tests.TestFramework;
 
@@ -11,6 +12,7 @@ public sealed class ValidationTests : ITestSuite
     {
         registry.Add("Persistence.SaveManager rejects corrupted payloads", RejectsCorruptedPayloads);
         registry.Add("Persistence.SaveManager rejects invalid world data", RejectsInvalidWorldData);
+        registry.Add("Persistence.SaveValidator rejects traps on non-trap tiles", RejectsTrapsOnNonTrapTiles);
     }
 
     private static void RejectsCorruptedPayloads()
@@ -33,6 +35,55 @@ public sealed class ValidationTests : ITestSuite
         var world = manager.LoadGame(SaveSlots.Slot2).GetAwaiter().GetResult();
         Expect.True(world is null, "Validation errors should prevent loading an invalid save");
         Expect.True(manager.GetSaveMetadata(SaveSlots.Slot2) is null, "Validation errors should also suppress metadata");
+    }
+
+    private static void RejectsTrapsOnNonTrapTiles()
+    {
+        using var sandbox = ValidationSandbox.Create();
+        var manager = new SaveManager(sandbox.DirectoryPath);
+        var world = new WorldState();
+        world.InitGrid(5, 5);
+        for (var y = 0; y < world.Height; y++)
+        {
+            for (var x = 0; x < world.Width; x++)
+            {
+                world.SetTile(new Position(x, y), TileType.Floor);
+            }
+        }
+
+        world.SetTile(new Position(2, 2), TileType.Trap);
+
+        var player = new Entity(
+            "Hero",
+            new Position(1, 1),
+            new Stats { HP = 10, MaxHP = 10, Attack = 2, Accuracy = 1, Defense = 1, Evasion = 1, Speed = 100, ViewRadius = 8, Energy = 0 },
+            Faction.Player,
+            id: new EntityId(Guid.Parse("11111111111111111111111111111111")));
+        world.Player = player;
+        world.AddEntity(player);
+
+        var trap = new Entity(
+            "spike_trap",
+            new Position(2, 2),
+            new Stats { HP = 1, MaxHP = 1, Attack = 0, Accuracy = 0, Defense = 0, Evasion = 0, Speed = 0, ViewRadius = 0, Energy = 0 },
+            Faction.Neutral,
+            blocksMovement: false,
+            blocksSight: false);
+        trap.SetComponent(new TrapComponent { TemplateId = "spike_trap", IsArmed = true, IsRevealed = false, TriggerCount = 0 });
+        world.AddEntity(trap);
+
+        Expect.True(manager.SaveGame(world, SaveSlots.Slot1).GetAwaiter().GetResult(), "Test setup should save a valid world with a trap tile");
+
+        var path = Path.Combine(sandbox.DirectoryPath, SaveSlots.GetFileName(SaveSlots.Slot1));
+        var root = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+        var entities = root["floors"]![0]!["entities"]!.AsArray();
+        var trapEntity = entities.First(entity => entity!["trap"] is not null)!;
+        trapEntity!["position"]!["x"] = 3;
+        trapEntity["position"]!["y"] = 3;
+        File.WriteAllText(path, root.ToJsonString());
+
+        var loaded = manager.LoadGame(SaveSlots.Slot1).GetAwaiter().GetResult();
+        Expect.True(loaded is null, "Traps on non-trap tiles should fail validation");
     }
 
     private static string InvalidSaveJson() => """

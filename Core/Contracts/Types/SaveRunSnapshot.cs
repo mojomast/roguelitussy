@@ -5,7 +5,7 @@ namespace Roguelike.Core;
 
 public sealed class SaveRunSnapshot
 {
-    public SaveRunSnapshot(int seed, int currentFloor, WorldState activeWorld, IReadOnlyDictionary<int, WorldState> floors)
+    public SaveRunSnapshot(int seed, int currentFloor, WorldState activeWorld, IReadOnlyDictionary<int, WorldState> floors, CharacterOptionsSaveData? characterOptions = null)
     {
         ArgumentNullException.ThrowIfNull(activeWorld);
         ArgumentNullException.ThrowIfNull(floors);
@@ -14,6 +14,7 @@ public sealed class SaveRunSnapshot
         CurrentFloor = currentFloor;
         ActiveWorld = activeWorld;
         Floors = new Dictionary<int, WorldState>(floors);
+        CharacterOptions = characterOptions ?? new CharacterOptionsSaveData();
     }
 
     public int Seed { get; }
@@ -23,4 +24,6 @@ public sealed class SaveRunSnapshot
     public WorldState ActiveWorld { get; }
 
     public IReadOnlyDictionary<int, WorldState> Floors { get; }
+
+    public CharacterOptionsSaveData CharacterOptions { get; }
 }

@@ -5,7 +5,7 @@ namespace Roguelike.Tests.Stubs;
 
 public sealed class StubPathfinder : IPathfinder
 {
-    public IReadOnlyList<Position> FindPath(Position start, Position goal, IWorldState world, int maxLength = 50)
+    public IReadOnlyList<Position> FindPath(Position start, Position goal, IWorldState world, int maxLength = 50, bool phaseThroughWalls = false)
     {
         var path = new List<Position> { start };
         var cursor = start;
@@ -21,15 +21,15 @@ public sealed class StubPathfinder : IPathfinder
         return path;
     }
 
-    public bool HasPath(Position start, Position goal, IWorldState world, int maxLength = 50) => true;
+    public bool HasPath(Position start, Position goal, IWorldState world, int maxLength = 50, bool phaseThroughWalls = false) => true;
 
-    public IReadOnlyDictionary<Position, int> GetReachable(Position origin, int range, IWorldState world)
+    public IReadOnlyDictionary<Position, int> GetReachable(Position origin, int range, IWorldState world, bool phaseThroughWalls = false)
     {
         var result = new Dictionary<Position, int> { [origin] = 0 };
         foreach (var direction in Position.Cardinals)
         {
             var next = origin + direction;
-            if (world.InBounds(next) && world.IsWalkable(next))
+            if (world.InBounds(next) && (phaseThroughWalls || world.IsWalkable(next)))
             {
                 result[next] = 1;
             }

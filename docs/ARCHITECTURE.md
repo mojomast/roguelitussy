@@ -127,3 +127,66 @@ This keeps authoring utilities on the Godot side while still allowing non-editor
 - Avoid introducing Godot randomness into the simulation layer.
 - Use explicit seed-driven generation paths for reproducible level creation.
 - Treat persistence as part of the deterministic contract; format changes require migration and validation.
+
+## Agent Onboarding Reference
+
+Quick-reference entry points for agents working on this codebase.
+
+### Core layer entry points
+
+| Concern | File | Line | What to know |
+|---|---|---|---|
+| Authoritative state | `Core/Contracts/WorldState.cs` | 7 | Grid, entity index, visibility, RNG state hooks |
+| Entity model | `Core/Simulation/Entity.cs` | 6 | Component bag; all state lives in components |
+| Action contract | `Core/Contracts/IAction.cs` | 5 | `Validate`, `Execute`, `GetEnergyCost`, `ActionOutcome` |
+| Turn loop | `Core/Simulation/GameLoop.cs` | 7 | `ProcessRound` drives actors and ticks cooldowns |
+| Scheduler | `Core/Simulation/TurnScheduler.cs` | 7 | Energy-based; status ticks happen in `ConsumeEnergy` |
+| Combat | `Core/Simulation/CombatResolver.cs` | 6 | Deterministic hit/damage/crit/on-hit |
+| Death | `Core/Simulation/DeathResolver.cs` | 6 | Central kill handler; awards XP |
+| Items | `Core/Simulation/Actions/UseItemAction.cs` | 6 | `heal`, `apply_status`, `cast_ability`, `cure` |
+| Abilities | `Core/Simulation/Actions/CastAbilityAction.cs` | 6 | Damage/status/teleport/heal_self |
+| Ability targets | `Core/Simulation/AbilityResolver.cs` | 9 | Only self/single/tile/aoe_circle implemented |
+| Statuses | `Core/Simulation/StatusEffectProcessor.cs` | 19 | Hardcoded behavior; JSON is descriptive |
+| Progression | `Core/Simulation/ProgressionService.cs` | 7 | XP/level-up helpers |
+| Content load | `Core/Content/ContentLoader.cs` | 122 | `LoadFromDirectory` entry point |
+| Save | `Core/Persistence/SaveManager.cs` | 9 | File I/O and slot management |
+| Serialize | `Core/Persistence/SaveSerializer.cs` | 9 | JSON round-trip, current version 8 |
+
+### Godot layer entry points
+
+| Concern | File | Line | What to know |
+|---|---|---|---|
+| Autoloads | `project.godot` | 11 | `GameManager`, `EventBus`, `ContentDatabase` |
+| Facade | `Scripts/Autoloads/GameManager.cs` | 10 | Owns world, services, turn processing, save/load |
+| Events | `Scripts/Autoloads/EventBus.cs` | 7 | 39 events; GameManager emits, UI/World subscribes |
+| Input | `Scripts/UI/UIRoot.cs` | 162 | `_UnhandledInput` routes all keys |
+| Input mapping | `Scripts/UI/InputHandler.cs` | 37 | Key-to-action mapping |
+| Action factory | `Scripts/UI/UIActionFactory.cs` | 7 | Builds `IAction` from UI intent |
+| World render | `Scripts/World/WorldView.cs` | 83 | Mirrors `WorldState`; no FOV computation |
+| Entity sprites | `Scripts/World/EntityRenderer.cs` | — | Procedural sprites from catalogs |
+| Catalogs | `Scripts/World/WorldArtCatalog.cs` | 16 | Builds `res://Assets/...` paths |
+
+### Data flow cheat sheet
+
+Player turn:
+`UIRoot._UnhandledInput` → `InputHandler.HandleKey` → `UIActionFactory` → `EventBus.PlayerActionSubmitted` → `GameManager.ProcessPlayerAction` → `IAction.Execute` + `GameLoop.ProcessRound` → `WorldState` mutation → `EventBus` → `WorldView`/UI refresh.
+
+Save/load:
+`GameManager.SaveToSlot`/`LoadFromSlot` → `SaveManager` → `SaveSerializer`/`SaveMigrator` → JSON. `CombatRandomState` and `ItemRandomState` round-trip per floor.
+
+Content:
+`ContentLoader.LoadFromDirectory` → JSON validation → template projection → `IContentDatabase` → consumed by `GameManager`, actions, and tests.
+
+### Coupling points to treat carefully
+
+- `GameManager` is the only Godot-side owner of `WorldState` for normal gameplay. Do not let other presentation scripts mutate state outside debug tooling.
+- `EventBus` events should carry enough payload to identify affected targets (actor, target, positions). GameManager currently emits some events with the actor ID where the target ID would be more useful.
+- `WorldView` reads `WorldState` visibility flags; `GameManager`/`WorldState` compute them. Do not move FOV ownership into `WorldView`.
+- Actions are the only legitimate gameplay mutation path. Debug tools are intentionally exempt but make deterministic replay/save harder.
+
+### Known wiring gaps
+
+- Targeted scrolls (`cast_ability:` with non-`self` targeting) have no UI path; `UIActionFactory.CreateUseItemAction` returns `null` for them. (Resolved in Wave 2; field targeting is now implemented.)
+- `StatusEffectProcessor` hardcodes status behavior; JSON `status_effects.json` is largely descriptive.
+- `aoe_line` and `aoe_cone` ability targeting validate but are not resolved at runtime.
+- `GameManager` directly mutates `WorldState` for map reveal, teleport, and floor travel.

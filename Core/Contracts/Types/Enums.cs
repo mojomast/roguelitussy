@@ -10,6 +10,8 @@ public enum TileType : byte
     StairsUp = 5,
     Water = 6,
     Lava = 7,
+    Trap = 8,
+    LockedDoor = 9,
 }
 
 public enum ActionType : byte
@@ -70,6 +72,7 @@ public enum StatusEffectType : byte
     Empowered,
     Corroded,
     Phased,
+    Flying,
 }
 
 public enum EquipSlot : byte

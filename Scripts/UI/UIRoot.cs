@@ -48,6 +48,8 @@ public partial class UIRoot : CanvasLayer
 
     public DebugOverlay DebugOverlay { get; } = new();
 
+    public TargetingOverlay TargetingOverlay { get; } = new();
+
     public InputHandler InputHandler { get; } = new();
 
     public override void _Ready()
@@ -74,7 +76,7 @@ public partial class UIRoot : CanvasLayer
 
         HUD.Bind(_gameManager, _eventBus);
         CombatLog.Bind(_gameManager, _eventBus);
-        Inventory.Bind(_gameManager, _eventBus, _content, Tooltip);
+        Inventory.Bind(_gameManager, _eventBus, _content, Tooltip, TargetingOverlay);
         CharacterSheet.Bind(_gameManager, _eventBus, _content);
         LevelUpOverlay.Bind(_gameManager);
         DialogUI.ShopRequested -= OpenShopFromDialog;
@@ -86,6 +88,7 @@ public partial class UIRoot : CanvasLayer
         PauseMenu.Bind(_eventBus);
         DebugConsole.Bind(_gameManager, _eventBus, _content);
         DebugOverlay.Bind(_gameManager, _eventBus);
+        TargetingOverlay.Bind(_gameManager, _eventBus, _content);
         InputHandler.Bind(_gameManager, _eventBus);
         CombatLog.RefreshConsole();
 
@@ -191,6 +194,7 @@ public partial class UIRoot : CanvasLayer
         AddIfMissing(Tooltip);
         AddIfMissing(DebugConsole);
         AddIfMissing(DebugOverlay);
+        AddIfMissing(TargetingOverlay);
         AddIfMissing(InputHandler);
     }
 
@@ -243,6 +247,17 @@ public partial class UIRoot : CanvasLayer
             }
 
             return handledByWorkshop;
+        }
+
+        if (TargetingOverlay.IsActive)
+        {
+            var handledByTargeting = TargetingOverlay.HandleKey(key);
+            if (handledByTargeting && !TargetingOverlay.IsActive)
+            {
+                RefreshInputGate();
+            }
+
+            return handledByTargeting;
         }
 
         if (key == Key.Quoteleft)
@@ -402,6 +417,7 @@ public partial class UIRoot : CanvasLayer
         LevelUpOverlay.Close();
         DialogUI.Close();
         ShopUI.Close();
+        TargetingOverlay.Cancel();
         Tooltip.Hide();
         CombatLog.RefreshConsole();
         UpdateLevelUpOverlay();
@@ -437,6 +453,7 @@ public partial class UIRoot : CanvasLayer
         ShopUI.Close();
         GameOverScreen.Close();
         HelpOverlay.Close();
+        TargetingOverlay.Cancel();
         Tooltip.Hide();
         CombatLog.RefreshConsole();
         UpdateLevelUpOverlay();
@@ -467,6 +484,7 @@ public partial class UIRoot : CanvasLayer
         LevelUpOverlay.Close();
         DialogUI.Close();
         ShopUI.Close();
+        TargetingOverlay.Cancel();
         Inventory.Toggle();
         if (!Inventory.Visible)
         {
@@ -488,6 +506,7 @@ public partial class UIRoot : CanvasLayer
         LevelUpOverlay.Close();
         DialogUI.Close();
         ShopUI.Close();
+        TargetingOverlay.Cancel();
         Tooltip.Hide();
         CharacterSheet.Toggle();
         RefreshInputGate();
@@ -523,6 +542,7 @@ public partial class UIRoot : CanvasLayer
         }
         else
         {
+            TargetingOverlay.Cancel();
             PauseMenu.Open();
         }
 
@@ -572,6 +592,7 @@ public partial class UIRoot : CanvasLayer
         LevelUpOverlay.Close();
         DialogUI.Close();
         ShopUI.Close();
+        TargetingOverlay.Cancel();
         Tooltip.Hide();
         MainMenu.Close();
         DevToolsWorkbench.Open();
@@ -587,6 +608,7 @@ public partial class UIRoot : CanvasLayer
     private void OpenDebugConsoleFromWorkshop()
     {
         DevToolsWorkbench.Close();
+        TargetingOverlay.Cancel();
         DebugConsole.Open();
         RefreshInputGate();
     }
@@ -631,6 +653,7 @@ public partial class UIRoot : CanvasLayer
         GameOverScreen.Close();
         HelpOverlay.Close();
         DevToolsWorkbench.Close();
+        TargetingOverlay.Cancel();
         Tooltip.Hide();
         MainMenu.Open();
         CombatLog.RefreshConsole();
@@ -681,6 +704,7 @@ public partial class UIRoot : CanvasLayer
         ShopUI.Close();
         HelpOverlay.Close();
         DevToolsWorkbench.Close();
+        TargetingOverlay.Cancel();
         Tooltip.Hide();
         var world = _gameManager.World;
         GameOverScreen.Open(new GameOverSummary(world.Player.Name, world.Depth, _enemiesKilled, world.TurnNumber));
@@ -707,7 +731,8 @@ public partial class UIRoot : CanvasLayer
             && !GameOverScreen.Visible
             && !HelpOverlay.Visible
             && !DevToolsWorkbench.Visible
-            && !DebugConsole.Visible);
+            && !DebugConsole.Visible
+            && !TargetingOverlay.IsActive);
     }
 
     private void RefreshGameplayChromeVisibility()
@@ -751,6 +776,7 @@ public partial class UIRoot : CanvasLayer
 
         Inventory.Close();
         CharacterSheet.Close();
+        TargetingOverlay.Cancel();
         Tooltip.Hide();
 
         var context = _gameManager?.GetInteractionContext();
@@ -768,6 +794,7 @@ public partial class UIRoot : CanvasLayer
     private void OpenShopFromDialog(EntityId merchantId)
     {
         DialogUI.Close();
+        TargetingOverlay.Cancel();
         ShopUI.Open(merchantId);
         RefreshInputGate();
     }
@@ -787,6 +814,7 @@ public partial class UIRoot : CanvasLayer
         CharacterSheet.Close();
         DialogUI.Close();
         ShopUI.Close();
+        TargetingOverlay.Cancel();
         Tooltip.Hide();
         if (!LevelUpOverlay.Visible)
         {

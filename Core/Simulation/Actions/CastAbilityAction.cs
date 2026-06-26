@@ -90,6 +90,7 @@ public sealed class CastAbilityAction : IAction
         var totalDamageDealt = 0;
         var damageResults = new List<DamageResult>();
         var statusEffectsApplied = new List<StatusEffectInstance>();
+        var affectedTargetId = Ability.Targeting.Type == "self" ? ActorId : EntityId.Invalid;
 
         foreach (var effect in Ability.Effects)
         {
@@ -115,11 +116,17 @@ public sealed class CastAbilityAction : IAction
                         var result = new DamageResult(ActorId, target.Id, rawDamage, finalDamage, effect.DamageType, false, false, isKill);
                         damageResults.Add(result);
 
+                        if (!affectedTargetId.IsValid)
+                        {
+                            affectedTargetId = target.Id;
+                        }
+
                         if (isKill || target.Stats.HP <= 0)
                         {
                             var death = DeathResolver.ResolveKill(world, actor, target);
                             DeathResolver.AppendProgressionLogMessages(outcome.LogMessages, actor.Name, death);
                             outcome.LogMessages.Add($"{actor.Name}'s {Ability.DisplayName} kills {target.Name} for {finalDamage} damage.");
+                            DeathResolver.AppendLootLogMessages(outcome.LogMessages, death);
                         }
                         else
                         {
@@ -158,6 +165,10 @@ public sealed class CastAbilityAction : IAction
                         {
                             statusEffectsApplied.Add(applied);
                             outcome.LogMessages.Add($"{target.Name} is affected by {effect.StatusEffect}.");
+                            if (!affectedTargetId.IsValid)
+                            {
+                                affectedTargetId = target.Id;
+                            }
                         }
                     }
                     break;
@@ -187,7 +198,8 @@ public sealed class CastAbilityAction : IAction
                 world.TurnNumber,
                 ActionType.CastAbility,
                 damageResults.ToArray(),
-                statusEffectsApplied.ToArray()));
+                statusEffectsApplied.ToArray(),
+                affectedTargetId.IsValid ? affectedTargetId : ActorId));
         }
 
         outcome.LogMessages.Insert(0, $"{actor.Name} casts {Ability.DisplayName}.");

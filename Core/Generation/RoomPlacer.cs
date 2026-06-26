@@ -5,20 +5,21 @@ namespace Roguelike.Core;
 
 public static class RoomPlacer
 {
-    private const int LeafPadding = 1;
+    internal const int LeafPadding = 1;
     private const int MinimumRectRoomSize = 4;
 
     public static IReadOnlyList<RoomPlacement> PlaceRooms(
         BSPNode root,
         WorldState world,
         Random rng,
-        IReadOnlyList<RoomPrefab> prefabs)
+        IReadOnlyList<RoomPrefab> prefabs,
+        string? themeTag = null)
     {
         var rooms = new List<RoomPlacement>();
 
         foreach (var leaf in root.Leaves())
         {
-            var room = CreatePlacement(leaf, rng, prefabs);
+            var room = CreatePlacement(leaf, rng, prefabs, themeTag);
             Carve(world, room);
             leaf.Room = room;
             rooms.Add(room);
@@ -27,7 +28,7 @@ public static class RoomPlacer
         return rooms;
     }
 
-    private static RoomPlacement CreatePlacement(BSPNode leaf, Random rng, IReadOnlyList<RoomPrefab> prefabs)
+    private static RoomPlacement CreatePlacement(BSPNode leaf, Random rng, IReadOnlyList<RoomPrefab> prefabs, string? themeTag)
     {
         var usableWidth = leaf.Width - (LeafPadding * 2);
         var usableHeight = leaf.Height - (LeafPadding * 2);
@@ -48,7 +49,25 @@ public static class RoomPlacer
 
         if (fittingPrefabs.Count > 0)
         {
-            return BuildPrefabRoom(leaf, fittingPrefabs[rng.Next(fittingPrefabs.Count)], rng);
+            var candidatePrefabs = fittingPrefabs;
+            if (!string.IsNullOrWhiteSpace(themeTag))
+            {
+                var themedPrefabs = new List<RoomPrefab>();
+                for (var i = 0; i < fittingPrefabs.Count; i++)
+                {
+                    if (fittingPrefabs[i].Tags.Contains(themeTag!))
+                    {
+                        themedPrefabs.Add(fittingPrefabs[i]);
+                    }
+                }
+
+                if (themedPrefabs.Count > 0)
+                {
+                    candidatePrefabs = themedPrefabs;
+                }
+            }
+
+            return BuildPrefabRoom(leaf, candidatePrefabs[rng.Next(candidatePrefabs.Count)], rng);
         }
 
         return BuildRectangularRoom(leaf, rng, usableWidth, usableHeight);
@@ -71,7 +90,7 @@ public static class RoomPlacer
         }
 
         var center = new Position(origin.X + (prefab.Width / 2), origin.Y + (prefab.Height / 2));
-        return new RoomPlacement(new RoomData(origin.X, origin.Y, prefab.Width, prefab.Height, center), walkableTiles, origin, prefab);
+        return new RoomPlacement(new RoomData(origin.X, origin.Y, prefab.Width, prefab.Height, center, prefab.Tags), walkableTiles, origin, prefab);
     }
 
     private static RoomPlacement BuildRectangularRoom(BSPNode leaf, Random rng, int usableWidth, int usableHeight)

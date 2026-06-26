@@ -17,3 +17,7 @@ public sealed record ChestSpawnData(
 public sealed record NpcSpawnData(
     Position Position,
     string TemplateId);
+
+public sealed record TrapSpawnData(
+    Position Position,
+    string? TrapId = null);

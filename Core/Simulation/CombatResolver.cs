@@ -143,6 +143,11 @@ public sealed class CombatResolver
 
     public int ApplyArmor(int rawDamage, IEntity defender, DamageType damageType)
     {
+        if (damageType == DamageType.Physical && StatusEffectProcessor.HasFlag(defender, "immune_physical"))
+        {
+            return 0;
+        }
+
         var armor = defender.Stats.Defense + (StatusEffectProcessor.GetMagnitude(defender, StatusEffectType.Shielded) * 3);
 
         if (StatusEffectProcessor.HasEffect(defender, StatusEffectType.Corroded))

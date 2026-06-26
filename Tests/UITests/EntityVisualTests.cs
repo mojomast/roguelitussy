@@ -309,6 +309,61 @@ public sealed class EntityVisualTests : ITestSuite
         Expect.True(FindChild<Label>(spriteRoot, "VariantSigil") is null, "Chest visuals should not reuse player identity sigils.");
     }
 
+    private static void EntityRendererAddsStatusOverlayForAffectedEntities()
+    {
+        var content = new StubContentDatabase();
+        var renderer = new EntityRenderer(new Node2D(), new AnimationController(), content);
+        var enemy = new StubEntity("Goblin", new Position(2, 1), Faction.Enemy);
+        enemy.SetComponent(new StatusEffectsComponent());
+        StatusEffectProcessor.ApplyEffect(enemy, StatusEffectType.Poisoned, 3, 1);
+
+        renderer.UpsertEntity(enemy);
+
+        var spriteRoot = renderer.GetSprite(enemy.Id);
+        Expect.NotNull(spriteRoot, "Entity renderer should create a sprite root for the enemy.");
+        var overlay = FindChild<Node2D>(spriteRoot!, "StatusOverlay");
+        Expect.NotNull(overlay, "Entity renderer should add a StatusOverlay container.");
+        var icon = FindChild<Sprite2D>(overlay!, "poisoned");
+        Expect.NotNull(icon, "StatusOverlay should contain a Sprite2D named after the status effect.");
+    }
+
+    private static void EntityRendererStatusOverlayUsesContentIconPathAndTint()
+    {
+        var content = new StubContentDatabase();
+        var renderer = new EntityRenderer(new Node2D(), new AnimationController(), content);
+        var enemy = new StubEntity("Goblin", new Position(2, 1), Faction.Enemy);
+        enemy.SetComponent(new StatusEffectsComponent());
+        StatusEffectProcessor.ApplyEffect(enemy, StatusEffectType.Burning, 3, 1);
+
+        renderer.UpsertEntity(enemy);
+
+        var spriteRoot = renderer.GetSprite(enemy.Id)!;
+        var overlay = FindChild<Node2D>(spriteRoot, "StatusOverlay")!;
+        var icon = FindChild<Sprite2D>(overlay, "burning")!;
+
+        Expect.NotNull(icon.Texture, "Status icon should load a texture from the content definition.");
+        Expect.Equal("res://Assets/Sprites/ui/status_burn.svg", icon.Texture!.ResourcePath, "Status icon texture path should match the content definition.");
+        Expect.True(icon.Modulate.R > 0.9f, "Burning status icon should apply a red-orange tint from the content definition.");
+    }
+
+    private static void EntityRendererRefreshesStatusOverlaysOnRequest()
+    {
+        var content = new StubContentDatabase();
+        var renderer = new EntityRenderer(new Node2D(), new AnimationController(), content);
+        var enemy = new StubEntity("Goblin", new Position(2, 1), Faction.Enemy);
+        enemy.SetComponent(new StatusEffectsComponent());
+
+        renderer.UpsertEntity(enemy);
+        var spriteRoot = renderer.GetSprite(enemy.Id)!;
+        Expect.True(FindChild<Node2D>(spriteRoot, "StatusOverlay")?.GetChildren().Count == 0, "Overlay should be empty before effects are applied.");
+
+        StatusEffectProcessor.ApplyEffect(enemy, StatusEffectType.Poisoned, 3, 1);
+        renderer.RefreshStatusOverlays(enemy.Id);
+
+        var overlay = FindChild<Node2D>(spriteRoot, "StatusOverlay")!;
+        Expect.NotNull(FindChild<Sprite2D>(overlay, "poisoned"), "RefreshStatusOverlays should create icons for newly applied effects.");
+    }
+
     private static T? FindChild<T>(Node parent, string name) where T : Node
     {
         for (var i = 0; i < parent.Children.Count; i++)

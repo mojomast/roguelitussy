@@ -24,4 +24,5 @@ public sealed record ItemTemplate(
     IReadOnlyList<WeaponOnHitEffect>? OnHitEffects = null,
     IReadOnlyDictionary<string, int>? Requirements = null,
     int Value = 0,
-    double Weight = 0.0);
+    double Weight = 0.0,
+    bool RequiresTargetSelection = false);

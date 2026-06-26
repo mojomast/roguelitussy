@@ -385,6 +385,7 @@ public sealed class ToolingTests : ITestSuite
         "status_effects.json",
         "room_prefabs.json",
         "loot_tables.json",
+        "traps.json",
     };
 
     private static T ReadDocument<T>(string path)

@@ -11,6 +11,9 @@ public sealed class ComponentPersistenceTests : ITestSuite
     {
         registry.Add("Persistence.Components preserves chest openability state", PreservesChestState);
         registry.Add("Persistence.Components preserves XP value", PreservesXpValue);
+        registry.Add("Persistence.Components preserves enemy template identity", PreservesEnemyTemplateIdentity);
+        registry.Add("Persistence.Components preserves trap component state", PreservesTrapComponentState);
+        registry.Add("Persistence.Components preserves scheduler actor order", PreservesSchedulerActorOrder);
         registry.Add("Persistence.Components preserves abilities and cooldowns", PreservesAbilitiesAndCooldowns);
         registry.Add("Persistence.Components preserves AI state and brain", PreservesAIStateAndBrain);
         registry.Add("Persistence.Components preserves status source attribution", PreservesStatusSourceAttribution);
@@ -52,6 +55,116 @@ public sealed class ComponentPersistenceTests : ITestSuite
 
         Expect.NotNull(restored, "Saved world should load again.");
         Expect.Equal(17, restored!.GetEntity(enemy.Id)!.GetComponent<XpValueComponent>()?.Value ?? -1, "XP value should survive round-trip.");
+    }
+
+    private static void PreservesEnemyTemplateIdentity()
+    {
+        using var sandbox = SaveSandbox.Create();
+        var manager = new SaveManager(sandbox.DirectoryPath, sandbox.Clock);
+        var world = CreateWorld(4, 4);
+        var enemy = CreateEntity("Goblin Archer", new Position(1, 0), Faction.Enemy);
+        enemy.SetComponent(new EnemyComponent { TemplateId = "goblin_archer" });
+        world.AddEntity(enemy);
+
+        Expect.True(manager.SaveGame(world, SaveSlots.Slot1).GetAwaiter().GetResult(), "Save should succeed with enemy component.");
+        var restoredEnemy = manager.LoadGame(SaveSlots.Slot1).GetAwaiter().GetResult()!.GetEntity(enemy.Id)!;
+        var enemyComponent = restoredEnemy.GetComponent<EnemyComponent>();
+
+        Expect.NotNull(enemyComponent, "Enemy component should survive round-trip.");
+        Expect.Equal("goblin_archer", enemyComponent?.TemplateId ?? string.Empty, "Enemy template id should survive round-trip.");
+    }
+
+    private static void PreservesTrapComponentState()
+    {
+        using var sandbox = SaveSandbox.Create();
+        var manager = new SaveManager(sandbox.DirectoryPath, sandbox.Clock);
+        var world = CreateWorld(4, 4);
+        world.SetTile(new Position(2, 2), TileType.Trap);
+        var trap = new Entity(
+            "Trap",
+            new Position(2, 2),
+            new Stats { HP = 1, MaxHP = 1, Attack = 0, Accuracy = 0, Defense = 0, Evasion = 0, Speed = 0, ViewRadius = 0, Energy = 0 },
+            Faction.Neutral,
+            blocksMovement: false,
+            blocksSight: false,
+            id: EntityId.New());
+        trap.SetComponent(new TrapComponent
+        {
+            TemplateId = "spike_trap",
+            IsArmed = true,
+            IsRevealed = false,
+            TriggerCount = 0,
+        });
+        world.AddEntity(trap);
+
+        Expect.True(manager.SaveGame(world, SaveSlots.Slot1).GetAwaiter().GetResult(), "Save should persist trap component.");
+        var restored = manager.LoadGame(SaveSlots.Slot1).GetAwaiter().GetResult();
+        Expect.NotNull(restored, "Saved world should load again.");
+        var restoredTrap = restored!.GetEntity(trap.Id);
+        Expect.NotNull(restoredTrap, "Trap entity should survive round-trip.");
+        var restoredComponent = restoredTrap!.GetComponent<TrapComponent>();
+        Expect.NotNull(restoredComponent, "Trap component should survive round-trip.");
+        Expect.Equal("spike_trap", restoredComponent!.TemplateId, "Trap template id should survive round-trip.");
+        Expect.True(restoredComponent.IsArmed, "Trap armed state should survive round-trip.");
+        Expect.False(restoredComponent.IsRevealed, "Trap revealed state should survive round-trip.");
+        Expect.Equal(0, restoredComponent.TriggerCount, "Trap trigger count should survive round-trip.");
+    }
+
+    private static void PreservesSchedulerActorOrder()
+    {
+        using var sandbox = SaveSandbox.Create();
+        var manager = new SaveManager(sandbox.DirectoryPath, sandbox.Clock);
+        var world = CreateWorld(4, 4);
+        var first = CreateEntity("First", new Position(1, 0), Faction.Enemy, energy: 1200);
+        var second = CreateEntity("Second", new Position(2, 0), Faction.Enemy, energy: 1200);
+        world.AddEntity(first);
+        world.AddEntity(second);
+
+        var scheduler = new TurnScheduler();
+        scheduler.BeginRound(world);
+        scheduler.Register(first);
+        scheduler.Register(second);
+        scheduler.EndRound(world);
+        scheduler.AttachWorld(world);
+        var beforeSave = scheduler.GetNextActor();
+        Expect.NotNull(beforeSave, "Scheduler should have a ready actor before save.");
+        Expect.Equal(first.Id, beforeSave!.Id, "First registered actor should win the energy tie.");
+
+        SyncSchedulerToWorld(world, scheduler);
+        Expect.True(manager.SaveGame(world, SaveSlots.Slot1).GetAwaiter().GetResult(), "Save should succeed with scheduler order.");
+        var restored = manager.LoadGame(SaveSlots.Slot1).GetAwaiter().GetResult();
+        Expect.NotNull(restored, "Saved world should load again.");
+
+        var restoredWorld = restored!;
+        var restoredScheduler = new TurnScheduler();
+        restoredScheduler.AttachWorld(restoredWorld);
+        foreach (var entity in restoredWorld.Entities)
+        {
+            if (entity.Faction == Faction.Enemy)
+            {
+                restoredScheduler.Register(entity);
+            }
+        }
+
+        restoredScheduler.NextOrder = restoredWorld.SchedulerNextOrder;
+        var afterLoad = restoredScheduler.GetNextActor();
+        Expect.NotNull(afterLoad, "Scheduler should have a ready actor after load.");
+        Expect.Equal(first.Id, afterLoad!.Id, "Loaded scheduler should preserve energy tie-break order.");
+    }
+
+    private static void SyncSchedulerToWorld(WorldState world, TurnScheduler scheduler)
+    {
+        world.SchedulerOrders.Clear();
+        foreach (var entity in world.Entities)
+        {
+            var order = scheduler.GetOrder(entity.Id);
+            if (order != 0)
+            {
+                world.SchedulerOrders[entity.Id] = order;
+            }
+        }
+
+        world.SchedulerNextOrder = scheduler.NextOrder;
     }
 
     private static void PreservesAbilitiesAndCooldowns()
@@ -227,12 +340,12 @@ public sealed class ComponentPersistenceTests : ITestSuite
         return world;
     }
 
-    private static Entity CreateEntity(string name, Position position, Faction faction, int speed = 100, bool blocksMovement = true)
+    private static Entity CreateEntity(string name, Position position, Faction faction, int speed = 100, bool blocksMovement = true, int energy = 1000)
     {
         return new Entity(
             name,
             position,
-            new Stats { HP = 20, MaxHP = 20, Attack = 10, Accuracy = 10, Defense = 1, Evasion = 0, Speed = speed, ViewRadius = 8, Energy = 1000 },
+            new Stats { HP = 20, MaxHP = 20, Attack = 10, Accuracy = 10, Defense = 1, Evasion = 0, Speed = speed, ViewRadius = 8, Energy = energy },
             faction,
             blocksMovement,
             id: EntityId.New());

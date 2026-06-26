@@ -222,6 +222,33 @@ public sealed class UISmokeTests : ITestSuite
         Expect.False(before == hud.MinimapText, "Toggling the minimap should change the HUD summary");
     }
 
+    private static void HudStatusIconsAppearWhenPlayerHasEffects()
+    {
+        var context = CreateContext();
+        var player = context.Player;
+        player.SetComponent(new StatusEffectsComponent());
+        StatusEffectProcessor.ApplyEffect(player, StatusEffectType.Poisoned, 3, 1);
+        StatusEffectProcessor.ApplyEffect(player, StatusEffectType.Burning, 3, 1);
+
+        var hud = new HUD();
+        hud.Bind(context.GameManager, context.Bus);
+
+        var panel = (Panel)hud.Children[0];
+        var container = FindChild<HBoxContainer>(panel, "StatusIconsContainer");
+        Expect.NotNull(container, "HUD should create a status icons container.");
+        Expect.True(container!.GetChildren().Count >= 2, "Status icons container should contain at least one icon per effect.");
+        var poisonIcon = FindChild<TextureRect>(container, "StatusIcon_poisoned");
+        var burnIcon = FindChild<TextureRect>(container, "StatusIcon_burning");
+        Expect.NotNull(poisonIcon, "HUD should show a poison status icon.");
+        Expect.NotNull(burnIcon, "HUD should show a burning status icon.");
+        Expect.Equal("res://Assets/Sprites/ui/status_poison.svg", poisonIcon!.Texture!.ResourcePath, "Poison icon should use the content icon path.");
+        Expect.Equal("res://Assets/Sprites/ui/status_burn.svg", burnIcon!.Texture!.ResourcePath, "Burning icon should use the content icon path.");
+
+        context.Bus.EmitStatusEffectRemoved(player.Id, StatusEffectType.Poisoned);
+        container = FindChild<HBoxContainer>(panel, "StatusIconsContainer");
+        Expect.True(FindChild<TextureRect>(container!, "StatusIcon_poisoned") is null, "HUD should remove the poison icon when the effect is removed.");
+    }
+
     private static void GameManagerEnemyTurnsResolveAfterPlayerAction()
     {
         var world = new WorldState();
@@ -373,18 +400,18 @@ public sealed class UISmokeTests : ITestSuite
 
         Expect.True(submitted is UseItemAction, "Using an inventory item should emit a concrete UseItemAction");
 
-    var equipContext = CreateContext(new ItemInstance { TemplateId = "sword_iron", IsIdentified = true });
-    var equipInventory = new InventoryUI();
-    equipInventory.Bind(equipContext.GameManager, equipContext.Bus, equipContext.Content, tooltip);
-    IAction? equipped = null;
-    equipContext.Bus.PlayerActionSubmitted += action => equipped = action;
+        var equipContext = CreateContext(new ItemInstance { TemplateId = "sword_iron", IsIdentified = true });
+        var equipInventory = new InventoryUI();
+        equipInventory.Bind(equipContext.GameManager, equipContext.Bus, equipContext.Content, tooltip);
+        IAction? equipped = null;
+        equipContext.Bus.PlayerActionSubmitted += action => equipped = action;
 
-    equipInventory.Open();
-    equipInventory.HandleKey(Key.E);
+        equipInventory.Open();
+        equipInventory.HandleKey(Key.E);
 
-    Expect.True(equipped is ToggleEquipAction, "Equipping an inventory item should emit a concrete ToggleEquipAction");
+        Expect.True(equipped is ToggleEquipAction, "Equipping an inventory item should emit a concrete ToggleEquipAction");
 
-    var dropContext = CreateContext(new ItemInstance { TemplateId = "potion_health", StackCount = 3, IsIdentified = true });
+        var dropContext = CreateContext(new ItemInstance { TemplateId = "potion_health", StackCount = 3, IsIdentified = true });
         var dropInventory = new InventoryUI();
         dropInventory.Bind(dropContext.GameManager, dropContext.Bus, dropContext.Content, tooltip);
         IAction? dropped = null;

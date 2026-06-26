@@ -2,7 +2,7 @@ using Roguelike.Core;
 
 namespace Godotussy;
 
-internal static class UIActionFactory
+public static class UIActionFactory
 {
     public static IAction? CreateDirectionalAction(IWorldState? world, EntityId actorId, Position delta)
     {
@@ -87,7 +87,7 @@ internal static class UIActionFactory
         };
     }
 
-    public static IAction? CreateUseItemAction(IWorldState? world, IContentDatabase? content, EntityId actorId, EntityId itemInstanceId)
+    public static IAction? CreateUseItemAction(IWorldState? world, IContentDatabase? content, EntityId actorId, EntityId itemInstanceId, Position? target = null)
     {
         if (world is null || content is null)
         {
@@ -114,7 +114,12 @@ internal static class UIActionFactory
                 return new UseItemAction(actorId, itemInstanceId, template, ability);
             }
 
-            return null;
+            if (!target.HasValue)
+            {
+                return null;
+            }
+
+            return new UseItemAction(actorId, itemInstanceId, template, ability, target.Value);
         }
 
         return new UseItemAction(actorId, itemInstanceId, template);

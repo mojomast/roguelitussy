@@ -51,7 +51,7 @@ godot --headless --path . --quit
 
 The project starts from `Scenes/Main.tscn`, which hosts `WorldRoot` and `UiRoot`. Most runtime services are attached through the autoloads rather than through a large scene tree.
 
-CI runs both the editorless .NET stub profile and a real Godot 4.4.1 Mono headless import/startup smoke. Keep `.godot/`, `.mono/`, `bin/`, and `obj/` out of commits; Godot import products are regenerated from committed source assets and `.import` files.
+CI runs both the editorless .NET stub profile and a real Godot 4.4.1 Mono headless import/startup smoke. The .NET job also builds the full solution, verifies formatting with `dotnet format --verify-no-changes`, validates JSON syntax for all files under `Content/`, and caches NuGet packages. Keep `.godot/`, `.mono/`, `bin/`, and `obj/` out of commits; Godot import products are regenerated from committed source assets and `.import` files.
 
 When adding or renaming SVG/PNG source art under `Assets/`, run the headless editor import before the startup smoke so Godot can regenerate local import products from committed assets.
 
@@ -102,6 +102,18 @@ Build the solution, including the custom test project for IDE/structural coverag
 
 ```powershell
 dotnet build godotussy.sln
+```
+
+Verify formatting (CI enforces this):
+
+```powershell
+dotnet format --verify-no-changes godotussy.sln
+```
+
+Validate JSON content syntax locally (CI runs the same check):
+
+```powershell
+Get-ChildItem -Recurse -Filter *.json -Path Content | ForEach-Object { python3 -m json.tool $_.FullName > $null }
 ```
 
 Build the test project:

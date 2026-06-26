@@ -12,8 +12,13 @@ public sealed record AIProfile(
     int PatrolRadius,
     int MaxPatrolSteps,
     int PreferredRange,
+    int MinRange,
+    int AggroRange,
+    int SupportRange,
+    int GroupAggroRange,
     bool CanFlee,
-    bool PatrolsWhenIdle);
+    bool PatrolsWhenIdle,
+    bool PhaseThroughWalls);
 
 public static class AIProfiles
 {
@@ -29,8 +34,13 @@ public static class AIProfiles
         8,
         8,
         1,
+        1,
+        0,
+        6,
+        0,
         CanFlee: false,
-        PatrolsWhenIdle: true);
+        PatrolsWhenIdle: true,
+        PhaseThroughWalls: false);
 
     public static AIProfile RangedKiter { get; } = new(
         "ranged_kiter",
@@ -44,8 +54,13 @@ public static class AIProfiles
         10,
         8,
         3,
+        1,
+        0,
+        6,
+        0,
         CanFlee: true,
-        PatrolsWhenIdle: true);
+        PatrolsWhenIdle: true,
+        PhaseThroughWalls: false);
 
     public static AIProfile PatrolGuard { get; } = new(
         "patrol_guard",
@@ -59,8 +74,13 @@ public static class AIProfiles
         10,
         10,
         1,
+        1,
+        0,
+        6,
+        0,
         CanFlee: false,
-        PatrolsWhenIdle: true);
+        PatrolsWhenIdle: true,
+        PhaseThroughWalls: false);
 
     public static AIProfile Fleeing { get; } = new(
         "fleeing",
@@ -74,8 +94,13 @@ public static class AIProfiles
         10,
         8,
         2,
+        1,
+        0,
+        6,
+        0,
         CanFlee: true,
-        PatrolsWhenIdle: true);
+        PatrolsWhenIdle: true,
+        PhaseThroughWalls: false);
 
     public static AIProfile Ambush { get; } = new(
         "ambush",
@@ -89,8 +114,13 @@ public static class AIProfiles
         6,
         6,
         1,
+        1,
+        0,
+        6,
+        0,
         CanFlee: false,
-        PatrolsWhenIdle: false);
+        PatrolsWhenIdle: false,
+        PhaseThroughWalls: false);
 
     public static AIProfile Support { get; } = new(
         "support",
@@ -104,8 +134,13 @@ public static class AIProfiles
         8,
         8,
         4,
+        1,
+        0,
+        6,
+        0,
         CanFlee: true,
-        PatrolsWhenIdle: true);
+        PatrolsWhenIdle: true,
+        PhaseThroughWalls: false);
 
     public static AIProfile Get(string brainType)
     {
@@ -118,6 +153,34 @@ public static class AIProfiles
             "ambush" => Ambush,
             "support" => Support,
             _ => MeleeRusher,
+        };
+    }
+
+    public static AIProfile ForTemplate(EnemyTemplate template)
+    {
+        var baseProfile = Get(template.BrainType);
+        var parameters = template.AIParameters;
+
+        var fleeThreshold = parameters.FleeHpPct.HasValue
+            ? parameters.FleeHpPct.Value / 100f
+            : baseProfile.FleeThreshold;
+
+        var canFlee = parameters.FleeHpPct.HasValue
+            ? parameters.FleeHpPct.Value > 0f
+            : baseProfile.CanFlee;
+
+        return baseProfile with
+        {
+            FleeThreshold = fleeThreshold,
+            CanFlee = canFlee,
+            AggroRange = parameters.AggroRange is > 0 ? parameters.AggroRange.Value : baseProfile.AggroRange,
+            PatrolsWhenIdle = parameters.WanderWhenIdle ?? baseProfile.PatrolsWhenIdle,
+            PreferredRange = parameters.PreferredRange is > 0 ? parameters.PreferredRange.Value : baseProfile.PreferredRange,
+            MinRange = parameters.MinRange is > 0 ? parameters.MinRange.Value : baseProfile.MinRange,
+            PatrolRadius = parameters.PatrolRadius is > 0 ? parameters.PatrolRadius.Value : baseProfile.PatrolRadius,
+            SupportRange = parameters.SupportRange is > 0 ? parameters.SupportRange.Value : baseProfile.SupportRange,
+            GroupAggroRange = parameters.GroupAggroRange is > 0 ? parameters.GroupAggroRange.Value : baseProfile.GroupAggroRange,
+            PhaseThroughWalls = parameters.PhaseThroughWalls ?? baseProfile.PhaseThroughWalls,
         };
     }
 }

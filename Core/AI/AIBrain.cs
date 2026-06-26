@@ -14,10 +14,11 @@ public class AIBrain : IBrain
 
     public IAction DecideAction(IEntity self, IWorldState world, IPathfinder pathfinder)
     {
+        EnsurePhaseThroughWalls(self);
         var target = AcquireTarget(self, world, pathfinder);
         var memory = AIStateManager.UpdateState(self, target, _profile);
         var objective = GetObjective(self, world, pathfinder, target, memory);
-        var candidates = GenerateCandidates(self, world, target);
+        var candidates = GenerateCandidates(self, world, target, _profile);
 
         IAction bestAction = new WaitAction(self.Id);
         var bestScore = float.NegativeInfinity;
@@ -45,11 +46,11 @@ public class AIBrain : IBrain
         return bestAction.Validate(world) == ActionResult.Success ? bestAction : new WaitAction(self.Id);
     }
 
-    private static List<IAction> GenerateCandidates(IEntity self, IWorldState world, IEntity? target)
+    private static List<IAction> GenerateCandidates(IEntity self, IWorldState world, IEntity? target, AIProfile profile)
     {
         var actions = new List<IAction>();
 
-        if (target is not null && self.Position.ChebyshevTo(target.Position) <= 1)
+        if (target is not null && self.Position.ChebyshevTo(target.Position) <= 1 && profile.MinRange <= 1)
         {
             actions.Add(new AttackAction(self.Id, target.Id));
         }
@@ -67,6 +68,21 @@ public class AIBrain : IBrain
 
         actions.Add(new WaitAction(self.Id));
         return actions;
+    }
+
+    private void EnsurePhaseThroughWalls(IEntity self)
+    {
+        if (!_profile.PhaseThroughWalls)
+        {
+            return;
+        }
+
+        if (StatusEffectProcessor.HasEffect(self, StatusEffectType.Phased))
+        {
+            return;
+        }
+
+        StatusEffectProcessor.ApplyEffect(self, StatusEffectType.Phased, int.MaxValue, 1);
     }
 
     private static void GenerateAbilityCandidates(IEntity self, IWorldState world, IEntity? target, List<IAction> actions)
@@ -139,16 +155,199 @@ public class AIBrain : IBrain
 
         if (target is not null)
         {
+            if (_profile.PreferredRange > 1 && _profile.Name == "ranged_kiter")
+            {
+                return FindRangeAnchor(self, target, world);
+            }
+
             return target.Position;
+        }
+
+        if (_profile.Name == "ambush")
+        {
+            var ambushTile = FindAmbushTile(self, world, pathfinder, memory);
+            if (ambushTile != Position.Invalid)
+            {
+                return ambushTile;
+            }
+        }
+
+        if (_profile.Name == "support")
+        {
+            var allyCluster = FindBestAllyClusterTile(self, world, pathfinder);
+            if (allyCluster != Position.Invalid)
+            {
+                return allyCluster;
+            }
         }
 
         return memory.LastKnownTargetPosition;
     }
 
-    private static IEntity? AcquireTarget(IEntity self, IWorldState world, IPathfinder pathfinder)
+    private Position FindRangeAnchor(IEntity self, IEntity target, IWorldState world)
     {
+        var best = Position.Invalid;
+        var bestDistance = int.MaxValue;
+
+        var minX = Math.Max(0, target.Position.X - _profile.PreferredRange);
+        var maxX = Math.Min(world.Width - 1, target.Position.X + _profile.PreferredRange);
+        var minY = Math.Max(0, target.Position.Y - _profile.PreferredRange);
+        var maxY = Math.Min(world.Height - 1, target.Position.Y + _profile.PreferredRange);
+
+        for (var y = minY; y <= maxY; y++)
+        {
+            for (var x = minX; x <= maxX; x++)
+            {
+                var candidate = new Position(x, y);
+                if (candidate == target.Position)
+                {
+                    continue;
+                }
+
+                if (target.Position.ChebyshevTo(candidate) != _profile.PreferredRange)
+                {
+                    continue;
+                }
+
+                if (!world.IsWalkable(candidate))
+                {
+                    continue;
+                }
+
+                if (!HasLineOfSight(candidate, target.Position, world))
+                {
+                    continue;
+                }
+
+                var distance = self.Position.DistanceTo(candidate);
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    best = candidate;
+                }
+            }
+        }
+
+        return best == Position.Invalid ? target.Position : best;
+    }
+
+    private Position FindAmbushTile(IEntity self, IWorldState world, IPathfinder pathfinder, AIStateComponent memory)
+    {
+        var searchRange = _profile.AggroRange > 0 ? _profile.AggroRange : self.Stats.ViewRadius;
+        var reachable = pathfinder.GetReachable(self.Position, searchRange, world, _profile.PhaseThroughWalls);
+
+        Position best = Position.Invalid;
+        var bestScore = float.NegativeInfinity;
+
+        foreach (var (tile, _) in reachable)
+        {
+            if (tile == self.Position || !world.IsWalkable(tile))
+            {
+                continue;
+            }
+
+            var score = 0f;
+            score += CountWallNeighbors(tile, world) * 1.0f;
+
+            if (memory.LastKnownTargetPosition != Position.Invalid && HasLineOfSight(tile, memory.LastKnownTargetPosition, world))
+            {
+                score += 2.0f;
+            }
+
+            if (world.Player is not null && world.Player.IsAlive && HasLineOfSight(world.Player.Position, tile, world))
+            {
+                score -= 5.0f;
+            }
+
+            score -= self.Position.DistanceTo(tile) * 0.1f;
+
+            if (score > bestScore)
+            {
+                bestScore = score;
+                best = tile;
+            }
+        }
+
+        return best;
+    }
+
+    private Position FindBestAllyClusterTile(IEntity self, IWorldState world, IPathfinder pathfinder)
+    {
+        var searchRange = _profile.SupportRange > 0 ? _profile.SupportRange * 2 : _profile.AggroRange;
+        if (searchRange <= 0)
+        {
+            searchRange = self.Stats.ViewRadius;
+        }
+
+        var reachable = pathfinder.GetReachable(self.Position, searchRange, world, _profile.PhaseThroughWalls);
+        var supportRange = _profile.SupportRange > 0 ? _profile.SupportRange : 4;
+
+        Position best = Position.Invalid;
+        var bestAllies = -1;
+        var bestDistance = int.MaxValue;
+
+        foreach (var (tile, _) in reachable)
+        {
+            if (!world.IsWalkable(tile))
+            {
+                continue;
+            }
+
+            var alliesInRange = 0;
+            foreach (var entity in world.Entities)
+            {
+                if (entity.Id == self.Id || !entity.IsAlive || entity.Faction != self.Faction || entity.Faction == Faction.Neutral)
+                {
+                    continue;
+                }
+
+                if (tile.ChebyshevTo(entity.Position) <= supportRange)
+                {
+                    alliesInRange++;
+                }
+            }
+
+            var distance = self.Position.DistanceTo(tile);
+            if (alliesInRange > bestAllies || (alliesInRange == bestAllies && distance < bestDistance))
+            {
+                bestAllies = alliesInRange;
+                bestDistance = distance;
+                best = tile;
+            }
+        }
+
+        return best;
+    }
+
+    private static int CountWallNeighbors(Position pos, IWorldState world)
+    {
+        var count = 0;
+        foreach (var delta in Position.AllDirections)
+        {
+            var neighbor = pos + delta;
+            if (!world.InBounds(neighbor) || world.GetTile(neighbor) == TileType.Wall)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private IEntity? AcquireTarget(IEntity self, IWorldState world, IPathfinder pathfinder)
+    {
+        if (_profile.GroupAggroRange > 0)
+        {
+            var groupTarget = AcquireGroupTarget(self, world);
+            if (groupTarget is not null)
+            {
+                return groupTarget;
+            }
+        }
+
         IEntity? bestTarget = null;
         var bestDistance = int.MaxValue;
+        var detectionRange = _profile.AggroRange > 0 ? _profile.AggroRange : self.Stats.ViewRadius;
 
         foreach (var entity in world.Entities)
         {
@@ -157,12 +356,12 @@ public class AIBrain : IBrain
                 continue;
             }
 
-            if (!CanSee(self, entity, world))
+            if (!CanSee(self, entity, world, detectionRange))
             {
                 continue;
             }
 
-            var path = pathfinder.FindPath(self.Position, entity.Position, world, 64);
+            var path = pathfinder.FindPath(self.Position, entity.Position, world, 64, _profile.PhaseThroughWalls);
             var distance = path.Count == 0 ? self.Position.DistanceTo(entity.Position) : path.Count;
             if (distance < bestDistance)
             {
@@ -183,9 +382,39 @@ public class AIBrain : IBrain
         return bestTarget;
     }
 
-    private static bool CanSee(IEntity self, IEntity target, IWorldState world)
+    private IEntity? AcquireGroupTarget(IEntity self, IWorldState world)
     {
-        if (self.Stats.ViewRadius <= 0 || self.Position.ChebyshevTo(target.Position) > self.Stats.ViewRadius)
+        foreach (var entity in world.Entities)
+        {
+            if (entity.Id == self.Id || !entity.IsAlive || entity.Faction != self.Faction || entity.Faction == Faction.Neutral)
+            {
+                continue;
+            }
+
+            if (self.Position.ChebyshevTo(entity.Position) > _profile.GroupAggroRange)
+            {
+                continue;
+            }
+
+            var allyMemory = entity.GetComponent<AIStateComponent>();
+            if (allyMemory is null || allyMemory.TargetId == EntityId.Invalid)
+            {
+                continue;
+            }
+
+            var target = world.GetEntity(allyMemory.TargetId);
+            if (target is not null && target.IsAlive && target.Faction != self.Faction && target.Faction != Faction.Neutral)
+            {
+                return target;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool CanSee(IEntity self, IEntity target, IWorldState world, int detectionRange)
+    {
+        if (detectionRange <= 0 || self.Position.ChebyshevTo(target.Position) > detectionRange)
         {
             return false;
         }

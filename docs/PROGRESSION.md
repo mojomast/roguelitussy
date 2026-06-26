@@ -151,7 +151,7 @@ This project already has room prefabs, shops, NPCs, and floor-based generation. 
 
 ### Phase 1: Refactor The Current Level-Up Core
 
-Status: implemented for the current melee, ability-damage, and sourced poison/burning status-tick kill paths. XP and level-up mutation now route through shared simulation-side death/progression handling instead of being exclusive to melee attack code. Remaining attribution work should extend the same shared path to trap/environmental kills and any future damage-over-time systems so they can credit the correct source consistently.
+Status: implemented for the current melee, ability-damage, sourced poison/burning status-tick, and trap-hazard kill paths. XP and level-up mutation now route through shared simulation-side death/progression handling instead of being exclusive to melee attack code. Trap kills are currently unattributed (no XP/kill credit), matching environmental hazard design; future systems can credit a trap setter by routing through `DeathResolver.ResolveKill` with a source entity.
 
 Move level-up logic out of `AttackAction`.
 

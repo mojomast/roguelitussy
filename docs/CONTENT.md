@@ -91,12 +91,25 @@ When adding an enemy, define:
 
 - core stats
 - `ai_type`
+- `ai_params` (optional overrides for the base AI profile)
 - depth range
 - spawn weight
 - faction
 - ability and loot references if used
+- optional `gold_min`/`gold_max` for gold awarded to the killer on death
 
 Enemy `ai_type` values currently expected by the loader are `melee_rush`, `ranged_kite`, `ambush`, `patrol`, and `support`.
+
+Recognized `ai_params` keys are:
+
+- `flee_hp_pct` (number 0-100): HP percentage at which the enemy will start fleeing.
+- `aggro_range` (positive integer): detection radius that overrides the entity's `fov_range` for acquiring hostile targets.
+- `wander_when_idle` (boolean): whether the enemy patrols when it has no target.
+- `preferred_range` (positive integer): ideal distance the enemy tries to maintain from its target.
+- `min_range` (positive integer): minimum distance the enemy will allow; it backs away if closer.
+- `patrol_radius` (positive integer): maximum distance from the spawn point when selecting patrol targets.
+- `support_range` (positive integer): radius within which support abilities look for allies to buff.
+- `phase_through_walls` (boolean): grants permanent phasing, allowing movement and pathfinding through walls.
 
 Enemy speed values should stay on the engine's current 100-based scale.
 
@@ -108,9 +121,34 @@ Supported ability targeting types currently in runtime use are `self`, `single`,
 
 Status-effect runtime behavior currently includes authored corroded stacking up to three stacks and burning/frozen mutual removal on apply. Status effects applied by melee on-hit effects or abilities retain source attribution for delayed poison/burning kill credit and save/load round-trips.
 
+### Traps
+
+Traps are authored in `Content/traps.json`. A trap definition contains:
+
+- `id` — unique trap identifier.
+- `name` / `description` — display text.
+- `ability_id` (optional) — ability from `abilities.json` the trap can delegate to.
+- `damage_min` / `damage_max` / `damage_type` — direct damage range and type.
+- `status_effect` / `status_duration` / `status_magnitude` (optional) — status applied to the victim.
+- `sprite_path` — `res://` path to the trap icon/sprite.
+- `avoid_flags` — list of actor status flags that prevent triggering (e.g., `phased`, `flying`).
+- `trigger_chance` — percent chance to trigger on entry (default 100).
+
+Room prefabs can place traps by using the `^` tile in the layout and/or a `type: "trap"` spawn point with `trap_id` referencing a trap definition. `ContentLoader` validates every `trap_id` and every trap `ability_id`.
+
 ### Room Prefabs
 
-Room prefab authoring depends on the shared tile legend in `room_prefabs.json`. Keep the legend and room definitions in sync when adding new symbols.
+Room prefab authoring depends on the shared tile legend in `room_prefabs.json`. Keep the legend and room definitions in sync when adding new symbols. The `+` symbol represents a door; doors may be converted into locked doors at generation time for rooms with `lock_doors_on_enter: true`.
+
+Each room should include `tags` that describe its role and, for procedural floors, its theme membership. The generator uses depth-to-theme mapping:
+
+- Depths 1–3: `prison`
+- Depths 4–6: `crypt`
+- Depth 7+: `magma`
+
+When a floor has at least four theme-matching prefabs that fit the BSP leaves, the generator prefers those prefabs; otherwise it falls back to all valid prefabs. Tag rooms with the appropriate theme(s) (`prison`, `crypt`, `magma`) plus functional tags such as `combat`, `loot`, `hazard`, or `boss` so the theme filter can select them.
+
+When a room has `lock_doors_on_enter: true` (typically arenas, vaults, or boss rooms), the generator converts its connecting door tiles into locked doors and places a `dungeon_key` item in a reachable non-locked room. The player must pick up the key and use it via `OpenDoorAction` to unlock the door permanently.
 
 ## Validation Workflow
 
@@ -120,11 +158,11 @@ After changing content:
 2. Pay attention to content, integration, and generation failures.
 3. If you changed loader behavior or schema expectations, update documentation and tests in the same change.
 
-Content validation tests assert the expected item, enemy, loot table, room prefab, ability, and status effect counts, so remember to update those expectations when intentionally expanding the catalog.
+Content validation tests assert the expected item, enemy, loot table, room prefab, ability, status effect, and trap counts, so remember to update those expectations when intentionally expanding the catalog.
 
-Authored item, enemy, and status-effect visual paths are also audited by tests to ensure each `res://` path resolves to a committed source file. Runtime loading remains soft: missing art should not crash content loading, but repository content should keep these paths valid.
+Authored item, enemy, trap, and status-effect visual paths are also audited by tests to ensure each `res://` path resolves to a committed source file. Runtime loading remains soft: missing art should not crash content loading, but repository content should keep these paths valid.
 
-Current item and status icons are simple limited-palette SVG source files under `Assets/Sprites/items/` and `Assets/Sprites/ui/`. Keep future SVGs simple, avoid embedded text, commit the matching `.svg.import` sidecars, and run the Godot headless editor import after changing assets so ignored `.godot/imported` cache files can be regenerated locally.
+Current item, status, and trap icons are simple limited-palette SVG source files under `Assets/Sprites/items/`, `Assets/Sprites/ui/`, and `Assets/Sprites/objects/`. Keep future SVGs simple, avoid embedded text, commit the matching `.svg.import` sidecars, and run the Godot headless editor import after changing assets so ignored `.godot/imported` cache files can be regenerated locally.
 
 ## Godot Tooling And Content
 

@@ -80,7 +80,7 @@ public sealed class UseItemAction : IAction
         }
 
         ConsumeIfNeeded(inventory, item);
-        outcome.LogMessages.Add($"{actor.Name} uses {Template.DisplayName}." );
+        outcome.LogMessages.Add($"{actor.Name} uses {Template.DisplayName}.");
         return outcome;
     }
 
@@ -128,7 +128,7 @@ public sealed class UseItemAction : IAction
             var applied = StatusEffectProcessor.GetEffect(actor, effectType);
             if (applied is not null)
             {
-                outcome.CombatEvents.Add(new CombatEvent(0, Type, Array.Empty<DamageResult>(), new[] { applied }));
+                outcome.CombatEvents.Add(new CombatEvent(0, Type, Array.Empty<DamageResult>(), new[] { applied }, ActorId));
             }
 
             return ActionResult.Success;

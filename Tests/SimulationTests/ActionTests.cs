@@ -30,6 +30,8 @@ public sealed class ActionTests : ITestSuite
         registry.Add("Simulation.Actions stack split ids are deterministic", StackSplitIdsAreDeterministic);
         registry.Add("Simulation.Actions open and close door toggles walkability", OpenAndCloseDoorTogglesWalkability);
         registry.Add("Simulation.Actions open door moves through when exit tile is clear", OpenDoorMovesThroughWhenExitTileIsClear);
+        registry.Add("Simulation.Actions open locked door consumes key", OpenLockedDoorConsumesKey);
+        registry.Add("Simulation.Actions open locked door fails without key", OpenLockedDoorFailsWithoutKey);
         registry.Add("Simulation.Actions open chest drops loot and removes chest", OpenChestDropsLootAndRemovesChest);
         registry.Add("Simulation.Actions open chest reports loot names in the log", OpenChestReportsLootNamesInLog);
         registry.Add("Simulation.Actions stairs validation requires matching tile", StairsValidationRequiresMatchingTile);
@@ -503,6 +505,42 @@ public sealed class ActionTests : ITestSuite
         Expect.Equal(ActionResult.Success, outcome.Result, "Opening a clear door should succeed");
         Expect.Equal(new Position(3, 1), actor.Position, "Actor should move to the tile beyond the opened door when it is available");
         Expect.True(world.IsDoorOpen(new Position(2, 1)), "Door should remain open after traversal");
+    }
+
+    private static void OpenLockedDoorConsumesKey()
+    {
+        var world = CreateWorld();
+        var actor = CreateActor("Player", new Position(1, 1), Faction.Player);
+        var inventory = actor.GetComponent<InventoryComponent>()!;
+        inventory.Add(new ItemInstance { TemplateId = "dungeon_key", StackCount = 1, IsIdentified = true });
+
+        world.Player = actor;
+        world.AddEntity(actor);
+        world.SetTile(new Position(2, 1), TileType.LockedDoor);
+
+        var outcome = new OpenDoorAction(actor.Id, new Position(2, 1)).Execute(world);
+
+        Expect.Equal(ActionResult.Success, outcome.Result, "Opening a locked door with a key should succeed");
+        Expect.Equal(TileType.Door, world.GetTile(new Position(2, 1)), "Locked door should become a regular door after unlocking");
+        Expect.True(world.IsDoorOpen(new Position(2, 1)), "Unlocked door should be open");
+        Expect.Equal(0, inventory.Items.Count, "Key should be consumed when unlocking the door");
+        Expect.Equal(new Position(3, 1), actor.Position, "Actor should move through the unlocked door");
+    }
+
+    private static void OpenLockedDoorFailsWithoutKey()
+    {
+        var world = CreateWorld();
+        var actor = CreateActor("Player", new Position(1, 1), Faction.Player);
+
+        world.Player = actor;
+        world.AddEntity(actor);
+        world.SetTile(new Position(2, 1), TileType.LockedDoor);
+
+        var outcome = new OpenDoorAction(actor.Id, new Position(2, 1)).Execute(world);
+
+        Expect.Equal(ActionResult.Blocked, outcome.Result, "Opening a locked door without a key should be blocked");
+        Expect.Equal(TileType.LockedDoor, world.GetTile(new Position(2, 1)), "Locked door should remain locked when the actor has no key");
+        Expect.Equal(new Position(1, 1), actor.Position, "Actor should not move when unlocking fails");
     }
 
     private static void OpenChestDropsLootAndRemovesChest()

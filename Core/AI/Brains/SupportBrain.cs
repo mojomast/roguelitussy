@@ -6,4 +6,9 @@ public sealed class SupportBrain : AIBrain
         : base(AIProfiles.Support)
     {
     }
+
+    public SupportBrain(AIProfile profile)
+        : base(profile)
+    {
+    }
 }

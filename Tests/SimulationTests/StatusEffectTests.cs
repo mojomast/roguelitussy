@@ -1,3 +1,4 @@
+using Godotussy;
 using Roguelike.Core;
 using Roguelike.Tests.Stubs;
 using Roguelike.Tests.TestFramework;
@@ -18,6 +19,12 @@ public sealed class StatusEffectTests : ITestSuite
         registry.Add("Simulation.StatusEffects sourced poison kill awards XP", SourcedPoisonKillAwardsXp);
         registry.Add("Simulation.StatusEffects corroded stacks to authored cap", CorrodedStacksToAuthoredCap);
         registry.Add("Simulation.StatusEffects burning and frozen remove each other", BurningAndFrozenRemoveEachOther);
+        registry.Add("Simulation.StatusEffects stunned actor skips turn", StunnedActorSkipsTurn);
+        registry.Add("Simulation.StatusEffects frozen actor skips turn", FrozenActorSkipsTurn);
+        registry.Add("Simulation.StatusEffects phased actor moves through walls", PhasedActorMovesThroughWalls);
+        registry.Add("Simulation.StatusEffects immune entity takes zero physical damage", ImmuneEntityTakesZeroPhysicalDamage);
+        registry.Add("Simulation.StatusEffects authored tick damage changes runtime tick damage", AuthoredTickDamageChangesRuntimeTickDamage);
+        registry.Add("Simulation.StatusEffects data driven speed modifiers replace hardcoded defaults", DataDrivenSpeedModifiersReplaceHardcodedDefaults);
     }
 
     private static void PoisonTicksAndExpires()
@@ -163,6 +170,157 @@ public sealed class StatusEffectTests : ITestSuite
         StatusEffectProcessor.ApplyEffect(actor, StatusEffectType.Frozen, 2);
         Expect.False(StatusEffectProcessor.HasEffect(actor, StatusEffectType.Burning), "Frozen should remove burning on apply");
         Expect.True(StatusEffectProcessor.HasEffect(actor, StatusEffectType.Frozen), "Frozen should remain after removing burning");
+    }
+
+    private static void StunnedActorSkipsTurn()
+    {
+        var world = CreateWorld();
+        var stunned = CreateActor(speed: 100);
+        var normal = CreateActor(speed: 100);
+        normal.Position = new Position(2, 1);
+        world.Player = stunned;
+        world.AddEntity(stunned);
+        world.AddEntity(normal);
+
+        var scheduler = new TurnScheduler();
+        scheduler.BeginRound(world);
+        stunned.Stats.Energy = scheduler.EnergyThreshold;
+        normal.Stats.Energy = scheduler.EnergyThreshold;
+        scheduler.Register(stunned);
+        scheduler.Register(normal);
+
+        StatusEffectProcessor.ApplyEffect(stunned, StatusEffectType.Stunned, 2);
+        var next = scheduler.GetNextActor();
+
+        Expect.NotNull(next, "Scheduler should still find a ready actor");
+        Expect.Equal(normal.Id, next!.Id, "A stunned actor should be skipped in favor of the next ready actor");
+        Expect.True(scheduler.GetEnergy(stunned.Id) < scheduler.EnergyThreshold, "Skipping should consume the stunned actor's energy");
+    }
+
+    private static void FrozenActorSkipsTurn()
+    {
+        var world = CreateWorld();
+        var frozen = CreateActor(speed: 100);
+        var normal = CreateActor(speed: 100);
+        normal.Position = new Position(2, 1);
+        world.Player = frozen;
+        world.AddEntity(frozen);
+        world.AddEntity(normal);
+
+        var scheduler = new TurnScheduler();
+        scheduler.BeginRound(world);
+        frozen.Stats.Energy = scheduler.EnergyThreshold;
+        normal.Stats.Energy = scheduler.EnergyThreshold;
+        scheduler.Register(frozen);
+        scheduler.Register(normal);
+
+        StatusEffectProcessor.ApplyEffect(frozen, StatusEffectType.Frozen, 2);
+        var next = scheduler.GetNextActor();
+
+        Expect.NotNull(next, "Scheduler should still find a ready actor");
+        Expect.Equal(normal.Id, next!.Id, "A frozen actor should be skipped in favor of the next ready actor");
+        Expect.True(scheduler.GetEnergy(frozen.Id) < scheduler.EnergyThreshold, "Skipping should consume the frozen actor's energy");
+    }
+
+    private static void PhasedActorMovesThroughWalls()
+    {
+        var world = CreateWorld();
+        var actor = CreateActor();
+        world.Player = actor;
+        world.AddEntity(actor);
+        world.SetTile(new Position(2, 1), TileType.Wall);
+
+        Expect.Equal(ActionResult.Blocked, new MoveAction(actor.Id, new Position(1, 0)).Validate(world), "Wall should block normal movement");
+
+        StatusEffectProcessor.ApplyEffect(actor, StatusEffectType.Phased, 2);
+        var outcome = new MoveAction(actor.Id, new Position(1, 0)).Execute(world);
+
+        Expect.Equal(ActionResult.Success, outcome.Result, "Phased actor should move through walls");
+        Expect.Equal(new Position(2, 1), actor.Position, "Phased actor should end on the wall tile");
+    }
+
+    private static void ImmuneEntityTakesZeroPhysicalDamage()
+    {
+        var defender = new StubEntity("Defender", Position.Zero, stats: new Stats { HP = 10, MaxHP = 10, Attack = 1, Defense = 0, Accuracy = 0, Evasion = 0 });
+        StatusEffectProcessor.ApplyEffect(defender, StatusEffectType.Phased, 2);
+
+        var resolver = new CombatResolver(23);
+        var physical = resolver.ApplyArmor(10, defender, DamageType.Physical);
+        var fire = resolver.ApplyArmor(10, defender, DamageType.Fire);
+
+        Expect.Equal(0, physical, "immune_physical should nullify physical damage");
+        Expect.Equal(10, fire, "immune_physical should not affect non-physical damage");
+    }
+
+    private static void AuthoredTickDamageChangesRuntimeTickDamage()
+    {
+        var world = CreateWorld();
+        var actor = CreateActor();
+        world.Player = actor;
+        world.AddEntity(actor);
+
+        var content = new StubContentDatabase();
+        StatusEffectProcessor.ApplyEffect(actor, StatusEffectType.Poisoned, content, 3);
+        StatusEffectProcessor.Tick(world, actor.Id, content);
+
+        Expect.Equal(18, actor.Stats.HP, "Stub content poison should deal two damage per tick");
+
+        actor.Stats.HP = 20;
+        var customContent = new StubContentDatabase();
+        customContent.StatusEffects["poisoned"].TickEffects[0].Value = 3;
+        StatusEffectProcessor.RemoveEffect(actor, StatusEffectType.Poisoned);
+        StatusEffectProcessor.ApplyEffect(actor, StatusEffectType.Poisoned, customContent, 3);
+        StatusEffectProcessor.Tick(world, actor.Id, customContent);
+
+        Expect.Equal(17, actor.Stats.HP, "Changing authored tick damage should change runtime tick damage");
+    }
+
+    private static void DataDrivenSpeedModifiersReplaceHardcodedDefaults()
+    {
+        var actor = CreateActor(speed: 100);
+        var content = new StubContentDatabase();
+
+        StatusEffectProcessor.ApplyEffect(actor, StatusEffectType.Hasted, content, 2);
+        var effectiveSpeed = StatusEffectProcessor.GetEffectiveSpeed(actor, content);
+
+        Expect.Equal(150, effectiveSpeed, "Data-driven haste should multiply speed by authored value");
+    }
+
+    private static void StatusAppliedEventCarriesAffectedTargetId()
+    {
+        var world = CreateWorld();
+        var caster = new StubEntity("Caster", new Position(1, 1), Faction.Player,
+            stats: new Stats { HP = 20, MaxHP = 20, Attack = 3, Defense = 1, Accuracy = 0, Evasion = 0, Speed = 100 });
+        var target = new StubEntity("Target", new Position(2, 1), Faction.Enemy,
+            stats: new Stats { HP = 20, MaxHP = 20, Attack = 3, Defense = 1, Accuracy = 0, Evasion = 0, Speed = 100 });
+        world.Player = caster;
+        world.AddEntity(caster);
+        world.AddEntity(target);
+
+        var gameManager = new GameManager();
+        var bus = new EventBus();
+        gameManager.AttachServices(world, new TurnScheduler(), new StubGenerator(), new FOVCalculator(), new StubContentDatabase(), new StubSaveManager(), bus);
+
+        EntityId? capturedTargetId = null;
+        bus.StatusEffectApplied += (entityId, effect) => capturedTargetId = entityId;
+
+        var ability = new AbilityTemplate(
+            "guaranteed_poison",
+            "Guaranteed Poison",
+            "Test ability that always applies poison to a single target.",
+            new AbilityTargeting("single", 8, 0, false, false, false, null),
+            1000,
+            null,
+            new AbilityEffect[]
+            {
+                new("apply_status", DamageType.Poison, 0, null, 0.0, "poisoned", 100, 3, null, null, 0.0, null),
+            });
+
+        var outcome = gameManager.ProcessPlayerAction(new CastAbilityAction(caster.Id, ability, target.Position));
+
+        Expect.Equal(ActionResult.Success, outcome.Result, "Cast ability should succeed.");
+        Expect.True(capturedTargetId.HasValue, "StatusEffectApplied event should have been emitted.");
+        Expect.Equal(target.Id, capturedTargetId!.Value, "StatusEffectApplied event should carry the target's id, not the caster's id.");
     }
 
     private static WorldState CreateWorld()

@@ -128,7 +128,17 @@ public sealed class StubContentDatabase : IContentDatabase
                 "cast_ability:fireball",
                 -1,
                 1,
-                "rare"),
+                "rare",
+                0,
+                0,
+                0,
+                0,
+                0,
+                null,
+                null,
+                0,
+                0.0,
+                true),
             ["scroll_blink"] = new(
                 "scroll_blink",
                 "Scroll of Blink",
@@ -139,7 +149,17 @@ public sealed class StubContentDatabase : IContentDatabase
                 "cast_ability:blink",
                 -1,
                 1,
-                "uncommon"),
+                "uncommon",
+                0,
+                0,
+                0,
+                0,
+                0,
+                null,
+                null,
+                0,
+                0.0,
+                true),
         };
 
         EnemyTemplates = new Dictionary<string, EnemyTemplate>
@@ -155,7 +175,10 @@ public sealed class StubContentDatabase : IContentDatabase
                 -1,
                 100,
                 null,
-                10),
+                0,
+                0,
+                10,
+                AIParameters.Empty),
         };
 
         AbilityTemplates = new Dictionary<string, AbilityTemplate>
@@ -228,6 +251,17 @@ public sealed class StubContentDatabase : IContentDatabase
                 new AbilityEffect[]
                 {
                     new("apply_status", DamageType.Physical, 0, null, 0.0, "phased", 100, 2, null, null, 0.0, null),
+                }),
+            ["spike_trap"] = new(
+                "spike_trap",
+                "Spike Trap",
+                "Sharp iron spikes spring from the floor.",
+                new AbilityTargeting("single", 0, 0, false, false, false, null),
+                100,
+                null,
+                new AbilityEffect[]
+                {
+                    new("damage", DamageType.Physical, 8, null, 0.0, null, 0, 0, null, null, 0.0, null),
                 }),
         };
 
@@ -345,23 +379,191 @@ public sealed class StubContentDatabase : IContentDatabase
                 "scarred",
                 "mystic"),
         };
+
+        TrapTemplates = new Dictionary<string, TrapTemplate>
+        {
+            ["spike_trap"] = new(
+                "spike_trap",
+                "Spike Trap",
+                "Sharp iron spikes hidden in the floor impale whoever steps on the tile.",
+                5,
+                10,
+                DamageType.Physical,
+                null,
+                0,
+                0,
+                null,
+                100,
+                "spike_trap",
+                "res://Assets/Sprites/objects/trap_spikes.svg"),
+        };
+
+        StatusEffects = new Dictionary<string, StatusEffectDefinition>
+        {
+            ["poisoned"] = new()
+            {
+                Id = "poisoned",
+                Name = "Poisoned",
+                Stackable = false,
+                Refreshable = true,
+                TickEffects = new() { new() { Type = "damage", DamageType = "poison", Value = 2 } },
+                IconPath = "res://Assets/Sprites/ui/status_poison.svg",
+                ColorTint = "#44FF4488",
+            },
+            ["burning"] = new()
+            {
+                Id = "burning",
+                Name = "Burning",
+                Stackable = false,
+                Refreshable = true,
+                TickEffects = new() { new() { Type = "damage", DamageType = "fire", Value = 3 } },
+                OnApplyEffects = new() { new() { Type = "remove_status", StatusId = "frozen" } },
+                IconPath = "res://Assets/Sprites/ui/status_burn.svg",
+                ColorTint = "#FF660088",
+            },
+            ["frozen"] = new()
+            {
+                Id = "frozen",
+                Name = "Frozen",
+                Stackable = false,
+                Refreshable = false,
+                Flags = new() { "skip_turn" },
+                StatModifiers = new()
+                {
+                    new() { Stat = "defense", Operation = "add", Value = 5 },
+                    new() { Stat = "speed", Operation = "set", Value = 0 },
+                },
+                OnApplyEffects = new() { new() { Type = "remove_status", StatusId = "burning" } },
+                IconPath = "res://Assets/Sprites/ui/status_frozen.svg",
+                ColorTint = "#88CCFF88",
+            },
+            ["stunned"] = new()
+            {
+                Id = "stunned",
+                Name = "Stunned",
+                Stackable = false,
+                Refreshable = false,
+                Flags = new() { "skip_turn" },
+                IconPath = "res://Assets/Sprites/ui/status_stun.svg",
+                ColorTint = "#FFFF0088",
+            },
+            ["haste"] = new()
+            {
+                Id = "haste",
+                Name = "Haste",
+                Stackable = false,
+                Refreshable = true,
+                StatModifiers = new() { new() { Stat = "speed", Operation = "multiply", Value = 1.5 } },
+                IconPath = "res://Assets/Sprites/ui/status_haste.svg",
+                ColorTint = "#00CCFF88",
+            },
+            ["regenerating"] = new()
+            {
+                Id = "regenerating",
+                Name = "Regenerating",
+                Stackable = true,
+                MaxStacks = 3,
+                Refreshable = true,
+                TickEffects = new() { new() { Type = "heal", Value = 2 } },
+                IconPath = "res://Assets/Sprites/ui/status_regen.svg",
+                ColorTint = "#00FF0088",
+            },
+            ["phased"] = new()
+            {
+                Id = "phased",
+                Name = "Phased",
+                Stackable = false,
+                Refreshable = false,
+                Flags = new() { "phase_through_walls", "immune_physical" },
+                IconPath = "res://Assets/Sprites/ui/status_phased.svg",
+                ColorTint = "#AAAAFF44",
+            },
+            ["flying"] = new()
+            {
+                Id = "flying",
+                Name = "Flying",
+                Stackable = false,
+                Refreshable = false,
+                Flags = new() { "flying" },
+                IconPath = "res://Assets/Sprites/ui/status_flying.svg",
+                ColorTint = "#CCCCFF88",
+            },
+        };
+
+        TrapTemplates = new Dictionary<string, TrapTemplate>
+        {
+            ["spike_trap"] = new(
+                "spike_trap",
+                "Spike Trap",
+                "Sharp spikes impale the victim.",
+                3,
+                5,
+                DamageType.Physical,
+                null,
+                0,
+                0,
+                new[] { "phase_through_walls", "flying" },
+                100,
+                "spike_trap"),
+            ["poison_needle"] = new(
+                "poison_needle",
+                "Poison Needle",
+                "A tiny needle coated with venom.",
+                1,
+                1,
+                DamageType.Physical,
+                "poisoned",
+                3,
+                1,
+                null,
+                100),
+            ["deadly_pit"] = new(
+                "deadly_pit",
+                "Deadly Pit",
+                "A bottomless pit.",
+                100,
+                100,
+                DamageType.Physical,
+                null,
+                0,
+                0,
+                null,
+                100),
+            ["ground_only"] = new(
+                "ground_only",
+                "Ground Only",
+                "Only harms grounded creatures.",
+                5,
+                5,
+                DamageType.Physical,
+                null,
+                0,
+                0,
+                new[] { "flying", "phase_through_walls" },
+                100),
+        };
     }
+
 
     public int ContentVersion { get; set; } = DefaultContentVersion;
 
     public string ContentHash { get; set; } = DefaultContentHash;
 
-    public IReadOnlyDictionary<string, ItemTemplate> ItemTemplates { get; }
+    public IReadOnlyDictionary<string, ItemTemplate> ItemTemplates { get; } = null!;
 
-    public IReadOnlyDictionary<string, EnemyTemplate> EnemyTemplates { get; }
+    public IReadOnlyDictionary<string, EnemyTemplate> EnemyTemplates { get; } = null!;
 
-    public IReadOnlyDictionary<string, AbilityTemplate> AbilityTemplates { get; }
+    public IReadOnlyDictionary<string, AbilityTemplate> AbilityTemplates { get; } = null!;
 
-    public IReadOnlyDictionary<string, PerkTemplate> PerkTemplates { get; }
+    public IReadOnlyDictionary<string, PerkTemplate> PerkTemplates { get; } = null!;
 
-    public IReadOnlyDictionary<string, NpcTemplate> NpcTemplates { get; }
+    public IReadOnlyDictionary<string, NpcTemplate> NpcTemplates { get; } = null!;
 
-    public IReadOnlyDictionary<string, DialogueTemplate> DialogueTemplates { get; }
+    public IReadOnlyDictionary<string, DialogueTemplate> DialogueTemplates { get; } = null!;
+
+    public IReadOnlyDictionary<string, StatusEffectDefinition> StatusEffects { get; } = null!;
+
+    public IReadOnlyDictionary<string, TrapTemplate> TrapTemplates { get; } = null!;
 
     public bool TryGetItemTemplate(string templateId, out ItemTemplate template)
     {
@@ -402,6 +604,20 @@ public sealed class StubContentDatabase : IContentDatabase
     {
         var found = DialogueTemplates.TryGetValue(dialogueId, out var dialogue);
         template = dialogue!;
+        return found;
+    }
+
+    public bool TryGetStatusEffect(string statusId, out StatusEffectDefinition definition)
+    {
+        var found = StatusEffects.TryGetValue(statusId, out var status);
+        definition = status!;
+        return found;
+    }
+
+    public bool TryGetTrapTemplate(string templateId, out TrapTemplate template)
+    {
+        var found = TrapTemplates.TryGetValue(templateId, out var trap);
+        template = trap!;
         return found;
     }
 

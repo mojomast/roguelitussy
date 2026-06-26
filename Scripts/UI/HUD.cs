@@ -14,6 +14,7 @@ public partial class HUD : Control
     private Label? _progressLabel;
     private Label? _statsLabel;
     private Label? _effectsLabel;
+    private HBoxContainer? _statusIconsContainer;
     private Label? _mapLabel;
     private EventBus? _eventBus;
     private GameManager? _gameManager;
@@ -60,6 +61,8 @@ public partial class HUD : Control
             _eventBus.LoadCompleted -= OnLoadCompleted;
             _eventBus.CurrencyChanged -= OnCurrencyChanged;
             _eventBus.ProgressionChanged -= OnProgressionChanged;
+            _eventBus.StatusEffectApplied -= OnStatusEffectChanged;
+            _eventBus.StatusEffectRemoved -= OnStatusEffectChanged;
         }
 
         _gameManager = gameManager;
@@ -72,6 +75,8 @@ public partial class HUD : Control
             _eventBus.LoadCompleted += OnLoadCompleted;
             _eventBus.CurrencyChanged += OnCurrencyChanged;
             _eventBus.ProgressionChanged += OnProgressionChanged;
+            _eventBus.StatusEffectApplied += OnStatusEffectChanged;
+            _eventBus.StatusEffectRemoved += OnStatusEffectChanged;
         }
 
         Refresh();
@@ -157,6 +162,22 @@ public partial class HUD : Control
         }
     }
 
+    private void OnStatusEffectChanged(EntityId entityId, StatusEffectInstance effect)
+    {
+        if (_gameManager?.World?.Player?.Id == entityId)
+        {
+            Refresh();
+        }
+    }
+
+    private void OnStatusEffectChanged(EntityId entityId, StatusEffectType effectType)
+    {
+        if (_gameManager?.World?.Player?.Id == entityId)
+        {
+            Refresh();
+        }
+    }
+
     private void Refresh()
     {
         EnsureVisualTree();
@@ -223,6 +244,7 @@ public partial class HUD : Control
         StatusEffectsText = effects.Count == 0
             ? string.Empty
             : "Effects: " + string.Join(", ", effects.Select(effect => $"{effect.Type}({effect.RemainingTurns})"));
+        SyncStatusIcons(effects);
 
         var visibleTiles = 0;
         var exploredTiles = 0;
@@ -304,9 +326,143 @@ public partial class HUD : Control
         _panel.AddChild(_progressLabel);
         _panel.AddChild(_statsLabel);
         _panel.AddChild(_effectsLabel);
+
+        _statusIconsContainer = new HBoxContainer
+        {
+            Name = "StatusIconsContainer",
+            Position = new Vector2(12f, 130f),
+            Size = new Vector2(416f, 24f),
+        };
+        _panel.AddChild(_statusIconsContainer);
+
         _panel.AddChild(_mapLabel);
         ApplyResponsiveLayout();
     }
+
+    private void SyncStatusIcons(IReadOnlyList<StatusEffectInstance> effects)
+    {
+        EnsureVisualTree();
+        if (_statusIconsContainer is null)
+        {
+            return;
+        }
+
+        foreach (var child in _statusIconsContainer.GetChildren().ToArray())
+        {
+            _statusIconsContainer.RemoveChild(child);
+            child.QueueFree();
+        }
+
+        var content = _gameManager?.Content;
+        foreach (var effect in effects)
+        {
+            var statusId = StatusEffectIdFromType(effect.Type);
+            if (string.IsNullOrWhiteSpace(statusId) || content?.TryGetStatusEffect(statusId, out var definition) != true || definition is null)
+            {
+                continue;
+            }
+
+            var iconTexture = LoadStatusIcon(definition.IconPath);
+            if (iconTexture is not null)
+            {
+                var icon = new TextureRect
+                {
+                    Name = $"StatusIcon_{statusId}",
+                    Texture = iconTexture,
+                    Modulate = ParseTint(definition.ColorTint),
+                    CustomMinimumSize = new Vector2(18f, 18f),
+                    StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+                };
+                _statusIconsContainer.AddChild(icon);
+            }
+
+            var turnLabel = new Label
+            {
+                Name = $"StatusTurns_{statusId}",
+                Text = effect.RemainingTurns.ToString(),
+                Modulate = UiStyle.Parchment(),
+            };
+            _statusIconsContainer.AddChild(turnLabel);
+        }
+    }
+
+    private static Texture2D? LoadStatusIcon(string iconPath)
+    {
+        if (string.IsNullOrWhiteSpace(iconPath))
+        {
+            return null;
+        }
+
+        try
+        {
+            return GD.Load<Texture2D>(iconPath);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static Color ParseTint(string colorTint)
+    {
+        if (string.IsNullOrWhiteSpace(colorTint))
+        {
+            return Colors.White;
+        }
+
+        var parsed = ParseHtmlColor(colorTint);
+        return parsed ?? Colors.White;
+    }
+
+    private static Color? ParseHtmlColor(string value)
+    {
+        var span = value.AsSpan().Trim();
+        if (span.Length > 0 && span[0] == '#')
+        {
+            span = span[1..];
+        }
+
+        if (span.Length == 6 && TryParseHexByte(span[..2], out var r6) && TryParseHexByte(span[2..4], out var g6) && TryParseHexByte(span[4..6], out var b6))
+        {
+            return new Color(r6 / 255f, g6 / 255f, b6 / 255f, 1f);
+        }
+
+        if (span.Length == 8 && TryParseHexByte(span[..2], out var r8) && TryParseHexByte(span[2..4], out var g8) && TryParseHexByte(span[4..6], out var b8) && TryParseHexByte(span[6..8], out var a8))
+        {
+            return new Color(r8 / 255f, g8 / 255f, b8 / 255f, a8 / 255f);
+        }
+
+        return null;
+    }
+
+    private static bool TryParseHexByte(ReadOnlySpan<char> chars, out byte value)
+    {
+        value = 0;
+        if (chars.Length != 2)
+        {
+            return false;
+        }
+
+        return byte.TryParse(chars, System.Globalization.NumberStyles.HexNumber, null, out value);
+    }
+
+    private static string? StatusEffectIdFromType(StatusEffectType type) => type switch
+    {
+        StatusEffectType.Poisoned => "poisoned",
+        StatusEffectType.Burning => "burning",
+        StatusEffectType.Frozen => "frozen",
+        StatusEffectType.Stunned => "stunned",
+        StatusEffectType.Hasted => "haste",
+        StatusEffectType.Invisible => null,
+        StatusEffectType.Regenerating => "regenerating",
+        StatusEffectType.Weakened => "weakened",
+        StatusEffectType.Shielded => "shielded",
+        StatusEffectType.Empowered => "empowered",
+        StatusEffectType.Corroded => "corroded",
+        StatusEffectType.Phased => "phased",
+        StatusEffectType.Flying => "flying",
+        _ => null,
+    };
 
     private void UpdateLabels()
     {
@@ -367,8 +523,14 @@ public partial class HUD : Control
         SetControlBounds(_headerLabel, 12f, 52f, contentWidth, 18f);
         SetControlBounds(_progressLabel, 12f, 74f, contentWidth, 18f);
         SetControlBounds(_statsLabel, 12f, 96f, contentWidth, 18f);
-        SetControlBounds(_effectsLabel, 12f, 118f, contentWidth, 18f);
-        SetControlBounds(_mapLabel, 12f, 140f, contentWidth, 18f);
+        SetControlBounds(_effectsLabel, 12f, 116f, contentWidth, 18f);
+        if (_statusIconsContainer is not null)
+        {
+            _statusIconsContainer.Position = new Vector2(12f, 134f);
+            _statusIconsContainer.Size = new Vector2(contentWidth, 22f);
+        }
+
+        SetControlBounds(_mapLabel, 12f, 150f, contentWidth, 18f);
     }
 
     private static void SetControlBounds(Control? control, float x, float y, float width, float height)

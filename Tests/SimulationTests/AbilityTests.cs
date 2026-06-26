@@ -25,6 +25,7 @@ public sealed class AbilityTests : ITestSuite
         registry.Add("Simulation.Ability kill awards XP and kill credit", AbilityKillAwardsXpAndKills);
         registry.Add("Simulation.Ability multi-kill awards XP and kill credit", AbilityMultiKillAwardsXpAndKills);
         registry.Add("Simulation.Ability does not apply status to killed target", AbilityDoesNotApplyStatusToKilledTarget);
+        registry.Add("Simulation.Ability tile targeted ability validates walkable", TileTargetedAbilityValidatesWalkable);
     }
 
     private static void SingleTargetDealsDamage()
@@ -384,6 +385,23 @@ public sealed class AbilityTests : ITestSuite
         Expect.Equal(ActionResult.Success, outcome.Result, "AoE damage should cast successfully");
         Expect.True(ally.Stats.HP < 20, "hits_allies true should include allied entities by default");
         Expect.True(enemy.Stats.HP < 20, "hits_allies true should include enemies too");
+    }
+
+    private static void TileTargetedAbilityValidatesWalkable()
+    {
+        var world = CreateWorld(seed: 1);
+        var caster = CreateActor("Blinker", new Position(2, 2), Faction.Player);
+        world.Player = caster;
+        world.AddEntity(caster);
+
+        var content = new StubContentDatabase();
+        content.TryGetAbilityTemplate("blink", out var ability);
+
+        world.SetTile(new Position(7, 7), TileType.Wall);
+        var action = new CastAbilityAction(caster.Id, ability, new Position(7, 7));
+        var result = action.Validate(world);
+
+        Expect.Equal(ActionResult.Blocked, result, "Tile-targeted ability should be blocked when the target tile is not walkable");
     }
 
     private static AbilityTemplate CreateDamageAbility(string id, string name, string targetingType, int radius, int damage)

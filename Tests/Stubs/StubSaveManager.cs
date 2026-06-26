@@ -32,14 +32,14 @@ public sealed class StubSaveManager : ISaveManager
 
     public void SetMetadata(int slotIndex, SaveMetadata metadata) => _metadata[slotIndex] = metadata;
 
-    public Task<WorldState?> LoadGame(int slotIndex)
+    public Task<WorldState?> LoadGame(int slotIndex, IContentDatabase? content = null)
     {
         return _slots.TryGetValue(slotIndex, out var snapshot)
             ? Task.FromResult<WorldState?>(snapshot.ActiveWorld)
             : Task.FromResult<WorldState?>(null);
     }
 
-    public Task<SaveRunSnapshot?> LoadRun(int slotIndex)
+    public Task<SaveRunSnapshot?> LoadRun(int slotIndex, IContentDatabase? content = null)
     {
         return _slots.TryGetValue(slotIndex, out var snapshot)
             ? Task.FromResult<SaveRunSnapshot?>(snapshot)

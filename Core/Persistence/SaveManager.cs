@@ -61,13 +61,13 @@ public sealed class SaveManager : ISaveManager
         }
     }
 
-    public async Task<WorldState?> LoadGame(int slotIndex)
+    public async Task<WorldState?> LoadGame(int slotIndex, IContentDatabase? content = null)
     {
-        var snapshot = await LoadRun(slotIndex).ConfigureAwait(false);
+        var snapshot = await LoadRun(slotIndex, content).ConfigureAwait(false);
         return snapshot?.ActiveWorld;
     }
 
-    public async Task<SaveRunSnapshot?> LoadRun(int slotIndex)
+    public async Task<SaveRunSnapshot?> LoadRun(int slotIndex, IContentDatabase? content = null)
     {
         if (!SaveSlots.IsValid(slotIndex))
         {
@@ -85,7 +85,7 @@ public sealed class SaveManager : ISaveManager
             var json = await File.ReadAllTextAsync(path).ConfigureAwait(false);
             var data = SaveMigrator.MigrateToCurrent(json);
             var errors = SaveValidator.Validate(data);
-            return errors.Count == 0 ? SaveSerializer.ToRunSnapshot(data) : null;
+            return errors.Count == 0 ? SaveSerializer.ToRunSnapshot(data, content) : null;
         }
         catch
         {

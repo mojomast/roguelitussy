@@ -135,13 +135,15 @@ public sealed class GameLoopTests : ITestSuite
 
         public IEntity? GetNextActor() => _world is null || _queue.Count == 0 ? null : _world.GetEntity(_queue.Dequeue());
 
-        public void ConsumeEnergy(EntityId actorId, int cost)
+        public StatusTickResult? ConsumeEnergy(EntityId actorId, int cost)
         {
             if (_world?.GetEntity(actorId) is { } entity)
             {
                 entity.Stats.Energy -= cost;
-                StatusEffectProcessor.Tick(_world, actorId);
+                return StatusEffectProcessor.Tick(_world, actorId);
             }
+
+            return null;
         }
 
         public void EndRound(WorldState world)
@@ -153,6 +155,14 @@ public sealed class GameLoopTests : ITestSuite
         }
 
         public void Unregister(EntityId id)
+        {
+        }
+
+        public int GetOrder(EntityId actorId) => 0;
+
+        public int NextOrder { get; set; }
+
+        public void AttachWorld(WorldState world)
         {
         }
     }

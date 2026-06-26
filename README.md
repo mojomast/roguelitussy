@@ -87,6 +87,18 @@ Build the solution, including the test project for IDE/structural coverage:
 dotnet build godotussy.sln
 ```
 
+Verify formatting matches the repository style (CI enforces this):
+
+```powershell
+dotnet format --verify-no-changes godotussy.sln
+```
+
+Validate JSON content syntax locally (CI runs the same check):
+
+```powershell
+Get-ChildItem -Recurse -Filter *.json -Path Content | ForEach-Object { python3 -m json.tool $_.FullName > $null }
+```
+
 Build the test project:
 
 ```powershell

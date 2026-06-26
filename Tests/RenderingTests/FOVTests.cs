@@ -3,6 +3,7 @@ using Godotussy;
 using Roguelike.Core;
 using Roguelike.Tests.Stubs;
 using Roguelike.Tests.TestFramework;
+using System.Reflection;
 
 namespace Roguelike.Tests.RenderingTests;
 
@@ -26,6 +27,9 @@ public sealed class FOVTests : ITestSuite
         registry.Add("Rendering.WorldArtCatalog gives each current monster a distinct sprite", WorldArtCatalogUsesDistinctSpritesForCurrentEnemyRoster);
         registry.Add("Rendering.WorldView marks interactive tiles clearly", WorldViewMarksInteractiveTilesClearly);
         registry.Add("Rendering.WorldView animates movement and attacks via events", WorldViewAnimatesMovementAndAttacks);
+        registry.Add("Rendering.WorldView renders trap tiles with floor and marker", WorldViewRendersTrapTiles);
+        registry.Add("Rendering.WorldArtCatalog resolves trap marker", WorldArtCatalogResolvesTrapMarker);
+        registry.Add("Rendering.Minimap colors trap tiles distinctly", MinimapColorsTrapTilesDistinctly);
         registry.Add("Rendering.WorldView rerenders dirty tiles without rebuilding the map", WorldViewRerendersDirtyTiles);
         registry.Add("Rendering.WorldView snaps severely desynced actors back to their logical tiles", WorldViewSnapsSeverelyDesyncedActorsBackToTheirLogicalTiles);
         registry.Add("Rendering.WorldView adds wall covers above entities along north edges", WorldViewAddsNorthWallCoverLayer);
@@ -173,6 +177,52 @@ public sealed class FOVTests : ITestSuite
         Expect.Equal(2, view.Animations.History.Count, "Damage event should queue attack and damage animations.");
         Expect.Equal(AnimationType.Attack, view.Animations.History[0].Type, "Attack animation should play first.");
         Expect.Equal(AnimationType.Damage, view.Animations.History[1].Type, "Damage flash should play second.");
+    }
+
+    private static void WorldViewRendersTrapTiles()
+    {
+        var world = CreateRoomWorld();
+        var trapPosition = new Position(3, 3);
+        world.SetTile(trapPosition, TileType.Trap);
+        var view = CreateWorldView(world);
+
+        Expect.Equal("^", view.GetTileMarkerText(trapPosition), "Trap tiles should expose a spike marker.");
+        Expect.True(view.FloorLayer.TryGetCell(new Vector2I(trapPosition.X, trapPosition.Y), out var floorCell), "Trap tile should render a floor cell.");
+        Expect.Equal(new Vector2I(0, 0), floorCell.AtlasCoords, "Trap tile should use the floor atlas coordinate.");
+        Expect.False(view.WallLayer.TryGetCell(new Vector2I(trapPosition.X, trapPosition.Y), out _), "Trap tile should not render to the wall layer.");
+    }
+
+    private static void WorldArtCatalogResolvesTrapMarker()
+    {
+        var marker = WorldArtCatalog.GetTileMarker(TileType.Trap, false);
+        Expect.Equal("^", marker ?? string.Empty, "Trap tiles should resolve a caret marker.");
+    }
+
+    private static void MinimapColorsTrapTilesDistinctly()
+    {
+        var world = CreateRoomWorld();
+        var trapPosition = new Position(3, 3);
+        world.SetTile(trapPosition, TileType.Trap);
+        world.SetVisible(trapPosition, true);
+
+        var minimap = new Minimap();
+        var gameManager = new GameManager();
+        gameManager.LoadToolWorld(world);
+        var bus = new EventBus();
+        minimap.Bind(gameManager, bus);
+
+        var resolveColor = typeof(Minimap).GetMethod("ResolveTileColor", BindingFlags.NonPublic | BindingFlags.Static);
+        if (resolveColor is null)
+        {
+            throw new InvalidOperationException("Minimap.ResolveTileColor method not found.");
+        }
+
+        var trapColor = (Color)resolveColor.Invoke(null, new object[] { world, trapPosition })!;
+        var floorPosition = new Position(2, 2);
+        world.SetVisible(floorPosition, true);
+        var floorColor = (Color)resolveColor.Invoke(null, new object[] { world, floorPosition })!;
+
+        Expect.NotEqual(floorColor, trapColor, "Trap tiles should render a color distinct from floor tiles on the minimap.");
     }
 
     private static void WorldViewRerendersDirtyTiles()
@@ -411,6 +461,41 @@ public sealed class FOVTests : ITestSuite
 
         Expect.False(view.EntityLayerNode.GetChildren().OfType<DamagePopup>().Any(),
             "Damage popups should expire and free themselves after their lifetime elapses.");
+    }
+
+    private static void WorldViewRefreshesEntityStatusOverlaysOnEvents()
+    {
+        var content = new StubContentDatabase();
+        var bus = new EventBus();
+        var world = CreateRoomWorld();
+        world.ContentDatabase = content;
+        var enemy = new StubEntity("Goblin", new Position(3, 2), Faction.Enemy);
+        enemy.SetComponent(new StatusEffectsComponent());
+        world.AddEntity(enemy);
+        var view = CreateWorldView(world, bus);
+
+        var spriteRoot = view.EntityRenderer.GetSprite(enemy.Id)!;
+        var overlayBefore = FindChild<Node2D>(spriteRoot, "StatusOverlay");
+        Expect.True(overlayBefore?.GetChildren().Count == 0, "Enemy sprite should start with no status overlays.");
+
+        StatusEffectProcessor.ApplyEffect(enemy, StatusEffectType.Poisoned, 3, 1);
+        bus.EmitStatusEffectApplied(enemy.Id, StatusEffectProcessor.GetEffect(enemy, StatusEffectType.Poisoned)!);
+
+        var overlayAfter = FindChild<Node2D>(spriteRoot, "StatusOverlay");
+        Expect.NotNull(FindChild<Sprite2D>(overlayAfter!, "poisoned"), "WorldView should refresh status overlays when StatusEffectApplied is emitted.");
+    }
+
+    private static T? FindChild<T>(Node parent, string name) where T : Node
+    {
+        for (var i = 0; i < parent.Children.Count; i++)
+        {
+            if (parent.Children[i] is T typed && typed.Name == name)
+            {
+                return typed;
+            }
+        }
+
+        return null;
     }
 
     private static void WorldViewKeepsTexturedCornerCoversAboveSameRowActors()

@@ -312,7 +312,7 @@ public sealed class DebugCommandProcessor
             return "Usage: load <slot>";
         }
 
-        var world = _gameManager.SaveManager.LoadGame(slot).GetAwaiter().GetResult();
+        var world = _gameManager.SaveManager.LoadGame(slot, _gameManager.Content).GetAwaiter().GetResult();
         if (world is null)
         {
             _eventBus?.EmitLoadCompleted(false);

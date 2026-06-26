@@ -6,4 +6,9 @@ public sealed class MeleeRusherBrain : AIBrain
         : base(AIProfiles.MeleeRusher)
     {
     }
+
+    public MeleeRusherBrain(AIProfile profile)
+        : base(profile)
+    {
+    }
 }

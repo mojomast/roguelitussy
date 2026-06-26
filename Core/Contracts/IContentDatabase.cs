@@ -20,6 +20,10 @@ public interface IContentDatabase
 
     IReadOnlyDictionary<string, DialogueTemplate> DialogueTemplates { get; }
 
+    IReadOnlyDictionary<string, StatusEffectDefinition> StatusEffects { get; }
+
+    IReadOnlyDictionary<string, TrapTemplate> TrapTemplates { get; }
+
     bool TryGetItemTemplate(string templateId, out ItemTemplate template);
 
     bool TryGetEnemyTemplate(string templateId, out EnemyTemplate template);
@@ -31,6 +35,10 @@ public interface IContentDatabase
     bool TryGetNpcTemplate(string templateId, out NpcTemplate template);
 
     bool TryGetDialogueTemplate(string dialogueId, out DialogueTemplate template);
+
+    bool TryGetStatusEffect(string statusId, out StatusEffectDefinition definition);
+
+    bool TryGetTrapTemplate(string templateId, out TrapTemplate template);
 
     IReadOnlyList<ItemTemplate> GetAvailableItems(int depth);
 

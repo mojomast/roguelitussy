@@ -161,8 +161,8 @@ public sealed class CombatModelTests : ITestSuite
         world.ContentDatabase = db;
 
         for (var x = 0; x < 5; x++)
-        for (var y = 0; y < 5; y++)
-            world.SetTile(new Position(x, y), TileType.Floor);
+            for (var y = 0; y < 5; y++)
+                world.SetTile(new Position(x, y), TileType.Floor);
 
         var actor = new StubEntity("Hero", new Position(0, 0), Faction.Player, stats: new Stats { HP = 30, MaxHP = 30, Attack = 6, Defense = 3, Accuracy = 50, Evasion = 0, Speed = 100 });
         var target = new StubEntity("Goblin", new Position(1, 0), Faction.Enemy, stats: new Stats { HP = 100, MaxHP = 100, Attack = 3, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 100 });

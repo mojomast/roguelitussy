@@ -376,9 +376,20 @@ public class TextureRect : Control
         KeepAspectCentered,
     }
 
+    public enum ExpandModeEnum
+    {
+        KeepSize,
+        IgnoreSize,
+        ExpandWidth,
+        ExpandHeight,
+        FitWidthProportional,
+    }
+
     public Texture2D? Texture { get; set; }
 
     public StretchModeEnum StretchMode { get; set; }
+
+    public ExpandModeEnum ExpandMode { get; set; }
 }
 
 public class TextureButton : Control
@@ -642,6 +653,28 @@ public readonly struct Color
         G = g;
         B = b;
         A = a;
+    }
+
+    public Color(string html)
+    {
+        if (html.Length == 8 && int.TryParse(html, System.Globalization.NumberStyles.HexNumber, null, out var rgba))
+        {
+            R = ((rgba >> 24) & 0xFF) / 255f;
+            G = ((rgba >> 16) & 0xFF) / 255f;
+            B = ((rgba >> 8) & 0xFF) / 255f;
+            A = (rgba & 0xFF) / 255f;
+        }
+        else if (html.Length == 6 && int.TryParse(html, System.Globalization.NumberStyles.HexNumber, null, out var rgb))
+        {
+            R = ((rgb >> 16) & 0xFF) / 255f;
+            G = ((rgb >> 8) & 0xFF) / 255f;
+            B = (rgb & 0xFF) / 255f;
+            A = 1f;
+        }
+        else
+        {
+            R = G = B = A = 1f;
+        }
     }
 
     public float R { get; }

@@ -6,4 +6,9 @@ public sealed class AmbushBrain : AIBrain
         : base(AIProfiles.Ambush)
     {
     }
+
+    public AmbushBrain(AIProfile profile)
+        : base(profile)
+    {
+    }
 }

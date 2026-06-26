@@ -54,7 +54,18 @@ public sealed class WorldState : IWorldState
         set => _itemRandomState = value == 0UL ? MixItemSeed(Seed) : value;
     }
 
+    internal void RehydrateRandomStates(int seed, ulong combatState, ulong itemState)
+    {
+        _seed = seed;
+        CombatResolver = combatState == 0UL ? new CombatResolver(seed) : new CombatResolver(combatState);
+        _itemRandomState = itemState == 0UL ? MixItemSeed(seed) : itemState;
+    }
+
     public IContentDatabase? ContentDatabase { get; set; }
+
+    public Dictionary<EntityId, int> SchedulerOrders { get; } = new();
+
+    public int SchedulerNextOrder { get; set; }
 
     public EntityId AllocateItemInstanceId()
     {
@@ -91,7 +102,7 @@ public sealed class WorldState : IWorldState
         }
 
         _grid[(pos.Y * Width) + pos.X] = type;
-        if (type != TileType.Door)
+        if (type is not TileType.Door and not TileType.LockedDoor)
         {
             _openDoors.Remove(pos);
         }
@@ -117,7 +128,7 @@ public sealed class WorldState : IWorldState
         }
 
         var tile = GetTile(pos);
-        if (tile is TileType.Void or TileType.Wall)
+        if (tile is TileType.Void or TileType.Wall or TileType.LockedDoor)
         {
             return true;
         }
@@ -147,14 +158,18 @@ public sealed class WorldState : IWorldState
             throw new InvalidOperationException($"Tile {entity.Position} is not walkable.");
         }
 
-        if (_entityByPosition.ContainsKey(entity.Position))
+        if (entity.BlocksMovement && _entityByPosition.ContainsKey(entity.Position))
         {
             throw new InvalidOperationException($"Tile {entity.Position} is already occupied.");
         }
 
         _entities.Add(entity);
         _entityById[entity.Id] = entity;
-        _entityByPosition[entity.Position] = entity;
+
+        if (entity.BlocksMovement)
+        {
+            _entityByPosition[entity.Position] = entity;
+        }
     }
 
     public void RemoveEntity(EntityId id)
@@ -166,7 +181,11 @@ public sealed class WorldState : IWorldState
 
         _entities.Remove(entity);
         _entityById.Remove(id);
-        _entityByPosition.Remove(entity.Position);
+
+        if (entity.BlocksMovement && _entityByPosition.TryGetValue(entity.Position, out var atPosition) && atPosition.Id == entity.Id)
+        {
+            _entityByPosition.Remove(entity.Position);
+        }
     }
 
     public bool MoveEntity(EntityId id, Position newPosition)
@@ -233,7 +252,7 @@ public sealed class WorldState : IWorldState
             return;
         }
 
-        if (oldPosition == newPosition)
+        if (oldPosition == newPosition || !entity.BlocksMovement)
         {
             return;
         }
@@ -376,6 +395,6 @@ public sealed class WorldState : IWorldState
     private bool IsTileWalkable(Position pos)
     {
         var tile = GetTile(pos);
-        return tile is TileType.Floor or TileType.StairsDown or TileType.StairsUp || (tile == TileType.Door && IsDoorOpen(pos));
+        return tile is TileType.Floor or TileType.StairsDown or TileType.StairsUp or TileType.Trap || (tile == TileType.Door && IsDoorOpen(pos));
     }
 }

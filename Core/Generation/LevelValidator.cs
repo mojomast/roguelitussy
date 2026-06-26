@@ -150,7 +150,7 @@ public static class LevelValidator
 
     public static bool IsTraversable(TileType tile)
     {
-        return tile is TileType.Floor or TileType.Door or TileType.StairsDown or TileType.StairsUp or TileType.Water;
+        return tile is TileType.Floor or TileType.Door or TileType.StairsDown or TileType.StairsUp or TileType.Water or TileType.Trap;
     }
 
     private static bool HasValidDoorwayShape(IWorldState world, Position position)

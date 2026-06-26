@@ -113,6 +113,11 @@ public static class SaveValidator
                 continue;
             }
 
+            if (floor.SchedulerNextOrder < 0)
+            {
+                errors.Add($"Floor {floor.Depth} has a negative scheduler next order {floor.SchedulerNextOrder}.");
+            }
+
             try
             {
                 ValidateTiles(floorData, errors);
@@ -160,7 +165,7 @@ public static class SaveValidator
     private static void ValidateEntities(SaveFileData data, List<string> errors, bool requirePlayer)
     {
         var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var positions = new HashSet<Position>();
+        var blockingPositions = new HashSet<Position>();
         var playerFound = false;
 
         foreach (var entity in data.Entities)
@@ -195,15 +200,19 @@ public static class SaveValidator
             {
                 errors.Add($"Entity '{entity.Name}' is out of bounds at ({entity.Position.X},{entity.Position.Y}).");
             }
-            else if (!positions.Add(new Position(entity.Position.X, entity.Position.Y)))
+            else if (entity.BlocksMovement)
             {
-                errors.Add($"Multiple entities occupy ({entity.Position.X},{entity.Position.Y}).");
+                var position = new Position(entity.Position.X, entity.Position.Y);
+                if (!blockingPositions.Add(position))
+                {
+                    errors.Add($"Multiple blocking entities occupy ({entity.Position.X},{entity.Position.Y}).");
+                }
             }
 
             ValidateStats(entity, errors);
             ValidateInventory(entity, errors);
             ValidateStatusEffects(entity, errors);
-            ValidateNewComponentPayloads(entity, errors);
+            ValidateNewComponentPayloads(data, entity, errors);
         }
 
         if (requirePlayer && !playerFound)
@@ -224,9 +233,9 @@ public static class SaveValidator
             errors.Add($"Entity '{entity.Name}' has an invalid HP value {entity.Stats.HP}.");
         }
 
-        if (entity.Stats.Speed < 0 || (entity.Stats.Speed == 0 && entity.Chest is null))
+        if (entity.Stats.Speed < 0 || (entity.Stats.Speed == 0 && entity.Chest is null && entity.Trap is null))
         {
-            errors.Add($"Entity '{entity.Name}' must have positive speed unless it is a chest.");
+            errors.Add($"Entity '{entity.Name}' must have positive speed unless it is a chest or trap.");
         }
 
         if (entity.Stats.ViewRadius < 0)
@@ -323,7 +332,7 @@ public static class SaveValidator
         }
     }
 
-    private static void ValidateNewComponentPayloads(EntitySaveData entity, List<string> errors)
+    private static void ValidateNewComponentPayloads(SaveFileData data, EntitySaveData entity, List<string> errors)
     {
         if (entity.Chest is not null && string.IsNullOrWhiteSpace(entity.Chest.LootTableId))
         {
@@ -388,6 +397,38 @@ public static class SaveValidator
         if (!string.IsNullOrWhiteSpace(entity.BrainType) && !IsAllowedBrainType(entity.BrainType))
         {
             errors.Add($"Entity '{entity.Name}' has an invalid brain type '{entity.BrainType}'.");
+        }
+
+        if (entity.Enemy is not null && string.IsNullOrWhiteSpace(entity.Enemy.TemplateId))
+        {
+            errors.Add($"Entity '{entity.Name}' has an enemy component without a template id.");
+        }
+
+        if (entity.Trap is not null)
+        {
+            if (string.IsNullOrWhiteSpace(entity.Trap.TemplateId))
+            {
+                errors.Add($"Entity '{entity.Name}' has a trap component without a template id.");
+            }
+
+            if (!IsInBounds(entity.Position, data.Width, data.Height))
+            {
+                errors.Add($"Entity '{entity.Name}' trap position is out of bounds.");
+            }
+            else
+            {
+                var tileBytes = SaveSerializer.DecodeTileBytes(data.Tiles, data.Width, data.Height);
+                var tileIndex = (entity.Position.Y * data.Width) + entity.Position.X;
+                if ((TileType)tileBytes[tileIndex] != TileType.Trap)
+                {
+                    errors.Add($"Entity '{entity.Name}' has a trap component on a non-trap tile.");
+                }
+            }
+        }
+
+        if (entity.SchedulerOrder < 0)
+        {
+            errors.Add($"Entity '{entity.Name}' has a negative scheduler order {entity.SchedulerOrder}.");
         }
     }
 

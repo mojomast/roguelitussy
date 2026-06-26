@@ -22,6 +22,7 @@ public partial class InventoryUI : Control
     private GameManager? _gameManager;
     private IContentDatabase? _content;
     private Tooltip? _tooltip;
+    private TargetingOverlay? _targetingOverlay;
     private Panel? _panel;
     private RichTextLabel? _gridLabel;
     private RichTextLabel? _descriptionLabel;
@@ -58,7 +59,7 @@ public partial class InventoryUI : Control
         RefreshVisualState();
     }
 
-    public void Bind(GameManager? gameManager, EventBus? eventBus, IContentDatabase? content, Tooltip? tooltip)
+    public void Bind(GameManager? gameManager, EventBus? eventBus, IContentDatabase? content, Tooltip? tooltip, TargetingOverlay? targetingOverlay = null)
     {
         if (_eventBus is not null)
         {
@@ -72,6 +73,7 @@ public partial class InventoryUI : Control
         _eventBus = eventBus;
         _content = content;
         _tooltip = tooltip;
+        _targetingOverlay = targetingOverlay;
         if (_eventBus is not null)
         {
             _eventBus.InventoryChanged += OnInventoryChanged;
@@ -231,6 +233,24 @@ public partial class InventoryUI : Control
         }
 
         var playerId = _gameManager?.World?.Player.Id ?? EntityId.Invalid;
+        if (_content is not null
+            && _content.TryGetItemTemplate(item.TemplateId, out var template)
+            && template.RequiresTargetSelection)
+        {
+            var world = _gameManager?.World;
+            if (_targetingOverlay is not null
+                && world is not null
+                && template.UseEffect is not null
+                && template.UseEffect.StartsWith("cast_ability:", System.StringComparison.OrdinalIgnoreCase)
+                && _content.TryGetAbilityTemplate(template.UseEffect["cast_ability:".Length..], out var ability))
+            {
+                _targetingOverlay.EnterTargetingForItem(world, playerId, item.InstanceId, template, ability);
+                Close();
+            }
+
+            return;
+        }
+
         var action = UIActionFactory.CreateUseItemAction(_gameManager?.World, _content, playerId, item.InstanceId);
         if (action is not null)
         {
@@ -831,13 +851,7 @@ public partial class InventoryUI : Control
             return false;
         }
 
-        if (template.UseEffect is null || !template.UseEffect.StartsWith("cast_ability:", System.StringComparison.OrdinalIgnoreCase) || _content is null)
-        {
-            return true;
-        }
-
-        return _content.TryGetAbilityTemplate(template.UseEffect["cast_ability:".Length..], out var ability)
-            && string.Equals(ability.Targeting.Type, "self", System.StringComparison.OrdinalIgnoreCase);
+        return !template.RequiresTargetSelection;
     }
 
     private static string BuildDescriptionMarkup(ItemTemplate template, ItemInstance item, IReadOnlyList<string> lines)
