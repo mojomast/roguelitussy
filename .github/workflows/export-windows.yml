@@ -46,16 +46,15 @@ jobs:
         run: |
           set -euo pipefail
           GODOT_DIR_NAME="Godot_v${GODOT_VERSION}_mono_linux_x86_64"
-          TEMPLATES_DIR_NAME="Godot_v${GODOT_VERSION}_mono_export_templates"
           GODOT_ZIP="${GODOT_DIR_NAME}.zip"
-          TEMPLATES_ZIP="Godot_v${GODOT_VERSION}-stable_mono_export_templates.x86_64.zip"
+          TEMPLATES_TPZ="Godot_v${GODOT_VERSION}_mono_export_templates.tpz"
           mkdir -p "$RUNNER_TEMP/godot"
           curl -L -o "$RUNNER_TEMP/godot.zip" "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/${GODOT_ZIP}"
-          curl -L -o "$RUNNER_TEMP/templates.zip" "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/${TEMPLATES_ZIP}"
+          curl -L -o "$RUNNER_TEMP/templates.tpz" "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/${TEMPLATES_TPZ}"
           unzip -q "$RUNNER_TEMP/godot.zip" -d "$RUNNER_TEMP/godot"
           chmod +x "$RUNNER_TEMP/godot/${GODOT_DIR_NAME}/Godot_v${GODOT_VERSION}_mono_linux.x86_64"
           mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable.mono"
-          unzip -q "$RUNNER_TEMP/templates.zip" -d "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable.mono"
+          unzip -q "$RUNNER_TEMP/templates.tpz" -d "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable.mono"
 
       - name: Add Godot to PATH
         shell: bash
