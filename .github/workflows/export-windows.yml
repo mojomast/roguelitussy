@@ -154,6 +154,36 @@ jobs:
 
           Keep Roguelitussy.exe, Roguelitussy.pck, and the data_godotussy_windows_x86_64 folder together.
           The game is a Godot C# export and will close at startup if the data folder is missing.
+
+          If the game closes after the splash screen, run Run_With_Logs.bat instead.
+          It writes roguelitussy.log, roguelitussy.stdout.log, and roguelitussy.stderr.log next to the executable.
+          EOF
+          cat > build/windows/Run_With_Logs.bat <<'EOF'
+          @echo off
+          setlocal
+          cd /d "%~dp0"
+          echo Starting Roguelitussy with verbose logging...
+          echo Working directory: %CD%
+          echo.
+          echo Logs will be written to:
+          echo   %CD%\roguelitussy.log
+          echo   %CD%\roguelitussy.stdout.log
+          echo   %CD%\roguelitussy.stderr.log
+          echo.
+          "Roguelitussy.exe" --verbose --log-file "%CD%\roguelitussy.log" > "%CD%\roguelitussy.stdout.log" 2> "%CD%\roguelitussy.stderr.log"
+          set EXITCODE=%ERRORLEVEL%
+          echo.
+          echo Roguelitussy exited with code %EXITCODE%.
+          echo.
+          echo Last lines from stdout log:
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path 'roguelitussy.stdout.log') { Get-Content 'roguelitussy.stdout.log' -Tail 40 }"
+          echo.
+          echo Last lines from stderr log:
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path 'roguelitussy.stderr.log') { Get-Content 'roguelitussy.stderr.log' -Tail 40 }"
+          echo.
+          echo Paste roguelitussy.log, roguelitussy.stdout.log, and roguelitussy.stderr.log if the issue persists.
+          pause
+          exit /b %EXITCODE%
           EOF
           (cd build/windows && zip -r ../roguelitussy-windows.zip .)
 
