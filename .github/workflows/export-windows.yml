@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  GODOT_VERSION: 4.4.1-stable
+  GODOT_VERSION: 4.5.2-stable
 
 jobs:
   export-windows:
@@ -57,7 +57,8 @@ jobs:
         run: |
           set -euo pipefail
           TEMPLATES_TPZ="Godot_v${GODOT_VERSION}_mono_export_templates.tpz"
-          TEMPLATES_DIR="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable.mono"
+          GODOT_TEMPLATE_VERSION="${GODOT_VERSION%-stable}.stable.mono"
+          TEMPLATES_DIR="$HOME/.local/share/godot/export_templates/${GODOT_TEMPLATE_VERSION}"
           mkdir -p "$TEMPLATES_DIR"
           curl -L -o "$RUNNER_TEMP/templates.tpz" "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/${TEMPLATES_TPZ}"
           rm -rf "$RUNNER_TEMP/templates"
@@ -66,7 +67,7 @@ jobs:
           ls -la "$TEMPLATES_DIR/"
           # Also place templates next to the Godot binary for portable lookup
           GODOT_DIR_NAME="Godot_v${GODOT_VERSION}_mono_linux_x86_64"
-          PORTABLE_DIR="$RUNNER_TEMP/godot/${GODOT_DIR_NAME}/export_templates/${GODOT_VERSION}.stable.mono"
+          PORTABLE_DIR="$RUNNER_TEMP/godot/${GODOT_DIR_NAME}/export_templates/${GODOT_TEMPLATE_VERSION}"
           mkdir -p "$PORTABLE_DIR"
           cp -r "$RUNNER_TEMP/templates/templates/"* "$PORTABLE_DIR/"
 
@@ -144,6 +145,41 @@ jobs:
         run: |
           set -euo pipefail
           Godot_v${GODOT_VERSION}_mono_linux.x86_64 --headless --export-release "Windows Desktop" build/windows/Roguelitussy.exe --path .
+
+      - name: Validate C# export payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("build/windows")
+          data_dirs = list(root.glob("data_*_windows_x86_64"))
+          if not data_dirs:
+              raise SystemExit("Missing Godot C# data directory in Windows export")
+
+          data_dir = data_dirs[0]
+          required = [
+              root / "Roguelitussy.exe",
+              root / "Roguelitussy.pck",
+              data_dir / "godotussy.dll",
+              data_dir / "godotussy.deps.json",
+              data_dir / "hostfxr.dll",
+              data_dir / "hostpolicy.dll",
+              data_dir / "coreclr.dll",
+          ]
+          missing = [str(path) for path in required if not path.exists()]
+          if missing:
+              raise SystemExit("Missing Windows export files: " + ", ".join(missing))
+
+          deps = json.loads((data_dir / "godotussy.deps.json").read_text())
+          if "GodotSharp" not in json.dumps(deps):
+              raise SystemExit("godotussy.deps.json does not reference GodotSharp")
+
+          if b"GodotPlugins" not in (data_dir / "godotussy.dll").read_bytes():
+              raise SystemExit("godotussy.dll does not contain generated GodotPlugins glue")
+          PY
 
       - name: Package Windows build
         shell: bash

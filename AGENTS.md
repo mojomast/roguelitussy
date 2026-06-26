@@ -1,6 +1,6 @@
 # Agent Instructions
 
-This repository is a Godot 4.4.1 C# roguelike with a pure simulation core, Godot-facing presentation scripts, JSON-authored content, and a custom .NET test harness.
+This repository is a Godot 4.5.2 C# roguelike with a pure simulation core, Godot-facing presentation scripts, JSON-authored content, and a custom .NET test harness.
 
 Read these files before making non-trivial changes:
 

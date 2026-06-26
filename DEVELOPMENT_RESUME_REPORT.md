@@ -4,7 +4,7 @@ Generated after cloning and reviewing the repository with parallel subagent pass
 
 ## Executive Summary
 
-The project is a strong Godot 4.4.1 Mono/.NET roguelike foundation with a mostly clean split between deterministic simulation in `Core/`, Godot presentation in `Scripts/`, JSON content in `Content/`, and a custom test harness in `Tests/`.
+The project is a strong Godot 4.5.2 Mono/.NET roguelike foundation with a mostly clean split between deterministic simulation in `Core/`, Godot presentation in `Scripts/`, JSON content in `Content/`, and a custom test harness in `Tests/`.
 
 Development should resume by stabilizing correctness and verification before adding more content. The highest-impact blockers are save/load rehydration, item/ability runtime drift, centralized death/progression handling, and build/test automation.
 
@@ -19,7 +19,7 @@ Development should resume by stabilizing correctness and verification before add
 ### Follow-up Status - 2026-06-09
 
 - Completed: minimal GitHub Actions CI now covers the .NET 8 Godot stub build, explicit test project build, full custom test harness run, and rendering validation profile.
-- Completed: docs now use the canonical editorless commands and Godot 4.4.1 Mono/.NET wording.
+- Completed: docs now use the canonical editorless commands and Godot 4.5.2 Mono/.NET wording.
 - Completed: save documentation reflects save version 7, persisted behavior-critical components, and `CombatRandomState` deterministic RNG continuation.
 - Completed: item-use and ability-cast docs now describe heal/apply_status/cast_ability behavior and targeting validation.
 - Partial: shared `DeathResolver` progression behavior is documented for melee and ability-damage kills; status/trap/environment attribution remains follow-up work.
@@ -112,7 +112,7 @@ godot --headless --path . --quit
 - Completed: harmful area effects now honor `hits_allies: false` by defaulting unfiltered harmful effects to enemies only.
 - Completed: rendering validation profile compiles without persistence implementation files by using a no-op save manager under `RENDERING_VALIDATION` and skipping persistence-backed tests.
 - Completed: save version 8 persists cached multi-floor run state through `SaveRunSnapshot`, including migration from v7 single-floor saves and validation that the player exists only on the active floor.
-- Completed: CI now includes a real Godot 4.4.1 Mono headless editor import and startup smoke, and rendering-validation intermediates are isolated from the normal stub build profile.
+- Completed: CI now includes a real Godot 4.5.2 Mono headless editor import and startup smoke, and rendering-validation intermediates are isolated from the normal stub build profile.
 - Completed: v8 persistence loose-end coverage now rejects missing active floors, duplicate player entities across floors, and duplicate floor depths; UI/GameManager coverage saves a multi-floor run, reloads it, and travels back to a cached inactive floor.
 - Completed: authored item/status/enemy visual paths now resolve to committed assets, with simple SVG item/status icon source art and enemy paths repointed to existing 0x72 sprites.
 - Completed: inventory and menu screens received a focused presentation pass: stable item category glyphs, explicit equipped/stack/charge/comparison details, contextual inventory footer text, clearer pause/help hierarchy, and sectioned character-sheet chrome.
@@ -325,9 +325,9 @@ Confirmed workflow state:
 
 - `.github/workflows/ci.yml` exists and runs on push, pull request, `workflow_dispatch`, and a weekly Sunday schedule.
 - CI pins the .NET SDK via `global.json` (`8.0.0` with `latestFeature` roll-forward).
-- CI caches NuGet packages and the Godot 4.4.1 Mono download with `actions/cache@v4`.
+- CI caches NuGet packages and the Godot 4.5.2 Mono download with `actions/cache@v4`.
 - CI validates JSON syntax for all files under `Content/`, verifies formatting with `dotnet format --verify-no-changes`, builds the full solution, builds the Godot stub profile, runs the full custom test harness, and runs the rendering validation profile.
-- A second CI job performs a real Godot 4.4.1 Mono headless editor import and startup smoke test.
+- A second CI job performs a real Godot 4.5.2 Mono headless editor import and startup smoke test.
 - `godotussy.sln` includes both `godotussy.csproj` and `Tests/godotussy.Tests.csproj`.
 - The canonical editorless build command remains `dotnet build godotussy.csproj -p:UseGodotStubs=true`.
 
@@ -359,7 +359,7 @@ Relevant files:
 
 Goal: know whether the repository is currently green.
 
-- Install .NET 8 SDK and Godot 4.4.1 Mono/.NET.
+- Install .NET 8 SDK and Godot 4.5.2 Mono/.NET.
 - Run the verification commands listed above.
 - Add a minimal CI workflow for stub build and tests. Status: completed; CI now also validates formatting, JSON syntax, solution build, and caches NuGet/Godot.
 - Add `Tests/godotussy.Tests.csproj` to the solution or document that solution build is not full validation. Status: completed; the solution already includes the test project.
@@ -454,7 +454,7 @@ Acceptance criteria:
 5. Add content-backed consumable tests for every item with `on_use` effects.
 6. Centralize death handling so ability kills award XP. Status: completed for melee and ability-damage kills; status/trap attribution remains.
 7. Add resource path validation for `res://` content references.
-8. Update README/docs for Godot 4.4.1 Mono/.NET and harness-reported test counts. Status: completed.
+8. Update README/docs for Godot 4.5.2 Mono/.NET and harness-reported test counts. Status: completed.
 
 ## Bottom Line
 

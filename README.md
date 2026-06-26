@@ -1,6 +1,6 @@
 # godotussy
 
-A deterministic roguelike foundation for Godot 4.4.1 Mono/.NET with a pure C# simulation core, Godot-facing presentation scripts, data-driven content, and a custom .NET test harness.
+A deterministic roguelike foundation for Godot 4.5.2 Mono/.NET with a pure C# simulation core, Godot-facing presentation scripts, data-driven content, and a custom .NET test harness.
 
 The current build includes character identity and progression, ability casting, gear-driven combat, role-specific AI, equipment requirements, authoritative GameManager-owned visibility, refreshed CC0 0x72 dungeon art with contextual wall layering, committed SVG item/status icons, clearer menu and inventory presentation, reconciled world-space movement, overlay-aware gameplay chrome, expanded enemy sprite coverage, and broader mid- and late-floor content.
 
@@ -8,7 +8,7 @@ The current build includes character identity and progression, ability casting, 
 
 1. Install .NET 8 SDK.
    If a system package is unavailable, the Microsoft user-local installer works for this repo; set `DOTNET_ROOT=$HOME/.dotnet` and put `$HOME/.dotnet` on `PATH` before running the commands below.
-2. Install Godot 4.4.1 Mono/.NET if you want to open or run the game inside the editor.
+2. Install Godot 4.5.2 Mono/.NET if you want to open or run the game inside the editor.
 3. Build the editorless Godot stub profile:
 
    ```powershell
@@ -22,7 +22,7 @@ The current build includes character identity and progression, ability casting, 
    dotnet run --project Tests/godotussy.Tests.csproj
    ```
 
-5. Open `project.godot` in Godot 4.4.1 Mono/.NET to inspect scenes, autoloads, and editor tools. Godot 4.5 should be verified in a branch before upgrading package or project pins.
+5. Open `project.godot` in Godot 4.5.2 Mono/.NET to inspect scenes, autoloads, and editor tools.
 
 6. Launch the playable shell and use the built-in developer workshop from the title screen or pause menu if you want to author rooms and content without opening the Godot editor.
 
@@ -123,8 +123,8 @@ The rendering validation profile intentionally excludes persistence implementati
 Run the game headlessly to validate startup:
 
 ```powershell
-Godot_v4.4.1-stable_mono_linux_x86_64 --headless --editor --path . --quit
-Godot_v4.4.1-stable_mono_linux_x86_64 --headless --path . --quit
+Godot_v4.5.2-stable_mono_linux_x86_64 --headless --editor --path . --quit
+Godot_v4.5.2-stable_mono_linux_x86_64 --headless --path . --quit
 ```
 
 Run the editor import step first in fresh checkouts so ignored Godot import products under `.godot/` are regenerated from committed assets and `.import` files.

@@ -59,11 +59,11 @@ The repository workflow at `.github/workflows/ci.yml` runs on every push and pul
 - The editorless stub build, test build, full harness, and rendering-validation profile.
 - Artifact upload of `bin/`, `obj/`, and Godot cache directories on failure.
 
-A second job downloads and caches Godot 4.4.1 Mono, runs a headless editor import, and runs a headless startup smoke test. The Godot version is centralized in a single workflow environment variable.
+A second job downloads and caches Godot 4.5.2 Mono, runs a headless editor import, and runs a headless startup smoke test. The Godot version is centralized in a single workflow environment variable.
 
 ## Godot Headless Smoke
 
-CI also runs a real Godot 4.4.1 Mono headless check in addition to the editorless .NET stub profile.
+CI also runs a real Godot 4.5.2 Mono headless check in addition to the editorless .NET stub profile.
 
 Use this locally after changing scenes, autoloads, imported assets, Godot project settings, or Godot-facing startup code:
 
