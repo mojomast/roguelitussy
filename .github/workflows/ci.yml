@@ -44,9 +44,6 @@ jobs:
       - name: Verify formatting
         run: dotnet format --verify-no-changes godotussy.sln
 
-      - name: Build solution
-        run: dotnet build godotussy.sln --no-restore
-
       - name: Build Godot stub profile
         run: dotnet build godotussy.csproj -p:UseGodotStubs=true --no-restore
 
