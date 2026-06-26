@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Roguelike.Core;
@@ -16,6 +17,7 @@ public sealed class ContentValidationTests : ITestSuite
         registry.Add("Content.Item stats and effects are runtime-supported", ItemStatsAndEffectsAreRuntimeSupported);
         registry.Add("Content.Authored art paths resolve to committed files", AuthoredArtPathsResolveToCommittedFiles);
         registry.Add("Content.Depth filters stay stable", DepthFiltersStayStable);
+        registry.Add("Content.Loads from in-memory JSON documents", LoadsFromInMemoryJsonDocuments);
     }
 
     private static void LoadsAndValidatesAllJson()
@@ -33,6 +35,23 @@ public sealed class ContentValidationTests : ITestSuite
         Expect.True(content.RoomPrefabs.Count >= 10, "Expected at least the baseline room prefab set to load");
         Expect.Equal(17, content.LootTables.Count, "Expected the full loot table set to load");
         Expect.Equal(1, content.TrapDefinitions.Count, "Expected the baseline trap set to load");
+    }
+
+    private static void LoadsFromInMemoryJsonDocuments()
+    {
+        var contentDirectory = ContentLoader.FindContentDirectory();
+        var documents = new Dictionary<string, string>();
+        foreach (var fileName in ContentLoader.RequiredFileNames)
+        {
+            documents[fileName] = File.ReadAllText(Path.Combine(contentDirectory, fileName));
+        }
+
+        var content = ContentLoader.LoadFromJsonDocuments("res://Content", documents, throwOnValidationErrors: false);
+
+        Expect.True(content.IsValid, FormatErrors(content));
+        Expect.Equal("res://Content", content.ContentDirectory, "Document-backed content should preserve the supplied content source label.");
+        Expect.True(content.TryGetItemTemplate("dungeon_key", out _), "Document-backed content should project item templates.");
+        Expect.True(content.TryGetTrapTemplate("spike_trap", out _), "Document-backed content should project trap templates.");
     }
 
     private static void ProjectsContractTemplates()

@@ -1,6 +1,6 @@
 # Content
 
-The project uses flat JSON documents under `Content/` as the source of truth for gameplay content.
+The project uses flat JSON documents under `Content/` as the source of truth for gameplay content. Editor and source-checkout runs load these files from the filesystem; exported Godot builds read the same `res://Content/*.json` resources from the packaged PCK before projecting them into `ContentLoader` templates.
 
 ## Content Files
 

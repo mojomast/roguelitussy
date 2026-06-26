@@ -588,6 +588,19 @@ public static class ProjectSettings
     }
 }
 
+public static class FileAccess
+{
+    public static bool FileExists(string path)
+    {
+        return File.Exists(ProjectSettings.GlobalizePath(path));
+    }
+
+    public static string GetFileAsString(string path)
+    {
+        return File.ReadAllText(ProjectSettings.GlobalizePath(path));
+    }
+}
+
 public readonly struct Vector2I
 {
     public Vector2I(int x, int y)

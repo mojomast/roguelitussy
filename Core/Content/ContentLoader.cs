@@ -136,16 +136,52 @@ public sealed class ContentLoader : IContentDatabase
             throw new DirectoryNotFoundException($"Content directory '{fullDirectory}' does not exist.");
         }
 
-        var items = ReadDocument<ItemsDocument>(Path.Combine(fullDirectory, "items.json"));
-        var enemies = ReadDocument<EnemiesDocument>(Path.Combine(fullDirectory, "enemies.json"));
-        var abilities = ReadDocument<AbilitiesDocument>(Path.Combine(fullDirectory, "abilities.json"));
-        var perks = ReadDocument<PerksDocument>(Path.Combine(fullDirectory, "perks.json"));
-        var dialogs = ReadDocument<DialogsDocument>(Path.Combine(fullDirectory, "dialogs.json"));
-        var npcs = ReadDocument<NpcsDocument>(Path.Combine(fullDirectory, "npcs.json"));
-        var statusEffects = ReadDocument<StatusEffectsDocument>(Path.Combine(fullDirectory, "status_effects.json"));
-        var rooms = ReadDocument<RoomPrefabsDocument>(Path.Combine(fullDirectory, "room_prefabs.json"));
-        var lootTables = ReadDocument<LootTablesDocument>(Path.Combine(fullDirectory, "loot_tables.json"));
-        var traps = ReadDocument<TrapsDocument>(Path.Combine(fullDirectory, "traps.json"));
+        return LoadFromJsonProvider(
+            fullDirectory,
+            fileName => File.ReadAllText(Path.Combine(fullDirectory, fileName)),
+            ComputeContentHash(fullDirectory),
+            throwOnValidationErrors);
+    }
+
+    public static ContentLoader LoadFromJsonDocuments(
+        string contentDirectory,
+        IReadOnlyDictionary<string, string> documents,
+        bool throwOnValidationErrors = true)
+    {
+        ArgumentNullException.ThrowIfNull(documents);
+        foreach (var fileName in RequiredContentFiles)
+        {
+            if (!documents.ContainsKey(fileName))
+            {
+                throw new FileNotFoundException($"Required content file '{fileName}' was not found.", fileName);
+            }
+        }
+
+        return LoadFromJsonProvider(
+            contentDirectory,
+            fileName => documents[fileName],
+            ComputeContentHash(documents),
+            throwOnValidationErrors);
+    }
+
+    public static IReadOnlyList<string> RequiredFileNames => RequiredContentFiles;
+
+    private static ContentLoader LoadFromJsonProvider(
+        string contentDirectory,
+        Func<string, string> readJson,
+        string contentHash,
+        bool throwOnValidationErrors)
+    {
+        var items = ReadDocument<ItemsDocument>("items.json", readJson("items.json"));
+        var enemies = ReadDocument<EnemiesDocument>("enemies.json", readJson("enemies.json"));
+        var abilities = ReadDocument<AbilitiesDocument>("abilities.json", readJson("abilities.json"));
+        var perks = ReadDocument<PerksDocument>("perks.json", readJson("perks.json"));
+        var dialogs = ReadDocument<DialogsDocument>("dialogs.json", readJson("dialogs.json"));
+        var npcs = ReadDocument<NpcsDocument>("npcs.json", readJson("npcs.json"));
+        var statusEffects = ReadDocument<StatusEffectsDocument>("status_effects.json", readJson("status_effects.json"));
+        var rooms = ReadDocument<RoomPrefabsDocument>("room_prefabs.json", readJson("room_prefabs.json"));
+        var lootTables = ReadDocument<LootTablesDocument>("loot_tables.json", readJson("loot_tables.json"));
+        var traps = ReadDocument<TrapsDocument>("traps.json", readJson("traps.json"));
 
         var itemDefinitions = BuildLookup(items.Items, item => item.Id, "item");
         var enemyDefinitions = BuildLookup(enemies.Enemies, enemy => enemy.Id, "enemy");
@@ -225,10 +261,8 @@ public sealed class ContentLoader : IContentDatabase
             tileLegend);
 
         validationErrors.AddRange(DifficultyScaler.ValidateBalance(itemDefinitions, enemyDefinitions, lootDefinitions));
-        var contentHash = ComputeContentHash(fullDirectory);
-
         var loader = new ContentLoader(
-            fullDirectory,
+            contentDirectory,
             itemDefinitions,
             enemyDefinitions,
             abilityDefinitions,
@@ -289,6 +323,23 @@ public sealed class ContentLoader : IContentDatabase
             sha256.TransformBlock(nameBytes, 0, nameBytes.Length, null, 0);
             sha256.TransformBlock(new byte[] { 0 }, 0, 1, null, 0);
             var fileBytes = File.ReadAllBytes(Path.Combine(contentDirectory, fileName));
+            sha256.TransformBlock(fileBytes, 0, fileBytes.Length, null, 0);
+            sha256.TransformBlock(new byte[] { 0 }, 0, 1, null, 0);
+        }
+
+        sha256.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+        return Convert.ToHexString(sha256.Hash!).ToLowerInvariant();
+    }
+
+    private static string ComputeContentHash(IReadOnlyDictionary<string, string> documents)
+    {
+        using var sha256 = SHA256.Create();
+        foreach (var fileName in RequiredContentFiles)
+        {
+            var nameBytes = System.Text.Encoding.UTF8.GetBytes(fileName);
+            sha256.TransformBlock(nameBytes, 0, nameBytes.Length, null, 0);
+            sha256.TransformBlock(new byte[] { 0 }, 0, 1, null, 0);
+            var fileBytes = System.Text.Encoding.UTF8.GetBytes(documents[fileName]);
             sha256.TransformBlock(fileBytes, 0, fileBytes.Length, null, 0);
             sha256.TransformBlock(new byte[] { 0 }, 0, 1, null, 0);
         }
@@ -407,6 +458,17 @@ public sealed class ContentLoader : IContentDatabase
         if (document is null)
         {
             throw new InvalidDataException($"Failed to deserialize content file '{path}'.");
+        }
+
+        return document;
+    }
+
+    private static T ReadDocument<T>(string displayPath, string json)
+    {
+        var document = JsonSerializer.Deserialize<T>(json, SerializerOptions);
+        if (document is null)
+        {
+            throw new InvalidDataException($"Failed to deserialize content file '{displayPath}'.");
         }
 
         return document;

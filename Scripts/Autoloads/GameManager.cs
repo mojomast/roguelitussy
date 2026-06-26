@@ -1056,7 +1056,7 @@ public partial class GameManager : Node
 
         try
         {
-            var content = Content as ContentLoader ?? ContentLoader.LoadFromDirectory(ToolPaths.ResolveContentDirectory());
+            var content = Content as ContentLoader ?? LoadRuntimeContent();
             ResolveContentAutoload()?.SetDatabase(content);
 
             AttachServices(
@@ -1071,6 +1071,33 @@ public partial class GameManager : Node
         catch (Exception ex)
         {
             Bus?.EmitLogMessage($"Runtime initialization failed: {ex.Message}");
+        }
+    }
+
+    private static ContentLoader LoadRuntimeContent()
+    {
+        try
+        {
+            return ContentLoader.LoadFromDirectory(ToolPaths.ResolveContentDirectory());
+        }
+        catch (Exception directoryException) when (directoryException is DirectoryNotFoundException or FileNotFoundException)
+        {
+            var documents = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var fileName in ContentLoader.RequiredFileNames)
+            {
+                var resourcePath = $"res://Content/{fileName}";
+                if (!Godot.FileAccess.FileExists(resourcePath))
+                {
+                    throw new FileNotFoundException(
+                        $"Required content resource '{resourcePath}' was not found in the exported project.",
+                        resourcePath,
+                        directoryException);
+                }
+
+                documents[fileName] = Godot.FileAccess.GetFileAsString(resourcePath);
+            }
+
+            return ContentLoader.LoadFromJsonDocuments("res://Content", documents);
         }
     }
 
