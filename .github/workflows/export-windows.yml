@@ -145,9 +145,21 @@ jobs:
           set -euo pipefail
           Godot_v${GODOT_VERSION}_mono_linux.x86_64 --headless --export-release "Windows Desktop" build/windows/Roguelitussy.exe --path .
 
+      - name: Package Windows build
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > build/windows/README.txt <<'EOF'
+          Run Roguelitussy.exe from this extracted folder.
+
+          Keep Roguelitussy.exe, Roguelitussy.pck, and the data_godotussy_windows_x86_64 folder together.
+          The game is a Godot C# export and will close at startup if the data folder is missing.
+          EOF
+          (cd build/windows && zip -r ../roguelitussy-windows.zip .)
+
       - name: Upload Windows build
         uses: actions/upload-artifact@v4
         with:
           name: roguelitussy-windows
-          path: build/windows/
+          path: build/roguelitussy-windows.zip
           if-no-files-found: error
