@@ -33,7 +33,7 @@ jobs:
             nuget-${{ runner.os }}-
 
       - name: Restore solution
-        run: dotnet restore godotussy.sln
+        run: dotnet restore godotussy.sln -p:UseGodotStubs=true
 
       - name: Validate JSON syntax
         shell: bash
@@ -54,10 +54,10 @@ jobs:
         run: dotnet run --project Tests/godotussy.Tests.csproj --no-build
 
       - name: Restore rendering validation profile
-        run: dotnet restore godotussy.csproj -p:UseGodotStubs=true -p:RenderingValidation=true
+        run: dotnet restore Tests/godotussy.Tests.csproj -p:UseGodotStubs=true -p:RenderingValidation=true
 
       - name: Run rendering validation profile
-        run: dotnet run --project Tests/godotussy.Tests.csproj -p:RenderingValidation=true
+        run: dotnet run --project Tests/godotussy.Tests.csproj -p:UseGodotStubs=true -p:RenderingValidation=true
 
       - name: Upload build artifacts on failure
         if: failure()

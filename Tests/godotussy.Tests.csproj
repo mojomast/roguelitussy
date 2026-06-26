@@ -15,7 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\godotussy.csproj">
-      <AdditionalProperties>UseGodotStubs=true</AdditionalProperties>
+      <AdditionalProperties>UseGodotStubs=true;RenderingValidation=$(RenderingValidation)</AdditionalProperties>
     </ProjectReference>
   </ItemGroup>
 
