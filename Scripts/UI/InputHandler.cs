@@ -93,6 +93,7 @@ public partial class InputHandler : Node
             Key.Left or Key.A => HandleDirectionalInput(world, playerId, new Position(-1, 0)),
             Key.Right or Key.D => HandleDirectionalInput(world, playerId, new Position(1, 0)),
             Key.R => EnterRunPrefix(),
+            Key.O => AutoExplore(),
             Key.Z => RestUntilHealed(),
             Key.Space or Key.Period => Submit(UIActionFactory.CreateWaitAction(world, playerId)),
             Key.G => Submit(UIActionFactory.CreatePickupAction(world, _gameManager?.Content, playerId, _gameManager?.AutoEquipUpgradesEnabled == true)),
@@ -127,6 +128,15 @@ public partial class InputHandler : Node
         _eventBus?.EmitLogMessage("Resting until healed or interrupted.", LogCategory.System);
         var turns = _gameManager?.RestPlayerUntilHealed() ?? 0;
         _eventBus?.EmitLogMessage(turns == 0 ? "Rest stopped." : $"Rest stopped after {turns} turns.", LogCategory.System);
+
+        return true;
+    }
+
+    private bool AutoExplore()
+    {
+        _eventBus?.EmitLogMessage("Autoexploring until interrupted.", LogCategory.System);
+        var steps = _gameManager?.AutoExplorePlayer() ?? 0;
+        _eventBus?.EmitLogMessage(steps == 0 ? "Autoexplore stopped." : $"Autoexplore stopped after {steps} steps.", LogCategory.System);
 
         return true;
     }

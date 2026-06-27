@@ -36,6 +36,7 @@ public enum Key
     H,
     I,
     M,
+    O,
     U,
     X,
     Z,

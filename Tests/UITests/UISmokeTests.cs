@@ -26,6 +26,9 @@ public sealed class UISmokeTests : ITestSuite
         registry.Add("UI.Run prefix enters and cancels without submitting movement", RunPrefixEntersAndCancels);
         registry.Add("UI.Run moves through normal action processing until blocked", RunMovesThroughNormalActionProcessingUntilBlocked);
         registry.Add("UI.Run stops when a hostile becomes visible or adjacent", RunStopsWhenHostileBecomesVisibleOrAdjacent);
+        registry.Add("UI.Autoexplore moves toward unexplored frontier through normal action processing", AutoExploreMovesTowardUnexploredFrontierThroughNormalActionProcessing);
+        registry.Add("UI.Autoexplore stops at visible hostile", AutoExploreStopsAtVisibleHostile);
+        registry.Add("UI.Autoexplore stops when no frontier or point of interest exists", AutoExploreStopsWhenNoFrontierOrPointOfInterestExists);
         registry.Add("UI.Rest waits through normal action processing", RestWaitsThroughNormalActionProcessing);
         registry.Add("UI.Rest stops immediately at full HP or visible hostile", RestStopsImmediatelyAtFullHpOrVisibleHostile);
         registry.Add("UI.Minimap reflects explored tiles and gameplay toggles", MinimapReflectsExplorationAndToggles);
@@ -407,6 +410,55 @@ public sealed class UISmokeTests : ITestSuite
         Expect.True(input.HandleKey(Key.Right), "A direction after U should execute the run.");
 
         Expect.Equal(new Position(4, 2), context.Player.Position, "Run should stop once the hostile is visible or adjacent, before attacking.");
+    }
+
+    private static void AutoExploreMovesTowardUnexploredFrontierThroughNormalActionProcessing()
+    {
+        var context = CreateCorridorExploreContext(width: 7, height: 5, playerPosition: new Position(1, 2), exploredThroughX: 3);
+        var input = new InputHandler();
+        input.Bind(context.GameManager, context.Bus);
+
+        var turnsStarted = 0;
+        context.Bus.TurnStarted += _ => turnsStarted++;
+
+        Expect.True(input.HandleKey(Key.O), "O should start autoexplore during gameplay.");
+
+        Expect.True(context.Player.Position.X > 1, "Autoexplore should move the player toward the nearest unexplored frontier.");
+        Expect.Equal(turnsStarted, context.Player.Position.X - 1, "Every autoexplore step should process through GameManager.ProcessPlayerAction and emit normal turn events.");
+    }
+
+    private static void AutoExploreStopsAtVisibleHostile()
+    {
+        var context = CreateRunContext(width: 7, height: 5, playerPosition: new Position(3, 2), viewRadius: 8);
+        context.World.AddEntity(new StubEntity("Lookout", new Position(5, 2), Faction.Enemy, stats: new Stats { HP = 10, MaxHP = 10, Speed = 100 }));
+        context.GameManager.LoadWorld(context.World);
+        var input = new InputHandler();
+        input.Bind(context.GameManager, context.Bus);
+
+        var turnsStarted = 0;
+        context.Bus.TurnStarted += _ => turnsStarted++;
+
+        Expect.True(input.HandleKey(Key.O), "O should be handled when a visible hostile interrupts autoexplore.");
+        Expect.Equal(new Position(3, 2), context.Player.Position, "Autoexplore should not move while a hostile is visible.");
+        Expect.Equal(0, turnsStarted, "Autoexplore should stop before spending a turn when a hostile is visible.");
+    }
+
+    private static void AutoExploreStopsWhenNoFrontierOrPointOfInterestExists()
+    {
+        var context = CreateRunContext(width: 7, height: 5, playerPosition: new Position(3, 2), viewRadius: 0);
+        context.GameManager.LoadWorld(context.World);
+        MarkAllWalkableExplored(context.World);
+        context.World.ClearVisibility();
+        context.World.SetVisible(context.Player.Position, true);
+        var input = new InputHandler();
+        input.Bind(context.GameManager, context.Bus);
+
+        var turnsStarted = 0;
+        context.Bus.TurnStarted += _ => turnsStarted++;
+
+        Expect.True(input.HandleKey(Key.O), "O should be handled even when autoexplore has no target.");
+        Expect.Equal(new Position(3, 2), context.Player.Position, "Autoexplore should stay still when there is no reachable frontier or visible point of interest.");
+        Expect.Equal(0, turnsStarted, "Autoexplore should not submit movement when no target exists.");
     }
 
     private static void RestWaitsThroughNormalActionProcessing()
@@ -1534,6 +1586,48 @@ public sealed class UISmokeTests : ITestSuite
         gameManager.AttachServices(world, scheduler, new StubGenerator(), new FOVCalculator(), content, new StubSaveManager(), bus);
 
         return new UIContext(world, player, bus, gameManager, content);
+    }
+
+    private static UIContext CreateCorridorExploreContext(int width, int height, Position playerPosition, int exploredThroughX)
+    {
+        var context = CreateRunContext(width, height, playerPosition, viewRadius: 0);
+        for (var y = 1; y < context.World.Height - 1; y++)
+        {
+            if (y == playerPosition.Y)
+            {
+                continue;
+            }
+
+            for (var x = 1; x < context.World.Width - 1; x++)
+            {
+                context.World.SetTile(new Position(x, y), TileType.Wall);
+            }
+        }
+
+        context.GameManager.LoadWorld(context.World);
+        for (var x = 1; x <= exploredThroughX; x++)
+        {
+            context.World.SetVisible(new Position(x, playerPosition.Y), true);
+        }
+
+        context.World.ClearVisibility();
+        context.World.SetVisible(playerPosition, true);
+        return context;
+    }
+
+    private static void MarkAllWalkableExplored(WorldState world)
+    {
+        for (var y = 0; y < world.Height; y++)
+        {
+            for (var x = 0; x < world.Width; x++)
+            {
+                var position = new Position(x, y);
+                if (world.IsWalkable(position))
+                {
+                    world.SetVisible(position, true);
+                }
+            }
+        }
     }
 
     private sealed record UIContext(WorldState World, StubEntity Player, EventBus Bus, GameManager GameManager, StubContentDatabase Content);

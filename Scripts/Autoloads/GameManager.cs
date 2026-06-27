@@ -14,6 +14,7 @@ public partial class GameManager : Node
     private const int StartingGold = 120;
     private const int MaxRunSteps = 64;
     private const int MaxRestTurns = 64;
+    private const int MaxAutoExploreSteps = 128;
     private RunStats _runStats = CreateDefaultRunStats();
     private FloorStats _floorStats = CreateDefaultFloorStats(0);
     private int _floorStartTurnNumber;
@@ -1077,6 +1078,48 @@ public partial class GameManager : Node
         return turns;
     }
 
+    public int AutoExplorePlayer()
+    {
+        if (World is null || Scheduler is null || World.Player is null || CurrentState != GameState.Playing)
+        {
+            return 0;
+        }
+
+        var steps = 0;
+        while (steps < MaxAutoExploreSteps
+            && CurrentState == GameState.Playing
+            && World.Player is { IsAlive: true } player
+            && CanAutoExploreOneMoreStep(World, player))
+        {
+            if (!TryFindAutoExploreStep(World, player, out var delta))
+            {
+                break;
+            }
+
+            var hpBefore = player.Stats.HP;
+            var outcome = ProcessPlayerAction(new MoveAction(player.Id, delta));
+            if (outcome.Result != ActionResult.Success || World.Player is not { IsAlive: true } playerAfter)
+            {
+                break;
+            }
+
+            steps++;
+            if (playerAfter.Stats.HP < hpBefore
+                || ShouldStopRunAtPointOfInterest(World, playerAfter)
+                || HasVisibleOrAdjacentHostile(World, playerAfter))
+            {
+                break;
+            }
+        }
+
+        if (steps >= MaxAutoExploreSteps)
+        {
+            Bus?.EmitLogMessage("Autoexplore stopped at the safety limit.", LogCategory.Warning);
+        }
+
+        return steps;
+    }
+
     public void TransitionFloor(int newFloor)
     {
         var previousFloor = CurrentFloor;
@@ -2009,6 +2052,136 @@ public partial class GameManager : Node
         }
 
         return new WaitAction(player.Id).Validate(world) == ActionResult.Success;
+    }
+
+    private static bool CanAutoExploreOneMoreStep(WorldState world, IEntity player)
+    {
+        if (player.Stats.MaxHP > 0 && player.Stats.HP <= Math.Max(1, player.Stats.MaxHP / 3))
+        {
+            return false;
+        }
+
+        return !ShouldStopRunAtPointOfInterest(world, player) && !HasVisibleOrAdjacentHostile(world, player);
+    }
+
+    private static bool TryFindAutoExploreStep(WorldState world, IEntity player, out Position delta)
+    {
+        delta = Position.Zero;
+
+        var start = player.Position;
+        var queue = new Queue<Position>();
+        var visited = new HashSet<Position> { start };
+        var firstStepByPosition = new Dictionary<Position, Position>();
+        Position? fallbackFrontier = null;
+
+        queue.Enqueue(start);
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            if (current != start)
+            {
+                if (IsAutoExplorePointOfInterestTarget(world, current))
+                {
+                    delta = firstStepByPosition[current];
+                    return true;
+                }
+
+                if (fallbackFrontier is null && IsAutoExploreFrontier(world, current))
+                {
+                    fallbackFrontier = current;
+                }
+            }
+
+            foreach (var direction in Position.Cardinals)
+            {
+                var next = current + direction;
+                if (!visited.Add(next) || !CanAutoExploreEnter(world, next))
+                {
+                    continue;
+                }
+
+                if (!world.IsExplored(next) && !IsAutoExploreFrontier(world, next))
+                {
+                    continue;
+                }
+
+                firstStepByPosition[next] = current == start ? direction : firstStepByPosition[current];
+                queue.Enqueue(next);
+            }
+        }
+
+        if (fallbackFrontier is null)
+        {
+            return false;
+        }
+
+        delta = firstStepByPosition[fallbackFrontier.Value];
+        return true;
+    }
+
+    private static bool CanAutoExploreEnter(WorldState world, Position position)
+    {
+        if (!world.InBounds(position))
+        {
+            return false;
+        }
+
+        return world.IsWalkable(position) && world.GetEntityAt(position) is null;
+    }
+
+    private static bool IsAutoExplorePointOfInterestTarget(WorldState world, Position position)
+    {
+        if (!world.IsVisible(position))
+        {
+            return false;
+        }
+
+        if (world.GetItemsAt(position).Count > 0 || world.GetTile(position) is TileType.StairsDown or TileType.StairsUp)
+        {
+            return true;
+        }
+
+        foreach (var direction in Position.Cardinals)
+        {
+            var adjacent = position + direction;
+            if (!world.InBounds(adjacent) || !world.IsVisible(adjacent))
+            {
+                continue;
+            }
+
+            var tile = world.GetTile(adjacent);
+            if (tile is TileType.StairsDown or TileType.StairsUp)
+            {
+                return true;
+            }
+
+            var entity = world.GetEntityAt(adjacent);
+            if (entity?.GetComponent<ChestComponent>() is not null || entity?.GetComponent<NpcComponent>() is not null)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsAutoExploreFrontier(WorldState world, Position position)
+    {
+        if (!world.InBounds(position) || !world.IsWalkable(position) || world.GetEntityAt(position) is not null)
+        {
+            return false;
+        }
+
+        foreach (var direction in Position.Cardinals)
+        {
+            var adjacent = position + direction;
+            if (world.InBounds(adjacent) && world.IsWalkable(adjacent) && !world.IsExplored(adjacent))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool HasDangerousRestStatus(IEntity player)

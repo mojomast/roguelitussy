@@ -95,3 +95,13 @@ Run mode repeats normal cardinal `MoveAction` turns until interrupted. It preser
 Rest mode repeats normal `WaitAction` turns while the player is injured and safe. It preserves single wait controls (`Space`/`.`), stops before spending a turn at full HP, visible or adjacent hostiles, low HP, dangerous poison/burning/corrosion status, game over, invalid wait, or a safety cap, and does not invent passive healing when the simulation has none.
 
 **Files modified:** `Scripts/UI/InputHandler.cs`, `Scripts/Autoloads/GameManager.cs`, `Compat/Godot/GodotStubs.cs`, `Tests/UITests/UISmokeTests.cs`, `docs/SYSTEMS.md`, `docs/EVENTS.md`, `docs/FEATURES.md`.
+
+## Autoexplore
+
+**Block:** 11  **Status:** Implemented
+
+**Keybinds:** `O` autoexplore until interrupted
+
+Autoexplore recomputes deterministic BFS each step from the current player position. It prefers visible points of interest, then the nearest reachable frontier next to unexplored walkable space, and submits each move through the same `MoveAction`/`GameManager.ProcessPlayerAction` path as manual movement. It stops for visible or adjacent hostiles, damage taken, low HP, reaching a point of interest, no reachable frontier or visible point of interest, game over, invalid movement, or the safety cap.
+
+**Files modified:** `Scripts/UI/InputHandler.cs`, `Scripts/Autoloads/GameManager.cs`, `Compat/Godot/GodotStubs.cs`, `Tests/UITests/UISmokeTests.cs`, `docs/SYSTEMS.md`, `docs/EVENTS.md`, `docs/FEATURES.md`.

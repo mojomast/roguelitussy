@@ -25,3 +25,7 @@ Run-until-blocked movement does not add a dedicated event. Each repeated step is
 ## Rest Movement
 
 Rest-until-healed does not add a dedicated event. Each repeated wait is processed as a normal `WaitAction` through `GameManager.ProcessPlayerAction`, so existing `TurnStarted`, `DamageDealt`, `HPChanged`, `LogMessage`, `TurnCompleted`, and game-over notifications continue to describe the resulting state changes.
+
+## Autoexplore Movement
+
+Autoexplore does not add a dedicated event. Each repeated step is processed as a normal `MoveAction` through `GameManager.ProcessPlayerAction`, so existing `TurnStarted`, `EntityMoved`, `DamageDealt`, `HPChanged`, `LogMessage`, `TurnCompleted`, and game-over notifications continue to describe the resulting state changes.
