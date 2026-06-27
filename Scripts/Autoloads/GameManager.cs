@@ -13,6 +13,7 @@ public partial class GameManager : Node
     private readonly Dictionary<int, FloorEntrances> _floorEntrances = new();
     private const int StartingGold = 120;
     private const int MaxRunSteps = 64;
+    private const int MaxRestTurns = 64;
     private RunStats _runStats = CreateDefaultRunStats();
     private FloorStats _floorStats = CreateDefaultFloorStats(0);
     private int _floorStartTurnNumber;
@@ -1041,6 +1042,41 @@ public partial class GameManager : Node
         return steps;
     }
 
+    public int RestPlayerUntilHealed()
+    {
+        if (World is null || Scheduler is null || World.Player is null || CurrentState != GameState.Playing)
+        {
+            return 0;
+        }
+
+        var turns = 0;
+        while (turns < MaxRestTurns
+            && CurrentState == GameState.Playing
+            && World.Player is { IsAlive: true } player
+            && CanRestOneMoreTurn(World, player))
+        {
+            var hpBefore = player.Stats.HP;
+            var outcome = ProcessPlayerAction(new WaitAction(player.Id));
+            if (outcome.Result != ActionResult.Success || World.Player is not { IsAlive: true } playerAfter)
+            {
+                break;
+            }
+
+            turns++;
+            if (playerAfter.Stats.HP >= playerAfter.Stats.MaxHP || playerAfter.Stats.HP < hpBefore || HasVisibleOrAdjacentHostile(World, playerAfter))
+            {
+                break;
+            }
+        }
+
+        if (turns >= MaxRestTurns)
+        {
+            Bus?.EmitLogMessage("Rest stopped at the safety limit.", LogCategory.Warning);
+        }
+
+        return turns;
+    }
+
     public void TransitionFloor(int newFloor)
     {
         var previousFloor = CurrentFloor;
@@ -1953,6 +1989,33 @@ public partial class GameManager : Node
         }
 
         return new MoveAction(player.Id, delta).Validate(world) == ActionResult.Success;
+    }
+
+    private static bool CanRestOneMoreTurn(WorldState world, IEntity player)
+    {
+        if (player.Stats.HP >= player.Stats.MaxHP)
+        {
+            return false;
+        }
+
+        if (player.Stats.MaxHP > 0 && player.Stats.HP <= Math.Max(1, player.Stats.MaxHP / 3))
+        {
+            return false;
+        }
+
+        if (HasDangerousRestStatus(player) || HasVisibleOrAdjacentHostile(world, player))
+        {
+            return false;
+        }
+
+        return new WaitAction(player.Id).Validate(world) == ActionResult.Success;
+    }
+
+    private static bool HasDangerousRestStatus(IEntity player)
+    {
+        return StatusEffectProcessor.HasEffect(player, StatusEffectType.Poisoned)
+            || StatusEffectProcessor.HasEffect(player, StatusEffectType.Burning)
+            || StatusEffectProcessor.HasEffect(player, StatusEffectType.Corroded);
     }
 
     private static bool ShouldStopRunAtPointOfInterest(WorldState world, IEntity player)

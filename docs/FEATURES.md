@@ -85,3 +85,13 @@ The HUD keeps HP and energy text values immediate, but the visible bar fills now
 Run mode repeats normal cardinal `MoveAction` turns until interrupted. It preserves single-step movement controls, stops before walls, closed doors, occupants, adjacent chests/NPCs/stairs/items, visible or adjacent hostiles, low HP or damage taken, game over, invalid movement, or a safety cap, and reuses existing turn/event processing for every step.
 
 **Files modified:** `Scripts/UI/InputHandler.cs`, `Scripts/Autoloads/GameManager.cs`, `Compat/Godot/GodotStubs.cs`, `Tests/UITests/UISmokeTests.cs`, `docs/SYSTEMS.md`, `docs/EVENTS.md`, `docs/FEATURES.md`.
+
+## Rest-Until-Healed
+
+**Block:** 10  **Status:** Implemented
+
+**Keybinds:** `Z` rest until healed, interrupted, or safety capped
+
+Rest mode repeats normal `WaitAction` turns while the player is injured and safe. It preserves single wait controls (`Space`/`.`), stops before spending a turn at full HP, visible or adjacent hostiles, low HP, dangerous poison/burning/corrosion status, game over, invalid wait, or a safety cap, and does not invent passive healing when the simulation has none.
+
+**Files modified:** `Scripts/UI/InputHandler.cs`, `Scripts/Autoloads/GameManager.cs`, `Compat/Godot/GodotStubs.cs`, `Tests/UITests/UISmokeTests.cs`, `docs/SYSTEMS.md`, `docs/EVENTS.md`, `docs/FEATURES.md`.

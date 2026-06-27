@@ -93,6 +93,7 @@ public partial class InputHandler : Node
             Key.Left or Key.A => HandleDirectionalInput(world, playerId, new Position(-1, 0)),
             Key.Right or Key.D => HandleDirectionalInput(world, playerId, new Position(1, 0)),
             Key.R => EnterRunPrefix(),
+            Key.Z => RestUntilHealed(),
             Key.Space or Key.Period => Submit(UIActionFactory.CreateWaitAction(world, playerId)),
             Key.G => Submit(UIActionFactory.CreatePickupAction(world, _gameManager?.Content, playerId, _gameManager?.AutoEquipUpgradesEnabled == true)),
             Key.Enter or Key.KpEnter => Submit(UIActionFactory.CreateStairsAction(world, playerId)),
@@ -118,6 +119,15 @@ public partial class InputHandler : Node
     {
         _runPrefixActive = true;
         _eventBus?.EmitLogMessage("Run: choose a direction, or Escape to cancel.", LogCategory.System);
+        return true;
+    }
+
+    private bool RestUntilHealed()
+    {
+        _eventBus?.EmitLogMessage("Resting until healed or interrupted.", LogCategory.System);
+        var turns = _gameManager?.RestPlayerUntilHealed() ?? 0;
+        _eventBus?.EmitLogMessage(turns == 0 ? "Rest stopped." : $"Rest stopped after {turns} turns.", LogCategory.System);
+
         return true;
     }
 

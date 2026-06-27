@@ -38,6 +38,7 @@ public enum Key
     M,
     U,
     X,
+    Z,
     C,
     One,
     Two,

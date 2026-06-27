@@ -26,6 +26,8 @@ public sealed class UISmokeTests : ITestSuite
         registry.Add("UI.Run prefix enters and cancels without submitting movement", RunPrefixEntersAndCancels);
         registry.Add("UI.Run moves through normal action processing until blocked", RunMovesThroughNormalActionProcessingUntilBlocked);
         registry.Add("UI.Run stops when a hostile becomes visible or adjacent", RunStopsWhenHostileBecomesVisibleOrAdjacent);
+        registry.Add("UI.Rest waits through normal action processing", RestWaitsThroughNormalActionProcessing);
+        registry.Add("UI.Rest stops immediately at full HP or visible hostile", RestStopsImmediatelyAtFullHpOrVisibleHostile);
         registry.Add("UI.Minimap reflects explored tiles and gameplay toggles", MinimapReflectsExplorationAndToggles);
         registry.Add("UI.MainMenu character creation affects the starting run", MainMenuCharacterCreationAffectsStartingRun);
         registry.Add("UI.GameManager enemy turns resolve after player action", GameManagerEnemyTurnsResolveAfterPlayerAction);
@@ -405,6 +407,50 @@ public sealed class UISmokeTests : ITestSuite
         Expect.True(input.HandleKey(Key.Right), "A direction after U should execute the run.");
 
         Expect.Equal(new Position(4, 2), context.Player.Position, "Run should stop once the hostile is visible or adjacent, before attacking.");
+    }
+
+    private static void RestWaitsThroughNormalActionProcessing()
+    {
+        var context = CreateRunContext(width: 7, height: 5, playerPosition: new Position(3, 2), viewRadius: 0);
+        context.Player.Stats.HP = 30;
+        context.GameManager.LoadWorld(context.World);
+        var input = new InputHandler();
+        input.Bind(context.GameManager, context.Bus);
+
+        var turnsStarted = 0;
+        context.Bus.TurnStarted += _ => turnsStarted++;
+
+        Expect.True(input.HandleKey(Key.Z), "Z should start rest-until-healed during gameplay.");
+
+        Expect.Equal(64, turnsStarted, "Rest should process each wait through GameManager.ProcessPlayerAction until the safety cap when no passive healing exists.");
+        Expect.Equal(new Position(3, 2), context.Player.Position, "Rest should wait in place.");
+    }
+
+    private static void RestStopsImmediatelyAtFullHpOrVisibleHostile()
+    {
+        var fullContext = CreateRunContext(width: 7, height: 5, playerPosition: new Position(3, 2), viewRadius: 0);
+        fullContext.GameManager.LoadWorld(fullContext.World);
+        var fullInput = new InputHandler();
+        fullInput.Bind(fullContext.GameManager, fullContext.Bus);
+
+        var fullTurnsStarted = 0;
+        fullContext.Bus.TurnStarted += _ => fullTurnsStarted++;
+
+        Expect.True(fullInput.HandleKey(Key.Z), "Z should be handled even when rest stops immediately at full HP.");
+        Expect.Equal(0, fullTurnsStarted, "Rest should not spend a wait turn when the player is already fully healed.");
+
+        var hostileContext = CreateRunContext(width: 7, height: 5, playerPosition: new Position(3, 2), viewRadius: 8);
+        hostileContext.Player.Stats.HP = 30;
+        hostileContext.World.AddEntity(new StubEntity("Lookout", new Position(5, 2), Faction.Enemy, stats: new Stats { HP = 10, MaxHP = 10, Speed = 100 }));
+        hostileContext.GameManager.LoadWorld(hostileContext.World);
+        var hostileInput = new InputHandler();
+        hostileInput.Bind(hostileContext.GameManager, hostileContext.Bus);
+
+        var hostileTurnsStarted = 0;
+        hostileContext.Bus.TurnStarted += _ => hostileTurnsStarted++;
+
+        Expect.True(hostileInput.HandleKey(Key.Z), "Z should be handled when a visible hostile interrupts rest.");
+        Expect.Equal(0, hostileTurnsStarted, "Rest should stop before waiting when a hostile is visible.");
     }
 
     private static void GameManagerEnemyTurnsResolveAfterPlayerAction()

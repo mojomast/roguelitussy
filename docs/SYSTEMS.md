@@ -121,6 +121,7 @@ The rendering layer is event-driven.
 - `HUD` derives a nearby interaction prompt from current world state on turn/UI refresh (`[F] Talk`, `[F] Open Chest`, `[Enter] Descend/Ascend`) and exposes it as a clickable shortcut without changing the underlying keyboard actions.
 - `HUD` also derives a runtime-only quick-use hotbar from the first five usable non-equipment inventory entries. Number keys `1`-`5` are routed only during normal gameplay, submit regular `UseItemAction` instances for self/no-target consumables, and log a warning instead of consuming aimed items that require the inventory targeting overlay.
 - Run movement uses a prefix key because the current input path routes only key codes, not modifier state. Press `R`, then a cardinal direction to repeatedly process normal `MoveAction` turns through `GameManager.ProcessPlayerAction`; `Escape` cancels the prefix. The run stops before blockers, doors, occupants, nearby points of interest, low HP, damage taken, game over, visible/adjacent hostiles, or a fixed safety cap.
+- Rest-until-healed uses `Z` to repeatedly process normal `WaitAction` turns through `GameManager.ProcessPlayerAction`. It preserves single waits on `Space` and `.`, stops immediately at full HP or visible/adjacent hostiles, also stops for low HP, poison/burning/corrosion, damage taken, game over, invalid waits, or a fixed safety cap, and does not add UI-side passive healing.
 
 Current presentation-specific behavior worth knowing:
 
