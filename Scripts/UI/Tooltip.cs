@@ -239,6 +239,7 @@ public partial class Tooltip : Control
 
         for (var i = 2; i < lines.Count; i++)
         {
+            var line = lines[i];
             builder.AppendLine(FormatItemBodyLine(line));
         }
 
@@ -265,7 +266,7 @@ public partial class Tooltip : Control
         {
             var split = line.Split(':', 2);
             var value = split.Length > 1 ? split[1].Trim() : string.Empty;
-            var valueColor = value.StartsWith('-', System.StringComparison.Ordinal)
+            var valueColor = value.StartsWith("-", System.StringComparison.Ordinal)
                 ? UiStyle.ToHex(UiStyle.DangerRed())
                 : IsPositiveStatLabel(split[0]) ? UiStyle.ToHex(UiStyle.ActiveGreen()) : UiStyle.ToHex(UiStyle.Parchment());
             return $"[color={UiStyle.ToHex(UiStyle.MutedText())}]{ItemRarityPresentation.EscapeBBCode(split[0])}:[/color] [color={valueColor}][b]{ItemRarityPresentation.EscapeBBCode(value)}[/b][/color]";
