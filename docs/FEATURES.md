@@ -1,5 +1,24 @@
 # Features
 
+## Current Status Summary
+
+| Feature | Status | Current State | Follow-up |
+|---|---|---|---|
+| GameOverScreen | Implemented | Displays finalized run stats through `GameOverWithStats`. | Add death-specific learning tips if desired. |
+| FloorSummaryUI | Implemented | Shows per-floor stats during floor travel. | None required for current behavior. |
+| Pause menu run stats | Implemented | Shows compact current-run stats in pause menu. | None required for current behavior. |
+| CombatLog category coloring | Partial | `LogCategory` colors, critical emphasis, and age fading are implemented. | Category filtering remains planned. |
+| ExaminePanel | Implemented | `X` opens examine mode; cursor movement is non-mutating. | None required for current behavior. |
+| RunUntilBlocked | Implemented | `R` then direction runs until blocked/interrupted. | Historical `Shift`+direction references are stale. |
+| RestUntilHealed | Implemented | `Z` rests until healed/interrupted/capped. | Historical `R`-rest references are stale. |
+| AutoExplore | Implemented | `O` autoexplores through normal move processing. | None required for current behavior. |
+| Quick-use hotbar | Implemented | `QuickSlotHotbar` and HUD text derive the first five usable items; keys `1`-`5` use them. | None required for current behavior. |
+| Minimap legend | Implemented | Legend exists inside the minimap and has an independent normal-gameplay toggle. | None required for current behavior. |
+| ChestUI `MenuBase` refactor | Planned | Chest UI is functional but extends `Control` directly. | Refactor onto shared menu chrome/input conventions. |
+| Animated HUD bars | Implemented | HP/energy bars interpolate and pulse on changes. | None required for current behavior. |
+
+The current keybind source of truth is `docs/KEYBINDS.md`.
+
 ## Death Screen
 
 **Block:** 1  **Status:** Implemented
@@ -54,19 +73,19 @@ Examine mode opens a `MenuBase` panel at the player's position and lets the play
 
 **Keybinds:** `1`-`5` quick-use visible hotbar slots during normal gameplay
 
-The HUD shows a small runtime hotbar derived from the first five usable non-equipment inventory entries. Number keys submit the same `UseItemAction` path as inventory use for safe consumables such as potions. Aimed scrolls remain visible but marked `(aim)` and are not consumed blindly; pressing their hotkey logs a warning and instructs the player to aim them from inventory.
+`QuickSlotHotbar` shows five runtime slots derived from the first five usable non-equipment inventory entries, while HUD keeps its compact text summary for compatibility. Number keys submit the same `UseItemAction` path as inventory use for safe consumables such as potions. Aimed scrolls remain visible in the derived model and are not consumed blindly; pressing their hotkey logs a warning and instructs the player to aim them from inventory. Slot assignment is intentionally derived from current inventory order and is not persisted.
 
-**Files modified:** `Scripts/UI/HUD.cs`, `Scripts/UI/InputHandler.cs`, `Scripts/UI/UIActionFactory.cs`, `Tests/UITests/UISmokeTests.cs`, `docs/SYSTEMS.md`, `docs/FEATURES.md`.
+**Files modified:** `Scripts/UI/QuickSlotHotbar.cs`, `Scripts/UI/UIRoot.cs`, `Scripts/UI/HUD.cs`, `Scripts/UI/InputHandler.cs`, `Scripts/UI/UIActionFactory.cs`, `Tests/UITests/QuickSlotTests.cs`, `Tests/UITests/UISmokeTests.cs`, `docs/KEYBINDS.md`, `docs/FEATURES.md`, `docs/TODO.md`.
 
 ## Minimap Legend
 
 **Block:** 7  **Status:** Implemented
 
-**Keybinds:** `M`/`Tab` toggle minimap visibility during normal gameplay
+**Keybinds:** `M`/`Tab` toggle minimap visibility, `U` toggles the minimap legend during normal gameplay
 
-The minimap keeps the existing HUD summary and gameplay toggle behavior, but now reserves a compact legend band inside the overlay. The legend identifies floor, door, stairs, trap, player, enemy, NPC, item, and chest markers. Visible enemies, NPCs, items, and chests draw small colored markers over explored tile colors; trap, door, and stair tiles keep distinct colors aligned with the legend.
+The minimap keeps the existing HUD summary and gameplay toggle behavior. The legend identifies floor, door, stairs, trap, player, enemy, NPC, item, and chest markers, and is hidden by default until toggled independently. Visible enemies, NPCs, items, and chests draw small colored markers over explored tile colors; trap, door, and stair tiles keep distinct colors aligned with the legend. When the minimap itself is hidden or suppressed by modal UI, the legend stays hidden while preserving the user's legend preference.
 
-**Files modified:** `Scripts/UI/Minimap.cs`, `Scripts/UI/UiStyle.cs`, `Tests/UITests/UISmokeTests.cs`, `docs/SYSTEMS.md`, `docs/FEATURES.md`.
+**Files modified:** `Scripts/UI/Minimap.cs`, `Scripts/UI/InputHandler.cs`, `Scripts/UI/UIRoot.cs`, `Tests/UITests/MinimapTests.cs`, `docs/KEYBINDS.md`, `docs/FEATURES.md`.
 
 ## Animated HUD Bars
 
@@ -105,3 +124,11 @@ Rest mode repeats normal `WaitAction` turns while the player is injured and safe
 Autoexplore recomputes deterministic BFS each step from the current player position. It prefers visible points of interest, then the nearest reachable frontier next to unexplored walkable space, and submits each move through the same `MoveAction`/`GameManager.ProcessPlayerAction` path as manual movement. It stops for visible or adjacent hostiles, damage taken, low HP, reaching a point of interest, no reachable frontier or visible point of interest, game over, invalid movement, or the safety cap.
 
 **Files modified:** `Scripts/UI/InputHandler.cs`, `Scripts/Autoloads/GameManager.cs`, `Compat/Godot/GodotStubs.cs`, `Tests/UITests/UISmokeTests.cs`, `docs/SYSTEMS.md`, `docs/EVENTS.md`, `docs/FEATURES.md`.
+
+## Planned UI Follow-ups
+
+| Feature | Status | Notes |
+|---|---|---|
+| ChestUI `MenuBase` refactor | Planned | Align chest UI with shared menu chrome, footer hints, and close behavior. |
+| CombatLog category filtering | Planned | Category colors exist; user-controlled category visibility does not. |
+| QuickSlotHotbar class extraction | Implemented | Dedicated overlay exists; quick-use still routes through the existing action path. |

@@ -459,3 +459,11 @@ Acceptance criteria:
 ## Bottom Line
 
 Do not add more enemies, items, or progression content yet. The codebase is ready for development, but the next work should make existing authored systems reliable: persistence, deterministic RNG, item/ability execution, shared death/progression, and CI. Once those are green, `docs/PROGRESSION.md` is the best roadmap for expanding the game.
+
+### Follow-up Status - 2026-06-27
+
+- Completed: Block 1 reconciled tests with existing input wiring for `Z` rest-until-healed and `O` autoexplore; `R` remains the run prefix rather than rest.
+- Completed: created `docs/KEYBINDS.md` and `docs/TODO.md` for current controls and remaining planned UI/QOL work.
+- Completed: updated `docs/EVENTS.md` with a full EventBus reference and InputHandler routing table; Block 1 added tests only and no new EventBus events.
+- Completed: updated `docs/FEATURES.md` with implemented/partial/planned status for the latest UI/QOL features, including partial quick-use hotbar extraction and minimap legend toggle follow-ups.
+- Verification: docs-only Block 2 required no code tests; Block 1 tests passed under Godot stubs per handoff.

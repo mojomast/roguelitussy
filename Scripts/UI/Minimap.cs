@@ -14,6 +14,7 @@ public partial class Minimap : Control
     private EventBus? _eventBus;
     private GameManager? _gameManager;
     private bool _suppressedByOverlay;
+    private bool _legendVisible;
     private readonly Label _legendLabel;
     private static readonly MinimapLegendEntry[] Legend =
     {
@@ -55,6 +56,8 @@ public partial class Minimap : Control
     public string SummaryText { get; private set; } = "Minimap unavailable";
 
     public string LegendText => _legendLabel.Text;
+
+    public bool LegendVisible => _legendVisible;
 
     public System.Collections.Generic.IReadOnlyList<MinimapLegendEntry> LegendEntries => Legend;
 
@@ -108,6 +111,12 @@ public partial class Minimap : Control
         Refresh();
     }
 
+    public void ToggleLegend()
+    {
+        _legendVisible = !_legendVisible;
+        Refresh();
+    }
+
     public void SetSuppressed(bool suppressed)
     {
         if (_suppressedByOverlay == suppressed)
@@ -129,6 +138,7 @@ public partial class Minimap : Control
             && world is not null
             && _gameManager?.CurrentState != GameManager.GameState.MainMenu;
         Visible = active;
+        _legendLabel.Visible = active && _legendVisible;
 
         VisibleTileCount = 0;
         ExploredTileCount = 0;
@@ -211,7 +221,8 @@ public partial class Minimap : Control
         DrawRect(new Rect2(Vector2.Zero, Size), UiStyle.GoldTrim(0.9f), filled: false);
 
         var availableWidth = Math.Max(1f, Size.X - (InnerPadding * 2f));
-        var availableHeight = Math.Max(1f, Size.Y - (InnerPadding * 2f) - LegendHeight);
+        var reservedLegendHeight = _legendVisible ? LegendHeight : 0f;
+        var availableHeight = Math.Max(1f, Size.Y - (InnerPadding * 2f) - reservedLegendHeight);
         var cellSize = MathF.Min(availableWidth / world.Width, availableHeight / world.Height);
         if (cellSize <= 0f)
         {
@@ -246,7 +257,10 @@ public partial class Minimap : Control
             DrawRect(playerRect, UiStyle.BrightGold());
         }
 
-        DrawLegendSwatches();
+        if (_legendVisible)
+        {
+            DrawLegendSwatches();
+        }
     }
 
     public Color GetTileColor(Roguelike.Core.Position position)

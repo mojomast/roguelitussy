@@ -18,6 +18,8 @@ public partial class InputHandler : Node
 
     public event System.Action? MinimapToggleRequested;
 
+    public event System.Action? MinimapLegendToggleRequested;
+
     public event System.Action? HelpRequested;
 
     public event System.Action? ToolsRequested;
@@ -112,6 +114,7 @@ public partial class InputHandler : Node
             Key.X => Raise(ExamineRequested),
             Key.Escape => Raise(PauseRequested),
             Key.M or Key.Tab => Raise(MinimapToggleRequested),
+            Key.U => Raise(MinimapLegendToggleRequested),
             _ => false,
         };
     }

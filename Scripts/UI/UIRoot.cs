@@ -51,6 +51,8 @@ public partial class UIRoot : CanvasLayer
 
     public Minimap Minimap { get; } = new();
 
+    public QuickSlotHotbar QuickSlotHotbar { get; } = new();
+
     public DevToolsWorkbench DevToolsWorkbench { get; } = new();
 
     public HelpOverlay HelpOverlay { get; } = new();
@@ -104,6 +106,7 @@ public partial class UIRoot : CanvasLayer
         ChestUI.Bind(_gameManager, _eventBus, _content);
         FloorSummaryUI.Bind(_eventBus);
         Minimap.Bind(_gameManager, _eventBus);
+        QuickSlotHotbar.Bind(_gameManager, _eventBus, _content);
         DevToolsWorkbench.Bind(_gameManager, _eventBus, _content);
         MainMenu.Bind(_gameManager, _eventBus);
         PauseMenu.Bind(_gameManager, _eventBus);
@@ -145,6 +148,8 @@ public partial class UIRoot : CanvasLayer
         InputHandler.PauseRequested += TogglePause;
         InputHandler.MinimapToggleRequested -= ToggleMinimap;
         InputHandler.MinimapToggleRequested += ToggleMinimap;
+        InputHandler.MinimapLegendToggleRequested -= ToggleMinimapLegend;
+        InputHandler.MinimapLegendToggleRequested += ToggleMinimapLegend;
         InputHandler.HelpRequested -= ToggleHelp;
         InputHandler.HelpRequested += ToggleHelp;
         InputHandler.InteractRequested -= Interact;
@@ -213,6 +218,7 @@ public partial class UIRoot : CanvasLayer
         AddIfMissing(ShopUI);
         AddIfMissing(ChestUI);
         AddIfMissing(Minimap);
+        AddIfMissing(QuickSlotHotbar);
         AddIfMissing(DevToolsWorkbench);
         AddIfMissing(MainMenu);
         AddIfMissing(PauseMenu);
@@ -644,6 +650,11 @@ public partial class UIRoot : CanvasLayer
         Minimap.Toggle();
     }
 
+    private void ToggleMinimapLegend()
+    {
+        Minimap.ToggleLegend();
+    }
+
     private void ToggleExamine()
     {
         if (MainMenu.Visible || GameOverScreen.Visible || _gameManager?.CurrentState != GameManager.GameState.Playing)
@@ -894,6 +905,7 @@ public partial class UIRoot : CanvasLayer
             || DebugConsole.Visible;
 
         Minimap.SetSuppressed(suppressGameplayChrome);
+        QuickSlotHotbar.SetSuppressed(suppressGameplayChrome || TargetingOverlay.IsActive);
         CombatLog.SetSuppressed(suppressGameplayChrome);
     }
 
