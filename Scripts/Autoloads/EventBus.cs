@@ -25,6 +25,16 @@ public sealed record RunStats(
     string BestItemName,
     int BestItemValue);
 
+public sealed record FloorStats(
+    int FloorNumber,
+    int EnemiesKilled,
+    int ItemsFound,
+    int GoldCollected,
+    int DamageTaken,
+    int TurnsSpent,
+    int ChestsOpened,
+    int TrapsTriggered);
+
 public partial class EventBus : Node
 {
     public event Action<int>? TurnStarted;
@@ -55,6 +65,8 @@ public partial class EventBus : Node
     public event Action<EntityId, EquipSlot, ItemInstance?>? EquipmentChanged;
     public event Action<int, int>? GameOver;
     public event Action<RunStats>? GameOverWithStats;
+    public event Action<FloorStats>? FloorSummaryReady;
+    public event Action? FloorTransitionConfirmed;
     public event Action<EntityId, int, int>? ExperienceGained;
     public event Action<EntityId, int>? LeveledUp;
     public event Action<EntityId>? ProgressionChanged;
@@ -127,6 +139,10 @@ public partial class EventBus : Node
     public void EmitGameOver(int finalDepth, int turnsSurvived) => GameOver?.Invoke(finalDepth, turnsSurvived);
 
     public void EmitGameOverWithStats(RunStats stats) => GameOverWithStats?.Invoke(stats);
+
+    public void EmitFloorSummaryReady(FloorStats stats) => FloorSummaryReady?.Invoke(stats);
+
+    public void EmitFloorTransitionConfirmed() => FloorTransitionConfirmed?.Invoke();
 
     public void EmitExperienceGained(EntityId entityId, int amount, int total) => ExperienceGained?.Invoke(entityId, amount, total);
 

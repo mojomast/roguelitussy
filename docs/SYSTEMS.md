@@ -50,6 +50,7 @@ Player-specific long-run state lives in explicit components instead of bloating 
 XP is awarded on kill, level thresholds are deterministic, level-ups grant baseline stat growth plus unspent points, and progression/identity data are persisted with saves.
 Loading a run with pending perk choices reopens the level-up overlay when choices are available, so saved progression decisions remain visible after resume.
 When the player dies, `GameManager` finalizes a runtime `RunStats` snapshot and emits `EventBus.GameOverWithStats`. `UIRoot` opens the `GameOverScreen`, which presents floor reached, turns survived, kills, gold, item finds, damage taken, seed, cause of death, best item, and a short contextual epitaph.
+Floor-specific runtime counters live in a separate `FloorStats` snapshot. `GameManager` resets them for each loaded floor and emits `EventBus.FloorSummaryReady` immediately before travel loads the destination floor, allowing the UI to show kills, loot, gold, damage, turns, opened chests, and triggered traps for the floor being left without mixing them into lifetime `RunStats`.
 
 The planned expansion path for progression is documented in `docs/PROGRESSION.md`.
 
@@ -114,6 +115,7 @@ The rendering layer is event-driven.
 - `Scripts/World/WorldView.cs` and related world scripts react to those events to move entities, refresh visuals, and spawn presentation effects.
 - `Scripts/World/AnimationController.cs` owns lightweight world-side effects such as the damage popup.
 - `Scripts/UI/UIRoot.cs` binds the HUD, menus, overlays, combat log, tooltip, debug console, and input handler to the current runtime services.
+- `FloorSummaryUI` listens for `FloorSummaryReady`, opens as a modal summary during floor travel, blocks gameplay input while visible through `UIRoot`, and auto-dismisses after six seconds unless the player presses a key.
 - `UIRoot` also owns modal interaction surfaces such as dialog, shop, inventory, targeting, and the chest-open confirmation panel. Pressing `F`/`E` near an NPC opens dialog; pressing it near a chest opens the chest panel, which submits the existing `OpenChestAction`.
 - `HUD` derives a nearby interaction prompt from current world state on turn/UI refresh (`[F] Talk`, `[F] Open Chest`, `[Enter] Descend/Ascend`) and exposes it as a clickable shortcut without changing the underlying keyboard actions.
 

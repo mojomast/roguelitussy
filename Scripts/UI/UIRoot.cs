@@ -47,6 +47,8 @@ public partial class UIRoot : CanvasLayer
 
     public GameOverScreen GameOverScreen { get; } = new();
 
+    public FloorSummaryUI FloorSummaryUI { get; } = new();
+
     public Minimap Minimap { get; } = new();
 
     public DevToolsWorkbench DevToolsWorkbench { get; } = new();
@@ -76,9 +78,11 @@ public partial class UIRoot : CanvasLayer
         {
             _eventBus.TurnCompleted -= OnTurnCompleted;
             _eventBus.EntityDied -= OnEntityDied;
+            _eventBus.GameOverWithStats -= OnGameOverWithStats;
             _eventBus.LoadCompleted -= OnLoadCompleted;
             _eventBus.FloorChanged -= OnFloorChanged;
             _eventBus.ProgressionChanged -= OnProgressionChanged;
+            _eventBus.FloorTransitionConfirmed -= OnFloorTransitionConfirmed;
         }
 
         _gameManager = gameManager;
@@ -96,6 +100,7 @@ public partial class UIRoot : CanvasLayer
         DialogUI.ShopRequested += OpenShopFromDialog;
         ShopUI.Bind(_gameManager, _eventBus, _content);
         ChestUI.Bind(_gameManager, _eventBus, _content);
+        FloorSummaryUI.Bind(_eventBus);
         Minimap.Bind(_gameManager, _eventBus);
         DevToolsWorkbench.Bind(_gameManager, _eventBus, _content);
         MainMenu.Bind(_gameManager, _eventBus);
@@ -161,6 +166,7 @@ public partial class UIRoot : CanvasLayer
             _eventBus.LoadCompleted += OnLoadCompleted;
             _eventBus.FloorChanged += OnFloorChanged;
             _eventBus.ProgressionChanged += OnProgressionChanged;
+            _eventBus.FloorTransitionConfirmed += OnFloorTransitionConfirmed;
         }
 
         _enemiesKilled = 0;
@@ -206,6 +212,7 @@ public partial class UIRoot : CanvasLayer
         AddIfMissing(MainMenu);
         AddIfMissing(PauseMenu);
         AddIfMissing(GameOverScreen);
+        AddIfMissing(FloorSummaryUI);
         AddIfMissing(HelpOverlay);
         AddIfMissing(Tooltip);
         AddIfMissing(DebugConsole);
@@ -291,6 +298,17 @@ public partial class UIRoot : CanvasLayer
         if (GameOverScreen.Visible)
         {
             var handled = GameOverScreen.HandleKey(key);
+            if (handled)
+            {
+                RefreshInputGate();
+            }
+
+            return handled;
+        }
+
+        if (FloorSummaryUI.Visible)
+        {
+            var handled = FloorSummaryUI.HandleKey(key);
             if (handled)
             {
                 RefreshInputGate();
@@ -443,6 +461,7 @@ public partial class UIRoot : CanvasLayer
         MainMenu.Close();
         PauseMenu.Close();
         GameOverScreen.Close();
+        FloorSummaryUI.Close();
         HelpOverlay.Close();
         Inventory.Close();
         CharacterSheet.Close();
@@ -476,6 +495,12 @@ public partial class UIRoot : CanvasLayer
         RefreshInputGate();
     }
 
+    private void OnFloorTransitionConfirmed()
+    {
+        FloorSummaryUI.Close();
+        RefreshInputGate();
+    }
+
     private void OnGameStarted()
     {
         _enemiesKilled = 0;
@@ -487,6 +512,7 @@ public partial class UIRoot : CanvasLayer
         ShopUI.Close();
         ChestUI.Close();
         GameOverScreen.Close();
+        FloorSummaryUI.Close();
         HelpOverlay.Close();
         TargetingOverlay.Cancel();
         Tooltip.Hide();
@@ -698,6 +724,7 @@ public partial class UIRoot : CanvasLayer
         ShopUI.Close();
         ChestUI.Close();
         GameOverScreen.Close();
+        FloorSummaryUI.Close();
         HelpOverlay.Close();
         DevToolsWorkbench.Close();
         TargetingOverlay.Cancel();
@@ -755,6 +782,7 @@ public partial class UIRoot : CanvasLayer
         DialogUI.Close();
         ShopUI.Close();
         ChestUI.Close();
+        FloorSummaryUI.Close();
         HelpOverlay.Close();
         DevToolsWorkbench.Close();
         TargetingOverlay.Cancel();
@@ -791,6 +819,7 @@ public partial class UIRoot : CanvasLayer
             && !ShopUI.Visible
             && !ChestUI.Visible
             && !GameOverScreen.Visible
+            && !FloorSummaryUI.Visible
             && !HelpOverlay.Visible
             && !DevToolsWorkbench.Visible
             && !DebugConsole.Visible
@@ -809,6 +838,7 @@ public partial class UIRoot : CanvasLayer
             || ShopUI.Visible
             || ChestUI.Visible
             || GameOverScreen.Visible
+            || FloorSummaryUI.Visible
             || HelpOverlay.Visible
             || DevToolsWorkbench.Visible
             || DebugConsole.Visible;
@@ -829,6 +859,7 @@ public partial class UIRoot : CanvasLayer
             || ShopUI.Visible
             || ChestUI.Visible
             || GameOverScreen.Visible
+            || FloorSummaryUI.Visible
             || HelpOverlay.Visible
             || DevToolsWorkbench.Visible
             || DebugConsole.Visible

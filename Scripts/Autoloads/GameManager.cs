@@ -13,6 +13,8 @@ public partial class GameManager : Node
     private readonly Dictionary<int, FloorEntrances> _floorEntrances = new();
     private const int StartingGold = 120;
     private RunStats _runStats = CreateDefaultRunStats();
+    private FloorStats _floorStats = CreateDefaultFloorStats(0);
+    private int _floorStartTurnNumber;
 
     private sealed record FloorEntrances(Position StairsUp, Position StairsDown);
 
@@ -252,6 +254,8 @@ public partial class GameManager : Node
 
     public RunStats CurrentRunStats => _runStats;
 
+    public FloorStats CurrentFloorStats => BuildCurrentFloorStats();
+
     public WorldState? World { get; private set; }
 
     public ITurnScheduler? Scheduler { get; private set; }
@@ -269,6 +273,8 @@ public partial class GameManager : Node
     public bool AutoEquipUpgradesEnabled { get; private set; }
 
     private static RunStats CreateDefaultRunStats() => new("Rook", 0, 0, 0, 0, 0, 0, 0, "Unknown", string.Empty, 0);
+
+    private static FloorStats CreateDefaultFloorStats(int floorNumber) => new(floorNumber, 0, 0, 0, 0, 0, 0, 0);
 
     private RunStats CreateFreshRunStats(int seed) => new(
         CharacterOptions.Name,
@@ -421,6 +427,7 @@ public partial class GameManager : Node
 
         Scheduler = new TurnScheduler();
         LoadWorld(snapshot.ActiveWorld);
+        ResetFloorStats(CurrentFloor);
         Bus?.EmitLoadCompleted(true);
         Bus?.EmitTurnCompleted();
         Bus?.EmitLogMessage($"Loaded slot {slot}.");
@@ -597,6 +604,7 @@ public partial class GameManager : Node
         CurrentFloor = world.Depth;
         Scheduler = new TurnScheduler();
         LoadWorld(world);
+        ResetFloorStats(CurrentFloor);
 
         if (!string.IsNullOrWhiteSpace(logMessage))
         {
@@ -610,6 +618,7 @@ public partial class GameManager : Node
         Seed = seed;
         CurrentFloor = 0;
         _runStats = CreateFreshRunStats(seed);
+        ResetFloorStats(CurrentFloor);
         _cachedFloors.Clear();
         _floorEntrances.Clear();
 
@@ -629,6 +638,7 @@ public partial class GameManager : Node
             var player = CreatePlayer(generatedFloor.Entrances.StairsUp, new Random(MixSeed(seed, CurrentFloor) ^ 17));
             PlacePlayerInWorld(world, player, generatedFloor.Entrances.StairsUp, TileType.StairsUp);
             LoadWorld(world);
+            ResetFloorStats(CurrentFloor);
             Bus?.EmitLogMessage($"Starting new game with seed {seed}.");
         }
         catch (Exception ex)
@@ -935,7 +945,7 @@ public partial class GameManager : Node
                     if (damage.DefenderId == playerId)
                     {
                         CurrentState = GameState.GameOver;
-                        UpdateRunStatsFromAction(playerId, walletBefore, inventoryBefore, playerHpBefore, outcome, damage);
+                        UpdateRunStatsFromAction(playerId, walletBefore, inventoryBefore, playerHpBefore, outcome, damage, action.Type);
                         runStatsUpdatedForDeath = true;
                         Bus?.EmitGameOverWithStats(_runStats);
                     }
@@ -983,7 +993,7 @@ public partial class GameManager : Node
 
         if (!runStatsUpdatedForDeath && World.GetEntity(playerId) is not null)
         {
-            UpdateRunStatsFromAction(playerId, walletBefore, inventoryBefore, playerHpBefore, outcome, null);
+            UpdateRunStatsFromAction(playerId, walletBefore, inventoryBefore, playerHpBefore, outcome, null, action.Type);
         }
 
         foreach (var message in outcome.LogMessages)
@@ -1063,6 +1073,10 @@ public partial class GameManager : Node
             damage,
             statusEffect,
             trapComponent?.IsArmed == false));
+        if (World.Player?.Id == victimId)
+        {
+            _floorStats = _floorStats with { TrapsTriggered = _floorStats.TrapsTriggered + 1 };
+        }
     }
 
     private void OnPlayerActionSubmitted(IAction action)
@@ -1625,7 +1639,9 @@ public partial class GameManager : Node
             _cachedFloors[previousFloor] = currentWorld;
             _cachedFloors[targetFloor] = targetWorld;
             Scheduler = new TurnScheduler();
+            Bus?.EmitFloorSummaryReady(BuildCurrentFloorStats());
             LoadWorld(targetWorld);
+            ResetFloorStats(targetFloor);
             Bus?.EmitLevelTransition(previousFloor, targetFloor);
             Bus?.EmitLogMessage($"Travelled to floor {targetFloor}.");
             return true;
@@ -2068,7 +2084,8 @@ public partial class GameManager : Node
         HashSet<EntityId> inventoryBefore,
         int playerHpBefore,
         ActionOutcome outcome,
-        DamageResult? lethalPlayerDamage)
+        DamageResult? lethalPlayerDamage,
+        ActionType actionType)
     {
         if (World is null)
         {
@@ -2120,6 +2137,19 @@ public partial class GameManager : Node
             causeOfDeath = ResolveDamageSourceName(lethalPlayerDamage.AttackerId);
         }
 
+        var openedChest = outcome.Result == ActionResult.Success && actionType == ActionType.OpenChest ? 1 : 0;
+
+        _floorStats = _floorStats with
+        {
+            FloorNumber = CurrentFloor,
+            EnemiesKilled = _floorStats.EnemiesKilled + kills,
+            ItemsFound = _floorStats.ItemsFound + itemsFound,
+            GoldCollected = _floorStats.GoldCollected + goldGain,
+            DamageTaken = _floorStats.DamageTaken + damageTaken,
+            TurnsSpent = ResolveFloorTurnsSpent(),
+            ChestsOpened = _floorStats.ChestsOpened + openedChest,
+        };
+
         _runStats = _runStats with
         {
             CharacterName = player?.Name ?? _runStats.CharacterName,
@@ -2134,6 +2164,20 @@ public partial class GameManager : Node
             BestItemName = bestItemName,
             BestItemValue = bestItemValue,
         };
+    }
+
+    private FloorStats BuildCurrentFloorStats() => _floorStats with
+    {
+        FloorNumber = CurrentFloor,
+        TurnsSpent = ResolveFloorTurnsSpent(),
+    };
+
+    private int ResolveFloorTurnsSpent() => World is null ? _floorStats.TurnsSpent : Math.Max(0, World.TurnNumber - _floorStartTurnNumber);
+
+    private void ResetFloorStats(int floorNumber)
+    {
+        _floorStats = CreateDefaultFloorStats(floorNumber);
+        _floorStartTurnNumber = World?.TurnNumber ?? 0;
     }
 
     private string ResolveDamageSourceName(EntityId attackerId)
