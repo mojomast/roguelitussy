@@ -900,7 +900,7 @@ public partial class InventoryUI : Control
         LayoutFooter(panelSize);
         LayoutSlots(PanelPadding, PanelPadding + HeaderHeight + 16f);
         _gridLabel.Position = new Vector2(PanelPadding, PanelPadding + HeaderHeight + 16f);
-        _gridLabel.Size = new Vector2(gridWidth, contentHeight);
+        _gridLabel.Size = new Vector2(gridWidth, System.Math.Max(0f, panelSize.Y - _gridLabel.Position.Y - PanelPadding - FooterHeight - 8f));
         _descriptionLabel.Position = new Vector2(descriptionX, PanelPadding);
         _descriptionLabel.Size = new Vector2(descriptionWidth, Math.Max(0f, contentHeight - FooterHeight - 8f));
         _panel.Visible = Visible;

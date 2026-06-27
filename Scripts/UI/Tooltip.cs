@@ -153,6 +153,7 @@ public partial class Tooltip : Control
         {
             Name = "Panel",
             Size = Size,
+            Modulate = UiStyle.GoldTrim(),
         };
         _background = new ColorRect { Name = "Background", Color = UiStyle.PanelInner(0.98f) };
         _borderTop = new ColorRect { Name = "BorderTop", Color = UiStyle.BorderActive() };
