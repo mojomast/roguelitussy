@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using Godot;
 using Roguelike.Core;
@@ -14,6 +15,8 @@ public partial class CombatLog : Control
     private const float PanelPadding = 12f;
     private readonly Queue<string> _messages = new();
     private Panel? _panel;
+    private ColorRect? _background;
+    private ColorRect? _fade;
     private RichTextLabel? _textLabel;
     private EventBus? _eventBus;
     private GameManager? _gameManager;
@@ -89,7 +92,7 @@ public partial class CombatLog : Control
 
     private void OnLogMessage(string message)
     {
-        AddMessage("white", message);
+        AddMessage(message);
     }
 
     private void OnDamageDealt(DamageResult damage)
@@ -99,12 +102,12 @@ public partial class CombatLog : Control
         var message = damage.IsMiss
             ? $"{attacker} misses {defender}."
             : $"{attacker} hits {defender} for {damage.FinalDamage} damage.";
-        AddMessage(damage.DefenderId == _gameManager?.World?.Player.Id ? "red" : "orange", message);
+        AddMessage(message);
     }
 
     private void OnEntityDied(EntityId entityId)
     {
-        AddMessage("orange", $"{ResolveName(entityId)} dies.");
+        AddMessage($"{ResolveName(entityId)} dies.");
     }
 
     private void OnItemPickedUp(EntityId entityId, ItemInstance item)
@@ -125,32 +128,68 @@ public partial class CombatLog : Control
             return;
         }
 
-        AddMessage("cyan", $"{ResolveName(entityId)} picks up {ResolveItemName(item.TemplateId)}.");
+        AddMessage($"{ResolveName(entityId)} picks up {ResolveItemName(item.TemplateId)}.");
     }
 
     private void OnStatusEffectApplied(EntityId entityId, StatusEffectInstance effect)
     {
-        AddMessage("yellow", $"{ResolveName(entityId)} gains {effect.Type} ({effect.RemainingTurns}).");
+        AddMessage($"{ResolveName(entityId)} gains {effect.Type} ({effect.RemainingTurns}).");
     }
 
     private void OnSaveCompleted(bool success)
     {
-        AddMessage("gray", success ? "Save completed." : "Save failed.");
+        AddMessage(success ? "Save completed." : "Save failed.");
     }
 
     private void OnLoadCompleted(bool success)
     {
-        AddMessage("gray", success ? "Load completed." : "Load failed.");
+        AddMessage(success ? "Load completed." : "Load failed.");
     }
 
     private void OnFloorChanged(int floor)
     {
-        AddMessage("gray", $"Reached floor {floor}.");
+        AddMessage($"Reached floor {floor}.");
     }
 
-    private void AddMessage(string color, string message)
+    private void AddMessage(string message)
     {
-        AddMarkupMessage($"[color={color}]{ItemRarityPresentation.EscapeBBCode(message)}[/color]");
+        AddMarkupMessage($"[color={UiStyle.ToHex(GetEntryColor(message))}]{ItemRarityPresentation.EscapeBBCode(message)}[/color]");
+    }
+
+    private Color GetEntryColor(string message)
+    {
+        var playerName = _gameManager?.World?.Player?.Name ?? "Rook";
+        if (message.Contains("dies", System.StringComparison.OrdinalIgnoreCase)
+            || message.Contains("defeated", System.StringComparison.OrdinalIgnoreCase))
+        {
+            return UiStyle.ActiveGreen();
+        }
+
+        if (message.Contains("moves to", System.StringComparison.OrdinalIgnoreCase)
+            || message.Contains("Waiting", System.StringComparison.OrdinalIgnoreCase))
+        {
+            return UiStyle.FaintText();
+        }
+
+        if (message.Contains("casts", System.StringComparison.OrdinalIgnoreCase)
+            || message.Contains("applies", System.StringComparison.OrdinalIgnoreCase)
+            || message.Contains("gains", System.StringComparison.OrdinalIgnoreCase))
+        {
+            return UiStyle.WarningOrange();
+        }
+
+        if (message.Contains($"hits {playerName}", System.StringComparison.OrdinalIgnoreCase)
+            || message.Contains("hits Rook", System.StringComparison.OrdinalIgnoreCase))
+        {
+            return UiStyle.DangerRed();
+        }
+
+        if (message.Contains("hits", System.StringComparison.OrdinalIgnoreCase))
+        {
+            return UiStyle.BrightGold();
+        }
+
+        return UiStyle.Parchment();
     }
 
     private void AddMarkupMessage(string markup)
@@ -162,7 +201,7 @@ public partial class CombatLog : Control
         }
 
         var builder = new StringBuilder();
-        foreach (var line in _messages)
+        foreach (var line in _messages.TakeLast(6))
         {
             builder.AppendLine(line);
         }
@@ -187,8 +226,9 @@ public partial class CombatLog : Control
         {
             Name = "Panel",
             Size = panelSize,
-            Modulate = UiStyle.GoldTrim(0.88f),
         };
+        _background = new ColorRect { Name = "Background", Color = UiStyle.PanelBlack(0.78f) };
+        _fade = new ColorRect { Name = "TopFade", Color = UiStyle.PanelBlack(0.55f) };
         _textLabel = new RichTextLabel
         {
             Name = "TextConsole",
@@ -200,6 +240,8 @@ public partial class CombatLog : Control
             ScrollFollowing = true,
             Modulate = UiStyle.Parchment(),
         };
+        _panel.AddChild(_background);
+        _panel.AddChild(_fade);
         _panel.AddChild(_textLabel);
         AddChild(_panel);
     }
@@ -208,7 +250,7 @@ public partial class CombatLog : Control
     {
         EnsureVisuals();
 
-        if (_panel is null || _textLabel is null)
+        if (_panel is null || _textLabel is null || _background is null || _fade is null)
         {
             return;
         }
@@ -220,6 +262,10 @@ public partial class CombatLog : Control
         Size = viewportSize;
         _panel.Size = panelSize;
         _panel.Position = new Vector2(OuterMargin, viewportSize.Y - panelSize.Y - OuterMargin);
+        _background.Position = Vector2.Zero;
+        _background.Size = panelSize;
+        _fade.Position = Vector2.Zero;
+        _fade.Size = new Vector2(panelSize.X, 16f);
         _textLabel.Position = new Vector2(PanelPadding, PanelPadding);
         _textLabel.Size = new Vector2(
             System.Math.Max(0f, panelSize.X - (PanelPadding * 2f)),

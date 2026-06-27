@@ -9,6 +9,7 @@ namespace Godotussy;
 public abstract partial class MenuBase : Control
 {
     private readonly List<string> _options = new();
+    private readonly HashSet<int> _sectionHeaderIndices = new();
     private Panel? _panel;
     private ColorRect? _backdrop;
     private ColorRect? _headerBand;
@@ -67,10 +68,34 @@ public abstract partial class MenuBase : Control
     protected void ConfigureOptions(params string[] options)
     {
         _options.Clear();
+        _sectionHeaderIndices.Clear();
         _options.AddRange(options);
-        if (SelectedIndex >= _options.Count)
+        if (SelectedIndex >= _options.Count || IsSectionHeader(SelectedIndex))
         {
-            SelectedIndex = 0;
+            SelectedIndex = ResolveNextSelectableIndex(0, 1);
+        }
+
+        RebuildMenuText();
+    }
+
+    protected void ConfigureSectionHeader(string title)
+    {
+        _sectionHeaderIndices.Add(_options.Count);
+        _options.Add($"── {title.ToUpperInvariant()} ─────────────");
+        if (_options.Count == 1)
+        {
+            SelectedIndex = ResolveNextSelectableIndex(0, 1);
+        }
+
+        RebuildMenuText();
+    }
+
+    protected void ConfigureOption(string option)
+    {
+        _options.Add(option);
+        if (_options.Count == 1 || IsSectionHeader(SelectedIndex))
+        {
+            SelectedIndex = ResolveNextSelectableIndex(0, 1);
         }
 
         RebuildMenuText();
@@ -85,7 +110,7 @@ public abstract partial class MenuBase : Control
             return;
         }
 
-        SelectedIndex = (index % _options.Count + _options.Count) % _options.Count;
+        SelectedIndex = ResolveNextSelectableIndex(index, index >= SelectedIndex ? 1 : -1);
         RebuildMenuText();
     }
 
@@ -384,6 +409,7 @@ public abstract partial class MenuBase : Control
             Math.Max(0f, _optionsCard.Size.X - (CardPadding * 2f)),
             Math.Max(0f, _optionsCard.Size.Y - (CardPadding * 2f)));
         _optionsLabel.Text = _visibleOptionsText;
+        _optionsLabel.Modulate = UiStyle.Parchment();
         _optionsLabel.Visible = _optionsCard.Visible;
 
         _footerLabel.Position = new Vector2(PanelPadding, footerTop);
@@ -433,6 +459,12 @@ public abstract partial class MenuBase : Control
         var lastVisibleOption = Math.Min(_options.Count, firstVisibleOption + visibleOptionCount);
         for (var index = firstVisibleOption; index < lastVisibleOption; index++)
         {
+            if (IsSectionHeader(index))
+            {
+                builder.AppendLine(_options[index]);
+                continue;
+            }
+
             builder.Append(index == SelectedIndex ? "> " : "  ");
             builder.AppendLine(_options[index]);
         }
@@ -456,6 +488,30 @@ public abstract partial class MenuBase : Control
 
         var preferred = SelectedIndex - (visibleOptionCount / 2);
         return Math.Clamp(preferred, 0, _options.Count - visibleOptionCount);
+    }
+
+    private bool IsSectionHeader(int index) => _sectionHeaderIndices.Contains(index);
+
+    private int ResolveNextSelectableIndex(int requestedIndex, int direction)
+    {
+        if (_options.Count == 0)
+        {
+            return 0;
+        }
+
+        var index = (requestedIndex % _options.Count + _options.Count) % _options.Count;
+        var step = direction < 0 ? -1 : 1;
+        for (var attempts = 0; attempts < _options.Count; attempts++)
+        {
+            if (!IsSectionHeader(index))
+            {
+                return index;
+            }
+
+            index = (index + step + _options.Count) % _options.Count;
+        }
+
+        return 0;
     }
 
     private Vector2 ResolvePanelSize(Vector2 viewportSize)

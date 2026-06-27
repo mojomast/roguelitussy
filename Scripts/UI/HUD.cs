@@ -10,7 +10,13 @@ public partial class HUD : Control
     private Panel? _panel;
     private Label? _headerLabel;
     private Label? _hpLabel;
-    private ProgressBar? _hpBar;
+    private Label? _hpValueLabel;
+    private ColorRect? _hpBarBackground;
+    private ColorRect? _hpBarFill;
+    private Label? _energyLabel;
+    private Label? _energyValueLabel;
+    private ColorRect? _energyBarBackground;
+    private ColorRect? _energyBarFill;
     private Label? _progressLabel;
     private Label? _statsLabel;
     private Label? _effectsLabel;
@@ -24,6 +30,10 @@ public partial class HUD : Control
     public double HPBarValue { get; private set; }
 
     public double HPBarMaxValue { get; private set; } = 1d;
+
+    public double EnergyBarValue { get; private set; }
+
+    public double EnergyBarMaxValue { get; private set; } = 1000d;
 
     public string EnergyText { get; private set; } = "Energy: --";
 
@@ -227,6 +237,8 @@ public partial class HUD : Control
             ? scheduler.GetEnergy(player.Id)
             : player.Stats.Energy;
         EnergyText = $"Energy: {energy}";
+        EnergyBarValue = System.Math.Clamp(energy, 0, 1000);
+        EnergyBarMaxValue = 1000d;
         FloorText = $"Floor: {world.Depth}";
         TurnText = $"Turn: {world.TurnNumber}";
 
@@ -275,12 +287,7 @@ public partial class HUD : Control
     private void UpdateHPColor(int currentHp, int maxHp)
     {
         var ratio = maxHp <= 0 ? 0f : (float)currentHp / maxHp;
-        HPColor = ratio switch
-        {
-            > 0.6f => UiStyle.BloodRedBright(),
-            > 0.3f => UiStyle.BrightGold(),
-            _ => UiStyle.BloodRed(),
-        };
+        HPColor = UiStyle.HpColor(ratio);
     }
 
     private void UpdateHPState(int currentHp, int maxHp)
@@ -301,19 +308,19 @@ public partial class HUD : Control
         _panel = new Panel
         {
             Name = "Panel",
-            Position = new Vector2(12f, 12f),
-            Modulate = UiStyle.GoldTrim(),
+            Position = new Vector2(8f, 8f),
+            Modulate = UiStyle.PanelBlack(0.82f),
         };
         AddChild(_panel);
 
-        _hpLabel = CreateLabel("HPLabel", new Vector2(12f, 10f), new Vector2(416f, 24f));
-        _hpBar = new ProgressBar
-        {
-            Name = "HPBar",
-            MinValue = 0d,
-            MaxValue = 1d,
-            Value = 0d,
-        };
+        _hpLabel = CreateLabel("HPLabel", new Vector2(12f, 10f), new Vector2(28f, 16f));
+        _hpValueLabel = CreateLabel("HPValueLabel", new Vector2(170f, 10f), new Vector2(70f, 16f));
+        _hpBarBackground = new ColorRect { Name = "HPBarBackground", Color = UiStyle.PanelBlack() };
+        _hpBarFill = new ColorRect { Name = "HPBarFill", Color = UiStyle.ActiveGreen() };
+        _energyLabel = CreateLabel("EnergyLabel", new Vector2(12f, 32f), new Vector2(28f, 16f));
+        _energyValueLabel = CreateLabel("EnergyValueLabel", new Vector2(170f, 32f), new Vector2(70f, 16f));
+        _energyBarBackground = new ColorRect { Name = "EnergyBarBackground", Color = UiStyle.PanelBlack() };
+        _energyBarFill = new ColorRect { Name = "EnergyBarFill", Color = UiStyle.EnergyBlue() };
         _headerLabel = CreateLabel("HeaderLabel", new Vector2(12f, 46f), new Vector2(416f, 18f));
         _progressLabel = CreateLabel("ProgressLabel", new Vector2(12f, 68f), new Vector2(416f, 18f));
         _statsLabel = CreateLabel("StatsLabel", new Vector2(12f, 90f), new Vector2(416f, 18f));
@@ -321,7 +328,13 @@ public partial class HUD : Control
         _mapLabel = CreateLabel("MapLabel", new Vector2(12f, 134f), new Vector2(416f, 18f));
 
         _panel.AddChild(_hpLabel);
-        _panel.AddChild(_hpBar);
+        _panel.AddChild(_hpValueLabel);
+        _panel.AddChild(_hpBarBackground);
+        _panel.AddChild(_hpBarFill);
+        _panel.AddChild(_energyLabel);
+        _panel.AddChild(_energyValueLabel);
+        _panel.AddChild(_energyBarBackground);
+        _panel.AddChild(_energyBarFill);
         _panel.AddChild(_headerLabel);
         _panel.AddChild(_progressLabel);
         _panel.AddChild(_statsLabel);
@@ -474,16 +487,17 @@ public partial class HUD : Control
             return;
         }
 
-        _headerLabel.Text = $"{EnergyText}  {FloorText}  {TurnText}";
-        _headerLabel.Modulate = UiStyle.Parchment();
+        _headerLabel.Text = $"{FloorText}  ▪  {TurnText}  ▪  {LevelText}  ▪  {GoldText}".Trim();
+        _headerLabel.Modulate = UiStyle.MutedText();
         _progressLabel.Text = string.Join("  ", new[] { LevelText, GoldText }.Where(text => !string.IsNullOrWhiteSpace(text)));
-        _progressLabel.Modulate = LevelText.Contains("LV UP!", System.StringComparison.Ordinal) ? UiStyle.BrightGold() : UiStyle.GoldTrim();
+        _progressLabel.Modulate = LevelText.Contains("LV UP!", System.StringComparison.Ordinal) ? UiStyle.BrightGold() : UiStyle.MutedText();
         _statsLabel.Text = StatsText;
-        _statsLabel.Modulate = UiStyle.MutedText();
-        _effectsLabel.Text = string.IsNullOrWhiteSpace(StatusEffectsText) ? "Effects: none" : StatusEffectsText;
-        _effectsLabel.Modulate = string.IsNullOrWhiteSpace(StatusEffectsText) ? UiStyle.MutedText() : UiStyle.Parchment();
+        _statsLabel.Modulate = UiStyle.Parchment();
+        _effectsLabel.Text = StatusEffectsText;
+        _effectsLabel.Visible = !string.IsNullOrWhiteSpace(StatusEffectsText);
+        _effectsLabel.Modulate = UiStyle.WarningOrange();
         _mapLabel.Text = MinimapText;
-        _mapLabel.Modulate = MinimapVisible ? UiStyle.MapGold() : UiStyle.MutedText();
+        _mapLabel.Modulate = MinimapVisible ? UiStyle.MutedText() : UiStyle.FaintText();
     }
 
     private void UpdateHPVisuals()
@@ -492,17 +506,30 @@ public partial class HUD : Control
 
         if (_hpLabel is not null)
         {
-            _hpLabel.Text = HPText;
-            _hpLabel.Modulate = HPColor;
+            _hpLabel.Text = "HP";
+            _hpLabel.Modulate = UiStyle.Parchment();
         }
 
-        if (_hpBar is not null)
+        if (_hpValueLabel is not null)
         {
-            _hpBar.MinValue = 0d;
-            _hpBar.MaxValue = HPBarMaxValue;
-            _hpBar.Value = HPBarValue;
-            _hpBar.Modulate = HPColor;
+            _hpValueLabel.Text = HPText.Replace("HP: ", string.Empty);
+            _hpValueLabel.Modulate = HPColor;
         }
+
+        if (_energyLabel is not null)
+        {
+            _energyLabel.Text = "EN";
+            _energyLabel.Modulate = UiStyle.Parchment();
+        }
+
+        if (_energyValueLabel is not null)
+        {
+            _energyValueLabel.Text = EnergyText.Replace("Energy: ", string.Empty);
+            _energyValueLabel.Modulate = UiStyle.EnergyBlue();
+        }
+
+        LayoutBar(_hpBarBackground, _hpBarFill, HPBarValue, HPBarMaxValue, HPColor);
+        LayoutBar(_energyBarBackground, _energyBarFill, EnergyBarValue, EnergyBarMaxValue, UiStyle.EnergyBlue(), y: 37f);
     }
 
     private void ApplyResponsiveLayout()
@@ -515,13 +542,16 @@ public partial class HUD : Control
         var viewportWidth = ResolveViewportWidth();
         var width = System.Math.Min(440f, System.Math.Max(0f, viewportWidth - 24f));
         var contentWidth = System.Math.Max(0f, width - 24f);
-        _panel.Position = new Vector2(12f, 12f);
-        _panel.Size = new Vector2(width, 160f);
+        _panel.Position = new Vector2(8f, 8f);
+        _panel.Size = new Vector2(width, 168f);
+        _panel.Modulate = UiStyle.PanelBlack(0.82f);
 
-        SetControlBounds(_hpLabel, 12f, 10f, contentWidth, 24f);
-        SetControlBounds(_hpBar, 12f, 34f, contentWidth, 10f);
-        SetControlBounds(_headerLabel, 12f, 52f, contentWidth, 18f);
-        SetControlBounds(_progressLabel, 12f, 74f, contentWidth, 18f);
+        SetControlBounds(_hpLabel, 12f, 10f, 28f, 16f);
+        SetControlBounds(_hpValueLabel, 170f, 10f, 70f, 16f);
+        SetControlBounds(_energyLabel, 12f, 32f, 28f, 16f);
+        SetControlBounds(_energyValueLabel, 170f, 32f, 70f, 16f);
+        SetControlBounds(_headerLabel, 12f, 56f, contentWidth, 18f);
+        SetControlBounds(_progressLabel, 12f, 76f, contentWidth, 18f);
         SetControlBounds(_statsLabel, 12f, 96f, contentWidth, 18f);
         SetControlBounds(_effectsLabel, 12f, 116f, contentWidth, 18f);
         if (_statusIconsContainer is not null)
@@ -531,6 +561,24 @@ public partial class HUD : Control
         }
 
         SetControlBounds(_mapLabel, 12f, 150f, contentWidth, 18f);
+    }
+
+    private static void LayoutBar(ColorRect? background, ColorRect? fill, double value, double maxValue, Color fillColor, float y = 15f)
+    {
+        if (background is null || fill is null)
+        {
+            return;
+        }
+
+        const float width = 120f;
+        const float height = 8f;
+        background.Position = new Vector2(44f, y);
+        background.Size = new Vector2(width, height);
+        background.Color = UiStyle.PanelBlack();
+        var fraction = maxValue <= 0d ? 0f : (float)System.Math.Clamp(value / maxValue, 0d, 1d);
+        fill.Position = background.Position + new Vector2(1f, 1f);
+        fill.Size = new Vector2((width - 2f) * fraction, height - 2f);
+        fill.Color = fillColor;
     }
 
     private static void SetControlBounds(Control? control, float x, float y, float width, float height)

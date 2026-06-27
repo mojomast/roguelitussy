@@ -162,33 +162,34 @@ public partial class LevelUpOverlay : Control
 
         var selected = choices[_selectedIndex];
         var builder = new StringBuilder();
-        builder.AppendLine("[b]LEVEL UP[/b]");
-        builder.AppendLine(ItemRarityPresentation.EscapeBBCode($"{player.Name} can choose a new perk."));
-        builder.AppendLine(ItemRarityPresentation.EscapeBBCode($"Pending choices: {progression.UnspentPerkChoices}"));
+        builder.AppendLine($"[b][color={UiStyle.ToHex(UiStyle.BrightGold())}]LEVEL UP[/color][/b]");
+        builder.AppendLine($"[color={UiStyle.ToHex(UiStyle.Parchment())}]{ItemRarityPresentation.EscapeBBCode($"{player.Name} can choose a new perk.")}[/color]");
+        builder.AppendLine($"[color={UiStyle.ToHex(UiStyle.WarningOrange())}]{ItemRarityPresentation.EscapeBBCode($"Pending choices: {progression.UnspentPerkChoices}")}[/color]");
         builder.AppendLine();
-        builder.AppendLine("[b]Available Perks[/b]");
+        builder.AppendLine($"[b][color={UiStyle.ToHex(UiStyle.MutedText())}]AVAILABLE PERKS[/color][/b]");
 
         for (var index = 0; index < choices.Count; index++)
         {
             var marker = index == _selectedIndex ? ">>" : "  ";
             var emphasisOpen = index == _selectedIndex ? "[b]" : string.Empty;
             var emphasisClose = index == _selectedIndex ? "[/b]" : string.Empty;
-            builder.AppendLine($"{emphasisOpen}{ItemRarityPresentation.EscapeBBCode($"{marker} {choices[index].DisplayName}")}{emphasisClose} [i]{ItemRarityPresentation.EscapeBBCode($"(Lv {choices[index].UnlockLevel})")}[/i]");
+            var color = index == _selectedIndex ? UiStyle.ToHex(UiStyle.BrightGold()) : UiStyle.ToHex(UiStyle.Parchment());
+            builder.AppendLine($"{emphasisOpen}[color={color}]{ItemRarityPresentation.EscapeBBCode($"{marker} {choices[index].DisplayName}")}[/color]{emphasisClose} [i][color={UiStyle.ToHex(UiStyle.FaintText())}]{ItemRarityPresentation.EscapeBBCode($"(Lv {choices[index].UnlockLevel})")}[/color][/i]");
         }
 
         builder.AppendLine();
-        builder.AppendLine("[b]Selected Perk[/b]");
-        builder.AppendLine($"[b]{ItemRarityPresentation.EscapeBBCode(selected.DisplayName)}[/b]");
-        builder.AppendLine(ItemRarityPresentation.EscapeBBCode(selected.Description));
+        builder.AppendLine($"[b][color={UiStyle.ToHex(UiStyle.MutedText())}]SELECTED PERK[/color][/b]");
+        builder.AppendLine($"[b][color={UiStyle.ToHex(UiStyle.BrightGold())}]{ItemRarityPresentation.EscapeBBCode(selected.DisplayName)}[/color][/b]");
+        builder.AppendLine($"[color={UiStyle.ToHex(UiStyle.Parchment())}]{ItemRarityPresentation.EscapeBBCode(selected.Description)}[/color]");
         builder.AppendLine();
-        builder.AppendLine("[b]Effects[/b]");
+        builder.AppendLine($"[b][color={UiStyle.ToHex(UiStyle.MutedText())}]EFFECTS[/color][/b]");
         foreach (var effect in selected.Effects)
         {
-            builder.AppendLine(ItemRarityPresentation.EscapeBBCode($"- {DescribeEffect(effect)}"));
+            builder.AppendLine($"[color={UiStyle.ToHex(UiStyle.ActiveGreen())}]{ItemRarityPresentation.EscapeBBCode($"+ {DescribeEffect(effect)}")}[/color]");
         }
 
         builder.AppendLine();
-        builder.Append($"[i]{ItemRarityPresentation.EscapeBBCode("Up/Down: choose    Enter/Right: confirm")}[/i]");
+        builder.Append($"[i][color={UiStyle.ToHex(UiStyle.FaintText())}]{ItemRarityPresentation.EscapeBBCode("Up/Down: choose    Enter/Right: confirm")}[/color][/i]");
         return builder.ToString().TrimEnd();
     }
 

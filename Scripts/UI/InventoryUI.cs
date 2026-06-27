@@ -22,8 +22,22 @@ public partial class InventoryUI : Control
     private GameManager? _gameManager;
     private IContentDatabase? _content;
     private Tooltip? _tooltip;
+    private Tooltip? _activeTooltip;
     private TargetingOverlay? _targetingOverlay;
     private Panel? _panel;
+    private ColorRect? _panelBackground;
+    private ColorRect? _panelBorderTop;
+    private ColorRect? _panelBorderBottom;
+    private ColorRect? _panelBorderLeft;
+    private ColorRect? _panelBorderRight;
+    private ColorRect? _headerBar;
+    private Label? _headerTitleLabel;
+    private Label? _headerStatsLabel;
+    private Label? _sortLabel;
+    private ColorRect? _footerBar;
+    private readonly List<Label> _footerHintLabels = new();
+    private readonly List<ColorRect> _footerDividers = new();
+    private readonly List<SlotVisual> _slotVisuals = new();
     private RichTextLabel? _gridLabel;
     private RichTextLabel? _descriptionLabel;
     private int _firstVisibleIndex;
@@ -32,6 +46,24 @@ public partial class InventoryUI : Control
     private const float PanelHeight = 420f;
     private const float PanelPadding = 18f;
     private const float OuterMargin = 24f;
+    private const float HeaderHeight = 28f;
+    private const float FooterHeight = 22f;
+    private const float SlotSize = 52f;
+    private const float SlotGap = 8f;
+
+    private sealed class SlotVisual
+    {
+        public ColorRect Background { get; init; } = null!;
+        public ColorRect BorderTop { get; init; } = null!;
+        public ColorRect BorderBottom { get; init; } = null!;
+        public ColorRect BorderLeft { get; init; } = null!;
+        public ColorRect BorderRight { get; init; } = null!;
+        public Label Glyph { get; init; } = null!;
+        public ColorRect StackBadge { get; init; } = null!;
+        public Label StackLabel { get; init; } = null!;
+        public ColorRect EquippedBadge { get; init; } = null!;
+        public Label EquippedLabel { get; init; } = null!;
+    }
 
     public int SelectedIndex { get; private set; }
 
@@ -99,7 +131,7 @@ public partial class InventoryUI : Control
     public void Close()
     {
         Visible = false;
-        _tooltip?.Hide();
+        HideActiveTooltip();
         RefreshVisualState();
     }
 
@@ -157,7 +189,6 @@ public partial class InventoryUI : Control
             case Key.I:
             case Key.Escape:
                 Close();
-                _tooltip?.Hide();
                 return true;
             default:
                 return false;
@@ -337,7 +368,6 @@ public partial class InventoryUI : Control
             builder.AppendLine();
         }
 
-        builder.Append(ResolveFooterText());
         GridText = builder.ToString().TrimEnd();
         RefreshVisualState();
     }
@@ -348,7 +378,7 @@ public partial class InventoryUI : Control
         {
             DescriptionText = "Empty slot\n\nCycle sort with Tab to reorganize the bag.";
             DescriptionMarkup = ItemRarityPresentation.EscapeBBCode(DescriptionText);
-            _tooltip?.Hide();
+            HideActiveTooltip();
             RefreshVisualState();
             return;
         }
@@ -415,16 +445,64 @@ public partial class InventoryUI : Control
             DescriptionMarkup = BuildDescriptionMarkup(template, item, lines);
             var tooltipComparison = (template.Slot != EquipSlot.None && !IsEquipped(item))
                 ? string.Join("\n", BuildEquipmentComparisonLines(template)) : null;
-            var tooltipPosition = _tooltip?.ResolveBottomRightPosition(GetViewportRect().Size) ?? new Vector2(840f, 220f);
-            _tooltip?.ShowItemTooltip(template, item, tooltipPosition, tooltipComparison, IsEquipped(item), ResolveEquippedSlot(item));
+            ShowActiveTooltip(template, item, tooltipComparison);
             RefreshVisualState();
             return;
         }
 
         DescriptionText = item.TemplateId;
         DescriptionMarkup = ItemRarityPresentation.EscapeBBCode(DescriptionText);
-        _tooltip?.Hide();
+        HideActiveTooltip();
         RefreshVisualState();
+    }
+
+    private void ShowActiveTooltip(ItemTemplate template, ItemInstance item, string? comparisonText)
+    {
+        _activeTooltip?.Hide();
+        _activeTooltip = ResolveTooltip();
+        _activeTooltip.ShowItemTooltip(template, item, ResolveSelectedSlotTooltipPosition(), comparisonText, IsEquipped(item), ResolveEquippedSlot(item));
+    }
+
+    private Tooltip ResolveTooltip()
+    {
+        if (_tooltip is not null)
+        {
+            return _tooltip;
+        }
+
+        if (_activeTooltip is not null)
+        {
+            return _activeTooltip;
+        }
+
+        _activeTooltip = new Tooltip { ZIndex = ZIndex + 5 };
+        AddChild(_activeTooltip);
+        _activeTooltip._Ready();
+        return _activeTooltip;
+    }
+
+    private void HideActiveTooltip()
+    {
+        _activeTooltip?.Hide();
+        _activeTooltip = null;
+    }
+
+    private Vector2 ResolveSelectedSlotTooltipPosition()
+    {
+        var viewportSize = ResolveViewportSize();
+        var panelSize = ResolvePanelSize(viewportSize);
+        var panelPosition = OverlayLayoutHelper.CenterInViewport(viewportSize, panelSize);
+        var visibleSlotIndex = SelectedIndex - _firstVisibleIndex;
+        if (visibleSlotIndex < 0 || visibleSlotIndex >= Columns * Rows)
+        {
+            return panelPosition + new Vector2(panelSize.X - 320f, PanelPadding + HeaderHeight + 12f);
+        }
+
+        var row = visibleSlotIndex / Columns;
+        var column = visibleSlotIndex % Columns;
+        return panelPosition + new Vector2(
+            PanelPadding + (column * (SlotSize + SlotGap)) + SlotSize + 12f,
+            PanelPadding + HeaderHeight + 16f + (row * (SlotSize + SlotGap)));
     }
 
     private void CycleSortMode()
@@ -698,8 +776,17 @@ public partial class InventoryUI : Control
         {
             Name = "Panel",
             Size = panelSize,
-            Modulate = UiStyle.GoldTrim(),
         };
+        _panelBackground = new ColorRect { Name = "PanelBackground", Color = UiStyle.PanelBlack(0.96f) };
+        _panelBorderTop = new ColorRect { Name = "PanelBorderTop", Color = UiStyle.BorderActive() };
+        _panelBorderBottom = new ColorRect { Name = "PanelBorderBottom", Color = UiStyle.BorderActive() };
+        _panelBorderLeft = new ColorRect { Name = "PanelBorderLeft", Color = UiStyle.BorderActive() };
+        _panelBorderRight = new ColorRect { Name = "PanelBorderRight", Color = UiStyle.BorderActive() };
+        _headerBar = new ColorRect { Name = "HeaderBar", Color = UiStyle.PanelHighlight() };
+        _headerTitleLabel = new Label { Name = "HeaderTitle", Text = "INVENTORY", Modulate = UiStyle.BrightGold() };
+        _headerStatsLabel = new Label { Name = "HeaderStats", Modulate = UiStyle.MutedText() };
+        _sortLabel = new Label { Name = "SortLabel", Modulate = UiStyle.FaintText() };
+        _footerBar = new ColorRect { Name = "FooterBar", Color = UiStyle.PanelHighlight() };
         _gridLabel = new RichTextLabel
         {
             Name = "GridLabel",
@@ -714,16 +801,82 @@ public partial class InventoryUI : Control
             BbcodeEnabled = true,
             Modulate = UiStyle.Parchment(),
         };
+        _panel.AddChild(_panelBackground);
+        _panel.AddChild(_panelBorderTop);
+        _panel.AddChild(_panelBorderBottom);
+        _panel.AddChild(_panelBorderLeft);
+        _panel.AddChild(_panelBorderRight);
+        _panel.AddChild(_headerBar);
+        _panel.AddChild(_headerTitleLabel);
+        _panel.AddChild(_headerStatsLabel);
+        _panel.AddChild(_sortLabel);
+        _panel.AddChild(_footerBar);
+        for (var i = 0; i < Columns * Rows; i++)
+        {
+            var slot = CreateSlotVisual(i);
+            _slotVisuals.Add(slot);
+            _panel.AddChild(slot.Background);
+            _panel.AddChild(slot.BorderTop);
+            _panel.AddChild(slot.BorderBottom);
+            _panel.AddChild(slot.BorderLeft);
+            _panel.AddChild(slot.BorderRight);
+            _panel.AddChild(slot.Glyph);
+            _panel.AddChild(slot.StackBadge);
+            _panel.AddChild(slot.StackLabel);
+            _panel.AddChild(slot.EquippedBadge);
+            _panel.AddChild(slot.EquippedLabel);
+        }
+
+        CreateFooterHints();
         _panel.AddChild(_gridLabel);
         _panel.AddChild(_descriptionLabel);
         AddChild(_panel);
+    }
+
+    private static SlotVisual CreateSlotVisual(int index)
+    {
+        return new SlotVisual
+        {
+            Background = new ColorRect { Name = $"Slot{index}_Background", Color = UiStyle.SlotBackground() },
+            BorderTop = new ColorRect { Name = $"Slot{index}_BorderTop", Color = UiStyle.BorderSubtle() },
+            BorderBottom = new ColorRect { Name = $"Slot{index}_BorderBottom", Color = UiStyle.BorderSubtle() },
+            BorderLeft = new ColorRect { Name = $"Slot{index}_BorderLeft", Color = UiStyle.BorderSubtle() },
+            BorderRight = new ColorRect { Name = $"Slot{index}_BorderRight", Color = UiStyle.BorderSubtle() },
+            Glyph = new Label { Name = $"Slot{index}_Glyph", Modulate = UiStyle.Parchment() },
+            StackBadge = new ColorRect { Name = $"Slot{index}_StackBadge", Color = UiStyle.BrightGold() },
+            StackLabel = new Label { Name = $"Slot{index}_StackLabel", Modulate = UiStyle.InverseText() },
+            EquippedBadge = new ColorRect { Name = $"Slot{index}_EquippedBadge", Color = UiStyle.DeepBlack(0.9f) },
+            EquippedLabel = new Label { Name = $"Slot{index}_EquippedLabel", Text = "E", Modulate = UiStyle.ActiveGreen() },
+        };
+    }
+
+    private void CreateFooterHints()
+    {
+        if (_footerHintLabels.Count > 0 || _panel is null)
+        {
+            return;
+        }
+
+        var hints = new[] { "[E] Equip", "[D] Drop", "[A] Auto", "[I/Esc] Close" };
+        foreach (var hint in hints)
+        {
+            var label = new Label { Name = $"FooterHint_{_footerHintLabels.Count}", Text = hint, Modulate = UiStyle.MutedText() };
+            _footerHintLabels.Add(label);
+            _panel.AddChild(label);
+            if (_footerHintLabels.Count < hints.Length)
+            {
+                var divider = new ColorRect { Name = $"FooterDivider_{_footerDividers.Count}", Color = UiStyle.BorderSubtle() };
+                _footerDividers.Add(divider);
+                _panel.AddChild(divider);
+            }
+        }
     }
 
     private void RefreshVisualState()
     {
         EnsureVisuals();
 
-        if (_panel is null || _gridLabel is null || _descriptionLabel is null)
+        if (_panel is null || _gridLabel is null || _descriptionLabel is null || _panelBackground is null || _headerBar is null || _footerBar is null || _headerTitleLabel is null || _headerStatsLabel is null || _sortLabel is null)
         {
             return;
         }
@@ -740,18 +893,139 @@ public partial class InventoryUI : Control
         Size = viewportSize;
         _panel.Size = panelSize;
         _panel.Position = OverlayLayoutHelper.CenterInViewport(viewportSize, panelSize);
-        _gridLabel.Position = new Vector2(PanelPadding, PanelPadding);
+        LayoutPanelChrome(panelSize);
+        LayoutHeader(panelSize, inventoryCapacity: _gameManager?.World?.Player?.GetComponent<InventoryComponent>()?.Capacity ?? 0);
+        LayoutFooter(panelSize);
+        LayoutSlots(PanelPadding, PanelPadding + HeaderHeight + 16f);
+        _gridLabel.Position = new Vector2(PanelPadding, PanelPadding + HeaderHeight + 16f);
         _gridLabel.Size = new Vector2(gridWidth, contentHeight);
         _descriptionLabel.Position = new Vector2(descriptionX, PanelPadding);
-        _descriptionLabel.Size = new Vector2(descriptionWidth, contentHeight);
+        _descriptionLabel.Size = new Vector2(descriptionWidth, Math.Max(0f, contentHeight - FooterHeight - 8f));
         _panel.Visible = Visible;
-        _gridLabel.Visible = Visible;
+        _gridLabel.Visible = false;
         _descriptionLabel.Visible = Visible;
         GridMarkup = BuildGridMarkup();
         _gridLabel.Clear();
         _gridLabel.AppendText(GridMarkup);
         _descriptionLabel.Clear();
         _descriptionLabel.AppendText(DescriptionMarkup);
+    }
+
+    private void LayoutPanelChrome(Vector2 panelSize)
+    {
+        if (_panelBackground is null || _panelBorderTop is null || _panelBorderBottom is null || _panelBorderLeft is null || _panelBorderRight is null)
+        {
+            return;
+        }
+
+        _panelBackground.Position = Vector2.Zero;
+        _panelBackground.Size = panelSize;
+        _panelBorderTop.Position = Vector2.Zero;
+        _panelBorderTop.Size = new Vector2(panelSize.X, 1f);
+        _panelBorderBottom.Position = new Vector2(0f, panelSize.Y - 1f);
+        _panelBorderBottom.Size = new Vector2(panelSize.X, 1f);
+        _panelBorderLeft.Position = Vector2.Zero;
+        _panelBorderLeft.Size = new Vector2(1f, panelSize.Y);
+        _panelBorderRight.Position = new Vector2(panelSize.X - 1f, 0f);
+        _panelBorderRight.Size = new Vector2(1f, panelSize.Y);
+    }
+
+    private void LayoutHeader(Vector2 panelSize, int inventoryCapacity)
+    {
+        if (_headerBar is null || _headerTitleLabel is null || _headerStatsLabel is null || _sortLabel is null)
+        {
+            return;
+        }
+
+        _headerBar.Position = new Vector2(PanelPadding, PanelPadding);
+        _headerBar.Size = new Vector2(panelSize.X - (PanelPadding * 2f), HeaderHeight);
+        _headerTitleLabel.Position = _headerBar.Position + new Vector2(10f, 5f);
+        _headerTitleLabel.Size = new Vector2(110f, HeaderHeight);
+        _headerStatsLabel.Position = _headerBar.Position + new Vector2(126f, 6f);
+        _headerStatsLabel.Size = new Vector2(520f, HeaderHeight);
+        _headerStatsLabel.Text = $"{_items.Count}/{inventoryCapacity} stacks  ▪  {ResolveTotalCarriedItems()} items  ▪  Wt: {ResolveTotalWeight():0.0}  ▪  Val: {ResolveTotalValue()}  ▪  Gold: {ResolveGold()}";
+        _sortLabel.Position = _headerBar.Position + new Vector2(_headerBar.Size.X - 150f, 6f);
+        _sortLabel.Size = new Vector2(140f, HeaderHeight);
+        _sortLabel.Text = $"[Tab] Sort: {CurrentSort}";
+    }
+
+    private void LayoutFooter(Vector2 panelSize)
+    {
+        if (_footerBar is null)
+        {
+            return;
+        }
+
+        _footerBar.Position = new Vector2(PanelPadding, panelSize.Y - PanelPadding - FooterHeight);
+        _footerBar.Size = new Vector2(panelSize.X - (PanelPadding * 2f), FooterHeight);
+        var x = _footerBar.Position.X + 10f;
+        for (var i = 0; i < _footerHintLabels.Count; i++)
+        {
+            var label = _footerHintLabels[i];
+            label.Position = new Vector2(x, _footerBar.Position.Y + 3f);
+            label.Size = new Vector2(i == 3 ? 96f : 72f, FooterHeight);
+            x += label.Size.X + 8f;
+            if (i < _footerDividers.Count)
+            {
+                var divider = _footerDividers[i];
+                divider.Position = new Vector2(x, _footerBar.Position.Y + 4f);
+                divider.Size = new Vector2(1f, FooterHeight - 8f);
+                x += 10f;
+            }
+        }
+    }
+
+    private void LayoutSlots(float left, float top)
+    {
+        for (var i = 0; i < _slotVisuals.Count; i++)
+        {
+            var slotIndex = _firstVisibleIndex + i;
+            var row = i / Columns;
+            var column = i % Columns;
+            var position = new Vector2(left + (column * (SlotSize + SlotGap)), top + (row * (SlotSize + SlotGap)));
+            var item = slotIndex < _items.Count ? _items[slotIndex] : null;
+            var selected = slotIndex == SelectedIndex;
+            UpdateSlotVisual(_slotVisuals[i], position, item, selected);
+        }
+    }
+
+    private void UpdateSlotVisual(SlotVisual slot, Vector2 position, ItemInstance? item, bool selected)
+    {
+        var occupied = item is not null;
+        var equipped = item is not null && IsEquipped(item);
+        var borderColor = selected ? UiStyle.BrightGold() : equipped ? UiStyle.ActiveGreen() : UiStyle.BorderSubtle();
+        var borderSize = selected || equipped ? 2f : 1f;
+        slot.Background.Position = position;
+        slot.Background.Size = new Vector2(SlotSize, SlotSize);
+        slot.Background.Color = selected ? UiStyle.SlotSelected() : UiStyle.SlotBackground();
+        slot.BorderTop.Position = position;
+        slot.BorderTop.Size = new Vector2(SlotSize, borderSize);
+        slot.BorderBottom.Position = new Vector2(position.X, position.Y + SlotSize - borderSize);
+        slot.BorderBottom.Size = new Vector2(SlotSize, borderSize);
+        slot.BorderLeft.Position = position;
+        slot.BorderLeft.Size = new Vector2(borderSize, SlotSize);
+        slot.BorderRight.Position = new Vector2(position.X + SlotSize - borderSize, position.Y);
+        slot.BorderRight.Size = new Vector2(borderSize, SlotSize);
+        slot.BorderTop.Color = slot.BorderBottom.Color = slot.BorderLeft.Color = slot.BorderRight.Color = borderColor;
+        slot.Glyph.Position = position + new Vector2(18f, 13f);
+        slot.Glyph.Size = new Vector2(24f, 24f);
+        slot.Glyph.Text = occupied ? ResolveSlotGlyph(item!) : string.Empty;
+        slot.Glyph.Modulate = occupied && _content is not null && _content.TryGetItemTemplate(item!.TemplateId, out var template)
+            ? ItemRarityPresentation.ResolveColor(template.Rarity)
+            : UiStyle.Parchment();
+        slot.StackBadge.Visible = occupied && item!.StackCount > 1;
+        slot.StackBadge.Position = position + new Vector2(SlotSize - 18f, SlotSize - 16f);
+        slot.StackBadge.Size = new Vector2(16f, 14f);
+        slot.StackLabel.Visible = slot.StackBadge.Visible;
+        slot.StackLabel.Position = slot.StackBadge.Position + new Vector2(2f, 0f);
+        slot.StackLabel.Size = slot.StackBadge.Size;
+        slot.StackLabel.Text = occupied ? item!.StackCount.ToString() : string.Empty;
+        slot.EquippedBadge.Visible = equipped;
+        slot.EquippedBadge.Position = position + new Vector2(2f, SlotSize - 15f);
+        slot.EquippedBadge.Size = new Vector2(13f, 13f);
+        slot.EquippedLabel.Visible = equipped;
+        slot.EquippedLabel.Position = slot.EquippedBadge.Position + new Vector2(3f, -1f);
+        slot.EquippedLabel.Size = slot.EquippedBadge.Size;
     }
 
     private Vector2 ResolvePanelSize(Vector2 viewportSize)
@@ -793,7 +1067,6 @@ public partial class InventoryUI : Control
             builder.AppendLine();
         }
 
-        builder.Append(ItemRarityPresentation.EscapeBBCode(ResolveFooterText()));
         return builder.ToString().TrimEnd();
     }
 

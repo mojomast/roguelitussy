@@ -290,8 +290,8 @@ public partial class ShopUI : Control
         }
 
         var builder = new StringBuilder();
-        builder.AppendLine($"[b]{ItemRarityPresentation.EscapeBBCode(merchant.Name)}[/b]");
-        builder.AppendLine(ItemRarityPresentation.EscapeBBCode($"Gold: {wallet.Gold}    Mode: {_mode}"));
+        builder.AppendLine($"[b][color={UiStyle.ToHex(UiStyle.BrightGold())}]{ItemRarityPresentation.EscapeBBCode(merchant.Name)}[/color][/b]");
+        builder.AppendLine($"[color={UiStyle.ToHex(UiStyle.ActiveGreen())}]{ItemRarityPresentation.EscapeBBCode($"Gold: {wallet.Gold}")}[/color]    [color={UiStyle.ToHex(UiStyle.MutedText())}]{ItemRarityPresentation.EscapeBBCode($"Mode: {_mode}")}[/color]");
         builder.AppendLine();
 
         if (_mode == ShopMode.Buy)
@@ -307,7 +307,9 @@ public partial class ShopUI : Control
                 var price = _gameManager?.ResolveMerchantBuyPrice(offer.Price) ?? offer.Price;
                 var marker = index == _selectedIndex ? ">" : " ";
                 var suffix = offer.Quantity > 0 ? $"qty {offer.Quantity}" : "sold out";
-                builder.AppendLine(ItemRarityPresentation.EscapeBBCode($"{marker} {name}  {price}g  {suffix}"));
+                var color = offer.Quantity > 0 ? UiStyle.ToHex(index == _selectedIndex ? UiStyle.BrightGold() : UiStyle.Parchment()) : UiStyle.ToHex(UiStyle.FaintText());
+                var priceColor = wallet.Gold >= price ? UiStyle.ToHex(UiStyle.BrightGold()) : UiStyle.ToHex(UiStyle.DangerRed());
+                builder.AppendLine($"[color={color}]{ItemRarityPresentation.EscapeBBCode($"{marker} {name}  ")}[/color][color={priceColor}]{price}g[/color][color={color}]{ItemRarityPresentation.EscapeBBCode($"  {suffix}")}[/color]");
             }
 
             AppendWindowSuffix(builder, window.End, merchantStock.Offers.Count);
@@ -327,14 +329,15 @@ public partial class ShopUI : Control
                     : 1;
                 var quantityText = item.StackCount > 1 ? $"x{item.StackCount}" : string.Empty;
                 var marker = index == _selectedIndex ? ">" : " ";
-                builder.AppendLine(ItemRarityPresentation.EscapeBBCode($"{marker} {name} {quantityText}  {sellPrice}g"));
+                var color = index == _selectedIndex ? UiStyle.ToHex(UiStyle.BrightGold()) : UiStyle.ToHex(UiStyle.Parchment());
+                builder.AppendLine($"[color={color}]{ItemRarityPresentation.EscapeBBCode($"{marker} {name} {quantityText}  ")}[/color][color={UiStyle.ToHex(UiStyle.BrightGold())}]{sellPrice}g[/color]");
             }
 
             AppendWindowSuffix(builder, window.End, inventory.Items.Count);
         }
 
         builder.AppendLine();
-        builder.Append(ItemRarityPresentation.EscapeBBCode("Up/Down: choose  Enter/B/S: trade  Tab: buy/sell  Esc/F: close"));
+        builder.Append($"[i][color={UiStyle.ToHex(UiStyle.FaintText())}]{ItemRarityPresentation.EscapeBBCode("Up/Down: choose  Enter/B/S: trade  Tab: buy/sell  Esc/F: close")}[/color][/i]");
         return builder.ToString().TrimEnd();
     }
 

@@ -9,41 +9,57 @@ public partial class MainMenu : MenuBase
     private const float PreviewPadding = 20f;
     private const float PreviewFrameMinimumHeight = 144f;
 
+    private enum MenuAction
+    {
+        None,
+        Start,
+        Name,
+        Seed,
+        Archetype,
+        Origin,
+        Trait,
+        Race,
+        Gender,
+        Appearance,
+        Vitality,
+        Power,
+        Guard,
+        Finesse,
+        LoadSlot1,
+        LoadSlot2,
+        LoadSlot3,
+        DevTools,
+        Help,
+        Quit,
+    }
+
+    private sealed record StatBonus(
+        int MaxHp,
+        int Attack,
+        int Defense,
+        int Accuracy,
+        int Evasion,
+        int Speed,
+        int ViewRadius,
+        int InventoryCapacity);
+
     private sealed record ArchetypeOption(
         string DisplayName,
         string Summary,
-        int BonusMaxHp,
-        int BonusAttack,
-        int BonusDefense,
-        int BonusEvasion,
-        int BonusSpeed,
-        int BonusViewRadius,
+        StatBonus Bonus,
         IReadOnlyList<string> StartingItems,
         IReadOnlyList<string> EquippedItems);
 
     private sealed record OriginOption(
         string DisplayName,
         string Summary,
-        int BonusMaxHp,
-        int BonusAttack,
-        int BonusDefense,
-        int BonusEvasion,
-        int BonusSpeed,
-        int BonusViewRadius,
-        int InventoryCapacityBonus,
+        StatBonus Bonus,
         IReadOnlyList<string> StartingItems);
 
     private sealed record TraitOption(
         string DisplayName,
         string Summary,
-        int BonusMaxHp,
-        int BonusAttack,
-        int BonusDefense,
-        int BonusAccuracy,
-        int BonusEvasion,
-        int BonusSpeed,
-        int BonusViewRadius,
-        int InventoryCapacityBonus,
+        StatBonus Bonus,
         IReadOnlyList<string> StartingItems);
 
     private static readonly string[] NameOptions =
@@ -65,34 +81,19 @@ public partial class MainMenu : MenuBase
         new(
             "Vanguard",
             "A tough delver who starts armed and ready for the front line.",
-            8,
-            2,
-            1,
-            0,
-            -5,
-            0,
+            new StatBonus(8, 2, 1, 0, 0, -5, 0, 0),
             new[] { "sword_iron", "shield_wooden", "potion_health", "potion_health" },
             new[] { "sword_iron", "shield_wooden" }),
         new(
             "Skirmisher",
             "A fast striker who trades durability for initiative and accuracy.",
-            0,
-            1,
-            0,
-            4,
-            10,
-            0,
+            new StatBonus(0, 1, 0, 0, 4, 10, 0, 0),
             new[] { "dagger_venom", "potion_haste", "potion_health" },
             new[] { "dagger_venom" }),
         new(
             "Mystic",
             "A fragile explorer who leans on scrolls, vision, and mobility.",
-            -4,
-            0,
-            -1,
-            0,
-            5,
-            1,
+            new StatBonus(-4, 0, -1, 0, 0, 5, 1, 0),
             new[] { "scroll_fireball", "scroll_blink", "potion_health" },
             System.Array.Empty<string>()),
     };
@@ -102,35 +103,17 @@ public partial class MainMenu : MenuBase
         new(
             "Survivor",
             "Veteran of too many bad runs. Starts a little tougher.",
-            4,
-            0,
-            1,
-            0,
-            0,
-            0,
-            0,
+            new StatBonus(4, 0, 1, 0, 0, 0, 0, 0),
             new[] { "potion_health" }),
         new(
             "Scout",
             "Maps routes quickly and sees danger earlier.",
-            0,
-            0,
-            0,
-            0,
-            5,
-            1,
-            0,
+            new StatBonus(0, 0, 0, 0, 0, 5, 1, 0),
             new[] { "potion_haste" }),
         new(
             "Scavenger",
             "Carries more, wastes less, and hoards every edge.",
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            4,
+            new StatBonus(0, 0, 0, 0, 0, 0, 0, 4),
             new[] { "potion_health", "scroll_blink" }),
     };
 
@@ -139,38 +122,17 @@ public partial class MainMenu : MenuBase
         new(
             "Iron Will",
             "Push through attrition with a deeper life pool and sturdier posture.",
-            4,
-            0,
-            1,
-            0,
-            0,
-            0,
-            0,
-            0,
+            new StatBonus(4, 0, 1, 0, 0, 0, 0, 0),
             new[] { "potion_health" }),
         new(
             "Quartermaster",
             "Travel heavier and keep extra supplies close at hand.",
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            2,
+            new StatBonus(0, 0, 0, 0, 0, 0, 0, 2),
             new[] { "potion_health", "potion_health" }),
         new(
             "Pathfinder",
             "See farther, move quicker, and carry a panic-scroll.",
-            0,
-            0,
-            0,
-            0,
-            0,
-            5,
-            1,
-            0,
+            new StatBonus(0, 0, 0, 0, 0, 5, 1, 0),
             new[] { "scroll_blink" }),
     };
 
@@ -198,6 +160,7 @@ public partial class MainMenu : MenuBase
 
     private EventBus? _eventBus;
     private GameManager? _gameManager;
+    private readonly List<MenuAction> _optionActions = new();
     private int _nameIndex;
     private int _archetypeIndex;
     private int _originIndex;
@@ -301,17 +264,7 @@ public partial class MainMenu : MenuBase
 
     public string BuildStatPreview()
     {
-        var archetype = Archetypes[_archetypeIndex];
-        var origin = Origins[_originIndex];
-        var trait = Traits[_traitIndex];
-
-        var hp = BaseMaxHp + archetype.BonusMaxHp + origin.BonusMaxHp + trait.BonusMaxHp + (_vitalityPoints * 3);
-        var atk = BaseAttack + archetype.BonusAttack + origin.BonusAttack + trait.BonusAttack + _powerPoints;
-        var def = BaseDefense + archetype.BonusDefense + origin.BonusDefense + trait.BonusDefense + _guardPoints;
-        var acc = BaseAccuracy + trait.BonusAccuracy + _finessePoints;
-        var eva = BaseEvasion + archetype.BonusEvasion + origin.BonusEvasion + trait.BonusEvasion + _finessePoints;
-        var spd = BaseSpeed + archetype.BonusSpeed + origin.BonusSpeed + trait.BonusSpeed;
-        var vr = BaseViewRadius + archetype.BonusViewRadius + origin.BonusViewRadius + trait.BonusViewRadius;
+        var (hp, atk, def, acc, eva, spd, vr) = ComputeProjectedStats();
 
         return string.Join(
             "\n",
@@ -384,6 +337,7 @@ public partial class MainMenu : MenuBase
             return string.Empty;
         }
 
+        // TODO: replace this temporary approximation with Font.GetStringSize() once project fonts are finalized.
         var maxCharsPerLine = System.Math.Max(18, System.Math.Min(30, (int)System.Math.Floor(availableWidth / 7.25f)));
         var wrappedLines = new List<string>();
 
@@ -426,17 +380,7 @@ public partial class MainMenu : MenuBase
 
     private string[] BuildProjectedStatLines()
     {
-        var archetype = Archetypes[_archetypeIndex];
-        var origin = Origins[_originIndex];
-        var trait = Traits[_traitIndex];
-
-        var hp = BaseMaxHp + archetype.BonusMaxHp + origin.BonusMaxHp + trait.BonusMaxHp + (_vitalityPoints * 3);
-        var atk = BaseAttack + archetype.BonusAttack + origin.BonusAttack + trait.BonusAttack + _powerPoints;
-        var def = BaseDefense + archetype.BonusDefense + origin.BonusDefense + trait.BonusDefense + _guardPoints;
-        var acc = BaseAccuracy + trait.BonusAccuracy + _finessePoints;
-        var eva = BaseEvasion + archetype.BonusEvasion + origin.BonusEvasion + trait.BonusEvasion + _finessePoints;
-        var spd = BaseSpeed + archetype.BonusSpeed + origin.BonusSpeed + trait.BonusSpeed;
-        var vr = BaseViewRadius + archetype.BonusViewRadius + origin.BonusViewRadius + trait.BonusViewRadius;
+        var (hp, atk, def, acc, eva, spd, vr) = ComputeProjectedStats();
 
         return new[]
         {
@@ -445,16 +389,39 @@ public partial class MainMenu : MenuBase
         };
     }
 
+    private (int hp, int atk, int def, int acc, int eva, int spd, int vr) ComputeProjectedStats()
+    {
+        var archetype = Archetypes[_archetypeIndex];
+        var origin = Origins[_originIndex];
+        var trait = Traits[_traitIndex];
+        var hp = BaseMaxHp + archetype.Bonus.MaxHp + origin.Bonus.MaxHp + trait.Bonus.MaxHp + (_vitalityPoints * 3);
+        var atk = BaseAttack + archetype.Bonus.Attack + origin.Bonus.Attack + trait.Bonus.Attack + _powerPoints;
+        var def = BaseDefense + archetype.Bonus.Defense + origin.Bonus.Defense + trait.Bonus.Defense + _guardPoints;
+        var acc = BaseAccuracy + archetype.Bonus.Accuracy + origin.Bonus.Accuracy + trait.Bonus.Accuracy + _finessePoints;
+        var eva = BaseEvasion + archetype.Bonus.Evasion + origin.Bonus.Evasion + trait.Bonus.Evasion + _finessePoints;
+        var spd = BaseSpeed + archetype.Bonus.Speed + origin.Bonus.Speed + trait.Bonus.Speed;
+        var vr = BaseViewRadius + archetype.Bonus.ViewRadius + origin.Bonus.ViewRadius + trait.Bonus.ViewRadius;
+        return (hp, atk, def, acc, eva, spd, vr);
+    }
+
     private static string FormatLoadoutTokens(IEnumerable<string> tokens)
     {
-        var visibleTokens = tokens
+        var allTokens = tokens
             .Where(token => !string.IsNullOrWhiteSpace(token))
             .Distinct()
+            .ToArray();
+        var visibleTokens = allTokens
             .Take(4)
             .Select(token => token.Replace('_', ' '))
             .ToArray();
 
-        return visibleTokens.Length == 0 ? "none" : string.Join(", ", visibleTokens);
+        if (visibleTokens.Length == 0)
+        {
+            return "none";
+        }
+
+        var suffix = allTokens.Length > visibleTokens.Length ? $", + {allTokens.Length - visibleTokens.Length} more" : string.Empty;
+        return string.Join(", ", visibleTokens) + suffix;
     }
 
     protected override Vector2 ResolveDesiredPanelSize(Vector2 viewportSize)
@@ -573,9 +540,9 @@ public partial class MainMenu : MenuBase
 
     protected override void ActivateSelected()
     {
-        switch (SelectedIndex)
+        switch (ResolveSelectedAction())
         {
-            case StartIndex:
+            case MenuAction.Start:
                 if (_gameManager is null)
                 {
                     UpdateStatus("Start unavailable: GameManager autoload missing.");
@@ -591,53 +558,53 @@ public partial class MainMenu : MenuBase
                     GameStarted?.Invoke();
                 }
                 break;
-            case NameIndex:
+            case MenuAction.Name:
                 CycleName(1);
                 break;
-            case ArchetypeIndex:
+            case MenuAction.Archetype:
                 CycleArchetype(1);
                 break;
-            case OriginIndex:
+            case MenuAction.Origin:
                 CycleOrigin(1);
                 break;
-            case TraitIndex:
+            case MenuAction.Trait:
                 CycleTrait(1);
                 break;
-            case RaceIndex:
+            case MenuAction.Race:
                 CycleRace(1);
                 break;
-            case GenderIndex:
+            case MenuAction.Gender:
                 CycleGender(1);
                 break;
-            case AppearanceIndex:
+            case MenuAction.Appearance:
                 CycleAppearance(1);
                 break;
-            case VitalityIndex:
-            case PowerIndex:
-            case GuardIndex:
-            case FinesseIndex:
-                AdjustAllocation(SelectedIndex, 1);
+            case MenuAction.Vitality:
+            case MenuAction.Power:
+            case MenuAction.Guard:
+            case MenuAction.Finesse:
+                AdjustAllocation(ResolveSelectedAction(), 1);
                 break;
-            case SeedIndex:
+            case MenuAction.Seed:
                 PendingSeed++;
                 RebuildOptions();
                 break;
-            case DevToolsIndex:
+            case MenuAction.DevTools:
                 DevToolsRequested?.Invoke();
                 break;
-            case HelpIndex:
+            case MenuAction.Help:
                 HelpRequested?.Invoke();
                 break;
-            case LoadSlot1Index:
+            case MenuAction.LoadSlot1:
                 _eventBus?.EmitLoadRequested(1);
                 break;
-            case LoadSlot2Index:
+            case MenuAction.LoadSlot2:
                 _eventBus?.EmitLoadRequested(2);
                 break;
-            case LoadSlot3Index:
+            case MenuAction.LoadSlot3:
                 _eventBus?.EmitLoadRequested(3);
                 break;
-            case QuitIndex:
+            case MenuAction.Quit:
                 GetTree().Quit();
                 break;
         }
@@ -701,35 +668,35 @@ public partial class MainMenu : MenuBase
 
     private bool AdjustHighlightedField(int delta)
     {
-        switch (SelectedIndex)
+        switch (ResolveSelectedAction())
         {
-            case NameIndex:
+            case MenuAction.Name:
                 CycleName(delta);
                 return true;
-            case ArchetypeIndex:
+            case MenuAction.Archetype:
                 CycleArchetype(delta);
                 return true;
-            case OriginIndex:
+            case MenuAction.Origin:
                 CycleOrigin(delta);
                 return true;
-            case TraitIndex:
+            case MenuAction.Trait:
                 CycleTrait(delta);
                 return true;
-            case RaceIndex:
+            case MenuAction.Race:
                 CycleRace(delta);
                 return true;
-            case GenderIndex:
+            case MenuAction.Gender:
                 CycleGender(delta);
                 return true;
-            case AppearanceIndex:
+            case MenuAction.Appearance:
                 CycleAppearance(delta);
                 return true;
-            case VitalityIndex:
-            case PowerIndex:
-            case GuardIndex:
-            case FinesseIndex:
-                return AdjustAllocation(SelectedIndex, delta);
-            case SeedIndex:
+            case MenuAction.Vitality:
+            case MenuAction.Power:
+            case MenuAction.Guard:
+            case MenuAction.Finesse:
+                return AdjustAllocation(ResolveSelectedAction(), delta);
+            case MenuAction.Seed:
                 PendingSeed = System.Math.Max(1, PendingSeed + delta);
                 RebuildOptions();
                 return true;
@@ -780,14 +747,14 @@ public partial class MainMenu : MenuBase
         RebuildOptions();
     }
 
-    private bool AdjustAllocation(int selectedIndex, int delta)
+    private bool AdjustAllocation(MenuAction selectedAction, int delta)
     {
-        return selectedIndex switch
+        return selectedAction switch
         {
-            VitalityIndex => AdjustAllocation(ref _vitalityPoints, delta),
-            PowerIndex => AdjustAllocation(ref _powerPoints, delta),
-            GuardIndex => AdjustAllocation(ref _guardPoints, delta),
-            FinesseIndex => AdjustAllocation(ref _finessePoints, delta),
+            MenuAction.Vitality => AdjustAllocation(ref _vitalityPoints, delta),
+            MenuAction.Power => AdjustAllocation(ref _powerPoints, delta),
+            MenuAction.Guard => AdjustAllocation(ref _guardPoints, delta),
+            MenuAction.Finesse => AdjustAllocation(ref _finessePoints, delta),
             _ => false,
         };
     }
@@ -834,26 +801,49 @@ public partial class MainMenu : MenuBase
 
     private void RebuildOptions()
     {
-        ConfigureOptions(
-            "Start Expedition",
-            $"Name: {NameOptions[_nameIndex]}",
-            $"Archetype: {Archetypes[_archetypeIndex].DisplayName}",
-            $"Origin: {Origins[_originIndex].DisplayName}",
-            $"Trait: {Traits[_traitIndex].DisplayName}",
-            $"Race: {RaceOptions[_raceIndex]}",
-            $"Gender: {GenderOptions[_genderIndex]}",
-            $"Appearance: {AppearanceOptions[_appearanceIndex]}",
-            $"Vitality (+3 Max HP): {_vitalityPoints}",
-            $"Power (+1 Attack): {_powerPoints}",
-            $"Guard (+1 Defense): {_guardPoints}",
-            $"Finesse (+1 Accuracy/Evasion): {_finessePoints}",
-            $"Seed: {PendingSeed}",
-            "Dev Tools",
-            "Help",
-            "Load Slot 1",
-            "Load Slot 2",
-            "Load Slot 3",
-            "Quit");
+        _optionActions.Clear();
+        ConfigureOptions();
+        AddSection("EXPEDITION");
+        AddOption("Start Expedition", MenuAction.Start);
+        AddOption($"Name: {NameOptions[_nameIndex]}", MenuAction.Name);
+        AddOption($"Seed: {PendingSeed}", MenuAction.Seed);
+        AddSection("BUILD");
+        AddOption($"Archetype: {Archetypes[_archetypeIndex].DisplayName}", MenuAction.Archetype);
+        AddOption($"Origin: {Origins[_originIndex].DisplayName}", MenuAction.Origin);
+        AddOption($"Trait: {Traits[_traitIndex].DisplayName}", MenuAction.Trait);
+        AddSection("IDENTITY");
+        AddOption($"Race: {RaceOptions[_raceIndex]}", MenuAction.Race);
+        AddOption($"Gender: {GenderOptions[_genderIndex]}", MenuAction.Gender);
+        AddOption($"Appearance: {AppearanceOptions[_appearanceIndex]}", MenuAction.Appearance);
+        AddSection("TRAINING");
+        AddOption($"Vitality (+3 Max HP): {_vitalityPoints}", MenuAction.Vitality);
+        AddOption($"Power (+1 Attack): {_powerPoints}", MenuAction.Power);
+        AddOption($"Guard (+1 Defense): {_guardPoints}", MenuAction.Guard);
+        AddOption($"Finesse (+1 Accuracy/Evasion): {_finessePoints}", MenuAction.Finesse);
+        AddSection("SYSTEM");
+        AddOption("Load Slot 1", MenuAction.LoadSlot1);
+        AddOption("Load Slot 2", MenuAction.LoadSlot2);
+        AddOption("Load Slot 3", MenuAction.LoadSlot3);
+        AddOption("Dev Tools", MenuAction.DevTools);
+        AddOption("Help", MenuAction.Help);
+        AddOption("Quit", MenuAction.Quit);
+    }
+
+    private void AddSection(string title)
+    {
+        _optionActions.Add(MenuAction.None);
+        ConfigureSectionHeader(title);
+    }
+
+    private void AddOption(string label, MenuAction action)
+    {
+        _optionActions.Add(action);
+        ConfigureOption(label);
+    }
+
+    private MenuAction ResolveSelectedAction()
+    {
+        return SelectedIndex >= 0 && SelectedIndex < _optionActions.Count ? _optionActions[SelectedIndex] : MenuAction.None;
     }
 
     private PlayerVisualProfile ResolveCurrentProfile()
@@ -1030,14 +1020,14 @@ public partial class MainMenu : MenuBase
             archetype.DisplayName,
             origin.DisplayName,
             trait.DisplayName,
-            archetype.BonusMaxHp + origin.BonusMaxHp + trait.BonusMaxHp + (_vitalityPoints * 3),
-            archetype.BonusAttack + origin.BonusAttack + trait.BonusAttack + _powerPoints,
-            archetype.BonusDefense + origin.BonusDefense + trait.BonusDefense + _guardPoints,
-            trait.BonusAccuracy + _finessePoints,
-            archetype.BonusEvasion + origin.BonusEvasion + trait.BonusEvasion + _finessePoints,
-            archetype.BonusSpeed + origin.BonusSpeed + trait.BonusSpeed,
-            archetype.BonusViewRadius + origin.BonusViewRadius + trait.BonusViewRadius,
-            origin.InventoryCapacityBonus + trait.InventoryCapacityBonus,
+            archetype.Bonus.MaxHp + origin.Bonus.MaxHp + trait.Bonus.MaxHp + (_vitalityPoints * 3),
+            archetype.Bonus.Attack + origin.Bonus.Attack + trait.Bonus.Attack + _powerPoints,
+            archetype.Bonus.Defense + origin.Bonus.Defense + trait.Bonus.Defense + _guardPoints,
+            archetype.Bonus.Accuracy + origin.Bonus.Accuracy + trait.Bonus.Accuracy + _finessePoints,
+            archetype.Bonus.Evasion + origin.Bonus.Evasion + trait.Bonus.Evasion + _finessePoints,
+            archetype.Bonus.Speed + origin.Bonus.Speed + trait.Bonus.Speed,
+            archetype.Bonus.ViewRadius + origin.Bonus.ViewRadius + trait.Bonus.ViewRadius,
+            archetype.Bonus.InventoryCapacity + origin.Bonus.InventoryCapacity + trait.Bonus.InventoryCapacity,
             items,
             archetype.EquippedItems,
             RaceOptions[_raceIndex].ToLowerInvariant(),

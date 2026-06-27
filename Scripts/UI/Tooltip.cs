@@ -7,8 +7,13 @@ namespace Godotussy;
 
 public partial class Tooltip : Control
 {
-    private const float PanelPadding = 12f;
+    private const float PanelPadding = 10f;
     private Panel? _panel;
+    private ColorRect? _background;
+    private ColorRect? _borderTop;
+    private ColorRect? _borderBottom;
+    private ColorRect? _borderLeft;
+    private ColorRect? _borderRight;
     private RichTextLabel? _titleLabel;
     private RichTextLabel? _bodyLabel;
 
@@ -26,7 +31,7 @@ public partial class Tooltip : Control
     {
         Name = "Tooltip";
         Visible = false;
-        Size = new Vector2(320f, 200f);
+        Size = new Vector2(280f, 220f);
     }
 
     public override void _Ready()
@@ -39,13 +44,11 @@ public partial class Tooltip : Control
         string? comparisonText = null, bool equipped = false, string equippedSlot = "None")
     {
         TitleText = template.DisplayName;
-        TitleMarkup = ItemRarityPresentation.WrapWithColor(template.DisplayName, template.Rarity);
+        var rarityLabel = ItemRarityPresentation.ResolveDisplayLabel(template.Rarity);
+        TitleMarkup = $"[b][color={UiStyle.ToHex(UiStyle.BrightGold())}]{ItemRarityPresentation.EscapeBBCode(template.DisplayName)}[/color][/b] "
+            + $"[i][color={ItemRarityPresentation.ResolveHexColor(template.Rarity)}]{ItemRarityPresentation.EscapeBBCode(rarityLabel)}[/color][/i]";
 
-        var lines = new List<string>
-        {
-            $"Rarity: {ItemRarityPresentation.ResolveDisplayLabel(template.Rarity)}",
-            template.Description,
-        };
+        var lines = new List<string> { template.Description };
         foreach (var modifier in template.StatModifiers)
         {
             lines.Add($"{modifier.Key}: {modifier.Value:+#;-#;0}");
@@ -57,17 +60,21 @@ public partial class Tooltip : Control
             lines.Add($"Charges: {remaining}/{template.MaxCharges}");
         }
 
-        lines.Add($"Stack: {instance.StackCount}/{System.Math.Max(1, template.MaxStack)}");
-        lines.Add(equipped ? $"Status: Equipped in {equippedSlot}" : "Status: Carried");
-
-        lines.Add($"Category: {template.Category}");
+        lines.Add($"Category: {template.Category}  ▪  Slot: {(template.Slot == EquipSlot.None ? "None" : template.Slot)}  ▪  Stack: {instance.StackCount}/{System.Math.Max(1, template.MaxStack)}");
 
         if (!string.IsNullOrEmpty(comparisonText))
         {
             lines.Add(comparisonText);
         }
 
-        var visibleLines = ClampLines(lines, 9);
+        if (equipped)
+        {
+            lines.Add($"Equipped: {equippedSlot}");
+        }
+
+        lines.Add(equipped ? "[E] Unequip  [D] Drop" : "[E] Equip/Use  [D] Drop");
+
+        var visibleLines = ClampLines(lines, 11);
         BodyText = string.Join("\n", visibleLines);
         BodyMarkup = BuildItemBodyMarkup(template, visibleLines);
         ScreenPosition = ClampToScreen(screenPos);
@@ -125,6 +132,7 @@ public partial class Tooltip : Control
         BodyText = string.Empty;
         TitleMarkup = string.Empty;
         BodyMarkup = string.Empty;
+        ScreenPosition = Vector2.Zero;
         RefreshVisualState();
     }
 
@@ -139,24 +147,33 @@ public partial class Tooltip : Control
         {
             Name = "Panel",
             Size = Size,
-            Modulate = UiStyle.GoldTrim(),
         };
+        _background = new ColorRect { Name = "Background", Color = UiStyle.PanelInner(0.98f) };
+        _borderTop = new ColorRect { Name = "BorderTop", Color = UiStyle.BorderActive() };
+        _borderBottom = new ColorRect { Name = "BorderBottom", Color = UiStyle.BorderActive() };
+        _borderLeft = new ColorRect { Name = "BorderLeft", Color = UiStyle.BorderActive() };
+        _borderRight = new ColorRect { Name = "BorderRight", Color = UiStyle.BorderActive() };
         _titleLabel = new RichTextLabel
         {
             Name = "TitleLabel",
             Position = new Vector2(PanelPadding, PanelPadding),
-            Size = new Vector2(Math.Max(0f, Size.X - (PanelPadding * 2f)), 24f),
+            Size = new Vector2(Math.Max(0f, Size.X - (PanelPadding * 2f)), 32f),
             BbcodeEnabled = true,
             Modulate = UiStyle.BrightGold(),
         };
         _bodyLabel = new RichTextLabel
         {
             Name = "BodyLabel",
-            Position = new Vector2(PanelPadding, PanelPadding + 28f),
-            Size = new Vector2(Math.Max(0f, Size.X - (PanelPadding * 2f)), Math.Max(0f, Size.Y - 40f - PanelPadding)),
+            Position = new Vector2(PanelPadding, PanelPadding + 38f),
+            Size = new Vector2(Math.Max(0f, Size.X - (PanelPadding * 2f)), Math.Max(0f, Size.Y - 48f - PanelPadding)),
             BbcodeEnabled = true,
             Modulate = UiStyle.Parchment(),
         };
+        _panel.AddChild(_background);
+        _panel.AddChild(_borderTop);
+        _panel.AddChild(_borderBottom);
+        _panel.AddChild(_borderLeft);
+        _panel.AddChild(_borderRight);
         _panel.AddChild(_titleLabel);
         _panel.AddChild(_bodyLabel);
         AddChild(_panel);
@@ -166,7 +183,7 @@ public partial class Tooltip : Control
     {
         EnsureVisuals();
 
-        if (_panel is null || _titleLabel is null || _bodyLabel is null)
+        if (_panel is null || _titleLabel is null || _bodyLabel is null || _background is null || _borderTop is null || _borderBottom is null || _borderLeft is null || _borderRight is null)
         {
             return;
         }
@@ -174,14 +191,24 @@ public partial class Tooltip : Control
         _panel.Visible = Visible;
         _panel.Position = ScreenPosition;
         _panel.Size = Size;
+        _background.Position = Vector2.Zero;
+        _background.Size = Size;
+        _borderTop.Position = Vector2.Zero;
+        _borderTop.Size = new Vector2(Size.X, 1f);
+        _borderBottom.Position = new Vector2(0f, Size.Y - 1f);
+        _borderBottom.Size = new Vector2(Size.X, 1f);
+        _borderLeft.Position = Vector2.Zero;
+        _borderLeft.Size = new Vector2(1f, Size.Y);
+        _borderRight.Position = new Vector2(Size.X - 1f, 0f);
+        _borderRight.Size = new Vector2(1f, Size.Y);
         _titleLabel.Visible = Visible;
         _titleLabel.Position = new Vector2(PanelPadding, PanelPadding);
-        _titleLabel.Size = new Vector2(Math.Max(0f, Size.X - (PanelPadding * 2f)), 24f);
+        _titleLabel.Size = new Vector2(Math.Max(0f, Size.X - (PanelPadding * 2f)), 32f);
         _titleLabel.Clear();
         _titleLabel.AppendText(TitleMarkup);
         _bodyLabel.Visible = Visible;
-        _bodyLabel.Position = new Vector2(PanelPadding, PanelPadding + 28f);
-        _bodyLabel.Size = new Vector2(Math.Max(0f, Size.X - (PanelPadding * 2f)), Math.Max(0f, Size.Y - 40f - PanelPadding));
+        _bodyLabel.Position = new Vector2(PanelPadding, PanelPadding + 38f);
+        _bodyLabel.Size = new Vector2(Math.Max(0f, Size.X - (PanelPadding * 2f)), Math.Max(0f, Size.Y - 48f - PanelPadding));
         _bodyLabel.Clear();
         _bodyLabel.AppendText(BodyMarkup);
     }
@@ -189,10 +216,22 @@ public partial class Tooltip : Control
     private static string BuildItemBodyMarkup(ItemTemplate template, IReadOnlyList<string> lines)
     {
         var builder = new StringBuilder();
-        builder.AppendLine(ItemRarityPresentation.WrapWithColor(lines[0], template.Rarity));
+        builder.AppendLine($"[color={UiStyle.ToHex(UiStyle.BorderActive())}]────────────────────────[/color]");
+        if (lines.Count > 0)
+        {
+            builder.AppendLine($"[i][color={UiStyle.ToHex(UiStyle.MutedText())}]{ItemRarityPresentation.EscapeBBCode(lines[0])}[/color][/i]");
+            builder.AppendLine($"[color={UiStyle.ToHex(UiStyle.BorderActive())}]────────────────────────[/color]");
+        }
+
         for (var i = 1; i < lines.Count; i++)
         {
-            builder.AppendLine(ItemRarityPresentation.EscapeBBCode(lines[i]));
+            var line = lines[i];
+            var color = line.StartsWith("Equipped:", System.StringComparison.Ordinal)
+                ? UiStyle.ToHex(UiStyle.ActiveGreen())
+                : line.Contains(':', System.StringComparison.Ordinal) && (line.Contains('+') || line.Contains('-'))
+                    ? UiStyle.ToHex(line.Contains('-') ? UiStyle.DangerRed() : UiStyle.ActiveGreen())
+                    : UiStyle.ToHex(UiStyle.Parchment());
+            builder.AppendLine($"[color={color}]{ItemRarityPresentation.EscapeBBCode(line)}[/color]");
         }
 
         return builder.ToString().TrimEnd();
@@ -228,7 +267,7 @@ public partial class Tooltip : Control
 
         if (x + Size.X > viewport.X)
         {
-            x = viewport.X - Size.X;
+            x -= Size.X + 18f;
         }
 
         if (y + Size.Y > viewport.Y)

@@ -1,4 +1,5 @@
 using System;
+using Godot;
 using Roguelike.Core;
 
 namespace Godotussy;
@@ -41,14 +42,19 @@ public static class ItemRarityPresentation
 
     public static string ResolveHexColor(string? rarity)
     {
+        return UiStyle.ToHex(ResolveColor(rarity));
+    }
+
+    public static Color ResolveColor(string? rarity)
+    {
         return Normalize(rarity) switch
         {
-            "uncommon" => UiStyle.UncommonHex,
-            "rare" => UiStyle.RareHex,
-            "epic" => UiStyle.EpicHex,
-            "legendary" => UiStyle.LegendaryHex,
-            "artifact" => UiStyle.ArtifactHex,
-            _ => UiStyle.CommonHex,
+            "uncommon" => UiStyle.RarityUncommon(),
+            "rare" => UiStyle.RarityRare(),
+            "epic" => UiStyle.RarityEpic(),
+            "legendary" => UiStyle.RarityLegendary(),
+            "artifact" => UiStyle.DangerRed(),
+            _ => UiStyle.RarityCommon(),
         };
     }
 

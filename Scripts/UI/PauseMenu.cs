@@ -4,6 +4,21 @@ namespace Godotussy;
 
 public partial class PauseMenu : MenuBase
 {
+    private enum PauseAction
+    {
+        None,
+        Resume,
+        Save1,
+        Save2,
+        Save3,
+        Character,
+        Help,
+        DevTools,
+        Title,
+        Quit,
+    }
+
+    private readonly System.Collections.Generic.List<PauseAction> _actions = new();
     private EventBus? _eventBus;
 
     public event System.Action? ResumeRequested;
@@ -19,8 +34,8 @@ public partial class PauseMenu : MenuBase
     public PauseMenu()
     {
         Name = "PauseMenu";
-        Title = "RUN PAUSED";
-        ConfigureOptions("Resume Run", "Save: Slot 1", "Save: Slot 2", "Save: Slot 3", "Review Character", "Open Help", "Developer Workshop", "Return to Title", "Quit Game");
+        Title = "PAUSED";
+        RebuildOptions();
         Visible = false;
     }
 
@@ -47,38 +62,69 @@ public partial class PauseMenu : MenuBase
 
     protected override void ActivateSelected()
     {
-        switch (SelectedIndex)
+        switch (SelectedIndex >= 0 && SelectedIndex < _actions.Count ? _actions[SelectedIndex] : PauseAction.None)
         {
-            case 0:
+            case PauseAction.Resume:
                 Close();
                 ResumeRequested?.Invoke();
                 break;
-            case 1:
+            case PauseAction.Save1:
                 _eventBus?.EmitSaveRequested(1);
                 break;
-            case 2:
+            case PauseAction.Save2:
                 _eventBus?.EmitSaveRequested(2);
                 break;
-            case 3:
+            case PauseAction.Save3:
                 _eventBus?.EmitSaveRequested(3);
                 break;
-            case 4:
+            case PauseAction.Character:
                 CharacterSheetRequested?.Invoke();
                 break;
-            case 5:
+            case PauseAction.Help:
                 HelpRequested?.Invoke();
                 break;
-            case 6:
+            case PauseAction.DevTools:
                 DevToolsRequested?.Invoke();
                 break;
-            case 7:
+            case PauseAction.Title:
                 Close();
                 MainMenuRequested?.Invoke();
                 break;
-            case 8:
+            case PauseAction.Quit:
                 GetTree().Quit();
                 break;
         }
+    }
+
+    private void RebuildOptions()
+    {
+        _actions.Clear();
+        ConfigureOptions();
+        AddSection("RUN");
+        AddOption("Resume", PauseAction.Resume);
+        AddSection("SAVE");
+        AddOption("Save: Slot 1", PauseAction.Save1);
+        AddOption("Save: Slot 2", PauseAction.Save2);
+        AddOption("Save: Slot 3", PauseAction.Save3);
+        AddSection("TOOLS");
+        AddOption("Review Character", PauseAction.Character);
+        AddOption("Open Help", PauseAction.Help);
+        AddOption("Developer Workshop", PauseAction.DevTools);
+        AddSection("SYSTEM");
+        AddOption("Return to Title", PauseAction.Title);
+        AddOption("Quit Game", PauseAction.Quit);
+    }
+
+    private void AddSection(string title)
+    {
+        _actions.Add(PauseAction.None);
+        ConfigureSectionHeader(title);
+    }
+
+    private void AddOption(string label, PauseAction action)
+    {
+        _actions.Add(action);
+        ConfigureOption(label);
     }
 
     protected override bool HandleCustomKey(Key key)
