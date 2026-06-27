@@ -53,7 +53,7 @@ public partial class InventoryUI : Control
 
     private sealed class SlotVisual
     {
-        public InteractiveRect Background { get; init; } = null!;
+        public ColorRect Background { get; init; } = null!;
         public ColorRect BorderTop { get; init; } = null!;
         public ColorRect BorderBottom { get; init; } = null!;
         public ColorRect BorderLeft { get; init; } = null!;
@@ -65,29 +65,9 @@ public partial class InventoryUI : Control
         public Label EquippedLabel { get; init; } = null!;
     }
 
-    private sealed class InteractiveRect : ColorRect
-    {
-        public int Index { get; init; }
-        public System.Action<int, InputEvent>? InputSubmitted { get; init; }
+    private sealed record FooterHitTarget(Vector2 Position, Vector2 Size, System.Action Action);
 
-        public override void _GuiInput(InputEvent @event)
-        {
-            InputSubmitted?.Invoke(Index, @event);
-        }
-    }
-
-    private sealed class FooterHintLabel : Label
-    {
-        public System.Action? Activated { get; init; }
-
-        public override void _GuiInput(InputEvent @event)
-        {
-            if (@event is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
-            {
-                Activated?.Invoke();
-            }
-        }
-    }
+    private readonly List<FooterHitTarget> _footerHitTargets = new();
 
     public int SelectedIndex { get; private set; }
 
@@ -113,6 +93,44 @@ public partial class InventoryUI : Control
     {
         EnsureVisuals();
         RefreshVisualState();
+    }
+
+    public override void _GuiInput(InputEvent @event)
+    {
+        if (!Visible || @event is not InputEventMouseButton { Pressed: true } button)
+        {
+            return;
+        }
+
+        foreach (var target in _footerHitTargets)
+        {
+            if (button.ButtonIndex == MouseButton.Left && ContainsPoint(button.Position, target.Position, target.Size))
+            {
+                target.Action();
+                return;
+            }
+        }
+
+        var visibleSlot = ResolveVisibleSlotAt(button.Position);
+        if (visibleSlot < 0)
+        {
+            return;
+        }
+
+        var absoluteIndex = _firstVisibleIndex + visibleSlot;
+        SelectedIndex = absoluteIndex;
+        EnsureSelectionVisible();
+        UpdateDescription();
+        UpdateGrid();
+
+        if (button.ButtonIndex == MouseButton.Right)
+        {
+            SubmitPrimary();
+        }
+        else if (button.ButtonIndex == MouseButton.Middle)
+        {
+            SubmitDrop();
+        }
     }
 
     public void Bind(GameManager? gameManager, EventBus? eventBus, IContentDatabase? content, Tooltip? tooltip, TargetingOverlay? targetingOverlay = null)
@@ -863,7 +881,7 @@ public partial class InventoryUI : Control
     {
         return new SlotVisual
         {
-            Background = new InteractiveRect { Name = $"Slot{index}_Background", Index = index, Color = UiStyle.SlotBackground(), InputSubmitted = OnSlotInputSubmitted },
+            Background = new ColorRect { Name = $"Slot{index}_Background", Color = UiStyle.SlotBackground() },
             BorderTop = new ColorRect { Name = $"Slot{index}_BorderTop", Color = UiStyle.BorderSubtle() },
             BorderBottom = new ColorRect { Name = $"Slot{index}_BorderBottom", Color = UiStyle.BorderSubtle() },
             BorderLeft = new ColorRect { Name = $"Slot{index}_BorderLeft", Color = UiStyle.BorderSubtle() },
@@ -892,7 +910,7 @@ public partial class InventoryUI : Control
         };
         foreach (var hint in hints)
         {
-            var label = new FooterHintLabel { Name = $"FooterHint_{_footerHintLabels.Count}", Text = hint.Label, Activated = hint.Action, Modulate = UiStyle.MutedText() };
+            var label = new Label { Name = $"FooterHint_{_footerHintLabels.Count}", Text = hint.Label, Modulate = UiStyle.MutedText() };
             _footerHintLabels.Add(label);
             _panel.AddChild(label);
             if (_footerHintLabels.Count < hints.Length)
@@ -901,39 +919,6 @@ public partial class InventoryUI : Control
                 _footerDividers.Add(divider);
                 _panel.AddChild(divider);
             }
-        }
-    }
-
-    private void OnSlotInputSubmitted(int visibleIndex, InputEvent @event)
-    {
-        if (!Visible)
-        {
-            return;
-        }
-
-        var absoluteIndex = _firstVisibleIndex + visibleIndex;
-        if (absoluteIndex < 0 || absoluteIndex >= System.Math.Max(Columns * Rows, _items.Count))
-        {
-            return;
-        }
-
-        SelectedIndex = absoluteIndex;
-        EnsureSelectionVisible();
-        UpdateDescription();
-        UpdateGrid();
-
-        if (@event is not InputEventMouseButton { Pressed: true } button)
-        {
-            return;
-        }
-
-        if (button.ButtonIndex == MouseButton.Right)
-        {
-            SubmitPrimary();
-        }
-        else if (button.ButtonIndex == MouseButton.Middle)
-        {
-            SubmitDrop();
         }
     }
 
@@ -1027,11 +1012,24 @@ public partial class InventoryUI : Control
         _footerBar.Size = new Vector2(panelSize.X - (PanelPadding * 2f), FooterHeight);
         var x = _footerBar.Position.X + 10f;
         var available = System.Math.Max(48f, (_footerBar.Size.X - 54f) / System.Math.Max(1, _footerHintLabels.Count));
+        _footerHitTargets.Clear();
         for (var i = 0; i < _footerHintLabels.Count; i++)
         {
             var label = _footerHintLabels[i];
             label.Position = new Vector2(x, _footerBar.Position.Y + 3f);
             label.Size = new Vector2(available, FooterHeight);
+            var action = i switch
+            {
+                0 => SubmitEquip,
+                1 => SubmitDrop,
+                2 => ToggleAutoEquipUpgrades,
+                _ => Close,
+            };
+            if (_panel is not null)
+            {
+                _footerHitTargets.Add(new FooterHitTarget(_panel.Position + label.Position, label.Size, action));
+            }
+
             x += label.Size.X + 4f;
             if (i < _footerDividers.Count)
             {
@@ -1041,6 +1039,31 @@ public partial class InventoryUI : Control
                 x += 6f;
             }
         }
+    }
+
+    private int ResolveVisibleSlotAt(Vector2 point)
+    {
+        if (_panel is null)
+        {
+            return -1;
+        }
+
+        for (var i = 0; i < _slotVisuals.Count; i++)
+        {
+            var position = _panel.Position + _slotVisuals[i].Background.Position;
+            if (ContainsPoint(point, position, _slotVisuals[i].Background.Size))
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private static bool ContainsPoint(Vector2 point, Vector2 position, Vector2 size)
+    {
+        return point.X >= position.X && point.X <= position.X + size.X
+            && point.Y >= position.Y && point.Y <= position.Y + size.Y;
     }
 
     private void LayoutSlots(float left, float top)
