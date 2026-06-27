@@ -8,6 +8,7 @@ namespace Godotussy;
 public partial class Tooltip : Control
 {
     private const float PanelPadding = 10f;
+    private const float MinimumWidth = 220f;
     private Panel? _panel;
     private ColorRect? _background;
     private ColorRect? _borderTop;
@@ -31,7 +32,7 @@ public partial class Tooltip : Control
     {
         Name = "Tooltip";
         Visible = false;
-        Size = new Vector2(280f, 220f);
+        Size = new Vector2(300f, 232f);
     }
 
     public override void _Ready()
@@ -164,15 +165,15 @@ public partial class Tooltip : Control
         {
             Name = "TitleLabel",
             Position = new Vector2(PanelPadding, PanelPadding),
-            Size = new Vector2(Math.Max(0f, Size.X - (PanelPadding * 2f)), 32f),
+            Size = new Vector2(Math.Max(0f, Size.X - (PanelPadding * 2f)), 34f),
             BbcodeEnabled = true,
             Modulate = UiStyle.BrightGold(),
         };
         _bodyLabel = new RichTextLabel
         {
             Name = "BodyLabel",
-            Position = new Vector2(PanelPadding, PanelPadding + 38f),
-            Size = new Vector2(Math.Max(0f, Size.X - (PanelPadding * 2f)), Math.Max(0f, Size.Y - 48f - PanelPadding)),
+            Position = new Vector2(PanelPadding, PanelPadding + 40f),
+            Size = new Vector2(Math.Max(0f, Size.X - (PanelPadding * 2f)), Math.Max(0f, Size.Y - 50f - PanelPadding)),
             BbcodeEnabled = true,
             Modulate = UiStyle.Parchment(),
         };
@@ -197,6 +198,7 @@ public partial class Tooltip : Control
 
         _panel.Visible = Visible;
         _panel.Position = ScreenPosition;
+        Size = new Vector2(Math.Max(MinimumWidth, Size.X), Size.Y);
         _panel.Size = Size;
         _background.Position = Vector2.Zero;
         _background.Size = Size;
@@ -214,8 +216,8 @@ public partial class Tooltip : Control
         _titleLabel.Clear();
         _titleLabel.AppendText(TitleMarkup);
         _bodyLabel.Visible = Visible;
-        _bodyLabel.Position = new Vector2(PanelPadding, PanelPadding + 38f);
-        _bodyLabel.Size = new Vector2(Math.Max(0f, Size.X - (PanelPadding * 2f)), Math.Max(0f, Size.Y - 48f - PanelPadding));
+        _bodyLabel.Position = new Vector2(PanelPadding, PanelPadding + 40f);
+        _bodyLabel.Size = new Vector2(Math.Max(0f, Size.X - (PanelPadding * 2f)), Math.Max(0f, Size.Y - 50f - PanelPadding));
         _bodyLabel.Clear();
         _bodyLabel.AppendText(BodyMarkup);
     }
@@ -237,16 +239,55 @@ public partial class Tooltip : Control
 
         for (var i = 2; i < lines.Count; i++)
         {
-            var line = lines[i];
-            var color = line.StartsWith("Equipped:", System.StringComparison.Ordinal)
-                ? UiStyle.ToHex(UiStyle.ActiveGreen())
-                : line.Contains(':', System.StringComparison.Ordinal) && (line.Contains('+') || line.Contains('-'))
-                    ? UiStyle.ToHex(line.Contains('-') ? UiStyle.DangerRed() : UiStyle.ActiveGreen())
-                    : UiStyle.ToHex(UiStyle.Parchment());
-            builder.AppendLine($"[color={color}]{ItemRarityPresentation.EscapeBBCode(line)}[/color]");
+            builder.AppendLine(FormatItemBodyLine(line));
         }
 
         return builder.ToString().TrimEnd();
+    }
+
+    private static string FormatItemBodyLine(string line)
+    {
+        var escaped = ItemRarityPresentation.EscapeBBCode(line);
+        if (line.StartsWith("Status: Equipped", System.StringComparison.Ordinal)
+            || line.StartsWith("Equipped:", System.StringComparison.Ordinal))
+        {
+            return $"[color={UiStyle.ToHex(UiStyle.ActiveGreen())}][b]{escaped}[/b][/color]";
+        }
+
+        if (line.StartsWith("Status:", System.StringComparison.Ordinal)
+            || line.StartsWith("Category:", System.StringComparison.Ordinal)
+            || line.StartsWith("Charges:", System.StringComparison.Ordinal))
+        {
+            return $"[color={UiStyle.ToHex(UiStyle.FaintText())}]{escaped}[/color]";
+        }
+
+        if (line.Contains(':', System.StringComparison.Ordinal) && (line.Contains('+') || line.Contains('-')))
+        {
+            var split = line.Split(':', 2);
+            var value = split.Length > 1 ? split[1].Trim() : string.Empty;
+            var valueColor = value.StartsWith('-', System.StringComparison.Ordinal)
+                ? UiStyle.ToHex(UiStyle.DangerRed())
+                : IsPositiveStatLabel(split[0]) ? UiStyle.ToHex(UiStyle.ActiveGreen()) : UiStyle.ToHex(UiStyle.Parchment());
+            return $"[color={UiStyle.ToHex(UiStyle.MutedText())}]{ItemRarityPresentation.EscapeBBCode(split[0])}:[/color] [color={valueColor}][b]{ItemRarityPresentation.EscapeBBCode(value)}[/b][/color]";
+        }
+
+        if (line.Contains('[', System.StringComparison.Ordinal) && line.Contains(']', System.StringComparison.Ordinal))
+        {
+            return $"[color={UiStyle.ToHex(UiStyle.FaintText())}]  {escaped}  [/color]";
+        }
+
+        return $"[color={UiStyle.ToHex(UiStyle.Parchment())}]{escaped}[/color]";
+    }
+
+    private static bool IsPositiveStatLabel(string label)
+    {
+        return label.Contains("Accuracy", System.StringComparison.OrdinalIgnoreCase)
+            || label.Contains("Attack", System.StringComparison.OrdinalIgnoreCase)
+            || label.Contains("Defense", System.StringComparison.OrdinalIgnoreCase)
+            || label.Contains("Evasion", System.StringComparison.OrdinalIgnoreCase)
+            || label.Contains("Speed", System.StringComparison.OrdinalIgnoreCase)
+            || label.Contains("Crit", System.StringComparison.OrdinalIgnoreCase)
+            || label.Contains("HP", System.StringComparison.OrdinalIgnoreCase);
     }
 
     private static IReadOnlyList<string> ClampLines(IReadOnlyList<string> lines, int maxLines)

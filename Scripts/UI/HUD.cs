@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Godot;
@@ -8,6 +9,11 @@ namespace Godotussy;
 public partial class HUD : Control
 {
     private Panel? _panel;
+    private ColorRect? _panelBackground;
+    private ColorRect? _panelBorderTop;
+    private ColorRect? _panelBorderBottom;
+    private ColorRect? _panelBorderLeft;
+    private ColorRect? _panelBorderRight;
     private Label? _headerLabel;
     private Label? _hpLabel;
     private ProgressBar? _hpBarCompat;
@@ -23,6 +29,8 @@ public partial class HUD : Control
     private Label? _effectsLabel;
     private HBoxContainer? _statusIconsContainer;
     private Label? _mapLabel;
+    private readonly List<ColorRect> _statPillBackgrounds = new();
+    private readonly List<Label> _statPillLabels = new();
     private EventBus? _eventBus;
     private GameManager? _gameManager;
 
@@ -314,6 +322,17 @@ public partial class HUD : Control
         };
         AddChild(_panel);
 
+        _panelBackground = new ColorRect { Name = "PanelBackground", Color = UiStyle.PanelBlack(0.80f) };
+        _panelBorderTop = new ColorRect { Name = "PanelBorderTop", Color = UiStyle.BorderSubtle() };
+        _panelBorderBottom = new ColorRect { Name = "PanelBorderBottom", Color = UiStyle.BorderSubtle() };
+        _panelBorderLeft = new ColorRect { Name = "PanelBorderLeft", Color = UiStyle.BorderSubtle() };
+        _panelBorderRight = new ColorRect { Name = "PanelBorderRight", Color = UiStyle.BorderSubtle() };
+        _panel.AddChild(_panelBackground);
+        _panel.AddChild(_panelBorderTop);
+        _panel.AddChild(_panelBorderBottom);
+        _panel.AddChild(_panelBorderLeft);
+        _panel.AddChild(_panelBorderRight);
+
         _hpLabel = CreateLabel("HPLabel", new Vector2(12f, 10f), new Vector2(28f, 16f));
         _hpBarCompat = new ProgressBar { Name = "HPBar", MinValue = 0d, MaxValue = 1d, Value = 0d, Visible = false };
         _hpValueLabel = CreateLabel("HPValueLabel", new Vector2(170f, 10f), new Vector2(70f, 16f));
@@ -328,6 +347,8 @@ public partial class HUD : Control
         _statsLabel = CreateLabel("StatsLabel", new Vector2(12f, 90f), new Vector2(416f, 18f));
         _effectsLabel = CreateLabel("EffectsLabel", new Vector2(12f, 112f), new Vector2(416f, 18f));
         _mapLabel = CreateLabel("MapLabel", new Vector2(12f, 134f), new Vector2(416f, 18f));
+
+        CreateStatPills();
 
         _panel.AddChild(_hpLabel);
         _panel.AddChild(_hpBarCompat);
@@ -353,6 +374,24 @@ public partial class HUD : Control
 
         _panel.AddChild(_mapLabel);
         ApplyResponsiveLayout();
+    }
+
+    private void CreateStatPills()
+    {
+        if (_panel is null || _statPillBackgrounds.Count > 0)
+        {
+            return;
+        }
+
+        for (var i = 0; i < 6; i++)
+        {
+            var background = new ColorRect { Name = $"StatPillBackground_{i}", Color = UiStyle.SlotBackground() };
+            var label = new Label { Name = $"StatPillLabel_{i}", Modulate = UiStyle.Parchment() };
+            _statPillBackgrounds.Add(background);
+            _statPillLabels.Add(label);
+            _panel.AddChild(background);
+            _panel.AddChild(label);
+        }
     }
 
     private void SyncStatusIcons(IReadOnlyList<StatusEffectInstance> effects)
@@ -496,11 +535,13 @@ public partial class HUD : Control
         _progressLabel.Modulate = LevelText.Contains("LV UP!", System.StringComparison.Ordinal) ? UiStyle.BrightGold() : UiStyle.MutedText();
         _statsLabel.Text = StatsText;
         _statsLabel.Modulate = UiStyle.Parchment();
+        _statsLabel.Visible = false;
+        UpdateStatPills();
         _effectsLabel.Text = StatusEffectsText;
         _effectsLabel.Visible = !string.IsNullOrWhiteSpace(StatusEffectsText);
         _effectsLabel.Modulate = UiStyle.WarningOrange();
         _mapLabel.Text = MinimapText;
-        _mapLabel.Modulate = MinimapVisible ? UiStyle.MutedText() : UiStyle.FaintText();
+        _mapLabel.Modulate = UiStyle.FaintText();
     }
 
     private void UpdateHPVisuals()
@@ -543,6 +584,23 @@ public partial class HUD : Control
         LayoutBar(_energyBarBackground, _energyBarFill, EnergyBarValue, EnergyBarMaxValue, UiStyle.EnergyBlue(), y: 37f);
     }
 
+    private void UpdateStatPills()
+    {
+        var parts = StatsText.Split(' ', System.StringSplitOptions.RemoveEmptyEntries);
+        for (var i = 0; i < _statPillLabels.Count; i++)
+        {
+            var label = _statPillLabels[i];
+            label.Visible = parts.Length >= (i * 2) + 2;
+            if (!label.Visible)
+            {
+                continue;
+            }
+
+            label.Text = $"{parts[i * 2]} {parts[(i * 2) + 1]}";
+            label.Modulate = UiStyle.Parchment();
+        }
+    }
+
     private void ApplyResponsiveLayout()
     {
         if (_panel is null)
@@ -556,6 +614,7 @@ public partial class HUD : Control
         _panel.Position = new Vector2(8f, 8f);
         _panel.Size = new Vector2(width, 168f);
         _panel.Modulate = UiStyle.GoldTrim();
+        LayoutPanelChrome(_panel.Size);
 
         SetControlBounds(_hpLabel, 12f, 10f, 28f, 16f);
         SetControlBounds(_hpValueLabel, 170f, 10f, 70f, 16f);
@@ -564,6 +623,7 @@ public partial class HUD : Control
         SetControlBounds(_headerLabel, 12f, 56f, contentWidth, 18f);
         SetControlBounds(_progressLabel, 12f, 76f, contentWidth, 18f);
         SetControlBounds(_statsLabel, 12f, 96f, contentWidth, 18f);
+        LayoutStatPills(12f, 96f, contentWidth);
         SetControlBounds(_effectsLabel, 12f, 116f, contentWidth, 18f);
         if (_statusIconsContainer is not null)
         {
@@ -572,6 +632,40 @@ public partial class HUD : Control
         }
 
         SetControlBounds(_mapLabel, 12f, 150f, contentWidth, 18f);
+    }
+
+    private void LayoutPanelChrome(Vector2 size)
+    {
+        if (_panelBackground is null || _panelBorderTop is null || _panelBorderBottom is null || _panelBorderLeft is null || _panelBorderRight is null)
+        {
+            return;
+        }
+
+        _panelBackground.Position = Vector2.Zero;
+        _panelBackground.Size = size;
+        _panelBackground.Color = UiStyle.PanelBlack(0.80f);
+        _panelBorderTop.Position = Vector2.Zero;
+        _panelBorderTop.Size = new Vector2(size.X, 1f);
+        _panelBorderBottom.Position = new Vector2(0f, size.Y - 1f);
+        _panelBorderBottom.Size = new Vector2(size.X, 1f);
+        _panelBorderLeft.Position = Vector2.Zero;
+        _panelBorderLeft.Size = new Vector2(1f, size.Y);
+        _panelBorderRight.Position = new Vector2(size.X - 1f, 0f);
+        _panelBorderRight.Size = new Vector2(1f, size.Y);
+    }
+
+    private void LayoutStatPills(float x, float y, float width)
+    {
+        var pillWidth = System.Math.Max(44f, (width - 15f) / 6f);
+        for (var i = 0; i < _statPillBackgrounds.Count; i++)
+        {
+            var px = x + (i * (pillWidth + 3f));
+            _statPillBackgrounds[i].Position = new Vector2(px, y);
+            _statPillBackgrounds[i].Size = new Vector2(pillWidth, 18f);
+            _statPillBackgrounds[i].Color = UiStyle.SlotBackground();
+            _statPillLabels[i].Position = new Vector2(px + 4f, y + 1f);
+            _statPillLabels[i].Size = new Vector2(System.Math.Max(0f, pillWidth - 8f), 16f);
+        }
     }
 
     private static void LayoutBar(ColorRect? background, ColorRect? fill, double value, double maxValue, Color fillColor, float y = 15f)
@@ -585,7 +679,7 @@ public partial class HUD : Control
         const float height = 8f;
         background.Position = new Vector2(44f, y);
         background.Size = new Vector2(width, height);
-        background.Color = UiStyle.PanelBlack();
+        background.Color = UiStyle.SlotBackground();
         var fraction = maxValue <= 0d ? 0f : (float)System.Math.Clamp(value / maxValue, 0d, 1d);
         fill.Position = background.Position + new Vector2(1f, 1f);
         fill.Size = new Vector2((width - 2f) * fraction, height - 2f);

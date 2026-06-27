@@ -53,7 +53,7 @@ public partial class InventoryUI : Control
 
     private sealed class SlotVisual
     {
-        public ColorRect Background { get; init; } = null!;
+        public InteractiveRect Background { get; init; } = null!;
         public ColorRect BorderTop { get; init; } = null!;
         public ColorRect BorderBottom { get; init; } = null!;
         public ColorRect BorderLeft { get; init; } = null!;
@@ -63,6 +63,30 @@ public partial class InventoryUI : Control
         public Label StackLabel { get; init; } = null!;
         public ColorRect EquippedBadge { get; init; } = null!;
         public Label EquippedLabel { get; init; } = null!;
+    }
+
+    private sealed class InteractiveRect : ColorRect
+    {
+        public int Index { get; init; }
+        public System.Action<int, InputEvent>? InputSubmitted { get; init; }
+
+        public override void _GuiInput(InputEvent @event)
+        {
+            InputSubmitted?.Invoke(Index, @event);
+        }
+    }
+
+    private sealed class FooterHintLabel : Label
+    {
+        public System.Action? Activated { get; init; }
+
+        public override void _GuiInput(InputEvent @event)
+        {
+            if (@event is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
+            {
+                Activated?.Invoke();
+            }
+        }
     }
 
     public int SelectedIndex { get; private set; }
@@ -835,11 +859,11 @@ public partial class InventoryUI : Control
         AddChild(_panel);
     }
 
-    private static SlotVisual CreateSlotVisual(int index)
+    private SlotVisual CreateSlotVisual(int index)
     {
         return new SlotVisual
         {
-            Background = new ColorRect { Name = $"Slot{index}_Background", Color = UiStyle.SlotBackground() },
+            Background = new InteractiveRect { Name = $"Slot{index}_Background", Index = index, Color = UiStyle.SlotBackground(), InputSubmitted = OnSlotInputSubmitted },
             BorderTop = new ColorRect { Name = $"Slot{index}_BorderTop", Color = UiStyle.BorderSubtle() },
             BorderBottom = new ColorRect { Name = $"Slot{index}_BorderBottom", Color = UiStyle.BorderSubtle() },
             BorderLeft = new ColorRect { Name = $"Slot{index}_BorderLeft", Color = UiStyle.BorderSubtle() },
@@ -859,10 +883,16 @@ public partial class InventoryUI : Control
             return;
         }
 
-        var hints = new[] { "[E] Equip", "[D] Drop", "[A] Auto", "[I/Esc] Close" };
+        var hints = new (string Label, System.Action Action)[]
+        {
+            ("[E] Equip", SubmitEquip),
+            ("[D] Drop", SubmitDrop),
+            ("[A] Auto", ToggleAutoEquipUpgrades),
+            ("[I/Esc] Close", Close),
+        };
         foreach (var hint in hints)
         {
-            var label = new Label { Name = $"FooterHint_{_footerHintLabels.Count}", Text = hint, Modulate = UiStyle.MutedText() };
+            var label = new FooterHintLabel { Name = $"FooterHint_{_footerHintLabels.Count}", Text = hint.Label, Activated = hint.Action, Modulate = UiStyle.MutedText() };
             _footerHintLabels.Add(label);
             _panel.AddChild(label);
             if (_footerHintLabels.Count < hints.Length)
@@ -871,6 +901,39 @@ public partial class InventoryUI : Control
                 _footerDividers.Add(divider);
                 _panel.AddChild(divider);
             }
+        }
+    }
+
+    private void OnSlotInputSubmitted(int visibleIndex, InputEvent @event)
+    {
+        if (!Visible)
+        {
+            return;
+        }
+
+        var absoluteIndex = _firstVisibleIndex + visibleIndex;
+        if (absoluteIndex < 0 || absoluteIndex >= System.Math.Max(Columns * Rows, _items.Count))
+        {
+            return;
+        }
+
+        SelectedIndex = absoluteIndex;
+        EnsureSelectionVisible();
+        UpdateDescription();
+        UpdateGrid();
+
+        if (@event is not InputEventMouseButton { Pressed: true } button)
+        {
+            return;
+        }
+
+        if (button.ButtonIndex == MouseButton.Right)
+        {
+            SubmitPrimary();
+        }
+        else if (button.ButtonIndex == MouseButton.Middle)
+        {
+            SubmitDrop();
         }
     }
 

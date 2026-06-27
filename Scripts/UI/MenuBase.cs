@@ -19,6 +19,7 @@ public abstract partial class MenuBase : Control
     private Label? _label;
     private Label? _optionsLabel;
     private Label? _footerLabel;
+    private readonly List<OptionRow> _optionRows = new();
     private const float PanelWidth = 420f;
     private const float PanelHeight = 300f;
     private const float PanelPadding = 20f;
@@ -32,6 +33,40 @@ public abstract partial class MenuBase : Control
     private string _visibleBodyText = string.Empty;
     private string _visibleOptionsText = string.Empty;
     private string _visibleFooterText = string.Empty;
+    private int _firstVisibleOption;
+    private int _visibleOptionCount;
+
+    private sealed class OptionRow : Panel
+    {
+        public int OptionIndex { get; init; }
+        public bool Interactive { get; init; }
+        public System.Action<int>? Hovered { get; init; }
+        public System.Action<int>? Clicked { get; init; }
+        public ColorRect Background { get; } = new() { Name = "RowBackground" };
+        public ColorRect LeftAccent { get; } = new() { Name = "RowAccent" };
+        public Label TextLabel { get; } = new() { Name = "RowLabel" };
+
+        public OptionRow()
+        {
+            AddChild(Background);
+            AddChild(LeftAccent);
+            AddChild(TextLabel);
+        }
+
+        public override void _GuiInput(InputEvent @event)
+        {
+            if (!Interactive)
+            {
+                return;
+            }
+
+            Hovered?.Invoke(OptionIndex);
+            if (@event is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
+            {
+                Clicked?.Invoke(OptionIndex);
+            }
+        }
+    }
 
     protected int SelectedIndex { get; private set; }
 
@@ -207,6 +242,8 @@ public abstract partial class MenuBase : Control
             : Math.Max(1, contentLineCapacity - titleSectionLines - bodySectionLines);
         var firstVisibleOption = visibleOptionCount == 0 ? 0 : ResolveFirstVisibleOption(visibleOptionCount);
         var visibleOptionsText = BuildVisibleOptionsText(firstVisibleOption, visibleOptionCount);
+        _firstVisibleOption = firstVisibleOption;
+        _visibleOptionCount = visibleOptionCount;
 
         var builder = new StringBuilder();
         if (titleLines.Count > 0)
@@ -421,10 +458,69 @@ public abstract partial class MenuBase : Control
         _titleLabel.Visible = Visible && !string.IsNullOrWhiteSpace(_visibleTitleText);
         _footerLabel.Visible = Visible && !string.IsNullOrWhiteSpace(_visibleFooterText);
         OnVisualStateRefreshed(_panel, _label, viewportSize, panelSize);
+        RebuildOptionRows(_optionsCard, _optionsLabel.Position, _optionsLabel.Size);
+        _optionsLabel.Visible = false;
     }
 
     protected virtual void OnVisualStateRefreshed(Panel panel, Label label, Vector2 viewportSize, Vector2 panelSize)
     {
+    }
+
+    private void RebuildOptionRows(ColorRect optionsCard, Vector2 position, Vector2 size)
+    {
+        foreach (var row in _optionRows)
+        {
+            optionsCard.RemoveChild(row);
+            row.QueueFree();
+        }
+
+        _optionRows.Clear();
+        if (!optionsCard.Visible || _visibleOptionCount <= 0 || _options.Count == 0)
+        {
+            return;
+        }
+
+        var y = position.Y;
+        var lastVisible = Math.Min(_options.Count, _firstVisibleOption + _visibleOptionCount);
+        for (var index = _firstVisibleOption; index < lastVisible; index++)
+        {
+            var section = IsSectionHeader(index);
+            var rowHeight = section ? 18f : 22f;
+            var row = new OptionRow
+            {
+                Name = $"OptionRow_{index}",
+                OptionIndex = index,
+                Interactive = !section,
+                Hovered = OnOptionHovered,
+                Clicked = OnOptionClicked,
+                Position = new Vector2(position.X, y),
+                Size = new Vector2(size.X, rowHeight),
+            };
+            row.Background.Position = Vector2.Zero;
+            row.Background.Size = row.Size;
+            row.Background.Color = index == SelectedIndex ? UiStyle.SlotSelected() : UiStyle.DeepBlack(0f);
+            row.LeftAccent.Position = Vector2.Zero;
+            row.LeftAccent.Size = new Vector2(index == SelectedIndex && !section ? 2f : 0f, rowHeight);
+            row.LeftAccent.Color = UiStyle.DimGold();
+            row.TextLabel.Position = new Vector2(section ? 0f : 8f, 2f);
+            row.TextLabel.Size = new Vector2(Math.Max(0f, size.X - 8f), rowHeight);
+            row.TextLabel.Text = section ? _options[index] : (index == SelectedIndex ? $"▶ {_options[index]}" : $"  {_options[index]}");
+            row.TextLabel.Modulate = section ? UiStyle.FaintText() : index == SelectedIndex ? UiStyle.BrightGold() : UiStyle.Parchment();
+            optionsCard.AddChild(row);
+            _optionRows.Add(row);
+            y += rowHeight;
+        }
+    }
+
+    private void OnOptionHovered(int index)
+    {
+        SetSelection(index);
+    }
+
+    private void OnOptionClicked(int index)
+    {
+        SetSelection(index);
+        ActivateSelected();
     }
 
     protected virtual Vector2 ResolveDesiredPanelSize(Vector2 viewportSize)

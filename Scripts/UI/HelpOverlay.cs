@@ -102,13 +102,83 @@ public partial class HelpOverlay : MenuBase
 
     protected override Vector2 ResolveDesiredPanelSize(Vector2 viewportSize)
     {
-        var maxWidth = viewportSize.X * 0.92f;
-        var maxHeight = viewportSize.Y * 0.92f;
-        return OverlayLayoutHelper.FitPanelSize(viewportSize, new Vector2(maxWidth, maxHeight), 24f);
+        var width = System.Math.Clamp(viewportSize.X * 0.60f, 560f, 800f);
+        var height = System.Math.Min(viewportSize.Y * 0.80f, 620f);
+        return new Vector2(width, height);
     }
 
     protected override float ResolveApproxLineHeight()
     {
         return 20f;
+    }
+
+    protected override void OnVisualStateRefreshed(Panel panel, Label label, Vector2 viewportSize, Vector2 panelSize)
+    {
+        panel.Modulate = UiStyle.GoldTrim();
+        if (Backdrop is not null)
+        {
+            Backdrop.Color = UiStyle.PanelBlack(0.96f);
+        }
+
+        if (HeaderBand is not null)
+        {
+            HeaderBand.Color = UiStyle.PanelHighlight();
+            HeaderBand.Size = new Vector2(panelSize.X, 46f);
+        }
+
+        if (TitleLabel is not null)
+        {
+            TitleLabel.Text = "HELP";
+            TitleLabel.Modulate = UiStyle.BrightGold();
+            TitleLabel.Position = new Vector2(20f, 12f);
+            TitleLabel.Size = new Vector2(panelSize.X - 40f, 24f);
+        }
+
+        if (BodyCard is not null)
+        {
+            BodyCard.Color = UiStyle.PanelInner(0.98f);
+        }
+
+        label.Text = BuildReadableHelpText(_bodyText);
+        label.Modulate = UiStyle.Parchment();
+
+        if (OptionsCard is not null)
+        {
+            OptionsCard.Color = UiStyle.PanelHighlight();
+            OptionsCard.Size = new Vector2(OptionsCard.Size.X, 34f);
+        }
+
+        if (FooterLabel is not null)
+        {
+            FooterLabel.Text = "[Up/Down] move    [Enter] confirm    [Esc] back";
+            FooterLabel.Modulate = UiStyle.FaintText();
+        }
+    }
+
+    private static string BuildReadableHelpText(string body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return string.Empty;
+        }
+
+        var lines = body.Split('\n');
+        for (var i = 0; i < lines.Length; i++)
+        {
+            var line = lines[i];
+            if (IsSectionHeader(line))
+            {
+                lines[i] = $"── {line} ─────────────────";
+            }
+        }
+
+        return string.Join("\n", lines);
+    }
+
+    private static bool IsSectionHeader(string line)
+    {
+        return line == line.ToUpperInvariant()
+            && line.Length > 0
+            && !line.Contains(':', System.StringComparison.Ordinal);
     }
 }

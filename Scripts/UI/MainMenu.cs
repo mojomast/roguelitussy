@@ -178,6 +178,8 @@ public partial class MainMenu : MenuBase
     private ColorRect? _previewAccentBand;
     private Label? _previewSigil;
     private Label? _previewDetail;
+    private Label? _previewKitLabel;
+    private Label? _previewStatsLabel;
     private Label? _previewTitle;
     private Label? _previewSubtitle;
     private Label? _previewVariantId;
@@ -330,6 +332,48 @@ public partial class MainMenu : MenuBase
             $"Edge {trait.DisplayName}");
     }
 
+    private string BuildPreviewKitText()
+    {
+        var archetype = Archetypes[_archetypeIndex];
+        var origin = Origins[_originIndex];
+        var trait = Traits[_traitIndex];
+        var pack = new List<string>();
+        pack.AddRange(archetype.StartingItems);
+        pack.AddRange(origin.StartingItems);
+        pack.AddRange(trait.StartingItems);
+        return string.Join(
+            "\n",
+            "READY KIT",
+            FormatBullets(archetype.EquippedItems),
+            "PACK",
+            FormatBullets(pack));
+    }
+
+    private string BuildPreviewStatsText()
+    {
+        var projected = BuildProjectedStatLines();
+        return string.Join("\n", "PROJECTED", projected[0], projected[1]);
+    }
+
+    private string BuildPreviewPathText()
+    {
+        var archetype = Archetypes[_archetypeIndex];
+        var origin = Origins[_originIndex];
+        var trait = Traits[_traitIndex];
+        return $"Path: {archetype.DisplayName} / {origin.DisplayName}\nTrait: {trait.DisplayName}";
+    }
+
+    private static string FormatBullets(IEnumerable<string> tokens)
+    {
+        var values = tokens
+            .Where(token => !string.IsNullOrWhiteSpace(token))
+            .Distinct()
+            .Take(4)
+            .Select(token => $"▪ {token.Replace('_', ' ')}")
+            .ToArray();
+        return values.Length == 0 ? "▪ none" : string.Join("\n", values);
+    }
+
     private static string WrapPreviewText(string text, float availableWidth)
     {
         if (string.IsNullOrWhiteSpace(text))
@@ -469,14 +513,14 @@ public partial class MainMenu : MenuBase
         var contentTop = 78f;
         var footerTop = panelSize.Y - 46f;
         var contentHeight = System.Math.Max(0f, footerTop - contentTop);
-        var previewWidth = System.Math.Clamp(panelSize.X * 0.34f, 220f, 320f);
-        var contentWidth = System.Math.Max(180f, panelSize.X - previewWidth - (PreviewPadding * 3f));
-        var summaryHeight = System.Math.Clamp(contentHeight * 0.32f, 88f, 148f);
-        var optionsHeight = System.Math.Max(68f, contentHeight - summaryHeight - 16f);
+        var totalContent = System.Math.Max(0f, panelSize.X - (PreviewPadding * 4f));
+        var summaryWidth = totalContent * 0.26f;
+        var optionsWidth = totalContent * 0.40f;
+        var previewWidth = totalContent * 0.34f;
 
         BodyCard.Color = UiStyle.PanelInner(0.98f);
         BodyCard.Position = new Vector2(PreviewPadding, contentTop);
-        BodyCard.Size = new Vector2(contentWidth, summaryHeight);
+        BodyCard.Size = new Vector2(summaryWidth, contentHeight);
 
         label.Position = new Vector2(18f, 16f);
         label.Size = new Vector2(
@@ -486,8 +530,8 @@ public partial class MainMenu : MenuBase
         label.Modulate = UiStyle.Parchment();
 
         OptionsCard.Color = UiStyle.CathedralBlack(0.99f);
-        OptionsCard.Position = new Vector2(PreviewPadding, contentTop + summaryHeight + 16f);
-        OptionsCard.Size = new Vector2(contentWidth, System.Math.Max(0f, optionsHeight));
+        OptionsCard.Position = new Vector2(PreviewPadding + summaryWidth + PreviewPadding, contentTop);
+        OptionsCard.Size = new Vector2(optionsWidth, contentHeight);
 
         var visibleOptionsText = OptionsLabel.Text;
         OptionsLabel.Position = new Vector2(18f, 14f);
@@ -503,7 +547,7 @@ public partial class MainMenu : MenuBase
         }
 
         _previewPanel.Visible = Visible;
-        _previewPanel.Position = new Vector2(BodyCard.Position.X + BodyCard.Size.X + PreviewPadding, contentTop);
+        _previewPanel.Position = new Vector2(OptionsCard.Position.X + OptionsCard.Size.X + PreviewPadding, contentTop);
         _previewPanel.Size = new Vector2(previewWidth, contentHeight);
         LayoutPreview(_previewPanel.Size);
         RefreshPreviewContent();
@@ -901,6 +945,14 @@ public partial class MainMenu : MenuBase
         {
             Name = "PreviewDetail",
         };
+        _previewKitLabel = new Label
+        {
+            Name = "PreviewKitLabel",
+        };
+        _previewStatsLabel = new Label
+        {
+            Name = "PreviewStatsLabel",
+        };
         _previewTitle = new Label
         {
             Name = "PreviewTitle",
@@ -919,6 +971,8 @@ public partial class MainMenu : MenuBase
         _previewPanel.AddChild(_previewAccentBand);
         _previewPanel.AddChild(_previewSigil);
         _previewPanel.AddChild(_previewDetail);
+        _previewPanel.AddChild(_previewKitLabel);
+        _previewPanel.AddChild(_previewStatsLabel);
         _previewPanel.AddChild(_previewTitle);
         _previewPanel.AddChild(_previewSubtitle);
         _previewPanel.AddChild(_previewVariantId);
@@ -932,6 +986,8 @@ public partial class MainMenu : MenuBase
             || _previewAccentBand is null
             || _previewSigil is null
             || _previewDetail is null
+            || _previewKitLabel is null
+            || _previewStatsLabel is null
             || _previewTitle is null
             || _previewSubtitle is null
             || _previewVariantId is null)
@@ -941,11 +997,14 @@ public partial class MainMenu : MenuBase
 
         var inset = 16f;
         var frameWidth = System.Math.Max(90f, previewSize.X - (inset * 2f));
-        var frameHeight = System.Math.Clamp(previewSize.Y * 0.42f, PreviewFrameMinimumHeight, 220f);
+        var frameHeight = System.Math.Clamp(previewSize.Y * 0.32f, PreviewFrameMinimumHeight, 180f);
         var titleTop = inset + frameHeight + 26f;
-        var detailTop = titleTop + 54f;
-        var maxVariantTop = System.Math.Max(detailTop + 28f, previewSize.Y - inset - 34f);
-        var variantTop = System.Math.Clamp(previewSize.Y - 50f, detailTop + 28f, maxVariantTop);
+        var kitTop = titleTop + 52f;
+        var remaining = System.Math.Max(90f, previewSize.Y - kitTop - inset);
+        var kitHeight = remaining * 0.30f;
+        var statsHeight = remaining * 0.30f;
+        var pathHeight = remaining * 0.18f;
+        var variantTop = kitTop + kitHeight + statsHeight + pathHeight + 20f;
 
         _previewFrame.Position = new Vector2(inset, inset);
         _previewFrame.Size = new Vector2(frameWidth, frameHeight);
@@ -959,8 +1018,14 @@ public partial class MainMenu : MenuBase
         _previewSigil.Position = new Vector2(inset + 8f, 10f);
         _previewSigil.Size = new Vector2(32f, 24f);
 
-        _previewDetail.Position = new Vector2(inset, detailTop);
-        _previewDetail.Size = new Vector2(frameWidth, System.Math.Max(24f, variantTop - detailTop - 8f));
+        _previewKitLabel.Position = new Vector2(inset, kitTop);
+        _previewKitLabel.Size = new Vector2(frameWidth, System.Math.Max(36f, kitHeight - 4f));
+
+        _previewStatsLabel.Position = new Vector2(inset, kitTop + kitHeight + 8f);
+        _previewStatsLabel.Size = new Vector2(frameWidth, System.Math.Max(36f, statsHeight - 4f));
+
+        _previewDetail.Position = new Vector2(inset, kitTop + kitHeight + statsHeight + 16f);
+        _previewDetail.Size = new Vector2(frameWidth, System.Math.Max(28f, pathHeight));
 
         _previewTitle.Position = new Vector2(inset, titleTop);
         _previewTitle.Size = new Vector2(frameWidth, 24f);
@@ -968,8 +1033,8 @@ public partial class MainMenu : MenuBase
         _previewSubtitle.Position = new Vector2(inset, titleTop + 24f);
         _previewSubtitle.Size = new Vector2(frameWidth, 24f);
 
-        _previewVariantId.Position = new Vector2(inset, variantTop);
-        _previewVariantId.Size = new Vector2(frameWidth, System.Math.Max(32f, previewSize.Y - variantTop - inset));
+        _previewVariantId.Position = new Vector2(inset, System.Math.Min(variantTop, previewSize.Y - inset - 34f));
+        _previewVariantId.Size = new Vector2(frameWidth, System.Math.Max(32f, previewSize.Y - _previewVariantId.Position.Y - inset));
     }
 
     private void RefreshPreviewContent()
@@ -992,10 +1057,22 @@ public partial class MainMenu : MenuBase
             _previewSigil.Modulate = profile.AccentTint;
         }
 
+        if (_previewKitLabel is not null)
+        {
+            _previewKitLabel.Text = WrapPreviewText(BuildPreviewKitText(), _previewKitLabel.Size.X);
+            _previewKitLabel.Modulate = UiStyle.Parchment();
+        }
+
+        if (_previewStatsLabel is not null)
+        {
+            _previewStatsLabel.Text = BuildPreviewStatsText();
+            _previewStatsLabel.Modulate = UiStyle.Parchment();
+        }
+
         if (_previewDetail is not null)
         {
-            _previewDetail.Text = WrapPreviewText(BuildPreviewDetailText(), _previewDetail.Size.X);
-            _previewDetail.Modulate = UiStyle.Parchment();
+            _previewDetail.Text = BuildPreviewPathText();
+            _previewDetail.Modulate = UiStyle.MutedText();
         }
 
         if (_previewTitle is not null)
