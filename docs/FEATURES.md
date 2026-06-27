@@ -37,3 +37,13 @@ The pause menu displays a compact `CURRENT RUN` snapshot from `GameManager.Curre
 The combat log now renders categorized messages from `EventBus.LogMessage`. Categories color system, player, enemy, loot, status, warning, and critical entries distinctly; critical entries are bold, and older visible lines fade using BBCode alpha. The existing `EmitLogMessage(string)` overload remains supported and defaults to `System`.
 
 **Files modified:** `Scripts/UI/CombatLog.cs`, `Scripts/Autoloads/EventBus.cs`, `Scripts/Autoloads/GameManager.cs`, `Scripts/UI/UiStyle.cs`, `Tests/UITests/CombatLogTests.cs`.
+
+## Examine Cursor
+
+**Block:** 5  **Status:** Implemented
+
+**Keybinds:** `X` open/close examine mode, `WASD`/arrow keys move cursor, `Escape` close
+
+Examine mode opens a `MenuBase` panel at the player's position and lets the player inspect visible or already explored nearby map cells without submitting gameplay actions or mutating `WorldState`. Visible cells can describe the tile, entity, chest, revealed trap, and ground items from existing state/content templates; explored-but-not-visible cells only show remembered tile information to avoid revealing current hidden details.
+
+**Files modified:** `Scripts/UI/ExaminePanel.cs`, `Scripts/UI/InputHandler.cs`, `Scripts/UI/UIRoot.cs`, `Compat/Godot/GodotStubs.cs`, `Tests/UITests/ExaminePanelTests.cs`, `docs/SYSTEMS.md`, `docs/FEATURES.md`.

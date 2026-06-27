@@ -23,6 +23,8 @@ public partial class InputHandler : Node
 
     public event System.Action? InteractRequested;
 
+    public event System.Action? ExamineRequested;
+
     public void Bind(GameManager? gameManager, EventBus? eventBus)
     {
         _gameManager = gameManager;
@@ -68,6 +70,7 @@ public partial class InputHandler : Node
             Key.H => Raise(HelpRequested),
             Key.F => Raise(InteractRequested),
             Key.T => Raise(ToolsRequested),
+            Key.X => Raise(ExamineRequested),
             Key.Escape => Raise(PauseRequested),
             Key.M or Key.Tab => Raise(MinimapToggleRequested),
             _ => false,

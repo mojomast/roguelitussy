@@ -63,6 +63,8 @@ public partial class UIRoot : CanvasLayer
 
     public TargetingOverlay TargetingOverlay { get; } = new();
 
+    public ExaminePanel ExaminePanel { get; } = new();
+
     public InputHandler InputHandler { get; } = new();
 
     public override void _Ready()
@@ -108,6 +110,7 @@ public partial class UIRoot : CanvasLayer
         DebugConsole.Bind(_gameManager, _eventBus, _content);
         DebugOverlay.Bind(_gameManager, _eventBus);
         TargetingOverlay.Bind(_gameManager, _eventBus, _content);
+        ExaminePanel.Bind(_gameManager, _content);
         InputHandler.Bind(_gameManager, _eventBus);
         CombatLog.RefreshConsole();
 
@@ -148,6 +151,8 @@ public partial class UIRoot : CanvasLayer
         InputHandler.InteractRequested += Interact;
         InputHandler.ToolsRequested -= ToggleDevTools;
         InputHandler.ToolsRequested += ToggleDevTools;
+        InputHandler.ExamineRequested -= ToggleExamine;
+        InputHandler.ExamineRequested += ToggleExamine;
 
         DevToolsWorkbench.DebugConsoleRequested -= OpenDebugConsoleFromWorkshop;
         DevToolsWorkbench.DebugConsoleRequested += OpenDebugConsoleFromWorkshop;
@@ -218,6 +223,7 @@ public partial class UIRoot : CanvasLayer
         AddIfMissing(DebugConsole);
         AddIfMissing(DebugOverlay);
         AddIfMissing(TargetingOverlay);
+        AddIfMissing(ExaminePanel);
         AddIfMissing(InputHandler);
     }
 
@@ -281,6 +287,17 @@ public partial class UIRoot : CanvasLayer
             }
 
             return handledByTargeting;
+        }
+
+        if (ExaminePanel.IsActive)
+        {
+            var handledByExamine = ExaminePanel.HandleKey(key);
+            if (handledByExamine && !ExaminePanel.IsActive)
+            {
+                RefreshInputGate();
+            }
+
+            return handledByExamine;
         }
 
         if (key == Key.Quoteleft)
@@ -470,6 +487,7 @@ public partial class UIRoot : CanvasLayer
         ShopUI.Close();
         ChestUI.Close();
         TargetingOverlay.Cancel();
+        ExaminePanel.Close();
         Tooltip.Hide();
         CombatLog.RefreshConsole();
         UpdateLevelUpOverlay();
@@ -480,6 +498,7 @@ public partial class UIRoot : CanvasLayer
     {
         GameOverScreen.Close();
         ChestUI.Close();
+        ExaminePanel.Close();
         CombatLog.RefreshConsole();
         RefreshInputGate();
     }
@@ -515,6 +534,7 @@ public partial class UIRoot : CanvasLayer
         FloorSummaryUI.Close();
         HelpOverlay.Close();
         TargetingOverlay.Cancel();
+        ExaminePanel.Close();
         Tooltip.Hide();
         CombatLog.RefreshConsole();
         UpdateLevelUpOverlay();
@@ -570,6 +590,7 @@ public partial class UIRoot : CanvasLayer
         ShopUI.Close();
         ChestUI.Close();
         TargetingOverlay.Cancel();
+        ExaminePanel.Close();
         Tooltip.Hide();
         CharacterSheet.Toggle();
         RefreshInputGate();
@@ -610,6 +631,7 @@ public partial class UIRoot : CanvasLayer
         else
         {
             TargetingOverlay.Cancel();
+            ExaminePanel.Close();
             PauseMenu.Open();
         }
 
@@ -620,6 +642,26 @@ public partial class UIRoot : CanvasLayer
     {
         HUD.ToggleMinimap();
         Minimap.Toggle();
+    }
+
+    private void ToggleExamine()
+    {
+        if (MainMenu.Visible || GameOverScreen.Visible || _gameManager?.CurrentState != GameManager.GameState.Playing)
+        {
+            return;
+        }
+
+        PauseMenu.Close();
+        Inventory.Close();
+        CharacterSheet.Close();
+        LevelUpOverlay.Close();
+        DialogUI.Close();
+        ShopUI.Close();
+        ChestUI.Close();
+        TargetingOverlay.Cancel();
+        Tooltip.Hide();
+        ExaminePanel.Toggle();
+        RefreshInputGate();
     }
 
     private void ToggleHelp()
@@ -661,6 +703,7 @@ public partial class UIRoot : CanvasLayer
         ShopUI.Close();
         ChestUI.Close();
         TargetingOverlay.Cancel();
+        ExaminePanel.Close();
         Tooltip.Hide();
         MainMenu.Close();
         DevToolsWorkbench.Open();
@@ -677,6 +720,7 @@ public partial class UIRoot : CanvasLayer
     {
         DevToolsWorkbench.Close();
         TargetingOverlay.Cancel();
+        ExaminePanel.Close();
         DebugConsole.Open();
         RefreshInputGate();
     }
@@ -688,6 +732,7 @@ public partial class UIRoot : CanvasLayer
         PauseMenu.Close();
         HelpOverlay.Close();
         ChestUI.Close();
+        ExaminePanel.Close();
         Tooltip.Hide();
         RefreshInputGate();
     }
@@ -699,6 +744,7 @@ public partial class UIRoot : CanvasLayer
         PauseMenu.Close();
         HelpOverlay.Close();
         ChestUI.Close();
+        ExaminePanel.Close();
         Tooltip.Hide();
         RefreshInputGate();
     }
@@ -728,6 +774,7 @@ public partial class UIRoot : CanvasLayer
         HelpOverlay.Close();
         DevToolsWorkbench.Close();
         TargetingOverlay.Cancel();
+        ExaminePanel.Close();
         Tooltip.Hide();
         MainMenu.Open();
         CombatLog.RefreshConsole();
@@ -786,6 +833,7 @@ public partial class UIRoot : CanvasLayer
         HelpOverlay.Close();
         DevToolsWorkbench.Close();
         TargetingOverlay.Cancel();
+        ExaminePanel.Close();
         Tooltip.Hide();
         var world = _gameManager.World;
         if (stats is not null)
@@ -818,6 +866,7 @@ public partial class UIRoot : CanvasLayer
             && !DialogUI.Visible
             && !ShopUI.Visible
             && !ChestUI.Visible
+            && !ExaminePanel.Visible
             && !GameOverScreen.Visible
             && !FloorSummaryUI.Visible
             && !HelpOverlay.Visible
@@ -837,6 +886,7 @@ public partial class UIRoot : CanvasLayer
             || DialogUI.Visible
             || ShopUI.Visible
             || ChestUI.Visible
+            || ExaminePanel.Visible
             || GameOverScreen.Visible
             || FloorSummaryUI.Visible
             || HelpOverlay.Visible
@@ -858,6 +908,7 @@ public partial class UIRoot : CanvasLayer
             || DialogUI.Visible
             || ShopUI.Visible
             || ChestUI.Visible
+            || ExaminePanel.Visible
             || GameOverScreen.Visible
             || FloorSummaryUI.Visible
             || HelpOverlay.Visible

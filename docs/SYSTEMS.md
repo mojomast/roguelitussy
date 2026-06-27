@@ -117,6 +117,7 @@ The rendering layer is event-driven.
 - `Scripts/UI/UIRoot.cs` binds the HUD, menus, overlays, combat log, tooltip, debug console, and input handler to the current runtime services.
 - `FloorSummaryUI` listens for `FloorSummaryReady`, opens as a modal summary during floor travel, blocks gameplay input while visible through `UIRoot`, and auto-dismisses after six seconds unless the player presses a key.
 - `UIRoot` also owns modal interaction surfaces such as dialog, shop, inventory, targeting, and the chest-open confirmation panel. Pressing `F`/`E` near an NPC opens dialog; pressing it near a chest opens the chest panel, which submits the existing `OpenChestAction`.
+- `ExaminePanel` is a `MenuBase` modal opened with `X` during gameplay. It routes through `UIRoot` before normal gameplay input, moves a cursor with `WASD`/arrow keys, and closes with `X` or `Escape`. It reads only visible/explored nearby cells from the current `WorldState`; visible cells may show entities, items, chests, doors, and revealed traps, while explored-but-not-visible cells show remembered tile information only. It does not emit `PlayerActionSubmitted` or mutate simulation state.
 - `HUD` derives a nearby interaction prompt from current world state on turn/UI refresh (`[F] Talk`, `[F] Open Chest`, `[Enter] Descend/Ascend`) and exposes it as a clickable shortcut without changing the underlying keyboard actions.
 
 Current presentation-specific behavior worth knowing:
