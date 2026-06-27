@@ -8,6 +8,8 @@ namespace Godotussy;
 
 public partial class HUD : Control
 {
+    private const float BarAnimationSpeed = 10f;
+    private const float BarPulseSeconds = 0.35f;
     private Panel? _panel;
     private ColorRect? _panelBackground;
     private ColorRect? _panelBorderTop;
@@ -35,14 +37,22 @@ public partial class HUD : Control
     private readonly List<Label> _statPillLabels = new();
     private EventBus? _eventBus;
     private GameManager? _gameManager;
+    private bool _hasHPBarState;
+    private bool _hasEnergyBarState;
+    private float _hpPulseSeconds;
+    private float _energyPulseSeconds;
 
     public string HPText { get; private set; } = "HP: --/--";
 
     public double HPBarValue { get; private set; }
 
+    public double HPBarDisplayedValue { get; private set; }
+
     public double HPBarMaxValue { get; private set; } = 1d;
 
     public double EnergyBarValue { get; private set; }
+
+    public double EnergyBarDisplayedValue { get; private set; }
 
     public double EnergyBarMaxValue { get; private set; } = 1000d;
 
@@ -67,6 +77,18 @@ public partial class HUD : Control
     public string InteractionPromptText { get; private set; } = string.Empty;
 
     public Color HPColor { get; private set; } = Colors.White;
+
+    public float HPPulseIntensity { get; private set; }
+
+    public float EnergyPulseIntensity { get; private set; }
+
+    public Color HPPulseColor { get; private set; } = Colors.White;
+
+    public Color EnergyPulseColor { get; private set; } = Colors.White;
+
+    public Color HPBarFillColor { get; private set; } = Colors.White;
+
+    public Color EnergyBarFillColor { get; private set; } = UiStyle.EnergyBlue();
 
     public bool MinimapVisible { get; private set; } = true;
 
@@ -115,6 +137,15 @@ public partial class HUD : Control
     {
         MinimapVisible = !MinimapVisible;
         Refresh();
+    }
+
+    public override void _Process(double delta)
+    {
+        var changed = AdvanceBarAnimation((float)delta);
+        if (changed)
+        {
+            UpdateHPVisuals();
+        }
     }
 
     public string Snapshot()
@@ -250,8 +281,8 @@ public partial class HUD : Control
             HotbarText = "Hotbar: empty";
             MinimapText = MinimapVisible ? "Minimap: 0 explored, 0 visible" : "Minimap hidden";
             HPColor = Colors.White;
-            HPBarValue = 0d;
-            HPBarMaxValue = 1d;
+            SetHPBarTarget(0d, 1d, animate: false);
+            SetEnergyBarTarget(0d, 1000d, animate: false);
             UpdateLabels();
             return;
         }
@@ -271,8 +302,8 @@ public partial class HUD : Control
                 ? $"Minimap: 0 explored, 0 visible"
                 : "Minimap hidden";
             HPColor = Colors.White;
-            HPBarValue = 0d;
-            HPBarMaxValue = 1d;
+            SetHPBarTarget(0d, 1d, animate: false);
+            SetEnergyBarTarget(0d, 1000d, animate: false);
             UpdateLabels();
             return;
         }
@@ -283,8 +314,7 @@ public partial class HUD : Control
             ? scheduler.GetEnergy(player.Id)
             : player.Stats.Energy;
         EnergyText = $"Energy: {energy}";
-        EnergyBarValue = System.Math.Clamp(energy, 0, 1000);
-        EnergyBarMaxValue = 1000d;
+        SetEnergyBarTarget(System.Math.Clamp(energy, 0, 1000), 1000d, animate: true);
         FloorText = $"Floor: {world.Depth}";
         TurnText = $"Turn: {world.TurnNumber}";
 
@@ -340,9 +370,102 @@ public partial class HUD : Control
     private void UpdateHPState(int currentHp, int maxHp)
     {
         HPText = $"HP: {currentHp}/{maxHp}";
-        HPBarMaxValue = System.Math.Max(1d, maxHp);
-        HPBarValue = System.Math.Clamp((double)currentHp, 0d, HPBarMaxValue);
+        SetHPBarTarget(currentHp, System.Math.Max(1d, maxHp), animate: true);
         UpdateHPColor(currentHp, maxHp);
+    }
+
+    private void SetHPBarTarget(double value, double maxValue, bool animate)
+    {
+        var nextMax = System.Math.Max(1d, maxValue);
+        var nextValue = System.Math.Clamp(value, 0d, nextMax);
+        var previous = HPBarValue;
+        HPBarMaxValue = nextMax;
+        HPBarValue = nextValue;
+
+        if (!_hasHPBarState || !animate)
+        {
+            HPBarDisplayedValue = HPBarValue;
+            _hpPulseSeconds = 0f;
+            HPPulseIntensity = 0f;
+            HPPulseColor = Colors.White;
+            _hasHPBarState = true;
+            return;
+        }
+
+        if (System.Math.Abs(nextValue - previous) > 0.001d)
+        {
+            HPPulseColor = nextValue < previous ? UiStyle.BloodRedBright() : UiStyle.ActiveGreen();
+            _hpPulseSeconds = BarPulseSeconds;
+            HPPulseIntensity = 1f;
+        }
+    }
+
+    private void SetEnergyBarTarget(double value, double maxValue, bool animate)
+    {
+        var nextMax = System.Math.Max(1d, maxValue);
+        var nextValue = System.Math.Clamp(value, 0d, nextMax);
+        var previous = EnergyBarValue;
+        EnergyBarMaxValue = nextMax;
+        EnergyBarValue = nextValue;
+
+        if (!_hasEnergyBarState || !animate)
+        {
+            EnergyBarDisplayedValue = EnergyBarValue;
+            _energyPulseSeconds = 0f;
+            EnergyPulseIntensity = 0f;
+            EnergyPulseColor = Colors.White;
+            _hasEnergyBarState = true;
+            return;
+        }
+
+        if (System.Math.Abs(nextValue - previous) > 0.001d)
+        {
+            EnergyPulseColor = nextValue < previous ? UiStyle.WarningOrange() : UiStyle.BrightGold();
+            _energyPulseSeconds = BarPulseSeconds;
+            EnergyPulseIntensity = 1f;
+        }
+    }
+
+    private bool AdvanceBarAnimation(float delta)
+    {
+        var changed = false;
+        (HPBarDisplayedValue, _hpPulseSeconds, HPPulseIntensity, var hpChanged) = AdvanceDisplayedValue(_hpPulseSeconds, HPPulseIntensity, HPBarDisplayedValue, HPBarValue, delta);
+        (EnergyBarDisplayedValue, _energyPulseSeconds, EnergyPulseIntensity, var energyChanged) = AdvanceDisplayedValue(_energyPulseSeconds, EnergyPulseIntensity, EnergyBarDisplayedValue, EnergyBarValue, delta);
+        changed |= hpChanged;
+        changed |= energyChanged;
+        return changed;
+    }
+
+    private static (double Displayed, float PulseSeconds, float PulseIntensity, bool Changed) AdvanceDisplayedValue(float pulseSeconds, float pulseIntensity, double displayed, double target, float delta)
+    {
+        var changed = false;
+        var clampedDelta = System.Math.Max(0f, delta);
+        if (System.Math.Abs(displayed - target) > 0.001d)
+        {
+            var factor = System.Math.Clamp(clampedDelta * BarAnimationSpeed, 0f, 1f);
+            var next = displayed + ((target - displayed) * factor);
+            if (System.Math.Abs(next - target) <= 0.001d)
+            {
+                next = target;
+            }
+
+            displayed = next;
+            changed = true;
+        }
+
+        if (pulseSeconds > 0f)
+        {
+            pulseSeconds = System.Math.Max(0f, pulseSeconds - clampedDelta);
+            pulseIntensity = BarPulseSeconds <= 0f ? 0f : pulseSeconds / BarPulseSeconds;
+            changed = true;
+        }
+        else if (pulseIntensity > 0f)
+        {
+            pulseIntensity = 0f;
+            changed = true;
+        }
+
+        return (displayed, pulseSeconds, pulseIntensity, changed);
     }
 
     private void EnsureVisualTree()
@@ -636,8 +759,20 @@ public partial class HUD : Control
             _energyValueLabel.Modulate = UiStyle.EnergyBlue();
         }
 
-        LayoutBar(_hpBarBackground, _hpBarFill, HPBarValue, HPBarMaxValue, HPColor);
-        LayoutBar(_energyBarBackground, _energyBarFill, EnergyBarValue, EnergyBarMaxValue, UiStyle.EnergyBlue(), y: 37f);
+        HPBarFillColor = BlendColor(HPColor, HPPulseColor, HPPulseIntensity * 0.65f);
+        EnergyBarFillColor = BlendColor(UiStyle.EnergyBlue(), EnergyPulseColor, EnergyPulseIntensity * 0.60f);
+        LayoutBar(_hpBarBackground, _hpBarFill, HPBarDisplayedValue, HPBarMaxValue, HPBarFillColor);
+        LayoutBar(_energyBarBackground, _energyBarFill, EnergyBarDisplayedValue, EnergyBarMaxValue, EnergyBarFillColor, y: 37f);
+    }
+
+    private static Color BlendColor(Color from, Color to, float amount)
+    {
+        var t = System.Math.Clamp(amount, 0f, 1f);
+        return new Color(
+            from.R + ((to.R - from.R) * t),
+            from.G + ((to.G - from.G) * t),
+            from.B + ((to.B - from.B) * t),
+            from.A + ((to.A - from.A) * t));
     }
 
     private void UpdateStatPills()

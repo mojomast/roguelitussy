@@ -19,6 +19,7 @@ public sealed class UISmokeTests : ITestSuite
         registry.Add("UI.GameManager floor travel succeeds when arrival stair is occupied", GameManagerFloorTravelFindsNearbyArrival);
         registry.Add("UI.GameManager floor travel restores mutated arrival stairs", GameManagerFloorTravelRepairsMutatedArrivalTile);
         registry.Add("UI.HUD updates from bus and exposes keyboard toggles", HudUpdatesFromBus);
+        registry.Add("UI.HUD animates HP and energy bar state", HudAnimatesHpAndEnergyBars);
         registry.Add("UI.HUD shows derived quick-use hotbar", HudShowsDerivedQuickUseHotbar);
         registry.Add("UI.Quick-use number key submits potion action", QuickUseNumberKeySubmitsPotionAction);
         registry.Add("UI.Quick-use rejects aimed and empty slots safely", QuickUseRejectsAimedAndEmptySlotsSafely);
@@ -250,6 +251,48 @@ public sealed class UISmokeTests : ITestSuite
         context.Bus.EmitStatusEffectRemoved(player.Id, StatusEffectType.Poisoned);
         container = FindChild<HBoxContainer>(panel, "StatusIconsContainer");
         Expect.True(FindChild<TextureRect>(container!, "StatusIcon_poisoned") is null, "HUD should remove the poison icon when the effect is removed.");
+    }
+
+    private static void HudAnimatesHpAndEnergyBars()
+    {
+        var context = CreateContext();
+        var hud = new HUD();
+        hud.Bind(context.GameManager, context.Bus);
+
+        Expect.Equal(40d, hud.HPBarValue, "Initial HP target should match player HP.");
+        Expect.Equal(40d, hud.HPBarDisplayedValue, "Initial HP display should start at the target without animation lag.");
+        Expect.Equal(0f, hud.HPPulseIntensity, "Initial HP pulse should be idle.");
+
+        context.Player.Stats.HP = 18;
+        context.Bus.EmitHPChanged(context.Player.Id, 18, 40);
+
+        Expect.Equal(18d, hud.HPBarValue, "HP target should update immediately after damage.");
+        Expect.Equal(40d, hud.HPBarDisplayedValue, "Displayed HP should retain the previous value until _Process advances interpolation.");
+        Expect.Equal(1f, hud.HPPulseIntensity, "Damage should start a visible HP pulse.");
+        AssertColor(UiStyle.BloodRedBright(), hud.HPPulseColor, "Damage pulse should use the red danger tint.");
+
+        hud._Process(0.05d);
+        Expect.True(hud.HPBarDisplayedValue < 40d && hud.HPBarDisplayedValue > 18d, "HP display should interpolate toward the damage target.");
+        Expect.True(hud.HPPulseIntensity < 1f && hud.HPPulseIntensity > 0f, "HP pulse should fade deterministically as process time advances.");
+        Expect.True(!ColorsEqual(hud.HPBarFillColor, hud.HPColor), "Active HP pulse should blend the fill away from its base HP color.");
+
+        hud._Process(1.0d);
+        Expect.Equal(18d, hud.HPBarDisplayedValue, "A large process step should settle displayed HP on the target.");
+        Expect.Equal(0f, hud.HPPulseIntensity, "HP pulse should finish after its short duration.");
+
+        context.Player.Stats.HP = 30;
+        context.Bus.EmitHPChanged(context.Player.Id, 30, 40);
+        AssertColor(UiStyle.ActiveGreen(), hud.HPPulseColor, "Healing pulse should use the green recovery tint.");
+
+        var energyBefore = hud.EnergyBarValue;
+        context.Player.Stats.Energy = 600;
+        ((TurnScheduler)context.GameManager.Scheduler!).Register(context.Player);
+        context.Bus.EmitTurnCompleted();
+
+        Expect.True(hud.EnergyBarValue > energyBefore, "Energy target should update on turn refresh when scheduler energy changes.");
+        Expect.Equal(energyBefore, hud.EnergyBarDisplayedValue, "Displayed energy should retain the previous value until interpolation advances.");
+        Expect.Equal(1f, hud.EnergyPulseIntensity, "Energy changes should start a lightweight pulse.");
+        AssertColor(UiStyle.BrightGold(), hud.EnergyPulseColor, "Energy gain should use the gold readying tint.");
     }
 
     private static void HudShowsDerivedQuickUseHotbar()
@@ -1531,6 +1574,15 @@ public sealed class UISmokeTests : ITestSuite
             && System.Math.Abs(expected.B - actual.B) <= tolerance
             && System.Math.Abs(expected.A - actual.A) <= tolerance,
             message);
+    }
+
+    private static bool ColorsEqual(Color left, Color right)
+    {
+        const float tolerance = 0.001f;
+        return System.Math.Abs(left.R - right.R) <= tolerance
+            && System.Math.Abs(left.G - right.G) <= tolerance
+            && System.Math.Abs(left.B - right.B) <= tolerance
+            && System.Math.Abs(left.A - right.A) <= tolerance;
     }
 
     private static int CountVisibleTiles(IWorldState world)

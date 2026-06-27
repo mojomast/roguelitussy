@@ -67,3 +67,11 @@ The HUD shows a small runtime hotbar derived from the first five usable non-equi
 The minimap keeps the existing HUD summary and gameplay toggle behavior, but now reserves a compact legend band inside the overlay. The legend identifies floor, door, stairs, trap, player, enemy, NPC, item, and chest markers. Visible enemies, NPCs, items, and chests draw small colored markers over explored tile colors; trap, door, and stair tiles keep distinct colors aligned with the legend.
 
 **Files modified:** `Scripts/UI/Minimap.cs`, `Scripts/UI/UiStyle.cs`, `Tests/UITests/UISmokeTests.cs`, `docs/SYSTEMS.md`, `docs/FEATURES.md`.
+
+## Animated HUD Bars
+
+**Block:** 8  **Status:** Implemented
+
+The HUD keeps HP and energy text values immediate, but the visible bar fills now interpolate toward their latest targets over `_Process(...)` frames. HP changes trigger a short red damage pulse or green healing pulse; energy changes trigger a warning/gold pulse. The state is exposed through HUD properties so UITests can verify target values, displayed values, and pulse behavior without relying on Godot rendering output.
+
+**Files modified:** `Scripts/UI/HUD.cs`, `Tests/UITests/UISmokeTests.cs`, `docs/SYSTEMS.md`, `docs/FEATURES.md`.
