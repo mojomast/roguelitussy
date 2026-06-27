@@ -104,7 +104,7 @@ public partial class UIRoot : CanvasLayer
         Minimap.Bind(_gameManager, _eventBus);
         DevToolsWorkbench.Bind(_gameManager, _eventBus, _content);
         MainMenu.Bind(_gameManager, _eventBus);
-        PauseMenu.Bind(_eventBus);
+        PauseMenu.Bind(_gameManager, _eventBus);
         DebugConsole.Bind(_gameManager, _eventBus, _content);
         DebugOverlay.Bind(_gameManager, _eventBus);
         TargetingOverlay.Bind(_gameManager, _eventBus, _content);

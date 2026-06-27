@@ -1,4 +1,5 @@
 using Godot;
+using System.Globalization;
 
 namespace Godotussy;
 
@@ -20,6 +21,7 @@ public partial class PauseMenu : MenuBase
 
     private readonly System.Collections.Generic.List<PauseAction> _actions = new();
     private EventBus? _eventBus;
+    private GameManager? _gameManager;
 
     public event System.Action? ResumeRequested;
 
@@ -41,18 +43,34 @@ public partial class PauseMenu : MenuBase
 
     public void Bind(EventBus? eventBus)
     {
+        Bind(null, eventBus);
+    }
+
+    public void Bind(GameManager? gameManager, EventBus? eventBus)
+    {
         _eventBus = eventBus;
+        _gameManager = gameManager;
+        RebuildMenuText();
     }
 
     protected override string BuildBodyText()
     {
+        var stats = ResolveRunStats();
         return string.Join(
             "\n",
             "Expedition command is paused.",
             "Resume keeps the current turn state intact.",
             "Save slots preserve active and cached floors.",
             "Review, Help, and Workshop are safe tools.",
-            "Return to Title or Quit ends this shell session.");
+            "Return to Title or Quit ends this shell session.",
+            string.Empty,
+            BuildRunStatsText(stats));
+    }
+
+    public override void Open()
+    {
+        RebuildMenuText();
+        base.Open();
     }
 
     protected override string BuildFooterText()
@@ -149,4 +167,25 @@ public partial class PauseMenu : MenuBase
         Close();
         ResumeRequested?.Invoke();
     }
+
+    private RunStats ResolveRunStats()
+    {
+        _gameManager ??= GetNodeOrNull<GameManager>("/root/GameManager")
+            ?? AutoloadResolver.Resolve<GameManager>(this, "GameManager");
+        return _gameManager?.CurrentRunStats ?? new RunStats("Rook", 0, 0, 0, 0, 0, 0, 0, "Unknown", string.Empty, 0);
+    }
+
+    private static string BuildRunStatsText(RunStats stats)
+    {
+        return string.Join(
+            "\n",
+            "─── CURRENT RUN ───────────────────",
+            $"Floor    {FormatStat(stats.FloorReached),5}       Turns {FormatStat(stats.TotalTurns),8}",
+            $"Enemies  {FormatStat(stats.EnemiesKilled),5}       Gold  {FormatStat(stats.GoldCollected),8}",
+            $"Damage   {FormatStat(stats.DamageTaken),5}       Items {FormatStat(stats.ItemsFound),8}",
+            $"Seed     {FormatStat(stats.Seed),5}",
+            "───────────────────────────────────");
+    }
+
+    private static string FormatStat(int value) => value.ToString("N0", CultureInfo.InvariantCulture);
 }
