@@ -119,6 +119,7 @@ The rendering layer is event-driven.
 - `UIRoot` also owns modal interaction surfaces such as dialog, shop, inventory, targeting, and the chest-open confirmation panel. Pressing `F`/`E` near an NPC opens dialog; pressing it near a chest opens the chest panel, which submits the existing `OpenChestAction`.
 - `ExaminePanel` is a `MenuBase` modal opened with `X` during gameplay. It routes through `UIRoot` before normal gameplay input, moves a cursor with `WASD`/arrow keys, and closes with `X` or `Escape`. It reads only visible/explored nearby cells from the current `WorldState`; visible cells may show entities, items, chests, doors, and revealed traps, while explored-but-not-visible cells show remembered tile information only. It does not emit `PlayerActionSubmitted` or mutate simulation state.
 - `HUD` derives a nearby interaction prompt from current world state on turn/UI refresh (`[F] Talk`, `[F] Open Chest`, `[Enter] Descend/Ascend`) and exposes it as a clickable shortcut without changing the underlying keyboard actions.
+- `HUD` also derives a runtime-only quick-use hotbar from the first five usable non-equipment inventory entries. Number keys `1`-`5` are routed only during normal gameplay, submit regular `UseItemAction` instances for self/no-target consumables, and log a warning instead of consuming aimed items that require the inventory targeting overlay.
 
 Current presentation-specific behavior worth knowing:
 

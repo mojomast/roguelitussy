@@ -1,9 +1,45 @@
+using System.Collections.Generic;
 using Roguelike.Core;
 
 namespace Godotussy;
 
 public static class UIActionFactory
 {
+    public const int QuickUseSlotCount = 5;
+
+    public static IReadOnlyList<ItemInstance> GetQuickUseItems(IWorldState? world, IContentDatabase? content, EntityId actorId, int maxSlots = QuickUseSlotCount)
+    {
+        var result = new List<ItemInstance>();
+        if (world is null || content is null || maxSlots <= 0)
+        {
+            return result;
+        }
+
+        var inventory = world.GetEntity(actorId)?.GetComponent<InventoryComponent>();
+        if (inventory is null)
+        {
+            return result;
+        }
+
+        foreach (var item in inventory.Items)
+        {
+            if (!content.TryGetItemTemplate(item.TemplateId, out var template)
+                || template.Slot != EquipSlot.None
+                || string.IsNullOrWhiteSpace(template.UseEffect))
+            {
+                continue;
+            }
+
+            result.Add(item);
+            if (result.Count >= maxSlots)
+            {
+                break;
+            }
+        }
+
+        return result;
+    }
+
     public static IAction? CreateDirectionalAction(IWorldState? world, EntityId actorId, Position delta)
     {
         if (world is null || delta == Position.Zero)

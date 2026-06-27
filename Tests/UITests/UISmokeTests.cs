@@ -19,6 +19,9 @@ public sealed class UISmokeTests : ITestSuite
         registry.Add("UI.GameManager floor travel succeeds when arrival stair is occupied", GameManagerFloorTravelFindsNearbyArrival);
         registry.Add("UI.GameManager floor travel restores mutated arrival stairs", GameManagerFloorTravelRepairsMutatedArrivalTile);
         registry.Add("UI.HUD updates from bus and exposes keyboard toggles", HudUpdatesFromBus);
+        registry.Add("UI.HUD shows derived quick-use hotbar", HudShowsDerivedQuickUseHotbar);
+        registry.Add("UI.Quick-use number key submits potion action", QuickUseNumberKeySubmitsPotionAction);
+        registry.Add("UI.Quick-use rejects aimed and empty slots safely", QuickUseRejectsAimedAndEmptySlotsSafely);
         registry.Add("UI.Minimap reflects explored tiles and gameplay toggles", MinimapReflectsExplorationAndToggles);
         registry.Add("UI.MainMenu character creation affects the starting run", MainMenuCharacterCreationAffectsStartingRun);
         registry.Add("UI.GameManager enemy turns resolve after player action", GameManagerEnemyTurnsResolveAfterPlayerAction);
@@ -247,6 +250,65 @@ public sealed class UISmokeTests : ITestSuite
         context.Bus.EmitStatusEffectRemoved(player.Id, StatusEffectType.Poisoned);
         container = FindChild<HBoxContainer>(panel, "StatusIconsContainer");
         Expect.True(FindChild<TextureRect>(container!, "StatusIcon_poisoned") is null, "HUD should remove the poison icon when the effect is removed.");
+    }
+
+    private static void HudShowsDerivedQuickUseHotbar()
+    {
+        var context = CreateContext(
+            new ItemInstance { TemplateId = "potion_health", StackCount = 2, IsIdentified = true },
+            new ItemInstance { TemplateId = "sword_iron", IsIdentified = true },
+            new ItemInstance { TemplateId = "scroll_fireball", IsIdentified = true });
+        var hud = new HUD();
+        hud.Bind(context.GameManager, context.Bus);
+
+        Expect.True(hud.HotbarText.Contains("1:Health Potion x2", System.StringComparison.Ordinal), "HUD should show stack count for the first quick-use consumable.");
+        Expect.True(hud.HotbarText.Contains("2:Scroll of Fireball (aim)", System.StringComparison.Ordinal), "HUD should mark aimed quick-use entries as requiring aim.");
+        Expect.False(hud.HotbarText.Contains("Iron Sword", System.StringComparison.Ordinal), "HUD quick-use slots should skip equipment.");
+
+        context.Player.GetComponent<InventoryComponent>()!.Add(new ItemInstance { TemplateId = "potion_haste", IsIdentified = true });
+        context.Bus.EmitInventoryChanged(context.Player.Id);
+
+        Expect.True(hud.HotbarText.Contains("Haste Potion", System.StringComparison.Ordinal), "HUD hotbar should refresh when the inventory changes.");
+    }
+
+    private static void QuickUseNumberKeySubmitsPotionAction()
+    {
+        var context = CreateContext(new ItemInstance { TemplateId = "potion_health", StackCount = 2, IsIdentified = true });
+        context.GameManager.LoadWorld(context.World);
+        var input = new InputHandler();
+        input.Bind(context.GameManager, context.Bus);
+
+        IAction? submitted = null;
+        context.Bus.PlayerActionSubmitted += action => submitted = action;
+
+        Expect.True(input.HandleKey(Key.Key1), "Number key 1 should route to the first quick-use slot during gameplay.");
+        Expect.True(submitted is UseItemAction, "Quick-using a potion should emit the normal UseItemAction path.");
+    }
+
+    private static void QuickUseRejectsAimedAndEmptySlotsSafely()
+    {
+        var context = CreateContext(new ItemInstance { TemplateId = "scroll_fireball", IsIdentified = true });
+        context.GameManager.LoadWorld(context.World);
+        var input = new InputHandler();
+        input.Bind(context.GameManager, context.Bus);
+
+        IAction? submitted = null;
+        var logs = new List<string>();
+        context.Bus.PlayerActionSubmitted += action => submitted = action;
+        context.Bus.LogMessage += (message, category) =>
+        {
+            if (category == LogCategory.Warning)
+            {
+                logs.Add(message);
+            }
+        };
+
+        Expect.True(input.HandleKey(Key.Key1), "Aimed quick-use slot should consume the hotkey without blind item use.");
+        Expect.True(submitted is null, "Aimed quick-use items should not submit an action without a target.");
+        Expect.True(logs.Any(message => message.Contains("needs targeting", System.StringComparison.Ordinal)), "Aimed quick-use rejection should explain that targeting is required.");
+
+        Expect.True(input.HandleKey(Key.Five), "Empty quick-use slot should still handle the hotkey.");
+        Expect.True(logs.Any(message => message.Contains("Quick slot 5 is empty", System.StringComparison.Ordinal)), "Empty quick-use slot should log a safe warning.");
     }
 
     private static void GameManagerEnemyTurnsResolveAfterPlayerAction()

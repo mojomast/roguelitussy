@@ -27,6 +27,7 @@ public partial class HUD : Control
     private Label? _progressLabel;
     private Label? _statsLabel;
     private Label? _effectsLabel;
+    private Label? _hotbarLabel;
     private HBoxContainer? _statusIconsContainer;
     private Label? _mapLabel;
     private UiMouseLabel? _interactionPromptLabel;
@@ -59,6 +60,8 @@ public partial class HUD : Control
 
     public string StatusEffectsText { get; private set; } = string.Empty;
 
+    public string HotbarText { get; private set; } = "Hotbar: empty";
+
     public string MinimapText { get; private set; } = "Map hidden";
 
     public string InteractionPromptText { get; private set; } = string.Empty;
@@ -85,6 +88,7 @@ public partial class HUD : Control
             _eventBus.LoadCompleted -= OnLoadCompleted;
             _eventBus.CurrencyChanged -= OnCurrencyChanged;
             _eventBus.ProgressionChanged -= OnProgressionChanged;
+            _eventBus.InventoryChanged -= OnInventoryChanged;
             _eventBus.StatusEffectApplied -= OnStatusEffectChanged;
             _eventBus.StatusEffectRemoved -= OnStatusEffectChanged;
         }
@@ -99,6 +103,7 @@ public partial class HUD : Control
             _eventBus.LoadCompleted += OnLoadCompleted;
             _eventBus.CurrencyChanged += OnCurrencyChanged;
             _eventBus.ProgressionChanged += OnProgressionChanged;
+            _eventBus.InventoryChanged += OnInventoryChanged;
             _eventBus.StatusEffectApplied += OnStatusEffectChanged;
             _eventBus.StatusEffectRemoved += OnStatusEffectChanged;
         }
@@ -135,6 +140,11 @@ public partial class HUD : Control
         if (!string.IsNullOrWhiteSpace(StatusEffectsText))
         {
             builder.AppendLine(StatusEffectsText);
+        }
+
+        if (!string.IsNullOrWhiteSpace(HotbarText))
+        {
+            builder.AppendLine(HotbarText);
         }
 
         builder.Append(MinimapText);
@@ -198,6 +208,14 @@ public partial class HUD : Control
         }
     }
 
+    private void OnInventoryChanged(EntityId entityId)
+    {
+        if (_gameManager?.World?.Player?.Id == entityId)
+        {
+            Refresh();
+        }
+    }
+
     private void OnStatusEffectChanged(EntityId entityId, StatusEffectInstance effect)
     {
         if (_gameManager?.World?.Player?.Id == entityId)
@@ -229,6 +247,7 @@ public partial class HUD : Control
             StatsText = string.Empty;
             GoldText = string.Empty;
             StatusEffectsText = string.Empty;
+            HotbarText = "Hotbar: empty";
             MinimapText = MinimapVisible ? "Minimap: 0 explored, 0 visible" : "Minimap hidden";
             HPColor = Colors.White;
             HPBarValue = 0d;
@@ -247,6 +266,7 @@ public partial class HUD : Control
             StatsText = string.Empty;
             GoldText = string.Empty;
             StatusEffectsText = string.Empty;
+            HotbarText = "Hotbar: empty";
             MinimapText = MinimapVisible
                 ? $"Minimap: 0 explored, 0 visible"
                 : "Minimap hidden";
@@ -277,6 +297,7 @@ public partial class HUD : Control
                 : $"Lv: {progression.Level}  XP: {progression.Experience}/{progression.ExperienceToNextLevel}")
             : string.Empty;
         StatsText = BuildStatsText(player, progression);
+        HotbarText = BuildHotbarText(world, player.Id, _gameManager?.Content);
 
         var effects = StatusEffectProcessor.GetEffects(player);
         StatusEffectsText = effects.Count == 0
@@ -363,7 +384,8 @@ public partial class HUD : Control
         _progressLabel = CreateLabel("ProgressLabel", new Vector2(12f, 68f), new Vector2(416f, 18f));
         _statsLabel = CreateLabel("StatsLabel", new Vector2(12f, 90f), new Vector2(416f, 18f));
         _effectsLabel = CreateLabel("EffectsLabel", new Vector2(12f, 112f), new Vector2(416f, 18f));
-        _mapLabel = CreateLabel("MapLabel", new Vector2(12f, 134f), new Vector2(416f, 18f));
+        _hotbarLabel = CreateLabel("HotbarLabel", new Vector2(12f, 134f), new Vector2(416f, 18f));
+        _mapLabel = CreateLabel("MapLabel", new Vector2(12f, 156f), new Vector2(416f, 18f));
         _interactionPromptLabel = new UiMouseLabel
         {
             Name = "InteractionPromptLabel",
@@ -392,6 +414,7 @@ public partial class HUD : Control
         _panel.AddChild(_progressLabel);
         _panel.AddChild(_statsLabel);
         _panel.AddChild(_effectsLabel);
+        _panel.AddChild(_hotbarLabel);
 
         _statusIconsContainer = new HBoxContainer
         {
@@ -554,7 +577,7 @@ public partial class HUD : Control
         ApplyResponsiveLayout();
         UpdateHPVisuals();
 
-        if (_headerLabel is null || _progressLabel is null || _statsLabel is null || _effectsLabel is null || _mapLabel is null)
+        if (_headerLabel is null || _progressLabel is null || _statsLabel is null || _effectsLabel is null || _hotbarLabel is null || _mapLabel is null)
         {
             return;
         }
@@ -570,6 +593,8 @@ public partial class HUD : Control
         _effectsLabel.Text = StatusEffectsText;
         _effectsLabel.Visible = !string.IsNullOrWhiteSpace(StatusEffectsText);
         _effectsLabel.Modulate = UiStyle.WarningOrange();
+        _hotbarLabel.Text = HotbarText;
+        _hotbarLabel.Modulate = UiStyle.BrightGold();
         _mapLabel.Text = MinimapText;
         _mapLabel.Modulate = UiStyle.FaintText();
         UpdateInteractionPromptVisual();
@@ -643,7 +668,7 @@ public partial class HUD : Control
         var width = System.Math.Min(440f, System.Math.Max(0f, viewportWidth - 24f));
         var contentWidth = System.Math.Max(0f, width - 24f);
         _panel.Position = new Vector2(8f, 8f);
-        _panel.Size = new Vector2(width, 168f);
+        _panel.Size = new Vector2(width, 190f);
         _panel.Modulate = UiStyle.GoldTrim();
         LayoutPanelChrome(_panel.Size);
 
@@ -656,13 +681,14 @@ public partial class HUD : Control
         SetControlBounds(_statsLabel, 12f, 96f, contentWidth, 18f);
         LayoutStatPills(12f, 96f, contentWidth);
         SetControlBounds(_effectsLabel, 12f, 116f, contentWidth, 18f);
+        SetControlBounds(_hotbarLabel, 12f, 134f, contentWidth, 18f);
         if (_statusIconsContainer is not null)
         {
-            _statusIconsContainer.Position = new Vector2(12f, 134f);
+            _statusIconsContainer.Position = new Vector2(12f, 152f);
             _statusIconsContainer.Size = new Vector2(contentWidth, 22f);
         }
 
-        SetControlBounds(_mapLabel, 12f, 150f, contentWidth, 18f);
+        SetControlBounds(_mapLabel, 12f, 172f, contentWidth, 18f);
         LayoutInteractionPrompt();
     }
 
@@ -784,6 +810,37 @@ public partial class HUD : Control
         }
 
         return builder.ToString();
+    }
+
+    private static string BuildHotbarText(IWorldState world, EntityId playerId, IContentDatabase? content)
+    {
+        var items = UIActionFactory.GetQuickUseItems(world, content, playerId);
+        if (items.Count == 0 || content is null)
+        {
+            return "Hotbar: empty";
+        }
+
+        var parts = new List<string>();
+        for (var i = 0; i < items.Count; i++)
+        {
+            var item = items[i];
+            var label = content.TryGetItemTemplate(item.TemplateId, out var template)
+                ? template.DisplayName
+                : item.TemplateId;
+            if (item.StackCount > 1)
+            {
+                label += $" x{item.StackCount}";
+            }
+
+            if (template?.RequiresTargetSelection == true)
+            {
+                label += " (aim)";
+            }
+
+            parts.Add($"{i + 1}:{label}");
+        }
+
+        return "Hotbar: " + string.Join("  ", parts);
     }
 
     private static Label CreateLabel(string name, Vector2 position, Vector2 size)

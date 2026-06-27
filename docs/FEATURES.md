@@ -47,3 +47,13 @@ The combat log now renders categorized messages from `EventBus.LogMessage`. Cate
 Examine mode opens a `MenuBase` panel at the player's position and lets the player inspect visible or already explored nearby map cells without submitting gameplay actions or mutating `WorldState`. Visible cells can describe the tile, entity, chest, revealed trap, and ground items from existing state/content templates; explored-but-not-visible cells only show remembered tile information to avoid revealing current hidden details.
 
 **Files modified:** `Scripts/UI/ExaminePanel.cs`, `Scripts/UI/InputHandler.cs`, `Scripts/UI/UIRoot.cs`, `Compat/Godot/GodotStubs.cs`, `Tests/UITests/ExaminePanelTests.cs`, `docs/SYSTEMS.md`, `docs/FEATURES.md`.
+
+## Quick-Use Hotbar
+
+**Block:** 6  **Status:** Implemented
+
+**Keybinds:** `1`-`5` quick-use visible hotbar slots during normal gameplay
+
+The HUD shows a small runtime hotbar derived from the first five usable non-equipment inventory entries. Number keys submit the same `UseItemAction` path as inventory use for safe consumables such as potions. Aimed scrolls remain visible but marked `(aim)` and are not consumed blindly; pressing their hotkey logs a warning and instructs the player to aim them from inventory.
+
+**Files modified:** `Scripts/UI/HUD.cs`, `Scripts/UI/InputHandler.cs`, `Scripts/UI/UIActionFactory.cs`, `Tests/UITests/UISmokeTests.cs`, `docs/SYSTEMS.md`, `docs/FEATURES.md`.

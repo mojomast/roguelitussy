@@ -64,6 +64,11 @@ public partial class InputHandler : Node
             Key.Space or Key.Period => Submit(UIActionFactory.CreateWaitAction(world, playerId)),
             Key.G => Submit(UIActionFactory.CreatePickupAction(world, _gameManager?.Content, playerId, _gameManager?.AutoEquipUpgradesEnabled == true)),
             Key.Enter or Key.KpEnter => Submit(UIActionFactory.CreateStairsAction(world, playerId)),
+            Key.Key1 => HandleQuickUse(world, playerId, 0),
+            Key.Key2 => HandleQuickUse(world, playerId, 1),
+            Key.Key3 => HandleQuickUse(world, playerId, 2),
+            Key.Key4 => HandleQuickUse(world, playerId, 3),
+            Key.Key5 => HandleQuickUse(world, playerId, 4),
             Key.I => Raise(InventoryRequested),
             Key.C => Raise(CharacterSheetRequested),
             Key.E => Raise(InteractRequested),
@@ -80,6 +85,35 @@ public partial class InputHandler : Node
     private bool HandleDirectionalInput(IWorldState world, EntityId playerId, Position delta)
     {
         return Submit(UIActionFactory.CreateDirectionalAction(world, playerId, delta));
+    }
+
+    private bool HandleQuickUse(IWorldState world, EntityId playerId, int slotIndex)
+    {
+        var content = _gameManager?.Content;
+        var items = UIActionFactory.GetQuickUseItems(world, content, playerId);
+        if (slotIndex < 0 || slotIndex >= items.Count)
+        {
+            _eventBus?.EmitLogMessage($"Quick slot {slotIndex + 1} is empty.", LogCategory.Warning);
+            return true;
+        }
+
+        var item = items[slotIndex];
+        if (content is not null
+            && content.TryGetItemTemplate(item.TemplateId, out var template)
+            && template.RequiresTargetSelection)
+        {
+            _eventBus?.EmitLogMessage($"{template.DisplayName} needs targeting. Open inventory and aim it from there.", LogCategory.Warning);
+            return true;
+        }
+
+        var action = UIActionFactory.CreateUseItemAction(world, content, playerId, item.InstanceId);
+        if (action is null)
+        {
+            _eventBus?.EmitLogMessage($"Quick slot {slotIndex + 1} cannot be used right now.", LogCategory.Warning);
+            return true;
+        }
+
+        return Submit(action);
     }
 
     private bool Submit(IAction? action)
