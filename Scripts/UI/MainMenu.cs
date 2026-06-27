@@ -801,6 +801,12 @@ public partial class MainMenu : MenuBase
 
     private void RebuildOptions()
     {
+        var selectedAction = ResolveSelectedAction();
+        if (selectedAction == MenuAction.None)
+        {
+            selectedAction = MenuAction.Start;
+        }
+
         _optionActions.Clear();
         ConfigureOptions();
         AddSection("EXPEDITION");
@@ -827,6 +833,12 @@ public partial class MainMenu : MenuBase
         AddOption("Dev Tools", MenuAction.DevTools);
         AddOption("Help", MenuAction.Help);
         AddOption("Quit", MenuAction.Quit);
+
+        var restoredIndex = _optionActions.IndexOf(selectedAction);
+        if (restoredIndex >= 0)
+        {
+            SetSelection(restoredIndex);
+        }
     }
 
     private void AddSection(string title)

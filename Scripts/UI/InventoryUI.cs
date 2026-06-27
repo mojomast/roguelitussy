@@ -461,7 +461,8 @@ public partial class InventoryUI : Control
     {
         _activeTooltip?.Hide();
         _activeTooltip = ResolveTooltip();
-        _activeTooltip.ShowItemTooltip(template, item, ResolveSelectedSlotTooltipPosition(), comparisonText, IsEquipped(item), ResolveEquippedSlot(item));
+        var tooltipPosition = _activeTooltip.ResolveBottomRightPosition(GetViewportRect().Size);
+        _activeTooltip.ShowItemTooltip(template, item, tooltipPosition, comparisonText, IsEquipped(item), ResolveEquippedSlot(item));
     }
 
     private Tooltip ResolveTooltip()
@@ -943,10 +944,12 @@ public partial class InventoryUI : Control
         _headerTitleLabel.Position = _headerBar.Position + new Vector2(10f, 5f);
         _headerTitleLabel.Size = new Vector2(110f, HeaderHeight);
         _headerStatsLabel.Position = _headerBar.Position + new Vector2(126f, 6f);
-        _headerStatsLabel.Size = new Vector2(520f, HeaderHeight);
+        var sortWidth = System.Math.Min(140f, System.Math.Max(80f, _headerBar.Size.X * 0.25f));
+        var statsRight = _headerBar.Position.X + _headerBar.Size.X - sortWidth - 12f;
+        _headerStatsLabel.Size = new Vector2(System.Math.Max(40f, statsRight - _headerStatsLabel.Position.X), HeaderHeight);
         _headerStatsLabel.Text = $"{_items.Count}/{inventoryCapacity} stacks  ▪  {ResolveTotalCarriedItems()} items  ▪  Wt: {ResolveTotalWeight():0.0}  ▪  Val: {ResolveTotalValue()}  ▪  Gold: {ResolveGold()}";
-        _sortLabel.Position = _headerBar.Position + new Vector2(_headerBar.Size.X - 150f, 6f);
-        _sortLabel.Size = new Vector2(140f, HeaderHeight);
+        _sortLabel.Position = new Vector2(_headerBar.Position.X + _headerBar.Size.X - sortWidth - 8f, _headerBar.Position.Y + 6f);
+        _sortLabel.Size = new Vector2(sortWidth, HeaderHeight);
         _sortLabel.Text = $"[Tab] Sort: {CurrentSort}";
     }
 

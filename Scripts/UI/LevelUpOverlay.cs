@@ -178,7 +178,7 @@ public partial class LevelUpOverlay : Control
         }
 
         builder.AppendLine();
-        builder.AppendLine($"[b][color={UiStyle.ToHex(UiStyle.MutedText())}]SELECTED PERK[/color][/b]");
+        builder.AppendLine($"[b][color={UiStyle.ToHex(UiStyle.MutedText())}]Selected Perk[/color][/b]");
         builder.AppendLine($"[b][color={UiStyle.ToHex(UiStyle.BrightGold())}]{ItemRarityPresentation.EscapeBBCode(selected.DisplayName)}[/color][/b]");
         builder.AppendLine($"[color={UiStyle.ToHex(UiStyle.Parchment())}]{ItemRarityPresentation.EscapeBBCode(selected.Description)}[/color]");
         builder.AppendLine();

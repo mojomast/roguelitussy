@@ -76,6 +76,8 @@ public partial class Tooltip : Control
             lines.Add($"Equipped: {equippedSlot}");
         }
 
+        lines.Add(equipped ? $"Status: Equipped in {equippedSlot}" : "Status: Carried");
+
         lines.Add(equipped ? "[E] Unequip  [D] Drop" : "[E] Equip/Use  [D] Drop");
 
         var visibleLines = ClampLines(lines, 11);
