@@ -48,7 +48,11 @@ public partial class Tooltip : Control
         TitleMarkup = $"[b][color={UiStyle.ToHex(UiStyle.BrightGold())}]{ItemRarityPresentation.EscapeBBCode(template.DisplayName)}[/color][/b] "
             + $"[i][color={ItemRarityPresentation.ResolveHexColor(template.Rarity)}]{ItemRarityPresentation.EscapeBBCode(rarityLabel)}[/color][/i]";
 
-        var lines = new List<string> { template.Description };
+        var lines = new List<string>
+        {
+            $"Rarity: {ItemRarityPresentation.ResolveDisplayLabel(template.Rarity)}",
+            template.Description,
+        };
         foreach (var modifier in template.StatModifiers)
         {
             lines.Add($"{modifier.Key}: {modifier.Value:+#;-#;0}");
@@ -219,11 +223,16 @@ public partial class Tooltip : Control
         builder.AppendLine($"[color={UiStyle.ToHex(UiStyle.BorderActive())}]────────────────────────[/color]");
         if (lines.Count > 0)
         {
-            builder.AppendLine($"[i][color={UiStyle.ToHex(UiStyle.MutedText())}]{ItemRarityPresentation.EscapeBBCode(lines[0])}[/color][/i]");
+            builder.AppendLine(ItemRarityPresentation.WrapWithColor(lines[0], template.Rarity));
+        }
+
+        if (lines.Count > 1)
+        {
+            builder.AppendLine($"[i][color={UiStyle.ToHex(UiStyle.MutedText())}]{ItemRarityPresentation.EscapeBBCode(lines[1])}[/color][/i]");
             builder.AppendLine($"[color={UiStyle.ToHex(UiStyle.BorderActive())}]────────────────────────[/color]");
         }
 
-        for (var i = 1; i < lines.Count; i++)
+        for (var i = 2; i < lines.Count; i++)
         {
             var line = lines[i];
             var color = line.StartsWith("Equipped:", System.StringComparison.Ordinal)

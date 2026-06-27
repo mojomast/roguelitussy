@@ -166,7 +166,7 @@ public partial class LevelUpOverlay : Control
         builder.AppendLine($"[color={UiStyle.ToHex(UiStyle.Parchment())}]{ItemRarityPresentation.EscapeBBCode($"{player.Name} can choose a new perk.")}[/color]");
         builder.AppendLine($"[color={UiStyle.ToHex(UiStyle.WarningOrange())}]{ItemRarityPresentation.EscapeBBCode($"Pending choices: {progression.UnspentPerkChoices}")}[/color]");
         builder.AppendLine();
-        builder.AppendLine($"[b][color={UiStyle.ToHex(UiStyle.MutedText())}]AVAILABLE PERKS[/color][/b]");
+        builder.AppendLine($"[b][color={UiStyle.ToHex(UiStyle.MutedText())}]Available Perks[/color][/b]");
 
         for (var index = 0; index < choices.Count; index++)
         {

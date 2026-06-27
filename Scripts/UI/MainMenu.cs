@@ -806,7 +806,6 @@ public partial class MainMenu : MenuBase
         AddSection("EXPEDITION");
         AddOption("Start Expedition", MenuAction.Start);
         AddOption($"Name: {NameOptions[_nameIndex]}", MenuAction.Name);
-        AddOption($"Seed: {PendingSeed}", MenuAction.Seed);
         AddSection("BUILD");
         AddOption($"Archetype: {Archetypes[_archetypeIndex].DisplayName}", MenuAction.Archetype);
         AddOption($"Origin: {Origins[_originIndex].DisplayName}", MenuAction.Origin);
@@ -821,6 +820,7 @@ public partial class MainMenu : MenuBase
         AddOption($"Guard (+1 Defense): {_guardPoints}", MenuAction.Guard);
         AddOption($"Finesse (+1 Accuracy/Evasion): {_finessePoints}", MenuAction.Finesse);
         AddSection("SYSTEM");
+        AddOption($"Seed: {PendingSeed}", MenuAction.Seed);
         AddOption("Load Slot 1", MenuAction.LoadSlot1);
         AddOption("Load Slot 2", MenuAction.LoadSlot2);
         AddOption("Load Slot 3", MenuAction.LoadSlot3);

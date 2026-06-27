@@ -368,6 +368,7 @@ public partial class InventoryUI : Control
             builder.AppendLine();
         }
 
+        builder.Append(ResolveFooterText());
         GridText = builder.ToString().TrimEnd();
         RefreshVisualState();
     }
@@ -959,18 +960,19 @@ public partial class InventoryUI : Control
         _footerBar.Position = new Vector2(PanelPadding, panelSize.Y - PanelPadding - FooterHeight);
         _footerBar.Size = new Vector2(panelSize.X - (PanelPadding * 2f), FooterHeight);
         var x = _footerBar.Position.X + 10f;
+        var available = System.Math.Max(48f, (_footerBar.Size.X - 54f) / System.Math.Max(1, _footerHintLabels.Count));
         for (var i = 0; i < _footerHintLabels.Count; i++)
         {
             var label = _footerHintLabels[i];
             label.Position = new Vector2(x, _footerBar.Position.Y + 3f);
-            label.Size = new Vector2(i == 3 ? 96f : 72f, FooterHeight);
-            x += label.Size.X + 8f;
+            label.Size = new Vector2(available, FooterHeight);
+            x += label.Size.X + 4f;
             if (i < _footerDividers.Count)
             {
                 var divider = _footerDividers[i];
                 divider.Position = new Vector2(x, _footerBar.Position.Y + 4f);
                 divider.Size = new Vector2(1f, FooterHeight - 8f);
-                x += 10f;
+                x += 6f;
             }
         }
     }
@@ -1067,6 +1069,7 @@ public partial class InventoryUI : Control
             builder.AppendLine();
         }
 
+        builder.Append(ItemRarityPresentation.EscapeBBCode(ResolveFooterText()));
         return builder.ToString().TrimEnd();
     }
 

@@ -10,6 +10,7 @@ public partial class HUD : Control
     private Panel? _panel;
     private Label? _headerLabel;
     private Label? _hpLabel;
+    private ProgressBar? _hpBarCompat;
     private Label? _hpValueLabel;
     private ColorRect? _hpBarBackground;
     private ColorRect? _hpBarFill;
@@ -309,11 +310,12 @@ public partial class HUD : Control
         {
             Name = "Panel",
             Position = new Vector2(8f, 8f),
-            Modulate = UiStyle.PanelBlack(0.82f),
+            Modulate = UiStyle.GoldTrim(),
         };
         AddChild(_panel);
 
         _hpLabel = CreateLabel("HPLabel", new Vector2(12f, 10f), new Vector2(28f, 16f));
+        _hpBarCompat = new ProgressBar { Name = "HPBar", MinValue = 0d, MaxValue = 1d, Value = 0d, Visible = false };
         _hpValueLabel = CreateLabel("HPValueLabel", new Vector2(170f, 10f), new Vector2(70f, 16f));
         _hpBarBackground = new ColorRect { Name = "HPBarBackground", Color = UiStyle.PanelBlack() };
         _hpBarFill = new ColorRect { Name = "HPBarFill", Color = UiStyle.ActiveGreen() };
@@ -328,6 +330,7 @@ public partial class HUD : Control
         _mapLabel = CreateLabel("MapLabel", new Vector2(12f, 134f), new Vector2(416f, 18f));
 
         _panel.AddChild(_hpLabel);
+        _panel.AddChild(_hpBarCompat);
         _panel.AddChild(_hpValueLabel);
         _panel.AddChild(_hpBarBackground);
         _panel.AddChild(_hpBarFill);
@@ -488,7 +491,7 @@ public partial class HUD : Control
         }
 
         _headerLabel.Text = $"{FloorText}  ▪  {TurnText}  ▪  {LevelText}  ▪  {GoldText}".Trim();
-        _headerLabel.Modulate = UiStyle.MutedText();
+        _headerLabel.Modulate = UiStyle.Parchment();
         _progressLabel.Text = string.Join("  ", new[] { LevelText, GoldText }.Where(text => !string.IsNullOrWhiteSpace(text)));
         _progressLabel.Modulate = LevelText.Contains("LV UP!", System.StringComparison.Ordinal) ? UiStyle.BrightGold() : UiStyle.MutedText();
         _statsLabel.Text = StatsText;
@@ -506,8 +509,16 @@ public partial class HUD : Control
 
         if (_hpLabel is not null)
         {
-            _hpLabel.Text = "HP";
-            _hpLabel.Modulate = UiStyle.Parchment();
+            _hpLabel.Text = HPText;
+            _hpLabel.Modulate = HPColor;
+        }
+
+        if (_hpBarCompat is not null)
+        {
+            _hpBarCompat.MinValue = 0d;
+            _hpBarCompat.MaxValue = HPBarMaxValue;
+            _hpBarCompat.Value = HPBarValue;
+            _hpBarCompat.Modulate = HPColor;
         }
 
         if (_hpValueLabel is not null)
@@ -544,7 +555,7 @@ public partial class HUD : Control
         var contentWidth = System.Math.Max(0f, width - 24f);
         _panel.Position = new Vector2(8f, 8f);
         _panel.Size = new Vector2(width, 168f);
-        _panel.Modulate = UiStyle.PanelBlack(0.82f);
+        _panel.Modulate = UiStyle.GoldTrim();
 
         SetControlBounds(_hpLabel, 12f, 10f, 28f, 16f);
         SetControlBounds(_hpValueLabel, 170f, 10f, 70f, 16f);

@@ -226,6 +226,7 @@ public partial class CombatLog : Control
         {
             Name = "Panel",
             Size = panelSize,
+            Modulate = UiStyle.GoldTrim(0.88f),
         };
         _background = new ColorRect { Name = "Background", Color = UiStyle.PanelBlack(0.78f) };
         _fade = new ColorRect { Name = "TopFade", Color = UiStyle.PanelBlack(0.55f) };

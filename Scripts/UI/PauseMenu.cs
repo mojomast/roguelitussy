@@ -101,7 +101,7 @@ public partial class PauseMenu : MenuBase
         _actions.Clear();
         ConfigureOptions();
         AddSection("RUN");
-        AddOption("Resume", PauseAction.Resume);
+        AddOption("Resume Run", PauseAction.Resume);
         AddSection("SAVE");
         AddOption("Save: Slot 1", PauseAction.Save1);
         AddOption("Save: Slot 2", PauseAction.Save2);
