@@ -20,7 +20,6 @@ public abstract partial class MenuBase : Control
     private Label? _optionsLabel;
     private Label? _footerLabel;
     private readonly List<Panel> _optionRows = new();
-    private readonly List<RowHitTarget> _rowHitTargets = new();
     private const float PanelWidth = 420f;
     private const float PanelHeight = 300f;
     private const float PanelPadding = 20f;
@@ -36,8 +35,6 @@ public abstract partial class MenuBase : Control
     private string _visibleFooterText = string.Empty;
     private int _firstVisibleOption;
     private int _visibleOptionCount;
-
-    private sealed record RowHitTarget(int OptionIndex, Vector2 Position, Vector2 Size);
 
     protected int SelectedIndex { get; private set; }
 
@@ -69,24 +66,6 @@ public abstract partial class MenuBase : Control
     {
         EnsureVisuals();
         RefreshVisualState();
-    }
-
-    public override void _GuiInput(InputEvent @event)
-    {
-        if (!Visible || @event is not InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left } button)
-        {
-            return;
-        }
-
-        foreach (var target in _rowHitTargets)
-        {
-            if (ContainsPoint(button.Position, target.Position, target.Size))
-            {
-                SetSelection(target.OptionIndex);
-                ActivateSelected();
-                return;
-            }
-        }
     }
 
     protected void ConfigureOptions(params string[] options)
@@ -464,7 +443,6 @@ public abstract partial class MenuBase : Control
         }
 
         _optionRows.Clear();
-        _rowHitTargets.Clear();
         if (!optionsCard.Visible || _visibleOptionCount <= 0 || _options.Count == 0)
         {
             return;
@@ -476,40 +454,56 @@ public abstract partial class MenuBase : Control
         {
             var section = IsSectionHeader(index);
             var rowHeight = section ? 18f : 22f;
-            var row = new Panel
-            {
-                Name = $"OptionRow_{index}",
-                Position = new Vector2(position.X, y),
-                Size = new Vector2(size.X, rowHeight),
-            };
-            var background = new ColorRect { Name = "RowBackground", Position = Vector2.Zero, Size = row.Size, Color = index == SelectedIndex ? UiStyle.SlotSelected() : UiStyle.DeepBlack(0f) };
+            var rowIndex = index;
+            var row = section
+                ? new Panel()
+                : new UiMousePanel { InputSubmitted = input => OnOptionRowInput(rowIndex, input) };
+            row.Name = $"OptionRow_{index}";
+            row.Position = new Vector2(position.X, y);
+            row.Size = new Vector2(size.X, rowHeight);
+            var background = section
+                ? new ColorRect()
+                : new UiMouseColorRect { InputSubmitted = input => OnOptionRowInput(rowIndex, input) };
+            background.Name = "RowBackground";
+            background.Position = Vector2.Zero;
+            background.Size = row.Size;
+            background.Color = index == SelectedIndex ? UiStyle.SlotSelected() : UiStyle.DeepBlack(0f);
             var accent = new ColorRect { Name = "RowAccent", Position = Vector2.Zero, Size = new Vector2(index == SelectedIndex && !section ? 2f : 0f, rowHeight), Color = UiStyle.DimGold() };
-            var textLabel = new Label
-            {
-                Name = "RowLabel",
-                Position = new Vector2(section ? 0f : 8f, 2f),
-                Size = new Vector2(Math.Max(0f, size.X - 8f), rowHeight),
-                Text = section ? _options[index] : (index == SelectedIndex ? $"▶ {_options[index]}" : $"  {_options[index]}"),
-                Modulate = section ? UiStyle.FaintText() : index == SelectedIndex ? UiStyle.BrightGold() : UiStyle.Parchment(),
-            };
+            var textLabel = section
+                ? new Label()
+                : new UiMouseLabel { InputSubmitted = input => OnOptionRowInput(rowIndex, input) };
+            textLabel.Name = "RowLabel";
+            textLabel.Position = new Vector2(section ? 0f : 8f, 2f);
+            textLabel.Size = new Vector2(Math.Max(0f, size.X - 8f), rowHeight);
+            textLabel.Text = section ? _options[index] : (index == SelectedIndex ? $"▶ {_options[index]}" : $"  {_options[index]}");
+            textLabel.Modulate = section ? UiStyle.FaintText() : index == SelectedIndex ? UiStyle.BrightGold() : UiStyle.Parchment();
             row.AddChild(background);
             row.AddChild(accent);
             row.AddChild(textLabel);
             optionsCard.AddChild(row);
             _optionRows.Add(row);
-            if (!section && RootPanel is not null)
-            {
-                _rowHitTargets.Add(new RowHitTarget(index, RootPanel.Position + optionsCard.Position + row.Position, row.Size));
-            }
-
             y += rowHeight;
         }
     }
 
-    private static bool ContainsPoint(Vector2 point, Vector2 position, Vector2 size)
+    private void OnOptionRowInput(int index, InputEvent input)
     {
-        return point.X >= position.X && point.X <= position.X + size.X
-            && point.Y >= position.Y && point.Y <= position.Y + size.Y;
+        if (!Visible || IsSectionHeader(index))
+        {
+            return;
+        }
+
+        if (input is InputEventMouseMotion)
+        {
+            SetSelection(index);
+            return;
+        }
+
+        if (input is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
+        {
+            SetSelection(index);
+            ActivateSelected();
+        }
     }
 
     protected virtual Vector2 ResolveDesiredPanelSize(Vector2 viewportSize)

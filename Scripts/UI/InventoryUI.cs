@@ -65,10 +65,6 @@ public partial class InventoryUI : Control
         public Label EquippedLabel { get; init; } = null!;
     }
 
-    private sealed record FooterHitTarget(Vector2 Position, Vector2 Size, System.Action Action);
-
-    private readonly List<FooterHitTarget> _footerHitTargets = new();
-
     public int SelectedIndex { get; private set; }
 
     public string SortLabel => CurrentSort.ToString();
@@ -95,29 +91,33 @@ public partial class InventoryUI : Control
         RefreshVisualState();
     }
 
-    public override void _GuiInput(InputEvent @event)
+    private void OnSlotInputSubmitted(int visibleIndex, InputEvent input)
     {
-        if (!Visible || @event is not InputEventMouseButton { Pressed: true } button)
+        if (!Visible)
         {
             return;
         }
 
-        foreach (var target in _footerHitTargets)
-        {
-            if (button.ButtonIndex == MouseButton.Left && ContainsPoint(button.Position, target.Position, target.Size))
-            {
-                target.Action();
-                return;
-            }
-        }
-
-        var visibleSlot = ResolveVisibleSlotAt(button.Position);
-        if (visibleSlot < 0)
+        var absoluteIndex = _firstVisibleIndex + visibleIndex;
+        if (absoluteIndex < 0 || absoluteIndex >= System.Math.Max(Columns * Rows, _items.Count))
         {
             return;
         }
 
-        var absoluteIndex = _firstVisibleIndex + visibleSlot;
+        if (input is InputEventMouseMotion)
+        {
+            SelectedIndex = absoluteIndex;
+            EnsureSelectionVisible();
+            UpdateDescription();
+            UpdateGrid();
+            return;
+        }
+
+        if (input is not InputEventMouseButton { Pressed: true } button)
+        {
+            return;
+        }
+
         SelectedIndex = absoluteIndex;
         EnsureSelectionVisible();
         UpdateDescription();
@@ -130,6 +130,14 @@ public partial class InventoryUI : Control
         else if (button.ButtonIndex == MouseButton.Middle)
         {
             SubmitDrop();
+        }
+    }
+
+    private static void OnFooterInput(System.Action action, InputEvent input)
+    {
+        if (input is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
+        {
+            action();
         }
     }
 
@@ -829,7 +837,7 @@ public partial class InventoryUI : Control
         _headerBar = new ColorRect { Name = "HeaderBar", Color = UiStyle.PanelHighlight() };
         _headerTitleLabel = new Label { Name = "HeaderTitle", Text = "INVENTORY", Modulate = UiStyle.BrightGold() };
         _headerStatsLabel = new Label { Name = "HeaderStats", Modulate = UiStyle.MutedText() };
-        _sortLabel = new Label { Name = "SortLabel", Modulate = UiStyle.FaintText() };
+        _sortLabel = new UiMouseLabel { Name = "SortLabel", Modulate = UiStyle.FaintText(), InputSubmitted = input => OnFooterInput(CycleSortMode, input) };
         _footerBar = new ColorRect { Name = "FooterBar", Color = UiStyle.PanelHighlight() };
         _gridLabel = new RichTextLabel
         {
@@ -879,18 +887,19 @@ public partial class InventoryUI : Control
 
     private SlotVisual CreateSlotVisual(int index)
     {
+        void BindSlot(InputEvent input) => OnSlotInputSubmitted(index, input);
         return new SlotVisual
         {
-            Background = new ColorRect { Name = $"Slot{index}_Background", Color = UiStyle.SlotBackground() },
-            BorderTop = new ColorRect { Name = $"Slot{index}_BorderTop", Color = UiStyle.BorderSubtle() },
-            BorderBottom = new ColorRect { Name = $"Slot{index}_BorderBottom", Color = UiStyle.BorderSubtle() },
-            BorderLeft = new ColorRect { Name = $"Slot{index}_BorderLeft", Color = UiStyle.BorderSubtle() },
-            BorderRight = new ColorRect { Name = $"Slot{index}_BorderRight", Color = UiStyle.BorderSubtle() },
-            Glyph = new Label { Name = $"Slot{index}_Glyph", Modulate = UiStyle.Parchment() },
-            StackBadge = new ColorRect { Name = $"Slot{index}_StackBadge", Color = UiStyle.BrightGold() },
-            StackLabel = new Label { Name = $"Slot{index}_StackLabel", Modulate = UiStyle.InverseText() },
-            EquippedBadge = new ColorRect { Name = $"Slot{index}_EquippedBadge", Color = UiStyle.DeepBlack(0.9f) },
-            EquippedLabel = new Label { Name = $"Slot{index}_EquippedLabel", Text = "E", Modulate = UiStyle.ActiveGreen() },
+            Background = new UiMouseColorRect { Name = $"Slot{index}_Background", Color = UiStyle.SlotBackground(), InputSubmitted = BindSlot },
+            BorderTop = new UiMouseColorRect { Name = $"Slot{index}_BorderTop", Color = UiStyle.BorderSubtle(), InputSubmitted = BindSlot },
+            BorderBottom = new UiMouseColorRect { Name = $"Slot{index}_BorderBottom", Color = UiStyle.BorderSubtle(), InputSubmitted = BindSlot },
+            BorderLeft = new UiMouseColorRect { Name = $"Slot{index}_BorderLeft", Color = UiStyle.BorderSubtle(), InputSubmitted = BindSlot },
+            BorderRight = new UiMouseColorRect { Name = $"Slot{index}_BorderRight", Color = UiStyle.BorderSubtle(), InputSubmitted = BindSlot },
+            Glyph = new UiMouseLabel { Name = $"Slot{index}_Glyph", Modulate = UiStyle.Parchment(), InputSubmitted = BindSlot },
+            StackBadge = new UiMouseColorRect { Name = $"Slot{index}_StackBadge", Color = UiStyle.BrightGold(), InputSubmitted = BindSlot },
+            StackLabel = new UiMouseLabel { Name = $"Slot{index}_StackLabel", Modulate = UiStyle.InverseText(), InputSubmitted = BindSlot },
+            EquippedBadge = new UiMouseColorRect { Name = $"Slot{index}_EquippedBadge", Color = UiStyle.DeepBlack(0.9f), InputSubmitted = BindSlot },
+            EquippedLabel = new UiMouseLabel { Name = $"Slot{index}_EquippedLabel", Text = "E", Modulate = UiStyle.ActiveGreen(), InputSubmitted = BindSlot },
         };
     }
 
@@ -910,7 +919,8 @@ public partial class InventoryUI : Control
         };
         foreach (var hint in hints)
         {
-            var label = new Label { Name = $"FooterHint_{_footerHintLabels.Count}", Text = hint.Label, Modulate = UiStyle.MutedText() };
+            var action = hint.Action;
+            var label = new UiMouseLabel { Name = $"FooterHint_{_footerHintLabels.Count}", Text = hint.Label, Modulate = UiStyle.MutedText(), InputSubmitted = input => OnFooterInput(action, input) };
             _footerHintLabels.Add(label);
             _panel.AddChild(label);
             if (_footerHintLabels.Count < hints.Length)
@@ -1012,24 +1022,11 @@ public partial class InventoryUI : Control
         _footerBar.Size = new Vector2(panelSize.X - (PanelPadding * 2f), FooterHeight);
         var x = _footerBar.Position.X + 10f;
         var available = System.Math.Max(48f, (_footerBar.Size.X - 54f) / System.Math.Max(1, _footerHintLabels.Count));
-        _footerHitTargets.Clear();
         for (var i = 0; i < _footerHintLabels.Count; i++)
         {
             var label = _footerHintLabels[i];
             label.Position = new Vector2(x, _footerBar.Position.Y + 3f);
             label.Size = new Vector2(available, FooterHeight);
-            System.Action action = i switch
-            {
-                0 => SubmitEquip,
-                1 => SubmitDrop,
-                2 => ToggleAutoEquipUpgrades,
-                _ => Close,
-            };
-            if (_panel is not null)
-            {
-                _footerHitTargets.Add(new FooterHitTarget(_panel.Position + label.Position, label.Size, action));
-            }
-
             x += label.Size.X + 4f;
             if (i < _footerDividers.Count)
             {
@@ -1039,31 +1036,6 @@ public partial class InventoryUI : Control
                 x += 6f;
             }
         }
-    }
-
-    private int ResolveVisibleSlotAt(Vector2 point)
-    {
-        if (_panel is null)
-        {
-            return -1;
-        }
-
-        for (var i = 0; i < _slotVisuals.Count; i++)
-        {
-            var position = _panel.Position + _slotVisuals[i].Background.Position;
-            if (ContainsPoint(point, position, _slotVisuals[i].Background.Size))
-            {
-                return i;
-            }
-        }
-
-        return -1;
-    }
-
-    private static bool ContainsPoint(Vector2 point, Vector2 position, Vector2 size)
-    {
-        return point.X >= position.X && point.X <= position.X + size.X
-            && point.Y >= position.Y && point.Y <= position.Y + size.Y;
     }
 
     private void LayoutSlots(float left, float top)
