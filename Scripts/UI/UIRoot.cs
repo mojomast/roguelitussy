@@ -157,6 +157,7 @@ public partial class UIRoot : CanvasLayer
         {
             _eventBus.TurnCompleted += OnTurnCompleted;
             _eventBus.EntityDied += OnEntityDied;
+            _eventBus.GameOverWithStats += OnGameOverWithStats;
             _eventBus.LoadCompleted += OnLoadCompleted;
             _eventBus.FloorChanged += OnFloorChanged;
             _eventBus.ProgressionChanged += OnProgressionChanged;
@@ -419,11 +420,16 @@ public partial class UIRoot : CanvasLayer
 
         if (entityId == _gameManager.World.Player.Id)
         {
-            OpenGameOver();
+            OpenGameOver(_gameManager.CurrentRunStats);
             return;
         }
 
         _enemiesKilled++;
+    }
+
+    private void OnGameOverWithStats(RunStats stats)
+    {
+        OpenGameOver(stats);
     }
 
     private void OnLoadCompleted(bool success)
@@ -732,6 +738,11 @@ public partial class UIRoot : CanvasLayer
 
     private void OpenGameOver()
     {
+        OpenGameOver(_gameManager?.CurrentRunStats);
+    }
+
+    private void OpenGameOver(RunStats? stats)
+    {
         if (GameOverScreen.Visible || _gameManager?.World?.Player is null)
         {
             return;
@@ -749,7 +760,15 @@ public partial class UIRoot : CanvasLayer
         TargetingOverlay.Cancel();
         Tooltip.Hide();
         var world = _gameManager.World;
-        GameOverScreen.Open(new GameOverSummary(world.Player.Name, world.Depth, _enemiesKilled, world.TurnNumber));
+        if (stats is not null)
+        {
+            GameOverScreen.Open(stats);
+        }
+        else
+        {
+            GameOverScreen.Open(new GameOverSummary(world.Player.Name, world.Depth, _enemiesKilled, world.TurnNumber));
+        }
+
         CombatLog.RefreshConsole();
         RefreshInputGate();
     }

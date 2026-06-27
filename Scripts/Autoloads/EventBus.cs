@@ -12,6 +12,19 @@ public sealed record TrapTriggeredEventArgs(
     string StatusEffect,
     bool Disarmed);
 
+public sealed record RunStats(
+    string CharacterName,
+    int FloorReached,
+    int TotalTurns,
+    int EnemiesKilled,
+    int GoldCollected,
+    int DamageTaken,
+    int ItemsFound,
+    int Seed,
+    string CauseOfDeath,
+    string BestItemName,
+    int BestItemValue);
+
 public partial class EventBus : Node
 {
     public event Action<int>? TurnStarted;
@@ -41,6 +54,7 @@ public partial class EventBus : Node
     public event Action<int, int>? LevelTransition;
     public event Action<EntityId, EquipSlot, ItemInstance?>? EquipmentChanged;
     public event Action<int, int>? GameOver;
+    public event Action<RunStats>? GameOverWithStats;
     public event Action<EntityId, int, int>? ExperienceGained;
     public event Action<EntityId, int>? LeveledUp;
     public event Action<EntityId>? ProgressionChanged;
@@ -111,6 +125,8 @@ public partial class EventBus : Node
         EquipmentChanged?.Invoke(entityId, slot, item);
 
     public void EmitGameOver(int finalDepth, int turnsSurvived) => GameOver?.Invoke(finalDepth, turnsSurvived);
+
+    public void EmitGameOverWithStats(RunStats stats) => GameOverWithStats?.Invoke(stats);
 
     public void EmitExperienceGained(EntityId entityId, int amount, int total) => ExperienceGained?.Invoke(entityId, amount, total);
 

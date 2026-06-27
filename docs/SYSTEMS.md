@@ -49,6 +49,7 @@ Player-specific long-run state lives in explicit components instead of bloating 
 
 XP is awarded on kill, level thresholds are deterministic, level-ups grant baseline stat growth plus unspent points, and progression/identity data are persisted with saves.
 Loading a run with pending perk choices reopens the level-up overlay when choices are available, so saved progression decisions remain visible after resume.
+When the player dies, `GameManager` finalizes a runtime `RunStats` snapshot and emits `EventBus.GameOverWithStats`. `UIRoot` opens the `GameOverScreen`, which presents floor reached, turns survived, kills, gold, item finds, damage taken, seed, cause of death, best item, and a short contextual epitaph.
 
 The planned expansion path for progression is documented in `docs/PROGRESSION.md`.
 

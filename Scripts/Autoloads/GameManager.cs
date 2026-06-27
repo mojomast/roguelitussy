@@ -12,6 +12,7 @@ public partial class GameManager : Node
     private readonly Dictionary<int, WorldState> _cachedFloors = new();
     private readonly Dictionary<int, FloorEntrances> _floorEntrances = new();
     private const int StartingGold = 120;
+    private RunStats _runStats = CreateDefaultRunStats();
 
     private sealed record FloorEntrances(Position StairsUp, Position StairsDown);
 
@@ -249,6 +250,8 @@ public partial class GameManager : Node
 
     public CharacterCreationOptions CharacterOptions { get; private set; } = CharacterCreationOptions.Default;
 
+    public RunStats CurrentRunStats => _runStats;
+
     public WorldState? World { get; private set; }
 
     public ITurnScheduler? Scheduler { get; private set; }
@@ -264,6 +267,21 @@ public partial class GameManager : Node
     public EventBus? Bus { get; private set; }
 
     public bool AutoEquipUpgradesEnabled { get; private set; }
+
+    private static RunStats CreateDefaultRunStats() => new("Rook", 0, 0, 0, 0, 0, 0, 0, "Unknown", string.Empty, 0);
+
+    private RunStats CreateFreshRunStats(int seed) => new(
+        CharacterOptions.Name,
+        CurrentFloor,
+        0,
+        0,
+        0,
+        0,
+        0,
+        seed,
+        "Unknown",
+        string.Empty,
+        0);
 
     public void SetAutoEquipUpgradesEnabled(bool enabled)
     {
@@ -591,6 +609,7 @@ public partial class GameManager : Node
         EnsureRuntimeServices();
         Seed = seed;
         CurrentFloor = 0;
+        _runStats = CreateFreshRunStats(seed);
         _cachedFloors.Clear();
         _floorEntrances.Clear();
 
@@ -871,6 +890,8 @@ public partial class GameManager : Node
         var equipmentBefore = SnapshotEquipment(actorBefore?.GetComponent<InventoryComponent>());
         var progressionBefore = SnapshotProgression(actorBefore);
         var walletBefore = SnapshotWallet(actorBefore);
+        var playerHpBefore = World.Player.Stats.HP;
+        var runStatsUpdatedForDeath = false;
 
         Bus?.EmitTurnStarted(World.TurnNumber + 1);
 
@@ -911,10 +932,17 @@ public partial class GameManager : Node
 
                 if (damage.IsKill)
                 {
-                    Bus?.EmitEntityDied(damage.DefenderId);
                     if (damage.DefenderId == playerId)
                     {
                         CurrentState = GameState.GameOver;
+                        UpdateRunStatsFromAction(playerId, walletBefore, inventoryBefore, playerHpBefore, outcome, damage);
+                        runStatsUpdatedForDeath = true;
+                        Bus?.EmitGameOverWithStats(_runStats);
+                    }
+
+                    Bus?.EmitEntityDied(damage.DefenderId);
+                    if (damage.DefenderId == playerId)
+                    {
                         Bus?.EmitGameOver(CurrentFloor, World.TurnNumber);
                     }
                 }
@@ -951,6 +979,11 @@ public partial class GameManager : Node
             EmitStateDelta(action, actorPositionBefore, entityPositionsBefore, inventoryBefore, equipmentBefore, outcome.DirtyPositions, playerId);
             EmitProgressionChanges(playerId, progressionBefore);
             EmitWalletChanges(playerId, walletBefore);
+        }
+
+        if (!runStatsUpdatedForDeath && World.GetEntity(playerId) is not null)
+        {
+            UpdateRunStatsFromAction(playerId, walletBefore, inventoryBefore, playerHpBefore, outcome, null);
         }
 
         foreach (var message in outcome.LogMessages)
@@ -2027,6 +2060,90 @@ public partial class GameManager : Node
         }
 
         return snapshot;
+    }
+
+    private void UpdateRunStatsFromAction(
+        EntityId playerId,
+        int goldBefore,
+        HashSet<EntityId> inventoryBefore,
+        int playerHpBefore,
+        ActionOutcome outcome,
+        DamageResult? lethalPlayerDamage)
+    {
+        if (World is null)
+        {
+            return;
+        }
+
+        var player = World.GetEntity(playerId) ?? World.Player;
+        var wallet = player?.GetComponent<WalletComponent>();
+        var inventory = player?.GetComponent<InventoryComponent>();
+        var goldGain = Math.Max(0, (wallet?.Gold ?? goldBefore) - goldBefore);
+        var damageTaken = player is null ? 0 : Math.Max(0, playerHpBefore - player.Stats.HP);
+        var kills = 0;
+
+        foreach (var combatEvent in outcome.CombatEvents)
+        {
+            foreach (var damage in combatEvent.DamageResults)
+            {
+                if (damage.IsKill && damage.DefenderId != playerId)
+                {
+                    kills++;
+                }
+            }
+        }
+
+        var itemsFound = 0;
+        var bestItemName = _runStats.BestItemName;
+        var bestItemValue = _runStats.BestItemValue;
+        if (inventory is not null)
+        {
+            foreach (var item in inventory.Items)
+            {
+                if (inventoryBefore.Contains(item.InstanceId))
+                {
+                    continue;
+                }
+
+                itemsFound += Math.Max(1, item.StackCount);
+                if (Content?.TryGetItemTemplate(item.TemplateId, out var template) == true && template.Value > bestItemValue)
+                {
+                    bestItemName = template.DisplayName;
+                    bestItemValue = template.Value;
+                }
+            }
+        }
+
+        var causeOfDeath = _runStats.CauseOfDeath;
+        if (lethalPlayerDamage is not null)
+        {
+            causeOfDeath = ResolveDamageSourceName(lethalPlayerDamage.AttackerId);
+        }
+
+        _runStats = _runStats with
+        {
+            CharacterName = player?.Name ?? _runStats.CharacterName,
+            FloorReached = CurrentFloor,
+            TotalTurns = World.TurnNumber,
+            EnemiesKilled = _runStats.EnemiesKilled + kills,
+            GoldCollected = _runStats.GoldCollected + goldGain,
+            DamageTaken = _runStats.DamageTaken + damageTaken,
+            ItemsFound = _runStats.ItemsFound + itemsFound,
+            Seed = Seed,
+            CauseOfDeath = string.IsNullOrWhiteSpace(causeOfDeath) ? "Unknown" : causeOfDeath,
+            BestItemName = bestItemName,
+            BestItemValue = bestItemValue,
+        };
+    }
+
+    private string ResolveDamageSourceName(EntityId attackerId)
+    {
+        if (!attackerId.IsValid || World?.GetEntity(attackerId) is not { } attacker)
+        {
+            return "Unknown";
+        }
+
+        return string.IsNullOrWhiteSpace(attacker.Name) ? "Unknown" : attacker.Name;
     }
 
     private static (int Experience, int Level, int UnspentStatPoints, int UnspentPerkChoices) SnapshotProgression(IEntity? entity)
