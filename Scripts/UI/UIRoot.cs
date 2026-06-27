@@ -969,7 +969,7 @@ public partial class UIRoot : CanvasLayer
                 return;
             }
 
-            _eventBus?.EmitLogMessage("Nothing nearby to interact with.");
+            _eventBus?.EmitLogMessage("Nothing nearby to interact with.", LogCategory.Warning);
             RefreshInputGate();
             return;
         }

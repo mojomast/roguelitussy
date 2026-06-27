@@ -29,3 +29,11 @@ The floor summary displays per-floor stats from `FloorStats`, including floor nu
 The pause menu displays a compact `CURRENT RUN` snapshot from `GameManager.CurrentRunStats` between the pause explanation and action list. It includes floor reached, turn count, enemies killed, gold collected, damage taken, items found, and seed, with numeric values formatted using thousand separators.
 
 **Files modified:** `Scripts/UI/PauseMenu.cs`, `Tests/UITests/PauseMenuTests.cs`, `docs/FEATURES.md`.
+
+## Categorized Combat Log
+
+**Block:** 4  **Status:** Implemented
+
+The combat log now renders categorized messages from `EventBus.LogMessage`. Categories color system, player, enemy, loot, status, warning, and critical entries distinctly; critical entries are bold, and older visible lines fade using BBCode alpha. The existing `EmitLogMessage(string)` overload remains supported and defaults to `System`.
+
+**Files modified:** `Scripts/UI/CombatLog.cs`, `Scripts/Autoloads/EventBus.cs`, `Scripts/Autoloads/GameManager.cs`, `Scripts/UI/UiStyle.cs`, `Tests/UITests/CombatLogTests.cs`.

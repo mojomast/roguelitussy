@@ -348,7 +348,7 @@ public partial class GameManager : Node
             }
 
             SetRuntimeContent(loader);
-            Bus?.EmitLogMessage($"Reloaded content from {loader.ContentDirectory}.");
+            Bus?.EmitLogMessage($"Reloaded content from {loader.ContentDirectory}.", LogCategory.System);
             return Array.Empty<string>();
         }
         catch (Exception ex)
@@ -362,13 +362,13 @@ public partial class GameManager : Node
         if (World is null || SaveManager is null)
         {
             Bus?.EmitSaveCompleted(false);
-            Bus?.EmitLogMessage($"Save failed for slot {slot}.");
+            Bus?.EmitLogMessage($"Save failed for slot {slot}.", LogCategory.Warning);
             return false;
         }
 
         var success = SaveManager.SaveRun(CreateSaveRunSnapshot(), slot).GetAwaiter().GetResult();
         Bus?.EmitSaveCompleted(success);
-        Bus?.EmitLogMessage(success ? $"Saved slot {slot}." : $"Save failed for slot {slot}.");
+        Bus?.EmitLogMessage(success ? $"Saved slot {slot}." : $"Save failed for slot {slot}.", success ? LogCategory.System : LogCategory.Warning);
         return success;
     }
 
@@ -379,7 +379,7 @@ public partial class GameManager : Node
         if (SaveManager is null || !SaveManager.HasSave(slot))
         {
             Bus?.EmitLoadCompleted(false);
-            Bus?.EmitLogMessage($"Load failed for slot {slot}.");
+            Bus?.EmitLogMessage($"Load failed for slot {slot}.", LogCategory.Warning);
             return false;
         }
 
@@ -389,7 +389,7 @@ public partial class GameManager : Node
         {
             CurrentState = GameState.MainMenu;
             Bus?.EmitLoadCompleted(false);
-            Bus?.EmitLogMessage($"Load failed for slot {slot}.");
+            Bus?.EmitLogMessage($"Load failed for slot {slot}.", LogCategory.Warning);
             return false;
         }
 
@@ -430,7 +430,7 @@ public partial class GameManager : Node
         ResetFloorStats(CurrentFloor);
         Bus?.EmitLoadCompleted(true);
         Bus?.EmitTurnCompleted();
-        Bus?.EmitLogMessage($"Loaded slot {slot}.");
+        Bus?.EmitLogMessage($"Loaded slot {slot}.", LogCategory.System);
         return true;
     }
 
@@ -444,18 +444,18 @@ public partial class GameManager : Node
 
         if (metadata.ContentVersion is null || string.IsNullOrWhiteSpace(metadata.ContentHash))
         {
-            Bus?.EmitLogMessage($"Loaded slot {slot}; save has no content metadata, compatibility cannot be verified.");
+            Bus?.EmitLogMessage($"Loaded slot {slot}; save has no content metadata, compatibility cannot be verified.", LogCategory.Warning);
             return;
         }
 
         if (metadata.ContentVersion.Value != Content.ContentVersion)
         {
-            Bus?.EmitLogMessage($"Loaded slot {slot}; save content version {metadata.ContentVersion.Value} differs from runtime content version {Content.ContentVersion}.");
+            Bus?.EmitLogMessage($"Loaded slot {slot}; save content version {metadata.ContentVersion.Value} differs from runtime content version {Content.ContentVersion}.", LogCategory.Warning);
         }
 
         if (!string.Equals(metadata.ContentHash, Content.ContentHash, StringComparison.OrdinalIgnoreCase))
         {
-            Bus?.EmitLogMessage($"Loaded slot {slot}; save content hash differs from current runtime content. Some content-backed references may behave differently.");
+            Bus?.EmitLogMessage($"Loaded slot {slot}; save content hash differs from current runtime content. Some content-backed references may behave differently.", LogCategory.Warning);
         }
     }
 
@@ -569,7 +569,7 @@ public partial class GameManager : Node
 
         Bus?.EmitEntityMoved(player.Id, origin, target);
         RecalculatePlayerVisibility(World);
-        Bus?.EmitLogMessage($"Teleported player to {target.X},{target.Y}.");
+        Bus?.EmitLogMessage($"Teleported player to {target.X},{target.Y}.", LogCategory.System);
         return true;
     }
 
@@ -587,7 +587,7 @@ public partial class GameManager : Node
 
         if (targetFloor == CurrentFloor)
         {
-            Bus?.EmitLogMessage($"Already on floor {targetFloor}.");
+            Bus?.EmitLogMessage($"Already on floor {targetFloor}.", LogCategory.System);
             return true;
         }
 
@@ -608,7 +608,7 @@ public partial class GameManager : Node
 
         if (!string.IsNullOrWhiteSpace(logMessage))
         {
-            Bus?.EmitLogMessage(logMessage);
+            Bus?.EmitLogMessage(logMessage, LogCategory.System);
         }
     }
 
@@ -625,7 +625,7 @@ public partial class GameManager : Node
         if (Generator is null || Content is null)
         {
             CurrentState = GameState.MainMenu;
-            Bus?.EmitLogMessage("Cannot start a new game because runtime services are not initialized.");
+            Bus?.EmitLogMessage("Cannot start a new game because runtime services are not initialized.", LogCategory.Warning);
             return;
         }
 
@@ -639,12 +639,12 @@ public partial class GameManager : Node
             PlacePlayerInWorld(world, player, generatedFloor.Entrances.StairsUp, TileType.StairsUp);
             LoadWorld(world);
             ResetFloorStats(CurrentFloor);
-            Bus?.EmitLogMessage($"Starting new game with seed {seed}.");
+            Bus?.EmitLogMessage($"Starting new game with seed {seed}.", LogCategory.System);
         }
         catch (Exception ex)
         {
             CurrentState = GameState.MainMenu;
-            Bus?.EmitLogMessage($"Failed to start a new game: {ex.Message}");
+            Bus?.EmitLogMessage($"Failed to start a new game: {ex.Message}", LogCategory.Warning);
         }
     }
 
@@ -652,7 +652,7 @@ public partial class GameManager : Node
     {
         if (world.Player is null)
         {
-            Bus?.EmitLogMessage($"Cannot load floor {world.Depth} because it does not contain an active player.");
+            Bus?.EmitLogMessage($"Cannot load floor {world.Depth} because it does not contain an active player.", LogCategory.Warning);
             return;
         }
 
@@ -723,7 +723,7 @@ public partial class GameManager : Node
             return false;
         }
 
-        Bus?.EmitLogMessage(message);
+        Bus?.EmitLogMessage(message, LogCategory.PlayerAction);
         Bus?.EmitHPChanged(player.Id, player.Stats.HP, player.Stats.MaxHP);
         Bus?.EmitProgressionChanged(player.Id);
         return true;
@@ -744,7 +744,7 @@ public partial class GameManager : Node
             return false;
         }
 
-        Bus?.EmitLogMessage(message);
+        Bus?.EmitLogMessage(message, LogCategory.PlayerAction);
         Bus?.EmitHPChanged(player.Id, player.Stats.HP, player.Stats.MaxHP);
         Bus?.EmitProgressionChanged(player.Id);
         return true;
@@ -824,7 +824,7 @@ public partial class GameManager : Node
         Bus?.EmitInventoryChanged(player.Id);
         Bus?.EmitCurrencyChanged(player.Id, wallet.Gold);
         message = $"Bought {template.DisplayName} from {merchant.Name} for {price} gold.";
-        Bus?.EmitLogMessage(message);
+        Bus?.EmitLogMessage(message, LogCategory.Loot);
         return true;
     }
 
@@ -875,7 +875,7 @@ public partial class GameManager : Node
         Bus?.EmitInventoryChanged(player.Id);
         Bus?.EmitCurrencyChanged(player.Id, wallet.Gold);
         message = $"Sold {template.DisplayName} for {goldEarned} gold.";
-        Bus?.EmitLogMessage(message);
+        Bus?.EmitLogMessage(message, LogCategory.Loot);
         return true;
     }
 
@@ -998,7 +998,7 @@ public partial class GameManager : Node
 
         foreach (var message in outcome.LogMessages)
         {
-            Bus?.EmitLogMessage(message);
+            Bus?.EmitLogMessage(message, ResolveOutcomeLogCategory(message, playerId));
         }
 
         Bus?.EmitTurnCompleted();
@@ -1117,7 +1117,7 @@ public partial class GameManager : Node
         }
         catch (Exception ex)
         {
-            Bus?.EmitLogMessage($"Runtime initialization failed: {ex.Message}");
+            Bus?.EmitLogMessage($"Runtime initialization failed: {ex.Message}", LogCategory.Warning);
         }
     }
 
@@ -1643,7 +1643,7 @@ public partial class GameManager : Node
             LoadWorld(targetWorld);
             ResetFloorStats(targetFloor);
             Bus?.EmitLevelTransition(previousFloor, targetFloor);
-            Bus?.EmitLogMessage($"Travelled to floor {targetFloor}.");
+            Bus?.EmitLogMessage($"Travelled to floor {targetFloor}.", LogCategory.System);
             return true;
         }
         catch (Exception ex)
@@ -1655,7 +1655,7 @@ public partial class GameManager : Node
                 currentWorld.AddEntity(player);
             }
 
-            Bus?.EmitLogMessage($"Floor transition failed: {ex.Message}");
+            Bus?.EmitLogMessage($"Floor transition failed: {ex.Message}", LogCategory.Warning);
             return false;
         }
     }
@@ -2188,6 +2188,44 @@ public partial class GameManager : Node
         }
 
         return string.IsNullOrWhiteSpace(attacker.Name) ? "Unknown" : attacker.Name;
+    }
+
+    private LogCategory ResolveOutcomeLogCategory(string message, EntityId playerId)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return LogCategory.System;
+        }
+
+        if (message.Contains("Loot found:", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("gold", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("auto-equips", StringComparison.OrdinalIgnoreCase))
+        {
+            return LogCategory.Loot;
+        }
+
+        if (message.Contains("afflicted", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("affected by", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("gains", StringComparison.OrdinalIgnoreCase))
+        {
+            return LogCategory.StatusEffect;
+        }
+
+        if (message.Contains("failed", StringComparison.OrdinalIgnoreCase)
+            || message.StartsWith("Cannot ", StringComparison.OrdinalIgnoreCase))
+        {
+            return LogCategory.Warning;
+        }
+
+        var playerName = World?.GetEntity(playerId)?.Name ?? World?.Player?.Name ?? "Rook";
+        if (message.Contains($"hits {playerName}", StringComparison.OrdinalIgnoreCase)
+            || message.Contains($"kills {playerName}", StringComparison.OrdinalIgnoreCase)
+            || message.Contains($"misses {playerName}", StringComparison.OrdinalIgnoreCase))
+        {
+            return LogCategory.EnemyAction;
+        }
+
+        return LogCategory.PlayerAction;
     }
 
     private static (int Experience, int Level, int UnspentStatPoints, int UnspentPerkChoices) SnapshotProgression(IEntity? entity)

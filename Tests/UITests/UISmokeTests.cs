@@ -161,7 +161,7 @@ public sealed class UISmokeTests : ITestSuite
         var loaded = new GameManager();
         var loadedBus = new EventBus();
         var logs = new System.Collections.Generic.List<string>();
-        loadedBus.LogMessage += logs.Add;
+        loadedBus.LogMessage += (message, _) => logs.Add(message);
         loaded.AttachServices(new WorldState(), new TurnScheduler(), new StubGenerator(), new FOVCalculator(), content, saveManager, loadedBus);
 
         Expect.True(loaded.LoadFromSlot(1), "Content metadata mismatch should warn but still load.");
@@ -901,7 +901,7 @@ public sealed class UISmokeTests : ITestSuite
         content.EnsureValid();
 
         var logs = new System.Collections.Generic.List<string>();
-        bus.LogMessage += logs.Add;
+        bus.LogMessage += (message, _) => logs.Add(message);
 
         gameManager.AttachServices(new WorldState(), new TurnScheduler(), new DungeonGenerator(), new FOVCalculator(), content, new StubSaveManager(), bus);
         gameManager.StartNewGame(1337);

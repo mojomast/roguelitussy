@@ -787,7 +787,7 @@ public partial class WorldView : Node2D
             return;
         }
 
-        _eventBus?.EmitLogMessage("Render rev: front-wall strip diagnostics active.");
+        _eventBus?.EmitLogMessage("Render rev: front-wall strip diagnostics active.", LogCategory.System);
         _loggedRenderRevision = true;
     }
 

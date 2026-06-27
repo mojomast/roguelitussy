@@ -62,6 +62,9 @@ public static class UiStyle
     public static Color WarningOrange()
         => new(0.82f, 0.52f, 0.18f);
 
+    public static Color WarningAmber()
+        => WarningOrange();
+
     public static Color DangerRed()
         => new(0.78f, 0.25f, 0.22f);
 

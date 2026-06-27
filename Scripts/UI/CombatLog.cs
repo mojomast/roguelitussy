@@ -9,11 +9,12 @@ namespace Godotussy;
 public partial class CombatLog : Control
 {
     private const int MaxMessages = 100;
+    private const int VisibleMessageCount = 8;
     private const float PanelWidth = 500f;
     private const float PanelHeight = 220f;
     private const float OuterMargin = 20f;
     private const float PanelPadding = 12f;
-    private readonly Queue<string> _messages = new();
+    private readonly Queue<LogEntry> _messages = new();
     private Panel? _panel;
     private ColorRect? _background;
     private ColorRect? _fade;
@@ -27,6 +28,8 @@ public partial class CombatLog : Control
     public bool IsSuppressed => _suppressedByOverlay;
 
     public bool ConsoleVisible => _panel?.Visible ?? false;
+
+    private sealed record LogEntry(string Markup, LogCategory Category);
 
     public CombatLog()
     {
@@ -88,11 +91,11 @@ public partial class CombatLog : Control
         RefreshVisualState();
     }
 
-    public IReadOnlyCollection<string> Messages => _messages;
+    public IReadOnlyCollection<string> Messages => _messages.Select(message => message.Markup).ToArray();
 
-    private void OnLogMessage(string message)
+    private void OnLogMessage(string message, LogCategory category)
     {
-        AddMessage(message);
+        AddMessage(message, category);
     }
 
     private void OnDamageDealt(DamageResult damage)
@@ -102,12 +105,12 @@ public partial class CombatLog : Control
         var message = damage.IsMiss
             ? $"{attacker} misses {defender}."
             : $"{attacker} hits {defender} for {damage.FinalDamage} damage.";
-        AddMessage(message);
+        AddMessage(message, damage.AttackerId == _gameManager?.World?.Player?.Id ? LogCategory.PlayerAction : LogCategory.EnemyAction);
     }
 
     private void OnEntityDied(EntityId entityId)
     {
-        AddMessage($"{ResolveName(entityId)} dies.");
+        AddMessage($"{ResolveName(entityId)} dies.", entityId == _gameManager?.World?.Player?.Id ? LogCategory.Critical : LogCategory.PlayerAction);
     }
 
     private void OnItemPickedUp(EntityId entityId, ItemInstance item)
@@ -120,94 +123,102 @@ public partial class CombatLog : Control
             if (ItemRarityPresentation.IsHighlighted(template.Rarity))
             {
                 var callout = ItemRarityPresentation.EscapeBBCode(ItemRarityPresentation.ResolvePickupCallout(template));
-                AddMarkupMessage($"[color=cyan]{actorName} secures {callout}: [/color]{itemName}[color=cyan].[/color]");
+                AddMarkupMessage($"[color=cyan]{actorName} secures {callout}: [/color]{itemName}[color=cyan].[/color]", LogCategory.Loot);
                 return;
             }
 
-            AddMarkupMessage($"[color=cyan]{actorName} picks up [/color]{itemName}[color=cyan].[/color]");
+            AddMarkupMessage($"[color=cyan]{actorName} picks up [/color]{itemName}[color=cyan].[/color]", LogCategory.Loot);
             return;
         }
 
-        AddMessage($"{ResolveName(entityId)} picks up {ResolveItemName(item.TemplateId)}.");
+        AddMessage($"{ResolveName(entityId)} picks up {ResolveItemName(item.TemplateId)}.", LogCategory.Loot);
     }
 
     private void OnStatusEffectApplied(EntityId entityId, StatusEffectInstance effect)
     {
-        AddMessage($"{ResolveName(entityId)} gains {effect.Type} ({effect.RemainingTurns}).");
+        AddMessage($"{ResolveName(entityId)} gains {effect.Type} ({effect.RemainingTurns}).", LogCategory.StatusEffect);
     }
 
     private void OnSaveCompleted(bool success)
     {
-        AddMessage(success ? "Save completed." : "Save failed.");
+        AddMessage(success ? "Save completed." : "Save failed.", success ? LogCategory.System : LogCategory.Warning);
     }
 
     private void OnLoadCompleted(bool success)
     {
-        AddMessage(success ? "Load completed." : "Load failed.");
+        AddMessage(success ? "Load completed." : "Load failed.", success ? LogCategory.System : LogCategory.Warning);
     }
 
     private void OnFloorChanged(int floor)
     {
-        AddMessage($"Reached floor {floor}.");
+        AddMessage($"Reached floor {floor}.", LogCategory.System);
     }
 
-    private void AddMessage(string message)
+    private void AddMessage(string message, LogCategory category)
     {
-        AddMarkupMessage($"[color={UiStyle.ToHex(GetEntryColor(message))}]{ItemRarityPresentation.EscapeBBCode(message)}[/color]");
+        AddMarkupMessage(FormatEntryForTest(message, category, 0), category);
     }
 
-    private Color GetEntryColor(string message)
+    public static string FormatEntryForTest(string? message, LogCategory category, int age)
     {
-        var playerName = _gameManager?.World?.Player?.Name ?? "Rook";
-        if (message.Contains("dies", System.StringComparison.OrdinalIgnoreCase)
-            || message.Contains("defeated", System.StringComparison.OrdinalIgnoreCase))
-        {
-            return UiStyle.ActiveGreen();
-        }
-
-        if (message.Contains("moves to", System.StringComparison.OrdinalIgnoreCase)
-            || message.Contains("Waiting", System.StringComparison.OrdinalIgnoreCase))
-        {
-            return UiStyle.FaintText();
-        }
-
-        if (message.Contains("casts", System.StringComparison.OrdinalIgnoreCase)
-            || message.Contains("applies", System.StringComparison.OrdinalIgnoreCase)
-            || message.Contains("gains", System.StringComparison.OrdinalIgnoreCase))
-        {
-            return UiStyle.WarningOrange();
-        }
-
-        if (message.Contains($"hits {playerName}", System.StringComparison.OrdinalIgnoreCase)
-            || message.Contains("hits Rook", System.StringComparison.OrdinalIgnoreCase))
-        {
-            return UiStyle.DangerRed();
-        }
-
-        if (message.Contains("hits", System.StringComparison.OrdinalIgnoreCase))
-        {
-            return UiStyle.BrightGold();
-        }
-
-        return UiStyle.Parchment();
+        var color = GetCategoryColor(category);
+        var alpha = ResolveAgeAlpha(age);
+        var hex = alpha >= 0.995f ? UiStyle.ToHex(color) : ToHexWithAlpha(color, alpha);
+        var escaped = ItemRarityPresentation.EscapeBBCode(message ?? string.Empty);
+        var body = category == LogCategory.Critical ? $"[b]{escaped}[/b]" : escaped;
+        return $"[color={hex}]{body}[/color]";
     }
 
-    private void AddMarkupMessage(string markup)
+    private static Color GetCategoryColor(LogCategory category) => category switch
     {
-        _messages.Enqueue(markup);
+        LogCategory.PlayerAction => UiStyle.Parchment(),
+        LogCategory.EnemyAction => UiStyle.DangerRed(),
+        LogCategory.Loot => UiStyle.BrightGold(),
+        LogCategory.StatusEffect => UiStyle.MutedText(),
+        LogCategory.Warning => UiStyle.WarningAmber(),
+        LogCategory.Critical => UiStyle.BrightGold(),
+        _ => UiStyle.MutedText(),
+    };
+
+    private static float ResolveAgeAlpha(int age) => age > 6 ? 0.30f : age > 3 ? 0.60f : 1f;
+
+    private static string ToHexWithAlpha(Color color, float alpha)
+    {
+        static int Channel(float value) => (int)System.Math.Clamp(System.MathF.Round(value * 255f), 0f, 255f);
+        return $"#{Channel(color.R):x2}{Channel(color.G):x2}{Channel(color.B):x2}{Channel(alpha):x2}";
+    }
+
+    private void AddMarkupMessage(string markup, LogCategory category)
+    {
+        _messages.Enqueue(new LogEntry(markup, category));
         while (_messages.Count > MaxMessages)
         {
             _messages.Dequeue();
         }
 
         var builder = new StringBuilder();
-        foreach (var line in _messages.TakeLast(6))
+        var visible = _messages.TakeLast(VisibleMessageCount).ToArray();
+        for (var i = 0; i < visible.Length; i++)
         {
-            builder.AppendLine(line);
+            var age = visible.Length - i - 1;
+            var line = visible[i];
+            var markupLine = age == 0 ? line.Markup : ApplyAgeFade(line.Markup, age, line.Category);
+            builder.AppendLine(markupLine);
         }
 
         RenderedText = builder.ToString().TrimEnd();
         RefreshVisualState();
+    }
+
+    private static string ApplyAgeFade(string markup, int age, LogCategory category)
+    {
+        var alpha = ResolveAgeAlpha(age);
+        if (alpha >= 0.995f)
+        {
+            return markup;
+        }
+
+        return $"[color={ToHexWithAlpha(GetCategoryColor(category), alpha)}]{markup}[/color]";
     }
 
     private void EnsureVisuals()

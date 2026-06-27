@@ -372,7 +372,7 @@ public partial class DevToolsWorkbench : Control
             var errors = loader.ValidationErrors;
 
             _gameManager?.SetRuntimeContent(loader);
-            _eventBus?.EmitLogMessage($"Reloaded runtime content from {loader.ContentDirectory}.");
+            _eventBus?.EmitLogMessage($"Reloaded runtime content from {loader.ContentDirectory}.", LogCategory.System);
             _content = loader;
             RuntimeContentReloaded?.Invoke(loader);
             ReloadData();

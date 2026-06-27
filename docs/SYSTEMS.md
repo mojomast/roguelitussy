@@ -139,6 +139,12 @@ Current presentation-specific behavior worth knowing:
 
 The important constraint is that rendering code mirrors simulation state; it should not become the source of truth.
 
+### Combat Log
+
+`Scripts/UI/CombatLog.cs` listens to `EventBus.LogMessage` plus combat, death, item, status, save/load, and floor events. Explicit log messages carry a `LogCategory` (`System`, `PlayerAction`, `EnemyAction`, `Loot`, `StatusEffect`, `Warning`, or `Critical`) so presentation no longer relies only on message-text heuristics. Existing one-argument emitters still route through `System` for compatibility.
+
+The log renders BBCode-safe entries with category colors from `UiStyle`: system and status entries use muted text, player actions use parchment, enemy actions use danger red, loot and critical entries use bright gold, and warnings use warning amber. Critical entries are bolded. Older visible entries fade with BBCode alpha after three newer entries and fade further after six newer entries.
+
 ## Persistence
 
 Persistence lives in `Core/Persistence/`.

@@ -125,7 +125,7 @@ public partial class DebugConsole : Control
         _lines.Clear();
     }
 
-    private void OnLogMessage(string message)
+    private void OnLogMessage(string message, LogCategory category)
     {
         AppendLine($"log: {message}");
     }

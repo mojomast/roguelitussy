@@ -667,7 +667,7 @@ public partial class MainMenu : MenuBase
         }
     }
 
-    private void OnLogMessage(string message)
+    private void OnLogMessage(string message, LogCategory category)
     {
         if (string.IsNullOrWhiteSpace(message))
         {

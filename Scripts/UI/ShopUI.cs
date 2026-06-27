@@ -209,7 +209,7 @@ public partial class ShopUI : Control
 
         if (!success)
         {
-            _eventBus.EmitLogMessage(message);
+            _eventBus.EmitLogMessage(message, LogCategory.Warning);
         }
 
         ClampSelection();

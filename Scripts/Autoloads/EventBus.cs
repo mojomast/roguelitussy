@@ -35,6 +35,17 @@ public sealed record FloorStats(
     int ChestsOpened,
     int TrapsTriggered);
 
+public enum LogCategory
+{
+    System,
+    PlayerAction,
+    EnemyAction,
+    Loot,
+    StatusEffect,
+    Warning,
+    Critical,
+}
+
 public partial class EventBus : Node
 {
     public event Action<int>? TurnStarted;
@@ -52,7 +63,7 @@ public partial class EventBus : Node
     public event Action<Position>? TileChanged;
     public event Action<EntityId, ItemInstance>? ItemPickedUp;
     public event Action<EntityId, ItemInstance, Position>? ItemDropped;
-    public event Action<string>? LogMessage;
+    public event Action<string, LogCategory>? LogMessage;
     public event Action<EntityId>? InventoryChanged;
     public event Action<EntityId, int, int>? HPChanged;
     public event Action<int>? SaveRequested;
@@ -112,7 +123,9 @@ public partial class EventBus : Node
     public void EmitItemDropped(EntityId entityId, ItemInstance item, Position position) =>
         ItemDropped?.Invoke(entityId, item, position);
 
-    public void EmitLogMessage(string message) => LogMessage?.Invoke(message);
+    public void EmitLogMessage(string message) => EmitLogMessage(message, LogCategory.System);
+
+    public void EmitLogMessage(string message, LogCategory category) => LogMessage?.Invoke(message, category);
 
     public void EmitInventoryChanged(EntityId entityId) => InventoryChanged?.Invoke(entityId);
 

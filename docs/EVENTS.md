@@ -1,5 +1,13 @@
 # Events
 
+## UI Log
+
+| Event Name | Parameters | Emitted When | Subscribers |
+|---|---|---|---|
+| `LogMessage` | `string message, LogCategory category` | Gameplay or presentation systems need to append a textual event to the combat/debug log. `EmitLogMessage(string)` remains available and emits `LogCategory.System`. | `CombatLog`, `MainMenu`, `DebugConsole`. |
+
+`LogCategory` values are `System`, `PlayerAction`, `EnemyAction`, `Loot`, `StatusEffect`, `Warning`, and `Critical`. The combat log uses them for color, bold critical entries, and age fading.
+
 ## Game Over
 
 | Event Name | Parameters | Emitted When | Subscribers |
