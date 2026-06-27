@@ -28,6 +28,7 @@ public enum Key
     A,
     S,
     D,
+    R,
     Q,
     T,
     E,

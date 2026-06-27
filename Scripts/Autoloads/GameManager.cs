@@ -12,6 +12,7 @@ public partial class GameManager : Node
     private readonly Dictionary<int, WorldState> _cachedFloors = new();
     private readonly Dictionary<int, FloorEntrances> _floorEntrances = new();
     private const int StartingGold = 120;
+    private const int MaxRunSteps = 64;
     private RunStats _runStats = CreateDefaultRunStats();
     private FloorStats _floorStats = CreateDefaultFloorStats(0);
     private int _floorStartTurnNumber;
@@ -1005,6 +1006,41 @@ public partial class GameManager : Node
         return outcome;
     }
 
+    public int RunPlayerUntilBlocked(Position delta)
+    {
+        if (World is null || Scheduler is null || World.Player is null || delta == Position.Zero || CurrentState != GameState.Playing)
+        {
+            return 0;
+        }
+
+        var steps = 0;
+        while (steps < MaxRunSteps
+            && CurrentState == GameState.Playing
+            && World.Player is { IsAlive: true } player
+            && CanRunOneMoreStep(World, player, delta))
+        {
+            var hpBefore = player.Stats.HP;
+            var outcome = ProcessPlayerAction(new MoveAction(player.Id, delta));
+            if (outcome.Result != ActionResult.Success || World.Player is not { IsAlive: true } playerAfter)
+            {
+                break;
+            }
+
+            steps++;
+            if (playerAfter.Stats.HP < hpBefore || ShouldStopRunAtPointOfInterest(World, playerAfter) || HasVisibleOrAdjacentHostile(World, playerAfter))
+            {
+                break;
+            }
+        }
+
+        if (steps >= MaxRunSteps)
+        {
+            Bus?.EmitLogMessage("Run stopped at the safety limit.", LogCategory.Warning);
+        }
+
+        return steps;
+    }
+
     public void TransitionFloor(int newFloor)
     {
         var previousFloor = CurrentFloor;
@@ -1890,6 +1926,88 @@ public partial class GameManager : Node
             aggregateOutcome.LogMessages.AddRange(enemyOutcome.LogMessages);
             aggregateOutcome.DirtyPositions.AddRange(enemyOutcome.DirtyPositions);
         }
+    }
+
+    private static bool CanRunOneMoreStep(WorldState world, IEntity player, Position delta)
+    {
+        if (player.Stats.MaxHP > 0 && player.Stats.HP <= Math.Max(1, player.Stats.MaxHP / 3))
+        {
+            return false;
+        }
+
+        if (ShouldStopRunAtPointOfInterest(world, player) || HasVisibleOrAdjacentHostile(world, player))
+        {
+            return false;
+        }
+
+        var target = player.Position + delta;
+        if (!world.InBounds(target))
+        {
+            return false;
+        }
+
+        var occupant = world.GetEntityAt(target);
+        if (occupant is not null)
+        {
+            return false;
+        }
+
+        return new MoveAction(player.Id, delta).Validate(world) == ActionResult.Success;
+    }
+
+    private static bool ShouldStopRunAtPointOfInterest(WorldState world, IEntity player)
+    {
+        if (world.GetItemsAt(player.Position).Count > 0)
+        {
+            return true;
+        }
+
+        var currentTile = world.GetTile(player.Position);
+        if (currentTile is TileType.StairsDown or TileType.StairsUp)
+        {
+            return true;
+        }
+
+        foreach (var direction in Position.Cardinals)
+        {
+            var adjacent = player.Position + direction;
+            if (!world.InBounds(adjacent))
+            {
+                continue;
+            }
+
+            var tile = world.GetTile(adjacent);
+            if (tile is TileType.StairsDown or TileType.StairsUp)
+            {
+                return true;
+            }
+
+            var adjacentEntity = world.GetEntityAt(adjacent);
+            if (adjacentEntity?.GetComponent<ChestComponent>() is not null || adjacentEntity?.GetComponent<NpcComponent>() is not null)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasVisibleOrAdjacentHostile(WorldState world, IEntity player)
+    {
+        foreach (var entity in world.Entities)
+        {
+            if (entity.Id == player.Id || !entity.IsAlive || entity.Faction == player.Faction || entity.Faction == Faction.Neutral)
+            {
+                continue;
+            }
+
+            if (player.Position.ChebyshevTo(entity.Position) <= 1 || world.IsVisible(entity.Position))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void RegisterWorldEntities(WorldState world)

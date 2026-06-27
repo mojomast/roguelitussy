@@ -8,6 +8,7 @@ public partial class InputHandler : Node
     private EventBus? _eventBus;
     private GameManager? _gameManager;
     private bool _inputEnabled = true;
+    private bool _runPrefixActive;
 
     public event System.Action? InventoryRequested;
 
@@ -25,6 +26,8 @@ public partial class InputHandler : Node
 
     public event System.Action? ExamineRequested;
 
+    public bool IsRunPrefixActive => _runPrefixActive;
+
     public void Bind(GameManager? gameManager, EventBus? eventBus)
     {
         _gameManager = gameManager;
@@ -34,6 +37,10 @@ public partial class InputHandler : Node
     public void SetInputEnabled(bool enabled)
     {
         _inputEnabled = enabled;
+        if (!enabled)
+        {
+            _runPrefixActive = false;
+        }
     }
 
     public bool HandleKey(Key key)
@@ -55,12 +62,37 @@ public partial class InputHandler : Node
         }
 
         var playerId = world.Player.Id;
+        if (_runPrefixActive)
+        {
+            if (TryGetDirection(key, out var runDelta))
+            {
+                _runPrefixActive = false;
+                var steps = _gameManager.RunPlayerUntilBlocked(runDelta);
+                if (steps == 0)
+                {
+                    _eventBus?.EmitLogMessage("Run blocked.", LogCategory.System);
+                }
+
+                return true;
+            }
+
+            if (key == Key.Escape || key == Key.R)
+            {
+                _runPrefixActive = false;
+                _eventBus?.EmitLogMessage("Run cancelled.", LogCategory.System);
+                return true;
+            }
+
+            return false;
+        }
+
         return key switch
         {
             Key.Up or Key.W => HandleDirectionalInput(world, playerId, new Position(0, -1)),
             Key.Down or Key.S => HandleDirectionalInput(world, playerId, new Position(0, 1)),
             Key.Left or Key.A => HandleDirectionalInput(world, playerId, new Position(-1, 0)),
             Key.Right or Key.D => HandleDirectionalInput(world, playerId, new Position(1, 0)),
+            Key.R => EnterRunPrefix(),
             Key.Space or Key.Period => Submit(UIActionFactory.CreateWaitAction(world, playerId)),
             Key.G => Submit(UIActionFactory.CreatePickupAction(world, _gameManager?.Content, playerId, _gameManager?.AutoEquipUpgradesEnabled == true)),
             Key.Enter or Key.KpEnter => Submit(UIActionFactory.CreateStairsAction(world, playerId)),
@@ -80,6 +112,27 @@ public partial class InputHandler : Node
             Key.M or Key.Tab => Raise(MinimapToggleRequested),
             _ => false,
         };
+    }
+
+    private bool EnterRunPrefix()
+    {
+        _runPrefixActive = true;
+        _eventBus?.EmitLogMessage("Run: choose a direction, or Escape to cancel.", LogCategory.System);
+        return true;
+    }
+
+    private static bool TryGetDirection(Key key, out Position delta)
+    {
+        delta = key switch
+        {
+            Key.Up or Key.W => new Position(0, -1),
+            Key.Down or Key.S => new Position(0, 1),
+            Key.Left or Key.A => new Position(-1, 0),
+            Key.Right or Key.D => new Position(1, 0),
+            _ => Position.Zero,
+        };
+
+        return delta != Position.Zero;
     }
 
     private bool HandleDirectionalInput(IWorldState world, EntityId playerId, Position delta)

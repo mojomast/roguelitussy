@@ -75,3 +75,13 @@ The minimap keeps the existing HUD summary and gameplay toggle behavior, but now
 The HUD keeps HP and energy text values immediate, but the visible bar fills now interpolate toward their latest targets over `_Process(...)` frames. HP changes trigger a short red damage pulse or green healing pulse; energy changes trigger a warning/gold pulse. The state is exposed through HUD properties so UITests can verify target values, displayed values, and pulse behavior without relying on Godot rendering output.
 
 **Files modified:** `Scripts/UI/HUD.cs`, `Tests/UITests/UISmokeTests.cs`, `docs/SYSTEMS.md`, `docs/FEATURES.md`.
+
+## Run-Until-Blocked Movement
+
+**Block:** 9  **Status:** Implemented
+
+**Keybinds:** `R` then `WASD`/arrow direction to run, `Escape` cancels the prefix
+
+Run mode repeats normal cardinal `MoveAction` turns until interrupted. It preserves single-step movement controls, stops before walls, closed doors, occupants, adjacent chests/NPCs/stairs/items, visible or adjacent hostiles, low HP or damage taken, game over, invalid movement, or a safety cap, and reuses existing turn/event processing for every step.
+
+**Files modified:** `Scripts/UI/InputHandler.cs`, `Scripts/Autoloads/GameManager.cs`, `Compat/Godot/GodotStubs.cs`, `Tests/UITests/UISmokeTests.cs`, `docs/SYSTEMS.md`, `docs/EVENTS.md`, `docs/FEATURES.md`.

@@ -23,6 +23,9 @@ public sealed class UISmokeTests : ITestSuite
         registry.Add("UI.HUD shows derived quick-use hotbar", HudShowsDerivedQuickUseHotbar);
         registry.Add("UI.Quick-use number key submits potion action", QuickUseNumberKeySubmitsPotionAction);
         registry.Add("UI.Quick-use rejects aimed and empty slots safely", QuickUseRejectsAimedAndEmptySlotsSafely);
+        registry.Add("UI.Run prefix enters and cancels without submitting movement", RunPrefixEntersAndCancels);
+        registry.Add("UI.Run moves through normal action processing until blocked", RunMovesThroughNormalActionProcessingUntilBlocked);
+        registry.Add("UI.Run stops when a hostile becomes visible or adjacent", RunStopsWhenHostileBecomesVisibleOrAdjacent);
         registry.Add("UI.Minimap reflects explored tiles and gameplay toggles", MinimapReflectsExplorationAndToggles);
         registry.Add("UI.MainMenu character creation affects the starting run", MainMenuCharacterCreationAffectsStartingRun);
         registry.Add("UI.GameManager enemy turns resolve after player action", GameManagerEnemyTurnsResolveAfterPlayerAction);
@@ -352,6 +355,56 @@ public sealed class UISmokeTests : ITestSuite
 
         Expect.True(input.HandleKey(Key.Five), "Empty quick-use slot should still handle the hotkey.");
         Expect.True(logs.Any(message => message.Contains("Quick slot 5 is empty", System.StringComparison.Ordinal)), "Empty quick-use slot should log a safe warning.");
+    }
+
+    private static void RunPrefixEntersAndCancels()
+    {
+        var context = CreateContext();
+        context.GameManager.LoadWorld(context.World);
+        var input = new InputHandler();
+        input.Bind(context.GameManager, context.Bus);
+
+        var submitted = 0;
+        context.Bus.PlayerActionSubmitted += _ => submitted++;
+
+        Expect.True(input.HandleKey(Key.R), "R should enter run-prefix mode during gameplay.");
+        Expect.True(input.IsRunPrefixActive, "Input handler should remember that the next direction starts a run.");
+        Expect.True(input.HandleKey(Key.Escape), "Escape should cancel run-prefix mode.");
+        Expect.False(input.IsRunPrefixActive, "Cancelling should leave run-prefix mode.");
+        Expect.Equal(0, submitted, "Entering or cancelling run-prefix mode should not submit gameplay actions.");
+    }
+
+    private static void RunMovesThroughNormalActionProcessingUntilBlocked()
+    {
+        var context = CreateRunContext(width: 7, height: 5, playerPosition: new Position(1, 2), viewRadius: 0);
+        context.GameManager.LoadWorld(context.World);
+        context.World.SetTile(new Position(5, 2), TileType.Wall);
+        var input = new InputHandler();
+        input.Bind(context.GameManager, context.Bus);
+
+        var turnsStarted = 0;
+        context.Bus.TurnStarted += _ => turnsStarted++;
+
+        Expect.True(input.HandleKey(Key.R), "R should enter run-prefix mode.");
+        Expect.True(input.HandleKey(Key.Right), "A direction after U should execute the run.");
+
+        Expect.Equal(new Position(4, 2), context.Player.Position, "Run should stop before the wall blocker.");
+        Expect.Equal(3, turnsStarted, "Each run step should process through GameManager.ProcessPlayerAction and emit normal turn events.");
+    }
+
+    private static void RunStopsWhenHostileBecomesVisibleOrAdjacent()
+    {
+        var context = CreateRunContext(width: 9, height: 5, playerPosition: new Position(1, 2), viewRadius: 1);
+        var enemy = new StubEntity("Lookout", new Position(5, 2), Faction.Enemy, stats: new Stats { HP = 10, MaxHP = 10, Speed = 100 });
+        context.World.AddEntity(enemy);
+        context.GameManager.LoadWorld(context.World);
+        var input = new InputHandler();
+        input.Bind(context.GameManager, context.Bus);
+
+        Expect.True(input.HandleKey(Key.R), "R should enter run-prefix mode.");
+        Expect.True(input.HandleKey(Key.Right), "A direction after U should execute the run.");
+
+        Expect.Equal(new Position(4, 2), context.Player.Position, "Run should stop once the hostile is visible or adjacent, before attacking.");
     }
 
     private static void GameManagerEnemyTurnsResolveAfterPlayerAction()
@@ -1375,6 +1428,52 @@ public sealed class UISmokeTests : ITestSuite
         }
 
         player.SetComponent(inventory);
+        player.SetComponent(new WalletComponent { Gold = 120 });
+
+        world.Player = player;
+        world.AddEntity(player);
+
+        var bus = new EventBus();
+        var scheduler = new TurnScheduler();
+        scheduler.BeginRound(world);
+
+        var gameManager = new GameManager();
+        var content = new StubContentDatabase();
+        gameManager.AttachServices(world, scheduler, new StubGenerator(), new FOVCalculator(), content, new StubSaveManager(), bus);
+
+        return new UIContext(world, player, bus, gameManager, content);
+    }
+
+    private static UIContext CreateRunContext(int width, int height, Position playerPosition, int viewRadius)
+    {
+        var world = new WorldState();
+        world.InitGrid(width, height);
+        world.Depth = 1;
+
+        for (var y = 0; y < world.Height; y++)
+        {
+            for (var x = 0; x < world.Width; x++)
+            {
+                world.SetTile(new Position(x, y), x == 0 || y == 0 || x == world.Width - 1 || y == world.Height - 1 ? TileType.Wall : TileType.Floor);
+            }
+        }
+
+        var player = new StubEntity(
+            "Player",
+            playerPosition,
+            Faction.Player,
+            stats: new Stats
+            {
+                HP = 40,
+                MaxHP = 40,
+                Attack = 8,
+                Defense = 4,
+                Accuracy = 80,
+                Evasion = 0,
+                Speed = 100,
+                ViewRadius = viewRadius,
+            });
+        player.SetComponent(new InventoryComponent(20));
         player.SetComponent(new WalletComponent { Gold = 120 });
 
         world.Player = player;

@@ -17,3 +17,7 @@
 | `FloorTransitionConfirmed` | none | The floor summary is dismissed by Enter/Space or its auto-dismiss timer. | `UIRoot` refreshes modal input gating. |
 
 `GameOverWithStats` is additive. The existing `GameOver(int finalDepth, int turnsSurvived)` event remains for compatibility.
+
+## Run Movement
+
+Run-until-blocked movement does not add a dedicated event. Each repeated step is processed as a normal `MoveAction` through `GameManager.ProcessPlayerAction`, so existing `TurnStarted`, `EntityMoved`, `DamageDealt`, `HPChanged`, `LogMessage`, and `TurnCompleted` notifications continue to describe the resulting state changes.
