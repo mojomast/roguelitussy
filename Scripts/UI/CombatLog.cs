@@ -15,6 +15,7 @@ public partial class CombatLog : Control
     private const float OuterMargin = 20f;
     private const float PanelPadding = 12f;
     private readonly Queue<LogEntry> _messages = new();
+    private LogFilter _activeFilter = LogFilter.All;
     private Panel? _panel;
     private ColorRect? _background;
     private ColorRect? _fade;
@@ -29,12 +30,21 @@ public partial class CombatLog : Control
 
     public bool ConsoleVisible => _panel?.Visible ?? false;
 
+    private enum LogFilter
+    {
+        All,
+        CombatOnly,
+        LootOnly,
+        SystemOnly,
+    }
+
     private sealed record LogEntry(string Markup, LogCategory Category);
 
     public CombatLog()
     {
         Name = "CombatLog";
         Visible = true;
+        RebuildRenderedText();
     }
 
     public override void _Ready()
@@ -45,6 +55,21 @@ public partial class CombatLog : Control
 
     public void RefreshConsole()
     {
+        RebuildRenderedText();
+        RefreshVisualState();
+    }
+
+    public void CycleFilter()
+    {
+        _activeFilter = _activeFilter switch
+        {
+            LogFilter.All => LogFilter.CombatOnly,
+            LogFilter.CombatOnly => LogFilter.LootOnly,
+            LogFilter.LootOnly => LogFilter.SystemOnly,
+            _ => LogFilter.All,
+        };
+
+        RebuildRenderedText();
         RefreshVisualState();
     }
 
@@ -119,7 +144,7 @@ public partial class CombatLog : Control
         if (content is not null && content.TryGetItemTemplate(item.TemplateId, out var template))
         {
             var actorName = ItemRarityPresentation.EscapeBBCode(ResolveName(entityId));
-            var itemName = ItemRarityPresentation.WrapWithColor(template.DisplayName, template.Rarity);
+            var itemName = ItemRarityPresentation.WrapDecoratedNameWithColor(template.DisplayName, template.Rarity);
             if (ItemRarityPresentation.IsHighlighted(template.Rarity))
             {
                 var callout = ItemRarityPresentation.EscapeBBCode(ItemRarityPresentation.ResolvePickupCallout(template));
@@ -196,8 +221,16 @@ public partial class CombatLog : Control
             _messages.Dequeue();
         }
 
+        RebuildRenderedText();
+        RefreshVisualState();
+    }
+
+    private void RebuildRenderedText()
+    {
         var builder = new StringBuilder();
-        var visible = _messages.TakeLast(VisibleMessageCount).ToArray();
+        builder.AppendLine($"[color={UiStyle.ToHex(UiStyle.MutedText())}][Filter: {GetFilterLabel(_activeFilter)}][/color]");
+
+        var visible = _messages.Where(IsVisibleForActiveFilter).TakeLast(VisibleMessageCount).ToArray();
         for (var i = 0; i < visible.Length; i++)
         {
             var age = visible.Length - i - 1;
@@ -207,8 +240,27 @@ public partial class CombatLog : Control
         }
 
         RenderedText = builder.ToString().TrimEnd();
-        RefreshVisualState();
     }
+
+    private static string GetFilterLabel(LogFilter filter) => filter switch
+    {
+        LogFilter.CombatOnly => "Combat",
+        LogFilter.LootOnly => "Loot",
+        LogFilter.SystemOnly => "System",
+        _ => "All",
+    };
+
+    private bool IsVisibleForActiveFilter(LogEntry entry) => _activeFilter switch
+    {
+        LogFilter.CombatOnly => entry.Category is LogCategory.PlayerAction
+            or LogCategory.EnemyAction
+            or LogCategory.Critical
+            or LogCategory.StatusEffect
+            or LogCategory.Warning,
+        LogFilter.LootOnly => entry.Category == LogCategory.Loot,
+        LogFilter.SystemOnly => entry.Category == LogCategory.System,
+        _ => true,
+    };
 
     private static string ApplyAgeFade(string markup, int age, LogCategory category)
     {

@@ -158,6 +158,8 @@ public partial class UIRoot : CanvasLayer
         InputHandler.ToolsRequested += ToggleDevTools;
         InputHandler.ExamineRequested -= ToggleExamine;
         InputHandler.ExamineRequested += ToggleExamine;
+        InputHandler.CombatLogFilterCycleRequested -= CombatLog.CycleFilter;
+        InputHandler.CombatLogFilterCycleRequested += CombatLog.CycleFilter;
 
         DevToolsWorkbench.DebugConsoleRequested -= OpenDebugConsoleFromWorkshop;
         DevToolsWorkbench.DebugConsoleRequested += OpenDebugConsoleFromWorkshop;

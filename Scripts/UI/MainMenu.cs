@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using Roguelike.Core;
 
 namespace Godotussy;
 
@@ -183,6 +184,8 @@ public partial class MainMenu : MenuBase
     private Label? _previewTitle;
     private Label? _previewSubtitle;
     private Label? _previewVariantId;
+    private Tooltip? _starterKitTooltip;
+    private bool _starterKitTooltipVisible;
     private string _statusMessage = "Ready for deployment.";
 
     public int PendingSeed { get; private set; } = 1337;
@@ -247,6 +250,7 @@ public partial class MainMenu : MenuBase
             $"Identity: {RaceOptions[_raceIndex]} / {GenderOptions[_genderIndex]} / {AppearanceOptions[_appearanceIndex]}",
             $"Training: VIT {_vitalityPoints}  POW {_powerPoints}  GRD {_guardPoints}  FIN {_finessePoints}",
             $"Points Remaining: {RemainingPoints}",
+            "Training effects: VIT +3 Max HP, POW +1 Attack, GRD +1 Defense, FIN +1 Accuracy and +1 Evasion.",
             string.Empty,
             "READOUT",
             archetype.Summary,
@@ -255,13 +259,18 @@ public partial class MainMenu : MenuBase
             string.Empty,
             BuildStatPreview(),
             string.Empty,
-            "Use Left/Right or +/- to edit the highlighted field.",
-            "Training raises max HP, attack, defense, and finesse.");
+            "Use Left/Right or +/- to edit the highlighted field.");
     }
 
     protected override string BuildFooterText()
     {
-        return "Enter deploy  Arrows or +/- adjust  H help  T workshop";
+        return "Enter deploy  Arrows or +/- adjust  Tab starter kit  H help  T workshop";
+    }
+
+    public override void Close()
+    {
+        HideStarterKitTooltip();
+        base.Close();
     }
 
     public string BuildStatPreview()
@@ -292,6 +301,33 @@ public partial class MainMenu : MenuBase
         return PlayerVisualCatalog.BuildPreviewToken(ResolveCurrentProfile());
     }
 
+    public static IEnumerable<string> EnumerateAuthoredStartingItemIds()
+    {
+        foreach (var archetype in Archetypes)
+        {
+            foreach (var itemId in archetype.StartingItems.Concat(archetype.EquippedItems))
+            {
+                yield return itemId;
+            }
+        }
+
+        foreach (var origin in Origins)
+        {
+            foreach (var itemId in origin.StartingItems)
+            {
+                yield return itemId;
+            }
+        }
+
+        foreach (var trait in Traits)
+        {
+            foreach (var itemId in trait.StartingItems)
+            {
+                yield return itemId;
+            }
+        }
+    }
+
     private string BuildHeroSummary()
     {
         var archetype = Archetypes[_archetypeIndex];
@@ -307,46 +343,24 @@ public partial class MainMenu : MenuBase
             $"Status     {_statusMessage}");
     }
 
-    private string BuildPreviewDetailText()
+    public string BuildStarterKitPreviewText()
     {
         var archetype = Archetypes[_archetypeIndex];
         var origin = Origins[_originIndex];
         var trait = Traits[_traitIndex];
-        var kit = new List<string>();
-        kit.AddRange(archetype.StartingItems);
-        kit.AddRange(origin.StartingItems);
-        kit.AddRange(trait.StartingItems);
+        var allItems = new List<string>();
+        allItems.AddRange(archetype.StartingItems);
+        allItems.AddRange(origin.StartingItems);
+        allItems.AddRange(trait.StartingItems);
+        var pack = SubtractItemCounts(allItems, archetype.EquippedItems);
 
-        var projectedStats = BuildProjectedStatLines();
-        return string.Join(
-            "\n",
-            "Ready kit",
-            $"Frontline {FormatLoadoutTokens(archetype.EquippedItems)}",
-            $"Pack {FormatLoadoutTokens(kit)}",
-            string.Empty,
-            "Projected stats",
-            projectedStats[0],
-            projectedStats[1],
-            string.Empty,
-            $"Route {archetype.DisplayName} / {origin.DisplayName}",
-            $"Edge {trait.DisplayName}");
-    }
-
-    private string BuildPreviewKitText()
-    {
-        var archetype = Archetypes[_archetypeIndex];
-        var origin = Origins[_originIndex];
-        var trait = Traits[_traitIndex];
-        var pack = new List<string>();
-        pack.AddRange(archetype.StartingItems);
-        pack.AddRange(origin.StartingItems);
-        pack.AddRange(trait.StartingItems);
         return string.Join(
             "\n",
             "READY KIT",
-            FormatBullets(archetype.EquippedItems),
-            "PACK",
-            FormatBullets(pack));
+            "Equipped:",
+            FormatStarterItemLines(archetype.EquippedItems),
+            "Pack:",
+            FormatStarterItemLines(pack));
     }
 
     private string BuildPreviewStatsText()
@@ -363,15 +377,80 @@ public partial class MainMenu : MenuBase
         return $"Path: {archetype.DisplayName} / {origin.DisplayName}\nTrait: {trait.DisplayName}";
     }
 
-    private static string FormatBullets(IEnumerable<string> tokens)
+    private string FormatStarterItemLines(IEnumerable<string> itemIds)
     {
-        var values = tokens
-            .Where(token => !string.IsNullOrWhiteSpace(token))
-            .Distinct()
+        var values = itemIds
+            .Where(itemId => !string.IsNullOrWhiteSpace(itemId))
+            .GroupBy(itemId => itemId)
             .Take(4)
-            .Select(token => $"▪ {token.Replace('_', ' ')}")
+            .Select(group => FormatStarterItemLine(group.Key, group.Count()))
             .ToArray();
-        return values.Length == 0 ? "▪ none" : string.Join("\n", values);
+
+        return values.Length == 0 ? "- none" : string.Join("\n", values);
+    }
+
+    private string FormatStarterItemLine(string itemId, int count)
+    {
+        var displayName = PrettifyTemplateId(itemId);
+        var description = string.Empty;
+        var requiresTargeting = false;
+        if (_gameManager?.Content?.TryGetItemTemplate(itemId, out var template) == true)
+        {
+            displayName = string.IsNullOrWhiteSpace(template.DisplayName) ? displayName : template.DisplayName.Trim();
+            description = NormalizePreviewDescription(template.Description);
+            requiresTargeting = template.RequiresTargetSelection;
+        }
+
+        var countSuffix = count > 1 ? $" x{count}" : string.Empty;
+        var parts = new List<string> { $"- {displayName}{countSuffix}" };
+        if (!string.IsNullOrWhiteSpace(description))
+        {
+            parts.Add(description);
+        }
+
+        if (requiresTargeting)
+        {
+            parts.Add("Requires targeting.");
+        }
+
+        return string.Join(" - ", parts);
+    }
+
+    private static IReadOnlyList<string> SubtractItemCounts(IEnumerable<string> itemIds, IEnumerable<string> equippedItemIds)
+    {
+        var remainingEquipped = equippedItemIds
+            .Where(itemId => !string.IsNullOrWhiteSpace(itemId))
+            .GroupBy(itemId => itemId)
+            .ToDictionary(group => group.Key, group => group.Count());
+        var pack = new List<string>();
+        foreach (var itemId in itemIds.Where(itemId => !string.IsNullOrWhiteSpace(itemId)))
+        {
+            if (remainingEquipped.TryGetValue(itemId, out var count) && count > 0)
+            {
+                remainingEquipped[itemId] = count - 1;
+                continue;
+            }
+
+            pack.Add(itemId);
+        }
+
+        return pack;
+    }
+
+    private static string NormalizePreviewDescription(string description)
+    {
+        return string.IsNullOrWhiteSpace(description)
+            ? string.Empty
+            : description.Replace('\n', ' ').Replace('\r', ' ').Trim();
+    }
+
+    private static string PrettifyTemplateId(string templateId)
+    {
+        return string.Join(
+            " ",
+            templateId
+                .Split('_', System.StringSplitOptions.RemoveEmptyEntries)
+                .Select(part => char.ToUpperInvariant(part[0]) + part[1..]));
     }
 
     private static string WrapPreviewText(string text, float availableWidth)
@@ -446,26 +525,6 @@ public partial class MainMenu : MenuBase
         var spd = BaseSpeed + archetype.Bonus.Speed + origin.Bonus.Speed + trait.Bonus.Speed;
         var vr = BaseViewRadius + archetype.Bonus.ViewRadius + origin.Bonus.ViewRadius + trait.Bonus.ViewRadius;
         return (hp, atk, def, acc, eva, spd, vr);
-    }
-
-    private static string FormatLoadoutTokens(IEnumerable<string> tokens)
-    {
-        var allTokens = tokens
-            .Where(token => !string.IsNullOrWhiteSpace(token))
-            .Distinct()
-            .ToArray();
-        var visibleTokens = allTokens
-            .Take(4)
-            .Select(token => token.Replace('_', ' '))
-            .ToArray();
-
-        if (visibleTokens.Length == 0)
-        {
-            return "none";
-        }
-
-        var suffix = allTokens.Length > visibleTokens.Length ? $", + {allTokens.Length - visibleTokens.Length} more" : string.Empty;
-        return string.Join(", ", visibleTokens) + suffix;
     }
 
     protected override Vector2 ResolveDesiredPanelSize(Vector2 viewportSize)
@@ -571,6 +630,9 @@ public partial class MainMenu : MenuBase
             case Key.Right:
             case Key.Plus:
                 return AdjustHighlightedField(1);
+            case Key.Tab:
+                ToggleStarterKitTooltip();
+                return true;
             case Key.H:
                 HelpRequested?.Invoke();
                 return true;
@@ -883,6 +945,55 @@ public partial class MainMenu : MenuBase
         {
             SetSelection(restoredIndex);
         }
+
+        RefreshStarterKitTooltip();
+    }
+
+    private void ToggleStarterKitTooltip()
+    {
+        if (_starterKitTooltipVisible)
+        {
+            HideStarterKitTooltip();
+            return;
+        }
+
+        _starterKitTooltipVisible = true;
+        RefreshStarterKitTooltip();
+    }
+
+    private void RefreshStarterKitTooltip()
+    {
+        if (!_starterKitTooltipVisible || !Visible)
+        {
+            return;
+        }
+
+        var tooltip = ResolveStarterKitTooltip();
+        var body = string.Join(
+            "\n",
+            "Equipped items start worn. Pack items are carried supplies.",
+            string.Empty,
+            BuildStarterKitPreviewText());
+        tooltip.ShowShortcutTooltip("Starter Kit", body, tooltip.ResolveBottomRightPosition(GetViewportRect().Size));
+    }
+
+    private Tooltip ResolveStarterKitTooltip()
+    {
+        if (_starterKitTooltip is not null)
+        {
+            return _starterKitTooltip;
+        }
+
+        _starterKitTooltip = new Tooltip { ZIndex = ZIndex + 5 };
+        AddChild(_starterKitTooltip);
+        _starterKitTooltip._Ready();
+        return _starterKitTooltip;
+    }
+
+    private void HideStarterKitTooltip()
+    {
+        _starterKitTooltipVisible = false;
+        _starterKitTooltip?.Hide();
     }
 
     private void AddSection(string title)
@@ -1059,7 +1170,7 @@ public partial class MainMenu : MenuBase
 
         if (_previewKitLabel is not null)
         {
-            _previewKitLabel.Text = WrapPreviewText(BuildPreviewKitText(), _previewKitLabel.Size.X);
+            _previewKitLabel.Text = WrapPreviewText(BuildStarterKitPreviewText(), _previewKitLabel.Size.X);
             _previewKitLabel.Modulate = UiStyle.Parchment();
         }
 

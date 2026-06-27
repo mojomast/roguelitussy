@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Godotussy;
 using Roguelike.Core;
 using Roguelike.Tests.TestFramework;
 
@@ -15,6 +16,7 @@ public sealed class ContentValidationTests : ITestSuite
         registry.Add("Content.Cross references remain intact", CrossReferencesRemainIntact);
         registry.Add("Content.Enemy gold ranges are valid", EnemyGoldRangesAreValid);
         registry.Add("Content.Item stats and effects are runtime-supported", ItemStatsAndEffectsAreRuntimeSupported);
+        registry.Add("Content.Character creation starter items resolve", CharacterCreationStarterItemsResolve);
         registry.Add("Content.Authored art paths resolve to committed files", AuthoredArtPathsResolveToCommittedFiles);
         registry.Add("Content.Depth filters stay stable", DepthFiltersStayStable);
         registry.Add("Content.Loads from in-memory JSON documents", LoadsFromInMemoryJsonDocuments);
@@ -159,6 +161,17 @@ public sealed class ContentValidationTests : ITestSuite
             {
                 Expect.False(string.Equals(effect.Type, "passive", System.StringComparison.Ordinal), $"Item '{item.Id}' passive effect should not be authored until runtime support exists");
             }
+        }
+    }
+
+    private static void CharacterCreationStarterItemsResolve()
+    {
+        var content = LoadContent();
+        foreach (var itemId in MainMenu.EnumerateAuthoredStartingItemIds().Distinct())
+        {
+            Expect.True(content.TryGetItemTemplate(itemId, out var template), $"Starter item '{itemId}' should resolve in loaded content.");
+            Expect.False(string.IsNullOrWhiteSpace(template.DisplayName), $"Starter item '{itemId}' should have a display name.");
+            Expect.False(string.IsNullOrWhiteSpace(template.Description), $"Starter item '{itemId}' should have a description.");
         }
     }
 

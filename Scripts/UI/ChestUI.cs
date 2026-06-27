@@ -4,42 +4,31 @@ using Roguelike.Core;
 
 namespace Godotussy;
 
-public partial class ChestUI : Control
+public partial class ChestUI : MenuBase
 {
-    private const float PanelWidth = 520f;
-    private const float PanelHeight = 260f;
-    private const float PanelPadding = 18f;
-    private const float OuterMargin = 24f;
+    private enum ChestAction
+    {
+        TakeAll,
+        Close,
+    }
 
+    private readonly System.Collections.Generic.List<ChestAction> _actions = new();
     private GameManager? _gameManager;
     private EventBus? _eventBus;
     private IContentDatabase? _content;
-    private Panel? _panel;
-    private ColorRect? _background;
-    private ColorRect? _borderTop;
-    private ColorRect? _borderBottom;
-    private ColorRect? _borderLeft;
-    private ColorRect? _borderRight;
-    private UiMouseLabel? _titleLabel;
-    private RichTextLabel? _bodyLabel;
-    private UiMouseLabel? _takeAllLabel;
-    private UiMouseLabel? _closeLabel;
     private EntityId _chestId = EntityId.Invalid;
     private string _statusText = string.Empty;
+    private UiMouseColorRect? _titleClickTarget;
 
     public ChestUI()
     {
         Name = "ChestUI";
+        Title = "CHEST";
+        ConfigureChestOptions();
         Visible = false;
     }
 
     public EntityId ChestId => _chestId;
-
-    public override void _Ready()
-    {
-        EnsureVisuals();
-        RefreshVisualState();
-    }
 
     public void Bind(GameManager? gameManager, EventBus? eventBus, IContentDatabase? content)
     {
@@ -59,26 +48,29 @@ public partial class ChestUI : Control
             _eventBus.TurnCompleted += OnTurnCompleted;
         }
 
-        RefreshVisualState();
+        RebuildMenuText();
     }
 
     public void Open(EntityId chestId)
     {
         _chestId = chestId;
         _statusText = string.Empty;
-        Visible = true;
-        RefreshVisualState();
+        Title = ResolveChestTitle();
+        SetSelection(0);
+        RebuildMenuText();
+        base.Open();
     }
 
-    public void Close()
+    public override void Close()
     {
-        Visible = false;
+        base.Close();
         _chestId = EntityId.Invalid;
         _statusText = string.Empty;
-        RefreshVisualState();
+        Title = "CHEST";
+        RebuildMenuText();
     }
 
-    public bool HandleKey(Key key)
+    public override bool HandleKey(Key key)
     {
         if (!Visible)
         {
@@ -87,22 +79,134 @@ public partial class ChestUI : Control
 
         switch (key)
         {
-            case Key.Enter:
-            case Key.KpEnter:
             case Key.T:
             case Key.A:
                 TakeAll();
                 return true;
-            case Key.Escape:
             case Key.F:
                 Close();
                 return true;
             default:
-                return false;
+                return base.HandleKey(key);
         }
     }
 
-    public string SnapshotBodyMarkup() => BuildBodyMarkup();
+    public string SnapshotBodyMarkup() => BuildBodyText();
+
+    protected override string BuildBodyText()
+    {
+        var chest = _gameManager?.World?.GetEntity(_chestId);
+        var chestComponent = chest?.GetComponent<ChestComponent>();
+        if (chest is null || chestComponent is null)
+        {
+            return "Chest unavailable.";
+        }
+
+        var builder = new StringBuilder();
+        builder.AppendLine($"Container   {chest.Name}");
+        builder.AppendLine($"Loot source {chestComponent.LootTableId}");
+        builder.AppendLine();
+        builder.AppendLine("This chest rolls its contents when opened. Loot that fits is stowed; overflow spills onto the floor.");
+        builder.AppendLine();
+        builder.AppendLine("TAKE ALL    Open chest and collect loot.");
+        if (!string.IsNullOrWhiteSpace(_statusText))
+        {
+            builder.AppendLine();
+            builder.Append(_statusText);
+        }
+
+        return builder.ToString().TrimEnd();
+    }
+
+    protected override string BuildFooterText()
+    {
+        return "Up/Down choose  Enter confirm  T/A take all  F/Esc close";
+    }
+
+    protected override void ActivateSelected()
+    {
+        var action = SelectedIndex >= 0 && SelectedIndex < _actions.Count ? _actions[SelectedIndex] : ChestAction.Close;
+        if (action == ChestAction.TakeAll)
+        {
+            TakeAll();
+        }
+        else
+        {
+            Close();
+        }
+    }
+
+    protected override void Cancel()
+    {
+        Close();
+    }
+
+    protected override Vector2 ResolveDesiredPanelSize(Vector2 viewportSize)
+    {
+        var desired = new Vector2(520f, System.Math.Min(300f, viewportSize.Y * 0.70f));
+        return OverlayLayoutHelper.FitPanelSize(viewportSize, desired, 24f);
+    }
+
+    protected override void OnVisualStateRefreshed(Panel panel, Label label, Vector2 viewportSize, Vector2 panelSize)
+    {
+        EnsureTitleClickTarget(panel);
+    }
+
+    private void ConfigureChestOptions()
+    {
+        _actions.Clear();
+        ConfigureOptions();
+        AddOption("Take All", ChestAction.TakeAll);
+        AddOption("Close", ChestAction.Close);
+    }
+
+    private void AddOption(string label, ChestAction action)
+    {
+        _actions.Add(action);
+        ConfigureOption(label);
+    }
+
+    private void EnsureTitleClickTarget(Panel panel)
+    {
+        var titleLabel = TitleLabel;
+        if (titleLabel is null)
+        {
+            return;
+        }
+
+        if (_titleClickTarget is null)
+        {
+            _titleClickTarget = new UiMouseColorRect
+            {
+                Name = "TitleClickTarget",
+                Color = UiStyle.DeepBlack(0f),
+                InputSubmitted = OnTitleInput,
+            };
+        }
+
+        if (_titleClickTarget.GetParent() != panel)
+        {
+            _titleClickTarget.GetParent()?.RemoveChild(_titleClickTarget);
+            panel.AddChild(_titleClickTarget);
+        }
+
+        _titleClickTarget.Position = titleLabel.Position;
+        _titleClickTarget.Size = titleLabel.Size;
+        _titleClickTarget.Visible = titleLabel.Visible;
+    }
+
+    private void OnTitleInput(InputEvent input)
+    {
+        if (!Visible)
+        {
+            return;
+        }
+
+        if (input is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
+        {
+            TakeAll();
+        }
+    }
 
     private void TakeAll()
     {
@@ -112,7 +216,7 @@ public partial class ChestUI : Control
         if (world is null || player is null || chest?.GetComponent<ChestComponent>() is null || _eventBus is null)
         {
             _statusText = "Chest unavailable.";
-            RefreshVisualState();
+            RebuildMenuText();
             return;
         }
 
@@ -120,7 +224,7 @@ public partial class ChestUI : Control
         if (action.Validate(world) != ActionResult.Success)
         {
             _statusText = "Move closer to open this chest.";
-            RefreshVisualState();
+            RebuildMenuText();
             return;
         }
 
@@ -144,163 +248,9 @@ public partial class ChestUI : Control
         }
     }
 
-    private void EnsureVisuals()
-    {
-        if (_panel is not null && _bodyLabel is not null)
-        {
-            return;
-        }
-
-        var viewportSize = ResolveViewportSize();
-        var panelSize = ResolvePanelSize(viewportSize);
-        Size = viewportSize;
-        ZIndex = 98;
-        _panel = new Panel { Name = "Panel", Size = panelSize };
-        _background = new ColorRect { Name = "Background", Color = UiStyle.PanelBlack(0.98f) };
-        _borderTop = new ColorRect { Name = "BorderTop", Color = UiStyle.BorderActive() };
-        _borderBottom = new ColorRect { Name = "BorderBottom", Color = UiStyle.BorderActive() };
-        _borderLeft = new ColorRect { Name = "BorderLeft", Color = UiStyle.BorderActive() };
-        _borderRight = new ColorRect { Name = "BorderRight", Color = UiStyle.BorderActive() };
-        _titleLabel = new UiMouseLabel
-        {
-            Name = "TitleLabel",
-            Text = "CHEST",
-            Modulate = UiStyle.BrightGold(),
-            InputSubmitted = input =>
-            {
-                if (input is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
-                {
-                    TakeAll();
-                }
-            },
-        };
-        _bodyLabel = new RichTextLabel
-        {
-            Name = "BodyLabel",
-            BbcodeEnabled = true,
-            Modulate = UiStyle.Parchment(),
-        };
-        _takeAllLabel = new UiMouseLabel
-        {
-            Name = "TakeAllButton",
-            Text = "[TAKE ALL]",
-            Modulate = UiStyle.BrightGold(),
-            InputSubmitted = input =>
-            {
-                if (input is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
-                {
-                    TakeAll();
-                }
-            },
-        };
-        _closeLabel = new UiMouseLabel
-        {
-            Name = "CloseButton",
-            Text = "[CLOSE]",
-            Modulate = UiStyle.MutedText(),
-            InputSubmitted = input =>
-            {
-                if (input is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
-                {
-                    Close();
-                }
-            },
-        };
-
-        _panel.AddChild(_background);
-        _panel.AddChild(_borderTop);
-        _panel.AddChild(_borderBottom);
-        _panel.AddChild(_borderLeft);
-        _panel.AddChild(_borderRight);
-        _panel.AddChild(_titleLabel);
-        _panel.AddChild(_bodyLabel);
-        _panel.AddChild(_takeAllLabel);
-        _panel.AddChild(_closeLabel);
-        AddChild(_panel);
-    }
-
-    private void RefreshVisualState()
-    {
-        EnsureVisuals();
-        if (_panel is null || _bodyLabel is null || _background is null || _borderTop is null || _borderBottom is null || _borderLeft is null || _borderRight is null || _titleLabel is null || _takeAllLabel is null || _closeLabel is null)
-        {
-            return;
-        }
-
-        var viewportSize = ResolveViewportSize();
-        var panelSize = ResolvePanelSize(viewportSize);
-        Size = viewportSize;
-        _panel.Size = panelSize;
-        _panel.Position = OverlayLayoutHelper.CenterInViewport(viewportSize, panelSize);
-        _panel.Visible = Visible;
-        _panel.Modulate = UiStyle.GoldTrim();
-        _background.Position = Vector2.Zero;
-        _background.Size = panelSize;
-        _borderTop.Position = Vector2.Zero;
-        _borderTop.Size = new Vector2(panelSize.X, 1f);
-        _borderBottom.Position = new Vector2(0f, panelSize.Y - 1f);
-        _borderBottom.Size = new Vector2(panelSize.X, 1f);
-        _borderLeft.Position = Vector2.Zero;
-        _borderLeft.Size = new Vector2(1f, panelSize.Y);
-        _borderRight.Position = new Vector2(panelSize.X - 1f, 0f);
-        _borderRight.Size = new Vector2(1f, panelSize.Y);
-
-        _titleLabel.Visible = Visible;
-        _titleLabel.Position = new Vector2(PanelPadding, 12f);
-        _titleLabel.Size = new Vector2(panelSize.X - (PanelPadding * 2f), 24f);
-        _titleLabel.Text = ResolveChestTitle();
-        _bodyLabel.Visible = Visible;
-        _bodyLabel.Position = new Vector2(PanelPadding, 48f);
-        _bodyLabel.Size = new Vector2(panelSize.X - (PanelPadding * 2f), panelSize.Y - 96f);
-        _bodyLabel.Clear();
-        _bodyLabel.AppendText(BuildBodyMarkup());
-        _takeAllLabel.Visible = Visible;
-        _takeAllLabel.Position = new Vector2(PanelPadding, panelSize.Y - 38f);
-        _takeAllLabel.Size = new Vector2(130f, 22f);
-        _closeLabel.Visible = Visible;
-        _closeLabel.Position = new Vector2(panelSize.X - PanelPadding - 110f, panelSize.Y - 38f);
-        _closeLabel.Size = new Vector2(110f, 22f);
-    }
-
-    private string BuildBodyMarkup()
-    {
-        var chest = _gameManager?.World?.GetEntity(_chestId);
-        var chestComponent = chest?.GetComponent<ChestComponent>();
-        if (chest is null || chestComponent is null)
-        {
-            return ItemRarityPresentation.EscapeBBCode("Chest unavailable.");
-        }
-
-        var builder = new StringBuilder();
-        builder.AppendLine($"[color={UiStyle.ToHex(UiStyle.MutedText())}]Container[/color] [color={UiStyle.ToHex(UiStyle.Parchment())}]{ItemRarityPresentation.EscapeBBCode(chest.Name)}[/color]");
-        builder.AppendLine($"[color={UiStyle.ToHex(UiStyle.MutedText())}]Loot source[/color] [color={UiStyle.ToHex(UiStyle.Parchment())}]{ItemRarityPresentation.EscapeBBCode(chestComponent.LootTableId)}[/color]");
-        builder.AppendLine();
-        builder.AppendLine($"[color={UiStyle.ToHex(UiStyle.Parchment())}]This chest rolls its contents when opened. Loot that fits is stowed; overflow spills onto the floor.[/color]");
-        builder.AppendLine();
-        builder.AppendLine($"[color={UiStyle.ToHex(UiStyle.BrightGold())}]TAKE ALL[/color] [color={UiStyle.ToHex(UiStyle.MutedText())}]Open chest and collect loot.[/color]");
-        if (!string.IsNullOrWhiteSpace(_statusText))
-        {
-            builder.AppendLine();
-            builder.Append($"[color={UiStyle.ToHex(UiStyle.DangerRed())}]{ItemRarityPresentation.EscapeBBCode(_statusText)}[/color]");
-        }
-
-        return builder.ToString().TrimEnd();
-    }
-
     private string ResolveChestTitle()
     {
         var chest = _gameManager?.World?.GetEntity(_chestId);
         return string.IsNullOrWhiteSpace(chest?.Name) ? "CHEST" : chest!.Name.ToUpperInvariant();
-    }
-
-    private static Vector2 ResolvePanelSize(Vector2 viewportSize)
-    {
-        var desired = new Vector2(PanelWidth, System.Math.Min(PanelHeight, viewportSize.Y * 0.70f));
-        return OverlayLayoutHelper.FitPanelSize(viewportSize, desired, OuterMargin);
-    }
-
-    private Vector2 ResolveViewportSize()
-    {
-        return GetParent() is not null && GetTree() is not null ? GetViewportRect().Size : new Vector2(1280f, 720f);
     }
 }

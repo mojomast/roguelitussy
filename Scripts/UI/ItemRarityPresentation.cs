@@ -40,6 +40,45 @@ public static class ItemRarityPresentation
         };
     }
 
+    public static string ResolveAbbreviation(string? rarity)
+    {
+        return Normalize(rarity) switch
+        {
+            "common" => "C",
+            "uncommon" => "U",
+            "rare" => "R",
+            "epic" => "E",
+            "legendary" => "L",
+            "artifact" => "A",
+            _ => "?",
+        };
+    }
+
+    public static string ResolveBracketedAbbreviation(string? rarity)
+    {
+        return $"[{ResolveAbbreviation(rarity)}]";
+    }
+
+    public static string ResolveBracketedAbbreviationMarkup(string? rarity)
+    {
+        return $"[lb]{ResolveAbbreviation(rarity)}[rb]";
+    }
+
+    public static string ResolveDecoratedName(string itemName, string? rarity)
+    {
+        return $"{ResolveBracketedAbbreviation(rarity)} {itemName}";
+    }
+
+    public static string ResolveDecoratedNameMarkup(string itemName, string? rarity)
+    {
+        return $"{ResolveBracketedAbbreviationMarkup(rarity)} {EscapeBBCode(itemName)}";
+    }
+
+    public static string WrapDecoratedNameWithColor(string itemName, string? rarity)
+    {
+        return $"[color={ResolveHexColor(rarity)}]{ResolveDecoratedNameMarkup(itemName, rarity)}[/color]";
+    }
+
     public static string ResolveHexColor(string? rarity)
     {
         return UiStyle.ToHex(ResolveColor(rarity));

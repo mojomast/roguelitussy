@@ -45,10 +45,10 @@ jobs:
         run: dotnet format --verify-no-changes godotussy.sln
 
       - name: Build Godot stub profile
-        run: dotnet build godotussy.csproj -p:UseGodotStubs=true --no-restore
+        run: dotnet build godotussy.csproj -p:UseGodotStubs=true -p:RoguelitussyWarningsAsErrors=true --no-restore
 
       - name: Build test project
-        run: dotnet build Tests/godotussy.Tests.csproj --no-restore
+        run: dotnet build Tests/godotussy.Tests.csproj -p:RoguelitussyWarningsAsErrors=true --no-restore
 
       - name: Run full custom test harness
         run: dotnet run --project Tests/godotussy.Tests.csproj --no-build
@@ -57,7 +57,7 @@ jobs:
         run: dotnet restore Tests/godotussy.Tests.csproj -p:UseGodotStubs=true -p:RenderingValidation=true
 
       - name: Run rendering validation profile
-        run: dotnet run --project Tests/godotussy.Tests.csproj -p:UseGodotStubs=true -p:RenderingValidation=true
+        run: dotnet run --project Tests/godotussy.Tests.csproj -p:UseGodotStubs=true -p:RenderingValidation=true -p:RoguelitussyWarningsAsErrors=true
 
       - name: Upload build artifacts on failure
         if: failure()

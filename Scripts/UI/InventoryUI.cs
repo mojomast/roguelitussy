@@ -61,6 +61,7 @@ public partial class InventoryUI : Control
         public Label Glyph { get; init; } = null!;
         public ColorRect StackBadge { get; init; } = null!;
         public Label StackLabel { get; init; } = null!;
+        public Label RarityLabel { get; init; } = null!;
         public ColorRect EquippedBadge { get; init; } = null!;
         public Label EquippedLabel { get; init; } = null!;
     }
@@ -440,7 +441,7 @@ public partial class InventoryUI : Control
             var lines = new List<string>
             {
                 template.DisplayName,
-                $"Rarity: {ItemRarityPresentation.ResolveDisplayLabel(template.Rarity)}",
+                $"Rarity: {ItemRarityPresentation.ResolveBracketedAbbreviation(template.Rarity)} {ItemRarityPresentation.ResolveDisplayLabel(template.Rarity)}",
                 template.Description,
                 $"Category: {template.Category}",
                 $"Slot: {(template.Slot == EquipSlot.None ? "None" : template.Slot.ToString())}",
@@ -631,8 +632,11 @@ public partial class InventoryUI : Control
         var marker = IsEquipped(item) ? "E" : " ";
         var glyph = ResolveSlotGlyph(item);
         var count = item.StackCount > 1 ? $"x{item.StackCount}" : string.Empty;
-        var token = $"{marker}{glyph}{count}";
-        return token.PadRight(7);
+        var rarity = _content is not null && _content.TryGetItemTemplate(item.TemplateId, out var template)
+            ? ItemRarityPresentation.ResolveBracketedAbbreviation(template.Rarity)
+            : "[?]";
+        var token = $"{marker}{rarity}{glyph}{count}";
+        return token.PadRight(10);
     }
 
     private string ResolveSlotGlyph(ItemInstance item)
@@ -873,6 +877,7 @@ public partial class InventoryUI : Control
             _panel.AddChild(slot.BorderLeft);
             _panel.AddChild(slot.BorderRight);
             _panel.AddChild(slot.Glyph);
+            _panel.AddChild(slot.RarityLabel);
             _panel.AddChild(slot.StackBadge);
             _panel.AddChild(slot.StackLabel);
             _panel.AddChild(slot.EquippedBadge);
@@ -896,6 +901,7 @@ public partial class InventoryUI : Control
             BorderLeft = new UiMouseColorRect { Name = $"Slot{index}_BorderLeft", Color = UiStyle.BorderSubtle(), InputSubmitted = BindSlot },
             BorderRight = new UiMouseColorRect { Name = $"Slot{index}_BorderRight", Color = UiStyle.BorderSubtle(), InputSubmitted = BindSlot },
             Glyph = new UiMouseLabel { Name = $"Slot{index}_Glyph", Modulate = UiStyle.Parchment(), InputSubmitted = BindSlot },
+            RarityLabel = new UiMouseLabel { Name = $"Slot{index}_Rarity", Modulate = UiStyle.FaintText(), InputSubmitted = BindSlot },
             StackBadge = new UiMouseColorRect { Name = $"Slot{index}_StackBadge", Color = UiStyle.BrightGold(), InputSubmitted = BindSlot },
             StackLabel = new UiMouseLabel { Name = $"Slot{index}_StackLabel", Modulate = UiStyle.InverseText(), InputSubmitted = BindSlot },
             EquippedBadge = new UiMouseColorRect { Name = $"Slot{index}_EquippedBadge", Color = UiStyle.DeepBlack(0.9f), InputSubmitted = BindSlot },
@@ -912,9 +918,11 @@ public partial class InventoryUI : Control
 
         var hints = new (string Label, System.Action Action)[]
         {
-            ("[E] Equip", SubmitEquip),
+            ("[Enter/U] Use", SubmitUse),
+            ("[Enter/E] Equip", SubmitEquip),
             ("[D] Drop", SubmitDrop),
             ("[A] Auto", ToggleAutoEquipUpgrades),
+            ("[Tab] Sort", CycleSortMode),
             ("[I/Esc] Close", Close),
         };
         foreach (var hint in hints)
@@ -1076,6 +1084,13 @@ public partial class InventoryUI : Control
         slot.Glyph.Modulate = occupied && _content is not null && _content.TryGetItemTemplate(item!.TemplateId, out var template)
             ? ItemRarityPresentation.ResolveColor(template.Rarity)
             : UiStyle.Parchment();
+        slot.RarityLabel.Visible = occupied;
+        slot.RarityLabel.Position = position + new Vector2(3f, 2f);
+        slot.RarityLabel.Size = new Vector2(30f, 14f);
+        slot.RarityLabel.Text = occupied && _content is not null && _content.TryGetItemTemplate(item!.TemplateId, out var rarityTemplate)
+            ? ItemRarityPresentation.ResolveBracketedAbbreviation(rarityTemplate.Rarity)
+            : string.Empty;
+        slot.RarityLabel.Modulate = UiStyle.FaintText();
         slot.StackBadge.Visible = occupied && item!.StackCount > 1;
         slot.StackBadge.Position = position + new Vector2(SlotSize - 18f, SlotSize - 16f);
         slot.StackBadge.Size = new Vector2(16f, 14f);
@@ -1194,8 +1209,8 @@ public partial class InventoryUI : Control
     private static string BuildDescriptionMarkup(ItemTemplate template, ItemInstance item, IReadOnlyList<string> lines)
     {
         var builder = new StringBuilder();
-        builder.AppendLine(ItemRarityPresentation.WrapWithColor(template.DisplayName, template.Rarity));
-        builder.AppendLine(ItemRarityPresentation.WrapWithColor($"Rarity: {ItemRarityPresentation.ResolveDisplayLabel(template.Rarity)}", template.Rarity));
+        builder.AppendLine(ItemRarityPresentation.WrapDecoratedNameWithColor(template.DisplayName, template.Rarity));
+        builder.AppendLine(ItemRarityPresentation.WrapWithColor($"Rarity: {ItemRarityPresentation.ResolveBracketedAbbreviation(template.Rarity)} {ItemRarityPresentation.ResolveDisplayLabel(template.Rarity)}", template.Rarity));
         for (var i = 2; i < lines.Count; i++)
         {
             builder.AppendLine(ItemRarityPresentation.EscapeBBCode(lines[i]));

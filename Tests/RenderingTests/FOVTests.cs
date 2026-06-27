@@ -27,6 +27,7 @@ public sealed class FOVTests : ITestSuite
         registry.Add("Rendering.WorldArtCatalog gives each current monster a distinct sprite", WorldArtCatalogUsesDistinctSpritesForCurrentEnemyRoster);
         registry.Add("Rendering.WorldView marks interactive tiles clearly", WorldViewMarksInteractiveTilesClearly);
         registry.Add("Rendering.WorldView animates movement and attacks via events", WorldViewAnimatesMovementAndAttacks);
+        registry.Add("Rendering.WorldView keeps damage flash visible until timed restore", WorldViewKeepsDamageFlashVisibleUntilTimedRestore);
         registry.Add("Rendering.WorldView renders trap tiles with floor and marker", WorldViewRendersTrapTiles);
         registry.Add("Rendering.WorldArtCatalog resolves trap marker", WorldArtCatalogResolvesTrapMarker);
         registry.Add("Rendering.Minimap colors trap tiles distinctly", MinimapColorsTrapTilesDistinctly);
@@ -177,6 +178,34 @@ public sealed class FOVTests : ITestSuite
         Expect.Equal(2, view.Animations.History.Count, "Damage event should queue attack and damage animations.");
         Expect.Equal(AnimationType.Attack, view.Animations.History[0].Type, "Attack animation should play first.");
         Expect.Equal(AnimationType.Damage, view.Animations.History[1].Type, "Damage flash should play second.");
+    }
+
+    private static void WorldViewKeepsDamageFlashVisibleUntilTimedRestore()
+    {
+        var bus = new EventBus();
+        var world = CreateRoomWorld();
+        var enemy = new StubEntity("Goblin", new Position(5, 2), Faction.Enemy);
+        world.AddEntity(enemy);
+
+        var view = CreateWorldView(world, bus);
+        var defenderSprite = view.EntityRenderer.GetSprite(enemy.Id)!;
+
+        bus.EmitDamageDealt(new DamageResult(world.Player.Id, enemy.Id, 5, 5, DamageType.Physical, false, false, false));
+
+        Expect.NotEqual(Colors.White, defenderSprite.Modulate, "Damage flash should tint the defender immediately after the damage event.");
+        Expect.True(view.Animations.IsDamageFlashing(enemy.Id), "Damage flash state should stay active after the initial event.");
+        Expect.Equal(1, view.Animations.ActiveFlashCount, "Exactly one defender flash should be active.");
+
+        view.EntityRenderer.UpsertEntity(enemy);
+        Expect.NotEqual(Colors.White, defenderSprite.Modulate, "Refreshing an entity during an active flash should not clobber the tint.");
+
+        view._Process(0.05d);
+        Expect.NotEqual(Colors.White, defenderSprite.Modulate, "Damage flash should remain visible during the short flash window.");
+
+        view._Process(0.10d);
+        Expect.Equal(Colors.White, defenderSprite.Modulate, "Damage flash should restore the defender exactly to white after it completes.");
+        Expect.False(view.Animations.IsDamageFlashing(enemy.Id), "Damage flash state should be cleared after completion.");
+        Expect.Equal(0, view.Animations.ActiveFlashCount, "No damage flashes should remain after completion.");
     }
 
     private static void WorldViewRendersTrapTiles()

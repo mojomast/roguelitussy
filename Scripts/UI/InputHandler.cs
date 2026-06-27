@@ -28,6 +28,8 @@ public partial class InputHandler : Node
 
     public event System.Action? ExamineRequested;
 
+    public event System.Action? CombatLogFilterCycleRequested;
+
     public bool IsRunPrefixActive => _runPrefixActive;
 
     public void Bind(GameManager? gameManager, EventBus? eventBus)
@@ -107,8 +109,8 @@ public partial class InputHandler : Node
             Key.Key5 => HandleQuickUse(world, playerId, 4),
             Key.I => Raise(InventoryRequested),
             Key.C => Raise(CharacterSheetRequested),
-            Key.E => Raise(InteractRequested),
             Key.H => Raise(HelpRequested),
+            Key.L => Raise(CombatLogFilterCycleRequested),
             Key.F => Raise(InteractRequested),
             Key.T => Raise(ToolsRequested),
             Key.X => Raise(ExamineRequested),

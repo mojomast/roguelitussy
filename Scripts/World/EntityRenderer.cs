@@ -84,7 +84,10 @@ public sealed class EntityRenderer
             root.Position = WorldView.ToCanvasPosition(entity.Position);
         }
         root.Visible = IsEntityVisible(entity.Id, entity.Position);
-        root.Modulate = Colors.White;
+        if (!_animationController.IsDamageFlashing(entity.Id))
+        {
+            root.Modulate = Colors.White;
+        }
         _lastKnownPositions[entity.Id] = entity.Position;
     }
 

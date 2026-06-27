@@ -58,6 +58,12 @@ public partial class LevelUpOverlay : Control
             return false;
         }
 
+        if (key == Key.Escape)
+        {
+            Close();
+            return true;
+        }
+
         var choices = _gameManager?.GetAvailablePerkChoices();
         if (choices is null || choices.Count == 0)
         {
@@ -189,7 +195,7 @@ public partial class LevelUpOverlay : Control
         }
 
         builder.AppendLine();
-        builder.Append($"[i][color={UiStyle.ToHex(UiStyle.FaintText())}]{ItemRarityPresentation.EscapeBBCode("Up/Down: choose    Enter/Right: confirm")}[/color][/i]");
+        builder.Append($"[i][color={UiStyle.ToHex(UiStyle.FaintText())}]{ItemRarityPresentation.EscapeBBCode("Up/Down: choose    Enter/Right: confirm    Esc close")}[/color][/i]");
         return builder.ToString().TrimEnd();
     }
 

@@ -14,7 +14,8 @@ internal static class AutoloadResolver
             throw new ArgumentException("Autoload name is required.", nameof(autoloadName));
         }
 
-        var viewportMatch = FindNamedChild<T>(context.GetViewport(), autoloadName);
+        var viewport = context.GetViewport();
+        var viewportMatch = viewport is null ? null : FindNamedChild<T>(viewport, autoloadName);
         if (viewportMatch is not null)
         {
             return viewportMatch;

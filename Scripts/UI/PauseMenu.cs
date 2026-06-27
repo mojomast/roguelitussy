@@ -170,8 +170,6 @@ public partial class PauseMenu : MenuBase
 
     private RunStats ResolveRunStats()
     {
-        _gameManager ??= GetNodeOrNull<GameManager>("/root/GameManager")
-            ?? AutoloadResolver.Resolve<GameManager>(this, "GameManager");
         return _gameManager?.CurrentRunStats ?? new RunStats("Rook", 0, 0, 0, 0, 0, 0, 0, "Unknown", string.Empty, 0);
     }
 

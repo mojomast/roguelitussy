@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 using Godotussy;
 using Roguelike.Core;
@@ -16,6 +17,11 @@ public sealed class CharacterUXTests : ITestSuite
         registry.Add("UX.Identity preview tile updates with character choices", IdentityPreviewTileUpdates);
         registry.Add("UX.Graphical identity preview updates with character choices", GraphicalIdentityPreviewUpdates);
         registry.Add("UX.Main menu body stays compact when graphical preview is present", MainMenuBodyStaysCompact);
+        registry.Add("UX.Character creation training copy shows exact effects", CharacterCreationTrainingCopyShowsExactEffects);
+        registry.Add("UX.Character creation starter kit uses content descriptions", CharacterCreationStarterKitUsesContentDescriptions);
+        registry.Add("UX.Character creation mystic preview notes targeted scrolls", CharacterCreationMysticPreviewNotesTargetedScrolls);
+        registry.Add("UX.Main menu Tab shows starter-kit tooltip", MainMenuTabShowsStarterKitTooltip);
+        registry.Add("UX.Main menu Mystic starter-kit tooltip notes targeting", MainMenuMysticStarterKitTooltipNotesTargeting);
         registry.Add("UX.Level-up spend reduces points and increases stat", LevelUpSpendReducesPointsAndIncreasesStat);
         registry.Add("UX.Level-up UI shows prompt when points available", LevelUpUIShowsPrompt);
         registry.Add("UX.Level-up overlay lists unlocked perks", LevelUpOverlayListsUnlockedPerks);
@@ -172,6 +178,111 @@ public sealed class CharacterUXTests : ITestSuite
         Expect.True(menu.MenuText.Contains("Identity:"), "Main menu body should keep the compact identity summary.");
     }
 
+    private static void CharacterCreationTrainingCopyShowsExactEffects()
+    {
+        var gameManager = new GameManager();
+        var bus = new EventBus();
+        gameManager.AttachServices(new WorldState(), new TurnScheduler(), new StubGenerator(), new FOVCalculator(), new StubContentDatabase(), new StubSaveManager(), bus);
+
+        var menu = new MainMenu();
+        menu.Bind(gameManager, bus);
+
+        Expect.True(menu.Options.Contains("Vitality (+3 Max HP): 0"), "Training option should label Vitality with its exact effect.");
+        Expect.True(menu.Options.Contains("Power (+1 Attack): 0"), "Training option should label Power with its exact effect.");
+        Expect.True(menu.Options.Contains("Guard (+1 Defense): 0"), "Training option should label Guard with its exact effect.");
+        Expect.True(menu.Options.Contains("Finesse (+1 Accuracy/Evasion): 0"), "Training option should label Finesse with its exact effect.");
+        Expect.True(menu.MenuText.Contains("VIT +3 Max HP"), "Main menu body should explain Vitality's exact training effect.");
+        Expect.True(menu.MenuText.Contains("POW +1 Attack"), "Main menu body should explain Power's exact training effect.");
+        Expect.True(menu.MenuText.Contains("GRD +1 Defense"), "Main menu body should explain Guard's exact training effect.");
+        Expect.True(menu.MenuText.Contains("FIN +1 Accuracy and +1 Evasion"), "Main menu body should explain Finesse's exact training effect.");
+    }
+
+    private static void CharacterCreationStarterKitUsesContentDescriptions()
+    {
+        var gameManager = new GameManager();
+        var bus = new EventBus();
+        gameManager.AttachServices(new WorldState(), new TurnScheduler(), new StubGenerator(), new FOVCalculator(), new StubContentDatabase(), new StubSaveManager(), bus);
+
+        var menu = new MainMenu();
+        menu.Bind(gameManager, bus);
+
+        var kit = menu.BuildStarterKitPreviewText();
+        Expect.True(kit.Contains("Equipped:"), "Starter kit preview should split equipped items into their own section.");
+        Expect.True(kit.Contains("Pack:"), "Starter kit preview should split carried items into their own section.");
+        Expect.True(kit.Contains("Iron Sword"), "Starter kit preview should use the content display name for sword_iron.");
+        Expect.True(kit.Contains("Wooden Shield"), "Starter kit preview should use the content display name for shield_wooden.");
+        Expect.True(kit.Contains("Health Potion"), "Starter kit preview should use the content display name for potion_health.");
+        Expect.True(kit.Contains("Reliable melee weapon") || kit.Contains("Restores health"), "Starter kit preview should include concise item descriptions.");
+        Expect.False(kit.Contains("sword_iron"), "Starter kit preview should not expose raw item ids when content is available.");
+    }
+
+    private static void CharacterCreationMysticPreviewNotesTargetedScrolls()
+    {
+        var gameManager = new GameManager();
+        var bus = new EventBus();
+        gameManager.AttachServices(new WorldState(), new TurnScheduler(), new StubGenerator(), new FOVCalculator(), new StubContentDatabase(), new StubSaveManager(), bus);
+
+        var menu = new MainMenu();
+        menu.Bind(gameManager, bus);
+        menu.HandleKey(Key.Down);  // Name
+        menu.HandleKey(Key.Down);  // Archetype
+        menu.HandleKey(Key.Right); // Skirmisher
+        menu.HandleKey(Key.Right); // Mystic
+
+        var kit = menu.BuildStarterKitPreviewText();
+        Expect.True(kit.Contains("Scroll of Fireball"), "Mystic starter kit should display the fireball scroll by content display name.");
+        Expect.True(kit.Contains("Scroll of Blink"), "Mystic starter kit should display the blink scroll by content display name.");
+        Expect.True(kit.Contains("Requires targeting"), "Targeted starter-kit scrolls should advertise that they require targeting.");
+    }
+
+    private static void MainMenuTabShowsStarterKitTooltip()
+    {
+        var gameManager = new GameManager();
+        var bus = new EventBus();
+        gameManager.AttachServices(new WorldState(), new TurnScheduler(), new StubGenerator(), new FOVCalculator(), new StubContentDatabase(), new StubSaveManager(), bus);
+
+        var menu = new MainMenu();
+        menu.Bind(gameManager, bus);
+        menu._Ready();
+        menu.Open();
+
+        Expect.True(menu.HandleKey(Key.Tab), "Main menu should handle Tab for the starter-kit tooltip.");
+        var tooltip = FindChild<Tooltip>(menu, "Tooltip");
+
+        Expect.NotNull(tooltip, "Tab should create a starter-kit tooltip on the main menu.");
+        Expect.True(tooltip!.Visible, "Starter-kit tooltip should be visible after pressing Tab.");
+        Expect.Equal("Starter Kit", tooltip.TitleText, "Starter-kit tooltip should use the expected title.");
+        Expect.True(tooltip.BodyText.Contains("Equipped items start worn. Pack items are carried supplies."), "Starter-kit tooltip should explain Equipped and Pack sections.");
+        Expect.True(tooltip.BodyText.Contains("Equipped:"), "Starter-kit tooltip should include the Equipped section.");
+        Expect.True(tooltip.BodyText.Contains("Pack:"), "Starter-kit tooltip should include the Pack section.");
+        Expect.True(tooltip.BodyText.Contains("Health Potion"), "Starter-kit tooltip should include content-resolved potion names.");
+        Expect.True(tooltip.BodyText.Contains("Iron Sword"), "Starter-kit tooltip should include content-resolved weapon names.");
+    }
+
+    private static void MainMenuMysticStarterKitTooltipNotesTargeting()
+    {
+        var gameManager = new GameManager();
+        var bus = new EventBus();
+        gameManager.AttachServices(new WorldState(), new TurnScheduler(), new StubGenerator(), new FOVCalculator(), new StubContentDatabase(), new StubSaveManager(), bus);
+
+        var menu = new MainMenu();
+        menu.Bind(gameManager, bus);
+        menu._Ready();
+        menu.Open();
+        menu.HandleKey(Key.Down);  // Name
+        menu.HandleKey(Key.Down);  // Archetype
+        menu.HandleKey(Key.Right); // Skirmisher
+        menu.HandleKey(Key.Right); // Mystic
+
+        Expect.True(menu.HandleKey(Key.Tab), "Main menu should handle Tab for the Mystic starter-kit tooltip.");
+        var tooltip = FindChild<Tooltip>(menu, "Tooltip");
+
+        Expect.NotNull(tooltip, "Tab should create a Mystic starter-kit tooltip on the main menu.");
+        Expect.True(tooltip!.BodyText.Contains("Scroll of Fireball"), "Mystic starter-kit tooltip should include the fireball scroll.");
+        Expect.True(tooltip.BodyText.Contains("Scroll of Blink"), "Mystic starter-kit tooltip should include the blink scroll.");
+        Expect.True(tooltip.BodyText.Contains("Requires targeting"), "Mystic starter-kit tooltip should include targeting notes.");
+    }
+
     private static void LevelUpSpendReducesPointsAndIncreasesStat()
     {
         var context = CreateContext();
@@ -321,6 +432,10 @@ public sealed class CharacterUXTests : ITestSuite
         overlay.OpenMainMenuHelp();
         Expect.True(overlay.CurrentBodyText.Contains("Stat Preview"), "Main menu help should mention Stat Preview.");
         Expect.True(overlay.CurrentBodyText.Contains("Training"), "Main menu help should mention Training points.");
+        Expect.True(overlay.CurrentBodyText.Contains("+3 Max HP"), "Main menu help should document exact training stat effects.");
+        Expect.True(overlay.CurrentBodyText.Contains("Equipped"), "Main menu help should describe equipped starter-kit items.");
+        Expect.True(overlay.CurrentBodyText.Contains("Pack"), "Main menu help should describe pack starter-kit items.");
+        Expect.True(overlay.CurrentBodyText.Contains("targeting"), "Main menu help should mention aimed scroll targeting.");
 
         overlay.OpenGameplayHelp();
         Expect.True(overlay.CurrentBodyText.Contains("Level Up"), "Gameplay help should mention Level Up.");

@@ -29,9 +29,9 @@ Recommended first verification on a machine with the toolchain:
 
 ```bash
 dotnet build godotussy.csproj -p:UseGodotStubs=true
-dotnet build Tests/godotussy.Tests.csproj
-dotnet run --project Tests/godotussy.Tests.csproj
-dotnet run --project Tests/godotussy.Tests.csproj -p:RenderingValidation=true
+dotnet build Tests/godotussy.Tests.csproj -p:UseGodotStubs=true
+dotnet run --project Tests/godotussy.Tests.csproj -p:UseGodotStubs=true
+dotnet run --project Tests/godotussy.Tests.csproj -p:UseGodotStubs=true -p:RenderingValidation=true
 godot --headless --path . --quit
 ```
 
@@ -121,6 +121,7 @@ godot --headless --path . --quit
 - Completed: stacked consumables and scrolls now consume exactly one item per successful use instead of deleting the whole stack.
 - Completed: loading a save with pending perk choices reopens the level-up overlay, and Core pickup actions now resolve stack metadata from world content instead of relying on UI-supplied templates.
 - Completed: UI chrome received an incremental Diablo II-inspired pass in Godot-facing scripts only: shared gothic palette, gold/parchment menu and sheet chrome, blood-red HUD HP styling, rarity-tinted inventory/tooltip text, muted combat log frame, and darker framed minimap colors. Core simulation behavior was not changed.
+- Completed: Block E4 / UI-4 standardized overlay hotkeys: normal gameplay interact is now `F` only, level-up closes with `Escape` without selecting a perk, and inventory/level-up hints advertise their active close/action keys.
 - Deferred: per-item chest loot selection needs persistent chest contents for safe leave-behind semantics; current v8-compatible behavior remains atomic open with inventory stow plus ground spill.
 
 ### Follow-up Status - GEN-1 Trap Persistence and Rendering
@@ -169,10 +170,74 @@ godot --headless --path . --quit
 - Completed: AI-3 ranged kiting. `AIProfile.MinRange` is consumed from authored `min_range`; `RangedKiterBrain`/`UtilityScorer` penalize moves that do not increase distance when inside minimum range, using Chebyshev distance for range comparisons.
 - Completed: AI-4 support behavior. `SupportBrain` selects nearest/most-damaged same-faction ally as a secondary objective, penalizes moves that block allied ranged attackers, and uses `FilterByRelation` to avoid harmful AoE casts that would hit allies unless `hits_allies` is true.
 - Completed: AI-5 group aggro propagation. `AIStateComponent` carries `AlertPosition` and `AlertTurn`; when an enemy enters `Chase`/`Attack`, same-faction allies within `AlertRadius` with no target enter `Chase` toward the alert position; alerts decay after a few turns.
-- Completed: CI/workflow hardening. Added `global.json` pinning SDK `8.0.0` with `latestFeature` roll-forward; updated `.github/workflows/ci.yml` with solution build, `dotnet format --verify-no-changes`, JSON syntax validation, NuGet and Godot caching, scheduled triggers, and failure artifact upload. Applied `dotnet format` across the solution.
+- Completed: CI/workflow hardening. Added `global.json` pinning SDK `8.0.0` with `latestFeature` roll-forward; updated `.github/workflows/ci.yml` with solution restore, `dotnet format --verify-no-changes`, JSON syntax validation, NuGet and Godot caching, scheduled triggers, and failure artifact upload. Applied `dotnet format` across the solution.
 - Completed: `dungeon_key` item and `dungeon_key.svg` asset added; content validation expected item count updated from 22 to 23.
 - Completed: documentation updates. `docs/SYSTEMS.md` now documents locked doors; `docs/CONTENT.md` documents `lock_doors_on_enter`, theme tags, and `dungeon_key`; `docs/IMPROVEMENT_SUGGESTIONS.md` marks GEN-2, GEN-4, STA-4, STA-5, AI-2, AI-3, AI-4, AI-5, UI-3, and TST-5 done.
-- Verification: 346 tests pass in the full harness; 299 tests pass in the rendering-validation profile. One pre-existing CS0109 warning in `Scripts/UI/Tooltip.cs` remains unresolved to avoid unrelated changes.
+- Verification: 346 tests pass in the full harness; 299 tests pass in the rendering-validation profile.
+
+### Follow-up Status - Block A Stub API Drift
+
+- Completed: added the inherited `Control.Hide()` API to the Godot stubs so `Tooltip.Hide()` matches real Godot under `-p:UseGodotStubs=true`; stub build now reports zero warnings.
+
+### Follow-up Status - Block C CombatLog Filter
+
+- Completed: CombatLog now supports local `L` key filter cycling across All, Combat, Loot, and System without deleting stored messages.
+
+### Follow-up Status - Block D HUD Bar Polish
+
+- Completed: HP damage and energy spending now show subtle trailing loss fills behind the animated main bars, with tests covering target/display interpolation, convergence, and trail clearing on healing.
+
+### Follow-up Status - Block E1 Backlog Sync
+
+- Completed: stale TODO/feature tracking was synchronized so implemented Minimap legend, ChestUI `MenuBase`, CombatLog filtering, and HUD bar polish work no longer appears as remaining backlog; persistent chest contents remains tracked as future work.
+
+### Follow-up Status - Block E2 Test Harness Polish
+
+- Completed: TST-1/TST-2/TST-3 — custom harness failures now print full exception diagnostics, `--filter` / `--filter=value` runs case-insensitive subsets, summaries report executed/registered/skipped/failure counts, and Godot stub static state resets before every registered test.
+- Completed: E2 follow-up — no-flag test builds now strip transitive real Godot references when the test project's default stub profile is active; canonical docs still show explicit `-p:UseGodotStubs=true` commands.
+- Completed: TST-4 — CI compile steps now opt into warnings-as-errors with `-p:RoguelitussyWarningsAsErrors=true`; full custom harness remains `--no-build` because the preceding test build enforces warnings.
+
+### Follow-up Status - Block E3 Character Creation Preview
+
+- Completed: CHR-4 — character creation now shows exact training effects in menu/help copy and content-backed starter kits split into `Equipped:` and `Pack:`.
+- Completed: ONB-4 — starter kit display names, descriptions, stack counts, aimed-scroll targeting notes, and the main-menu `Tab` Starter Kit tooltip are implemented.
+- Added UI/content tests for starter-kit copy, targeted scroll notes, help text, and authored starter item content resolution.
+
+### Follow-up Status - Block E5 Accessibility Indicators
+
+- Completed: UI-5 — item rarity now exposes centralized non-color markers (`[C]`, `[R]`, etc.) in inventory slots/descriptions, tooltips, combat-log pickups, and shop rows while keeping rarity colors supplemental.
+- Completed: UI-5 — HUD low-HP state now exposes a deterministic stripe pattern and `HPBarDangerPatternVisible` below the existing `< 0.3` danger threshold, with UI regression coverage.
+- Deferred: optional white/bright damage flash adjustment was not changed because the scoped accessibility cue is covered by the HP bar pattern without touching animation timing.
+
+### Follow-up Status - F1 Warnings As Errors
+
+- Completed: added conditional `TreatWarningsAsErrors` to `Directory.Build.props` behind the explicit `RoguelitussyWarningsAsErrors=true` property.
+- Completed: `.github/workflows/ci.yml` passes `-p:RoguelitussyWarningsAsErrors=true` to the Godot stub build, test project build, and rendering-validation run while leaving the already-built full harness `--no-build` step unchanged.
+- Documentation: README, setup/testing docs, improvement backlog, TODO, and historical improvement notes now mark TST-4 done and remove the stale CS0109 warning note.
+
+### Follow-up Status - F2 Starter-Kit Tooltip Onboarding
+
+- Completed: ONB-4 tooltip follow-up — pressing `Tab` on the main menu toggles a `Starter Kit` tooltip that explains Equipped versus Pack items and reuses the content-resolved starter-kit preview.
+- Completed: starter-kit tooltip content refreshes when character creation options rebuild, so archetype/origin/trait changes keep the tooltip aligned with the current starter kit.
+- Documentation: ONB-4 is marked done in the improvement backlog; TODO, features, and keybind docs no longer list starter-kit tooltips as deferred.
+
+### Follow-up Status - F3 Floor Summary Escape
+
+- Completed: FloorSummaryUI now treats `Escape` like `Enter`/`Space`, closing the summary and emitting `FloorTransitionConfirmed` without changing the existing floor travel timing.
+- Completed: non-confirm keys still mark the player as engaged, reset the countdown, and keep the summary open.
+- Documentation: keybinds, features, and UI-4 improvement notes now include FloorSummaryUI Escape behavior.
+
+### Follow-up Status - F4 Timed Hit Flash
+
+- Completed: GFX-1 — `DamageDealt` presentation now applies an immediate bright/white defender flash, keeps it active for about 0.12 seconds, and restores the sprite root to exact white when complete.
+- Completed: `EntityRenderer.UpsertEntity` preserves active damage flash tint during refresh so world redraws do not clobber the short effect.
+- Documentation: improvement backlog, features, systems, and TODO now mark hit flashes done while leaving camera shake, popup polish, SFX/VFX, and projectile travel as future game-feel work.
+
+### Follow-up Status - Windows Startup Hotfix
+
+- Completed: PauseMenu no longer resolves `/root/GameManager` or autoloads while its constructor builds initial menu text, preventing exported startup from crashing before `UIRoot` enters the active scene tree.
+- Completed: `AutoloadResolver` now treats a missing viewport as unresolved instead of throwing, keeping pre-tree UI construction defensive.
+- Verification: full stub test suite passes with startup regression coverage for constructing `PauseMenu` and `UIRoot` before scene-tree entry.
 
 ## Current Strengths
 
@@ -326,15 +391,15 @@ Confirmed workflow state:
 - `.github/workflows/ci.yml` exists and runs on push, pull request, `workflow_dispatch`, and a weekly Sunday schedule.
 - CI pins the .NET SDK via `global.json` (`8.0.0` with `latestFeature` roll-forward).
 - CI caches NuGet packages and the Godot 4.5.2 Mono download with `actions/cache@v4`.
-- CI validates JSON syntax for all files under `Content/`, verifies formatting with `dotnet format --verify-no-changes`, builds the full solution, builds the Godot stub profile, runs the full custom test harness, and runs the rendering validation profile.
+- CI validates JSON syntax for all files under `Content/`, verifies formatting with `dotnet format --verify-no-changes`, restores the solution, builds the Godot stub profile and test project, runs the full custom test harness, runs the rendering validation profile, and treats warnings as errors on compile steps through explicit `-p:RoguelitussyWarningsAsErrors=true` opt-in.
 - A second CI job performs a real Godot 4.5.2 Mono headless editor import and startup smoke test.
 - `godotussy.sln` includes both `godotussy.csproj` and `Tests/godotussy.Tests.csproj`.
 - The canonical editorless build command remains `dotnet build godotussy.csproj -p:UseGodotStubs=true`.
 
-Known remaining workflow gaps:
+Current workflow notes:
 
-- Build warnings are not yet treated as errors in CI.
-- The repository currently fails `dotnet format --verify-no-changes`; code needs a one-time formatting pass before the new CI check will be green.
+- Build warnings are treated as errors in CI compile steps via explicit `-p:RoguelitussyWarningsAsErrors=true` opt-in.
+- `dotnet format --verify-no-changes godotussy.sln` currently passes in the local SDK environment.
 
 Relevant files:
 
@@ -466,4 +531,5 @@ Do not add more enemies, items, or progression content yet. The codebase is read
 - Completed: created `docs/KEYBINDS.md` and `docs/TODO.md` for current controls and remaining planned UI/QOL work.
 - Completed: updated `docs/EVENTS.md` with a full EventBus reference and InputHandler routing table; Block 1 added tests only and no new EventBus events.
 - Completed: updated `docs/FEATURES.md` with implemented/partial/planned status for the latest UI/QOL features, including partial quick-use hotbar extraction and minimap legend toggle follow-ups.
+- Completed: Block B refactored `ChestUI` onto `MenuBase` shared modal architecture while preserving Take All/Close input behavior and event dispatch.
 - Verification: docs-only Block 2 required no code tests; Block 1 tests passed under Godot stubs per handoff.

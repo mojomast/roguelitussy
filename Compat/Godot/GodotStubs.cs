@@ -35,6 +35,7 @@ public enum Key
     G,
     H,
     I,
+    L,
     M,
     O,
     U,
@@ -139,6 +140,12 @@ public class Node : GodotObject
 
     public Rect2 GetViewportRect() => new(Vector2.Zero, SharedViewport.Size);
 
+    internal static void ResetSharedState()
+    {
+        SharedViewport.ResetTestState();
+        SharedTree.ResetTestState();
+    }
+
     protected T GetNode<T>(string path) where T : Node, new()
     {
         return ResolvePath(path) as T ?? new T();
@@ -213,6 +220,8 @@ public class Control : Node
     {
     }
 
+    public void Hide() => Visible = false;
+
     protected void DrawRect(Rect2 rect, Color color, bool filled = true)
     {
     }
@@ -233,6 +242,12 @@ public class Viewport : Node
     {
         InputHandled = false;
     }
+
+    internal void ResetTestState()
+    {
+        Size = new Vector2(1280f, 720f);
+        InputHandled = false;
+    }
 }
 
 public class SceneTree : Node
@@ -242,6 +257,11 @@ public class SceneTree : Node
     public void Quit()
     {
         QuitRequested = true;
+    }
+
+    internal void ResetTestState()
+    {
+        QuitRequested = false;
     }
 }
 
@@ -488,6 +508,11 @@ public static class Input
 
         PressedButtons.Remove(button);
     }
+
+    internal static void ResetTestState()
+    {
+        PressedButtons.Clear();
+    }
 }
 
 public static class GD
@@ -509,6 +534,17 @@ public static class GD
         }
 
         return resource;
+    }
+}
+
+public static class GodotStubTestState
+{
+    public static void ResetTestState()
+    {
+        GD.MissingResourcePaths.Clear();
+        Image.MissingImagePaths.Clear();
+        Input.ResetTestState();
+        Node.ResetSharedState();
     }
 }
 

@@ -23,4 +23,12 @@
     <Compile Remove="PersistenceTests\**\*.cs" />
     <Compile Remove="SimulationTests\IdentityTests.cs" />
   </ItemGroup>
+
+  <Target Name="RemoveGodotReferencesForStubTests" BeforeTargets="CoreCompile" Condition="'$(UseGodotStubs)' == 'true'">
+    <ItemGroup>
+      <ReferencePath Remove="@(ReferencePath)" Condition="$([System.String]::Copy('%(ReferencePath.Identity)').Contains('GodotSharp'))" />
+      <ReferencePathWithRefAssemblies Remove="@(ReferencePathWithRefAssemblies)" Condition="$([System.String]::Copy('%(ReferencePathWithRefAssemblies.Identity)').Contains('GodotSharp'))" />
+      <Analyzer Remove="@(Analyzer)" Condition="$([System.String]::Copy('%(Analyzer.Filename)').StartsWith('Godot.SourceGenerators'))" />
+    </ItemGroup>
+  </Target>
 </Project>

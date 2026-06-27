@@ -302,7 +302,7 @@ public partial class ShopUI : Control
             {
                 var offer = merchantStock.Offers[index];
                 var name = _content is not null && _content.TryGetItemTemplate(offer.ItemTemplateId, out var template)
-                    ? template.DisplayName
+                    ? ItemRarityPresentation.ResolveDecoratedName(template.DisplayName, template.Rarity)
                     : offer.ItemTemplateId;
                 var price = _gameManager?.ResolveMerchantBuyPrice(offer.Price) ?? offer.Price;
                 var marker = index == _selectedIndex ? ">" : " ";
@@ -322,7 +322,7 @@ public partial class ShopUI : Control
             {
                 var item = inventory.Items[index];
                 var name = _content is not null && _content.TryGetItemTemplate(item.TemplateId, out var template)
-                    ? template.DisplayName
+                    ? ItemRarityPresentation.ResolveDecoratedName(template.DisplayName, template.Rarity)
                     : item.TemplateId;
                 var sellPrice = _content is not null && _content.TryGetItemTemplate(item.TemplateId, out var pricedTemplate)
                     ? System.Math.Max(1, pricedTemplate.Value / 2)

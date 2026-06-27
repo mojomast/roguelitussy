@@ -70,14 +70,15 @@ public partial class FloorSummaryUI : MenuBase
             return false;
         }
 
-        PlayerEngaged = true;
-        CountdownSeconds = DefaultCountdownSeconds;
-        RebuildMenuText();
-        if (key is Key.Enter or Key.KpEnter or Key.Space)
+        if (key is Key.Enter or Key.KpEnter or Key.Space or Key.Escape)
         {
             ConfirmTransition();
             return true;
         }
+
+        PlayerEngaged = true;
+        CountdownSeconds = DefaultCountdownSeconds;
+        RebuildMenuText();
 
         return true;
     }
@@ -104,8 +105,8 @@ public partial class FloorSummaryUI : MenuBase
     protected override string BuildFooterText()
     {
         return PlayerEngaged
-            ? "[ENTER/SPACE] Continue"
-            : $"[ENTER/SPACE] Continue     Auto in {CountdownSeconds:0.0}s";
+            ? "[ENTER/SPACE/ESC] Continue"
+            : $"[ENTER/SPACE/ESC] Continue     Auto in {CountdownSeconds:0.0}s";
     }
 
     protected override void OnVisualStateRefreshed(Panel panel, Label label, Vector2 viewportSize, Vector2 panelSize)

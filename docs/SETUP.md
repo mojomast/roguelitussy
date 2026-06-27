@@ -28,8 +28,8 @@ On Linux, Godot 4.5.2 Mono can also be installed user-locally by downloading the
 4. Run the test suite to confirm the local environment is healthy:
 
    ```powershell
-   dotnet build Tests/godotussy.Tests.csproj
-   dotnet run --project Tests/godotussy.Tests.csproj
+   dotnet build Tests/godotussy.Tests.csproj -p:UseGodotStubs=true
+   dotnet run --project Tests/godotussy.Tests.csproj -p:UseGodotStubs=true
    ```
 
 ## Opening The Project In Godot
@@ -51,7 +51,7 @@ godot --headless --path . --quit
 
 The project starts from `Scenes/Main.tscn`, which hosts `WorldRoot` and `UiRoot`. Most runtime services are attached through the autoloads rather than through a large scene tree.
 
-CI runs both the editorless .NET stub profile and a real Godot 4.5.2 Mono headless import/startup smoke. The .NET job also builds the full solution, verifies formatting with `dotnet format --verify-no-changes`, validates JSON syntax for all files under `Content/`, and caches NuGet packages. Keep `.godot/`, `.mono/`, `bin/`, and `obj/` out of commits; Godot import products are regenerated from committed source assets and `.import` files.
+CI runs both the editorless .NET stub profile and a real Godot 4.5.2 Mono headless import/startup smoke. The .NET job restores the solution, verifies formatting with `dotnet format --verify-no-changes`, validates JSON syntax for all files under `Content/`, treats warnings as errors on compile steps through `-p:RoguelitussyWarningsAsErrors=true`, and caches NuGet packages. Keep `.godot/`, `.mono/`, `bin/`, and `obj/` out of commits; Godot import products are regenerated from committed source assets and `.import` files.
 
 When adding or renaming SVG/PNG source art under `Assets/`, run the headless editor import before the startup smoke so Godot can regenerate local import products from committed assets.
 
@@ -110,6 +110,13 @@ Verify formatting (CI enforces this):
 dotnet format --verify-no-changes godotussy.sln
 ```
 
+Run the warnings-as-errors compile checks used by CI:
+
+```powershell
+dotnet build godotussy.csproj -p:UseGodotStubs=true -p:RoguelitussyWarningsAsErrors=true
+dotnet build Tests/godotussy.Tests.csproj -p:RoguelitussyWarningsAsErrors=true
+```
+
 Validate JSON content syntax locally (CI runs the same check):
 
 ```powershell
@@ -119,20 +126,26 @@ Get-ChildItem -Recurse -Filter *.json -Path Content | ForEach-Object { python3 -
 Build the test project:
 
 ```powershell
-dotnet build Tests/godotussy.Tests.csproj
+dotnet build Tests/godotussy.Tests.csproj -p:UseGodotStubs=true
 ```
 
 Run the full custom test harness:
 
 ```powershell
-dotnet run --project Tests/godotussy.Tests.csproj
+dotnet run --project Tests/godotussy.Tests.csproj -p:UseGodotStubs=true
+```
+
+Run a focused subset while iterating:
+
+```powershell
+dotnet run --project Tests/godotussy.Tests.csproj -p:UseGodotStubs=true -- --filter Simulation.
 ```
 
 Run the rendering-focused test compile profile:
 
 ```powershell
 dotnet restore godotussy.csproj -p:UseGodotStubs=true -p:RenderingValidation=true
-dotnet run --project Tests/godotussy.Tests.csproj -p:RenderingValidation=true
+dotnet run --project Tests/godotussy.Tests.csproj -p:UseGodotStubs=true -p:RenderingValidation=true
 ```
 
 This profile removes persistence implementation files from the main project and skips persistence-dependent test files. `GameManager` uses a no-op save manager only under this compile symbol so rendering and UI validation can run without the save subsystem.

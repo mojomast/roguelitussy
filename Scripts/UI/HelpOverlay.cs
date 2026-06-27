@@ -29,7 +29,10 @@ public partial class HelpOverlay : MenuBase
             "Name: cosmetic identity for the run.  Seed: deterministic world generation.",
             "Archetype: starting combat style and loadout.  Origin: small secondary bonus.",
             "Trait: passive perk or bonus.  Training: spend 4 points across VIT/POW/GRD/FIN.",
+            "Training effects: VIT +3 Max HP, POW +1 Attack, GRD +1 Defense, FIN +1 Accuracy and +1 Evasion.",
             "Stat Preview: updates live as you change selections.",
+            "Starter kit preview groups Equipped items, which are ready at launch, and Pack items, which are carried supplies.",
+            "Aimed scrolls in the starter kit require targeting before use.",
             "",
             "RUN TOOLS",
             "Dev Tools opens the workshop.  Load Slot entries resume saved expeditions.");

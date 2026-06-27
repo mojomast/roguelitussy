@@ -64,13 +64,13 @@
 | CHR-1 | Restore `CharacterOptions` when loading a saved run | P0 | Character / Identity | done |
 | CHR-2 | Make race mechanically meaningful with minor bonuses | P1 | Character / Identity | open |
 | CHR-3 | Give each archetype a signature starting ability | P1 | Character / Identity | open |
-| CHR-4 | Improve creation preview clarity | P1 | Character / Identity | open |
+| CHR-4 | Improve creation preview clarity | P1 | Character / Identity | done |
 | CHR-5 | Add a "Randomize Build" option | P2 | Character / Identity | open |
 | UI-1 | Add mouse interaction to the inventory grid | P1 | UI / UX | open |
 | UI-2 | Add message categories and filtering to combat log | P1 | UI / UX | open |
 | UI-3 | Make status effects visible on HUD and entity sprites | P1 | UI / UX | done |
-| UI-4 | Standardize overlay close keys and inline hotkey hints | P1 | UI / UX | open |
-| UI-5 | Add colorblind-safe rarity and HP indicators | P1 | UI / UX | open |
+| UI-4 | Standardize overlay close keys and inline hotkey hints | P1 | UI / UX | done |
+| UI-5 | Add colorblind-safe rarity and HP indicators | P1 | UI / UX | done |
 | INV-1 | Add category/rarity filters to inventory | P1 | Inventory | open |
 | INV-2 | Add bulk use/drop for stacks | P1 | Inventory | open |
 | INV-3 | Add explicit stack-split quantity prompt | P1 | Inventory | open |
@@ -94,9 +94,9 @@
 | ONB-1 | Add a "First Delve" welcome message to combat log | P1 | Onboarding | open |
 | ONB-2 | Show an objective hint when down-stairs become visible | P1 | Onboarding | open |
 | ONB-3 | Improve game-over screen with death-specific learning tips | P1 | Onboarding | open |
-| ONB-4 | Surface starter-kit item effects in main menu preview | P1 | Onboarding | open |
+| ONB-4 | Surface starter-kit item effects in main menu preview | P1 | Onboarding | done |
 | ONB-5 | Add a temporary key-reminder ribbon to HUD | P1 | Onboarding | open |
-| GFX-1 | Make hit flashes readable and layered | P1 | Game Feel | open |
+| GFX-1 | Make hit flashes readable and layered | P1 | Game Feel | done |
 | GFX-2 | Add lightweight camera shake on impactful hits | P1 | Game Feel | open |
 | GFX-3 | Polish damage popups (color/scale/crit/miss/heal) | P1 | Game Feel | open |
 | GFX-4 | Wire ability/item `animation` and `sfx` fields | P1 | Game Feel | open |
@@ -106,10 +106,10 @@
 | PERF-3 | Replace `EntityRenderer` child-name string lookups | P1 | Performance | open |
 | PERF-4 | Pool/reuse per-tile art nodes | P1 | Performance | open |
 | PERF-5 | Cache `WorldState.GetEntitiesInRadius` | P1 | Performance | open |
-| TST-1 | Capture full exception details on test failure | P1 | Test / CI | open |
-| TST-2 | Add test filtering / selection to harness | P1 | Test / CI | open |
-| TST-3 | Reset shared static stub state between tests | P1 | Test / CI | open |
-| TST-4 | Treat build warnings as errors in CI | P1 | Test / CI | open |
+| TST-1 | Capture full exception details on test failure | P1 | Test / CI | done |
+| TST-2 | Add test filtering / selection to harness | P1 | Test / CI | done |
+| TST-3 | Reset shared static stub state between tests | P1 | Test / CI | done |
+| TST-4 | Treat build warnings as errors in CI | P1 | Test / CI | done |
 | TST-5 | Cache NuGet packages and Godot editor in CI | P1 | Test / CI | done |
 
 ---
@@ -704,6 +704,7 @@
 
 ### CHR-4 — Improve creation preview clarity
 
+- **Status:** done. Main menu and help now state exact training effects, starter kit preview uses `Equipped:` / `Pack:` grouping, and aimed starter scrolls show a targeting note.
 - **Priority:** P1
 - **Target files:**
   - `Scripts/UI/MainMenu.cs`
@@ -787,21 +788,23 @@
 ### UI-4 — Standardize overlay close keys and inline hotkey hints
 
 - **Priority:** P1
+- **Status:** done in Block E4; F3 follow-up includes FloorSummaryUI Escape dismissal.
 - **Target files:**
   - `Scripts/UI/UIRoot.cs`
   - `Scripts/UI/MenuBase.cs`
   - `Scripts/UI/InputHandler.cs`
 - **Why it improves the game:** Close behavior is inconsistent; `E` and `F` both map to interact. Standardization reduces cognitive load.
 - **Implementation notes:**
-  - `Esc` closes every overlay (inventory, sheet, help, pause, level up, dialog, shop).
+  - `Esc` closes every overlay (inventory, sheet, help, pause, level up, dialog, shop, floor summary).
   - Remove duplicate `E => InteractRequested` binding; keep only `F`.
-  - Add footer hints consistently via `MenuBase.BuildFooterText`.
+  - Add footer hints consistently to modal overlay chrome.
 - **Acceptance criteria / tests:**
   - `UI.UIRoot escape closes every overlay`
   - `UI.InputHandler does not bind E for interact`
 
 ### UI-5 — Add colorblind-safe rarity and HP indicators
 
+- **Status:** done. Item rarity now has centralized `[C]`/`[U]`/`[R]`/`[E]`/`[L]`/`[A]` presentation helpers, inventory slots/descriptions/tooltips/combat-log pickups/shop rows include non-color rarity markers while preserving rarity colors, and the HUD shows a striped low-HP pattern plus `HPBarDangerPatternVisible` below the existing `< 0.3` danger threshold. GFX-1 also adds a timed bright/white damage flash so hit feedback is visible without relying on red-only tinting.
 - **Priority:** P1
 - **Target files:**
   - `Scripts/UI/ItemRarityPresentation.cs`
@@ -1220,6 +1223,7 @@
 
 ### ONB-4 — Surface starter-kit item effects in main menu preview
 
+- **Status:** done. Main-menu starter kits use content display names, descriptions, stack counts, Equipped/Pack grouping, targeting notes, and a `Tab` shortcut tooltip.
 - **Priority:** P1
 - **Target files:**
   - `Scripts/UI/MainMenu.cs`
@@ -1227,9 +1231,9 @@
 - **Why it improves the game:** Preview shows raw IDs like `sword_iron` and `scroll_blink`; new players don't know what they do.
 - **Implementation notes:**
   - Replace IDs with display names + one-line descriptions.
-  - Add tooltips if feasible.
+  - Add a low-risk keyboard tooltip using `Tab` in the main menu.
 - **Acceptance criteria / tests:**
-  - `BuildPreviewDetailText()` contains display names and short descriptions for every starting item.
+  - `BuildStarterKitPreviewText()` and the `Tab` tooltip contain display names and short descriptions for starting items.
   - Content-driven test fails if a starting item template is unknown or lacks a description.
 
 ### ONB-5 — Add a temporary key-reminder ribbon to HUD
@@ -1250,6 +1254,7 @@
 
 ### GFX-1 — Make hit flashes readable and layered
 
+- **Status:** done in F4. `AnimationController` keeps a timed bright/white flash state for damaged entities, restores sprites to exact white after ~0.12s, and `EntityRenderer.UpsertEntity` preserves active flashes during refresh.
 - **Priority:** P1
 - **Target files:**
   - `Scripts/World/AnimationController.cs`
@@ -1396,6 +1401,7 @@
 
 ### TST-1 — Capture full exception details on test failure
 
+- **Status:** done
 - **Priority:** P1
 - **Target files:**
   - `Tests/TestFramework/TestRegistry.cs`
@@ -1408,6 +1414,7 @@
 
 ### TST-2 — Add test filtering / selection to harness
 
+- **Status:** done
 - **Priority:** P1
 - **Target files:**
   - `Tests/Program.cs`
@@ -1422,6 +1429,7 @@
 
 ### TST-3 — Reset shared static stub state between tests
 
+- **Status:** done
 - **Priority:** P1
 - **Target files:**
   - `Compat/Godot/GodotStubs.cs`
@@ -1435,16 +1443,18 @@
 
 ### TST-4 — Treat build warnings as errors in CI
 
+- **Status:** done
 - **Priority:** P1
 - **Target files:**
   - `Directory.Build.props`
   - `.github/workflows/ci.yml`
 - **Why it improves the game:** Without warnings-as-errors, nullable/reference warnings and stub mismatches can accumulate silently.
 - **Implementation notes:**
-  - Add CI-only property group with `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>`.
-  - Set `CI: true` in workflow environment.
+  - `Directory.Build.props` enables `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` only when `RoguelitussyWarningsAsErrors=true` is supplied.
+  - `.github/workflows/ci.yml` passes `-p:RoguelitussyWarningsAsErrors=true` to compile steps without relying on GitHub Actions' global `CI=true` environment.
 - **Acceptance criteria / tests:**
-  - `dotnet build godotussy.csproj -p:UseGodotStubs=true -p:CI=true` produces zero warnings.
+  - `dotnet build godotussy.csproj -p:UseGodotStubs=true -p:RoguelitussyWarningsAsErrors=true` produces zero warnings.
+  - `dotnet build Tests/godotussy.Tests.csproj -p:RoguelitussyWarningsAsErrors=true` produces zero warnings.
 
 ### TST-5 — Cache NuGet packages and Godot editor in CI
 
@@ -1511,7 +1521,7 @@ Build on Wave 1–2 to make combat/AI more interesting.
 5. CHR-1 — Restore `CharacterOptions` on load
 6. CHR-2 — Race bonuses
 7. CHR-3 — Signature starting abilities
-8. CHR-4 — Improve creation preview clarity
+8. CHR-4 — Improve creation preview clarity (**done**)
 
 ### Wave 5 — UI/UX and Inventory Polish
 
@@ -1544,7 +1554,7 @@ Recent QOL features outside the original numbered backlog are tracked in `docs/F
 1. ONB-1 — First Delve welcome message
 2. ONB-2 — Stairs-visible hint
 3. ONB-3 — Death learning tips
-4. ONB-4 — Starter kit preview
+4. ONB-4 — Starter kit preview and tooltip (**done**)
 5. ONB-5 — Key-reminder ribbon
 6. GFX-1 — Hit flashes
 7. GFX-2 — Camera shake
@@ -1555,11 +1565,7 @@ Recent QOL features outside the original numbered backlog are tracked in `docs/F
 12. PERF-3 — `EntityRenderer` child caching
 13. PERF-4 — Tile art pooling
 14. PERF-5 — Radius query optimization
-15. TST-1 — Stack traces on failure
-16. TST-2 — Test filtering
-17. TST-3 — Reset stub state
-18. TST-4 — Warnings-as-errors in CI
-19. TST-5 — CI caching
+15. TST-4 — Warnings-as-errors in CI (**done**)
 
 ---
 

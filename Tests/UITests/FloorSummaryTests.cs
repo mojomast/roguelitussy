@@ -15,6 +15,7 @@ public sealed class FloorSummaryTests : ITestSuite
         registry.Add("UI.FloorSummary timer starts at six seconds", TimerStartsAtSixSeconds);
         registry.Add("UI.FloorSummary any key engages and stops countdown", AnyKeyEngagesAndStopsCountdown);
         registry.Add("UI.FloorSummary enter emits confirmed", EnterEmitsConfirmed);
+        registry.Add("UI.FloorSummary escape emits confirmed", EscapeEmitsConfirmed);
         registry.Add("UI.FloorSummary timer expiry emits confirmed", TimerExpiryEmitsConfirmed);
     }
 
@@ -79,11 +80,13 @@ public sealed class FloorSummaryTests : ITestSuite
         var screen = new FloorSummaryUI();
         screen.Open(SampleStats());
 
-        screen.HandleKey(Key.A);
+        var handled = screen.HandleKey(Key.A);
         screen._Process(2.0);
 
+        Expect.True(handled, "Non-confirm keys should be handled while the summary is visible.");
         Expect.True(screen.PlayerEngaged, "Any key should mark the player as engaged.");
         Expect.Equal(6.0f, screen.CountdownSeconds, "Engaged summary should stop countdown.");
+        Expect.True(screen.Visible, "Non-confirm keys should not close the summary.");
     }
 
     private static void EnterEmitsConfirmed()
@@ -95,10 +98,27 @@ public sealed class FloorSummaryTests : ITestSuite
         screen.Bind(bus);
         screen.Open(SampleStats());
 
-        screen.HandleKey(Key.Enter);
+        var handled = screen.HandleKey(Key.Enter);
 
+        Expect.True(handled, "Enter should be handled by the floor summary.");
         Expect.Equal(1, count, "Enter should emit exactly one transition confirmation.");
         Expect.False(screen.Visible, "Enter should close the summary.");
+    }
+
+    private static void EscapeEmitsConfirmed()
+    {
+        var bus = new EventBus();
+        var screen = new FloorSummaryUI();
+        var count = 0;
+        bus.FloorTransitionConfirmed += () => count++;
+        screen.Bind(bus);
+        screen.Open(SampleStats());
+
+        var handled = screen.HandleKey(Key.Escape);
+
+        Expect.True(handled, "Escape should be handled by the floor summary.");
+        Expect.Equal(1, count, "Escape should emit exactly one transition confirmation.");
+        Expect.False(screen.Visible, "Escape should close the summary.");
     }
 
     private static void TimerExpiryEmitsConfirmed()

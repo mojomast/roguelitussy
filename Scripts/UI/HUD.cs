@@ -9,6 +9,7 @@ namespace Godotussy;
 public partial class HUD : Control
 {
     private const float BarAnimationSpeed = 10f;
+    private const float BarGhostAnimationSpeed = 3.5f;
     private const float BarPulseSeconds = 0.35f;
     private Panel? _panel;
     private ColorRect? _panelBackground;
@@ -21,10 +22,13 @@ public partial class HUD : Control
     private ProgressBar? _hpBarCompat;
     private Label? _hpValueLabel;
     private ColorRect? _hpBarBackground;
+    private ColorRect? _hpBarGhostFill;
     private ColorRect? _hpBarFill;
+    private readonly List<ColorRect> _hpDangerPatternStripes = new();
     private Label? _energyLabel;
     private Label? _energyValueLabel;
     private ColorRect? _energyBarBackground;
+    private ColorRect? _energyBarGhostFill;
     private ColorRect? _energyBarFill;
     private Label? _progressLabel;
     private Label? _statsLabel;
@@ -48,11 +52,15 @@ public partial class HUD : Control
 
     public double HPBarDisplayedValue { get; private set; }
 
+    public double HPBarGhostValue { get; private set; }
+
     public double HPBarMaxValue { get; private set; } = 1d;
 
     public double EnergyBarValue { get; private set; }
 
     public double EnergyBarDisplayedValue { get; private set; }
+
+    public double EnergyBarGhostValue { get; private set; }
 
     public double EnergyBarMaxValue { get; private set; } = 1000d;
 
@@ -87,6 +95,8 @@ public partial class HUD : Control
     public Color EnergyPulseColor { get; private set; } = Colors.White;
 
     public Color HPBarFillColor { get; private set; } = Colors.White;
+
+    public bool HPBarDangerPatternVisible { get; private set; }
 
     public Color EnergyBarFillColor { get; private set; } = UiStyle.EnergyBlue();
 
@@ -282,6 +292,7 @@ public partial class HUD : Control
             MinimapText = MinimapVisible ? "Minimap: 0 explored, 0 visible" : "Minimap hidden";
             HPColor = Colors.White;
             SetHPBarTarget(0d, 1d, animate: false);
+            HPBarDangerPatternVisible = false;
             SetEnergyBarTarget(0d, 1000d, animate: false);
             UpdateLabels();
             return;
@@ -303,6 +314,7 @@ public partial class HUD : Control
                 : "Minimap hidden";
             HPColor = Colors.White;
             SetHPBarTarget(0d, 1d, animate: false);
+            HPBarDangerPatternVisible = false;
             SetEnergyBarTarget(0d, 1000d, animate: false);
             UpdateLabels();
             return;
@@ -381,10 +393,12 @@ public partial class HUD : Control
         var previous = HPBarValue;
         HPBarMaxValue = nextMax;
         HPBarValue = nextValue;
+        UpdateHPDangerPatternState();
 
         if (!_hasHPBarState || !animate)
         {
             HPBarDisplayedValue = HPBarValue;
+            HPBarGhostValue = HPBarValue;
             _hpPulseSeconds = 0f;
             HPPulseIntensity = 0f;
             HPPulseColor = Colors.White;
@@ -397,6 +411,9 @@ public partial class HUD : Control
             HPPulseColor = nextValue < previous ? UiStyle.BloodRedBright() : UiStyle.ActiveGreen();
             _hpPulseSeconds = BarPulseSeconds;
             HPPulseIntensity = 1f;
+            HPBarGhostValue = nextValue < previous
+                ? System.Math.Max(HPBarGhostValue, System.Math.Max(HPBarDisplayedValue, previous))
+                : HPBarDisplayedValue;
         }
     }
 
@@ -411,6 +428,7 @@ public partial class HUD : Control
         if (!_hasEnergyBarState || !animate)
         {
             EnergyBarDisplayedValue = EnergyBarValue;
+            EnergyBarGhostValue = EnergyBarValue;
             _energyPulseSeconds = 0f;
             EnergyPulseIntensity = 0f;
             EnergyPulseColor = Colors.White;
@@ -423,6 +441,9 @@ public partial class HUD : Control
             EnergyPulseColor = nextValue < previous ? UiStyle.WarningOrange() : UiStyle.BrightGold();
             _energyPulseSeconds = BarPulseSeconds;
             EnergyPulseIntensity = 1f;
+            EnergyBarGhostValue = nextValue < previous
+                ? System.Math.Max(EnergyBarGhostValue, System.Math.Max(EnergyBarDisplayedValue, previous))
+                : EnergyBarDisplayedValue;
         }
     }
 
@@ -431,8 +452,12 @@ public partial class HUD : Control
         var changed = false;
         (HPBarDisplayedValue, _hpPulseSeconds, HPPulseIntensity, var hpChanged) = AdvanceDisplayedValue(_hpPulseSeconds, HPPulseIntensity, HPBarDisplayedValue, HPBarValue, delta);
         (EnergyBarDisplayedValue, _energyPulseSeconds, EnergyPulseIntensity, var energyChanged) = AdvanceDisplayedValue(_energyPulseSeconds, EnergyPulseIntensity, EnergyBarDisplayedValue, EnergyBarValue, delta);
+        (HPBarGhostValue, var hpGhostChanged) = AdvanceGhostValue(HPBarGhostValue, HPBarDisplayedValue, HPBarValue, delta);
+        (EnergyBarGhostValue, var energyGhostChanged) = AdvanceGhostValue(EnergyBarGhostValue, EnergyBarDisplayedValue, EnergyBarValue, delta);
         changed |= hpChanged;
         changed |= energyChanged;
+        changed |= hpGhostChanged;
+        changed |= energyGhostChanged;
         return changed;
     }
 
@@ -468,6 +493,30 @@ public partial class HUD : Control
         return (displayed, pulseSeconds, pulseIntensity, changed);
     }
 
+    private static (double Value, bool Changed) AdvanceGhostValue(double ghost, double displayed, double target, float delta)
+    {
+        var clampedDelta = System.Math.Max(0f, delta);
+        if (ghost <= displayed || ghost <= target)
+        {
+            var snapped = System.Math.Max(displayed, target);
+            return (snapped, System.Math.Abs(snapped - ghost) > 0.001d);
+        }
+
+        var factor = System.Math.Clamp(clampedDelta * BarGhostAnimationSpeed, 0f, 1f);
+        var next = ghost + ((target - ghost) * factor);
+        if (next < displayed)
+        {
+            next = displayed;
+        }
+
+        if (System.Math.Abs(next - target) <= 0.001d)
+        {
+            next = target;
+        }
+
+        return (next, System.Math.Abs(next - ghost) > 0.001d);
+    }
+
     private void EnsureVisualTree()
     {
         if (_panel is not null)
@@ -498,10 +547,13 @@ public partial class HUD : Control
         _hpBarCompat = new ProgressBar { Name = "HPBar", MinValue = 0d, MaxValue = 1d, Value = 0d, Visible = false };
         _hpValueLabel = CreateLabel("HPValueLabel", new Vector2(170f, 10f), new Vector2(70f, 16f));
         _hpBarBackground = new ColorRect { Name = "HPBarBackground", Color = UiStyle.PanelBlack() };
+        _hpBarGhostFill = new ColorRect { Name = "HPBarGhostFill", Color = UiStyle.BloodRed(0.38f) };
         _hpBarFill = new ColorRect { Name = "HPBarFill", Color = UiStyle.ActiveGreen() };
+        CreateHPDangerPatternStripes();
         _energyLabel = CreateLabel("EnergyLabel", new Vector2(12f, 32f), new Vector2(28f, 16f));
         _energyValueLabel = CreateLabel("EnergyValueLabel", new Vector2(170f, 32f), new Vector2(70f, 16f));
         _energyBarBackground = new ColorRect { Name = "EnergyBarBackground", Color = UiStyle.PanelBlack() };
+        _energyBarGhostFill = new ColorRect { Name = "EnergyBarGhostFill", Color = UiStyle.WarningOrange() };
         _energyBarFill = new ColorRect { Name = "EnergyBarFill", Color = UiStyle.EnergyBlue() };
         _headerLabel = CreateLabel("HeaderLabel", new Vector2(12f, 46f), new Vector2(416f, 18f));
         _progressLabel = CreateLabel("ProgressLabel", new Vector2(12f, 68f), new Vector2(416f, 18f));
@@ -528,10 +580,17 @@ public partial class HUD : Control
         _panel.AddChild(_hpBarCompat);
         _panel.AddChild(_hpValueLabel);
         _panel.AddChild(_hpBarBackground);
+        _panel.AddChild(_hpBarGhostFill);
         _panel.AddChild(_hpBarFill);
+        foreach (var stripe in _hpDangerPatternStripes)
+        {
+            _panel.AddChild(stripe);
+        }
+
         _panel.AddChild(_energyLabel);
         _panel.AddChild(_energyValueLabel);
         _panel.AddChild(_energyBarBackground);
+        _panel.AddChild(_energyBarGhostFill);
         _panel.AddChild(_energyBarFill);
         _panel.AddChild(_headerLabel);
         _panel.AddChild(_progressLabel);
@@ -761,8 +820,54 @@ public partial class HUD : Control
 
         HPBarFillColor = BlendColor(HPColor, HPPulseColor, HPPulseIntensity * 0.65f);
         EnergyBarFillColor = BlendColor(UiStyle.EnergyBlue(), EnergyPulseColor, EnergyPulseIntensity * 0.60f);
+        var hpGhostColor = BlendColor(UiStyle.BloodRed(0.34f), UiStyle.DimGold(0.28f), 0.25f);
+        var energyGhostColor = BlendColor(UiStyle.WarningOrange(), UiStyle.DimGold(), 0.35f);
+        LayoutBar(_hpBarBackground, _hpBarGhostFill, HPBarGhostValue, HPBarMaxValue, hpGhostColor);
         LayoutBar(_hpBarBackground, _hpBarFill, HPBarDisplayedValue, HPBarMaxValue, HPBarFillColor);
+        LayoutHPDangerPattern();
+        LayoutBar(_energyBarBackground, _energyBarGhostFill, EnergyBarGhostValue, EnergyBarMaxValue, energyGhostColor, y: 37f);
         LayoutBar(_energyBarBackground, _energyBarFill, EnergyBarDisplayedValue, EnergyBarMaxValue, EnergyBarFillColor, y: 37f);
+    }
+
+    private void UpdateHPDangerPatternState()
+    {
+        HPBarDangerPatternVisible = HPBarMaxValue > 0d && HPBarValue / HPBarMaxValue < 0.3d;
+    }
+
+    private void CreateHPDangerPatternStripes()
+    {
+        if (_hpDangerPatternStripes.Count > 0)
+        {
+            return;
+        }
+
+        for (var i = 0; i < 5; i++)
+        {
+            _hpDangerPatternStripes.Add(new ColorRect
+            {
+                Name = $"HPDangerStripe_{i}",
+                Color = UiStyle.BrightGold(0.72f),
+                Visible = false,
+            });
+        }
+    }
+
+    private void LayoutHPDangerPattern()
+    {
+        const float barX = 44f;
+        const float barY = 15f;
+        const float stripeWidth = 4f;
+        const float stripeHeight = 8f;
+        const float stripeSpacing = 24f;
+
+        for (var i = 0; i < _hpDangerPatternStripes.Count; i++)
+        {
+            var stripe = _hpDangerPatternStripes[i];
+            stripe.Visible = HPBarDangerPatternVisible;
+            stripe.Position = new Vector2(barX + 8f + (i * stripeSpacing), barY);
+            stripe.Size = new Vector2(stripeWidth, stripeHeight);
+            stripe.Color = UiStyle.BrightGold(0.72f);
+        }
     }
 
     private static Color BlendColor(Color from, Color to, float amount)

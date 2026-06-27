@@ -6,15 +6,26 @@ The project uses a custom .NET test harness instead of xUnit or NUnit.
 
 `Tests/Program.cs` reflects over the test assembly, instantiates every concrete `ITestSuite`, registers its tests with `TestRegistry`, and executes them.
 
-`TestRegistry` prints a simple pass/fail line per test and returns a non-zero exit code when any test fails.
+`TestRegistry` prints a pass/fail line per executed test and returns a non-zero exit code when any test fails. Failures include the test name, a separator, and `ex.ToString()` output so exception type, message, and stack trace are visible in CI logs.
+
+The harness resets mutable Godot stub state before every registered test. This clears missing resource/image path sets, pressed mouse buttons, and shared viewport/tree state so UI and rendering tests do not depend on execution order.
 
 ## Standard Commands
 
 Run the full suite:
 
 ```powershell
-dotnet run --project Tests/godotussy.Tests.csproj
+dotnet run --project Tests/godotussy.Tests.csproj -p:UseGodotStubs=true
 ```
+
+Run a filtered subset by case-insensitive test-name match:
+
+```powershell
+dotnet run --project Tests/godotussy.Tests.csproj -p:UseGodotStubs=true -- --filter Simulation.
+dotnet run --project Tests/godotussy.Tests.csproj -p:UseGodotStubs=true -- --filter=TestFramework.
+```
+
+An empty filter runs all tests. A nonmatching filter executes zero tests, prints a summary with executed/registered/skipped/failure counts, and exits successfully.
 
 The harness prints the current test count at runtime; avoid hardcoding exact counts in docs unless they are generated from the harness output.
 
@@ -33,14 +44,14 @@ dotnet build godotussy.sln
 Build the test project explicitly:
 
 ```powershell
-dotnet build Tests/godotussy.Tests.csproj
+dotnet build Tests/godotussy.Tests.csproj -p:UseGodotStubs=true
 ```
 
 Run the rendering-focused compile profile:
 
 ```powershell
 dotnet restore godotussy.csproj -p:UseGodotStubs=true -p:RenderingValidation=true
-dotnet run --project Tests/godotussy.Tests.csproj -p:RenderingValidation=true
+dotnet run --project Tests/godotussy.Tests.csproj -p:UseGodotStubs=true -p:RenderingValidation=true
 ```
 
 The rendering profile defines `RENDERING_VALIDATION`, excludes `Core/Persistence/**/*.cs`, and skips persistence-dependent tests. It is a compile/runtime smoke for rendering and UI surfaces, not a replacement for the full persistence suite.
@@ -55,11 +66,19 @@ The repository workflow at `.github/workflows/ci.yml` runs on every push and pul
 - NuGet package caching.
 - JSON syntax validation for all files under `Content/`.
 - `dotnet format --verify-no-changes godotussy.sln`.
-- `dotnet build godotussy.sln`.
 - The editorless stub build, test build, full harness, and rendering-validation profile.
+- Warnings-as-errors on CI compile steps through explicit `-p:RoguelitussyWarningsAsErrors=true` opt-in.
 - Artifact upload of `bin/`, `obj/`, and Godot cache directories on failure.
 
 A second job downloads and caches Godot 4.5.2 Mono, runs a headless editor import, and runs a headless startup smoke test. The Godot version is centralized in a single workflow environment variable.
+
+Use the same warnings-as-errors property locally when validating CI compile behavior:
+
+```powershell
+dotnet build godotussy.csproj -p:UseGodotStubs=true -p:RoguelitussyWarningsAsErrors=true
+dotnet build Tests/godotussy.Tests.csproj -p:RoguelitussyWarningsAsErrors=true
+dotnet run --project Tests/godotussy.Tests.csproj -p:UseGodotStubs=true -p:RenderingValidation=true -p:RoguelitussyWarningsAsErrors=true
+```
 
 ## Godot Headless Smoke
 
@@ -97,6 +116,8 @@ The repository contains targeted suites for:
 2. Register each test through the provided registry.
 3. Keep tests deterministic and self-contained.
 4. Prefer focused tests around one subsystem or regression.
+
+Stub-backed tests may rely on the harness-level reset for shared Godot stub state, but each test should still set up its own required scene/input/resource state explicitly.
 
 When changing simulation, persistence, generation, or content loading, add or update tests in the same change.
 

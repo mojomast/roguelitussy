@@ -38,9 +38,21 @@ public sealed class AnimationController
         public float ElapsedSeconds { get; set; }
     }
 
+    private sealed class DamageFlashState
+    {
+        public required Node2D Sprite { get; init; }
+
+        public float ElapsedSeconds { get; set; }
+
+        public float DurationSeconds { get; init; }
+    }
+
     private const float MoveDurationSeconds = 0.08f;
+    private const float DamageFlashDurationSeconds = 0.12f;
+    private static readonly Color DamageFlashTint = new(1.6f, 1.35f, 1.2f, 1f);
     private readonly List<AnimationRecord> _history = new();
     private readonly Dictionary<EntityId, MoveAnimationState> _activeMoves = new();
+    private readonly Dictionary<EntityId, DamageFlashState> _activeDamageFlashes = new();
     private readonly List<PopupAnimationState> _activePopups = new();
 
     public IReadOnlyList<AnimationRecord> History => _history;
@@ -49,7 +61,11 @@ public sealed class AnimationController
 
     public int ActivePopupCount => _activePopups.Count;
 
+    public int ActiveFlashCount => _activeDamageFlashes.Count;
+
     public bool IsMoveAnimating(EntityId entityId) => _activeMoves.ContainsKey(entityId);
+
+    public bool IsDamageFlashing(EntityId entityId) => _activeDamageFlashes.ContainsKey(entityId);
 
     public Vector2? GetMoveTarget(EntityId entityId) =>
         _activeMoves.TryGetValue(entityId, out var state) ? state.To : null;
@@ -86,8 +102,13 @@ public sealed class AnimationController
 
     public void AnimateDamage(EntityId entityId, Node2D sprite)
     {
-        sprite.Modulate = Colors.Red;
-        sprite.Modulate = Colors.White;
+        sprite.Modulate = DamageFlashTint;
+        _activeDamageFlashes[entityId] = new DamageFlashState
+        {
+            Sprite = sprite,
+            ElapsedSeconds = 0f,
+            DurationSeconds = DamageFlashDurationSeconds,
+        };
         _history.Add(new AnimationRecord(AnimationType.Damage, entityId, sprite.Position, sprite.Position));
     }
 
@@ -119,7 +140,7 @@ public sealed class AnimationController
 
     public void Advance(double delta)
     {
-        if (_activeMoves.Count == 0 && _activePopups.Count == 0)
+        if (_activeMoves.Count == 0 && _activeDamageFlashes.Count == 0 && _activePopups.Count == 0)
         {
             return;
         }
@@ -136,6 +157,20 @@ public sealed class AnimationController
             {
                 state.Sprite.Position = state.To;
                 _activeMoves.Remove(entry.Key);
+            }
+        }
+
+        foreach (var entry in _activeDamageFlashes.ToArray())
+        {
+            var state = entry.Value;
+            state.ElapsedSeconds += (float)delta;
+            var progress = Math.Clamp(state.ElapsedSeconds / state.DurationSeconds, 0f, 1f);
+            state.Sprite.Modulate = Lerp(DamageFlashTint, Colors.White, progress);
+
+            if (progress >= 1f)
+            {
+                state.Sprite.Modulate = Colors.White;
+                _activeDamageFlashes.Remove(entry.Key);
             }
         }
 
@@ -163,6 +198,13 @@ public sealed class AnimationController
         }
 
         _activeMoves.Clear();
+
+        foreach (var state in _activeDamageFlashes.Values)
+        {
+            state.Sprite.Modulate = Colors.White;
+        }
+
+        _activeDamageFlashes.Clear();
 
         foreach (var popupState in _activePopups)
         {
@@ -192,5 +234,14 @@ public sealed class AnimationController
     private static Vector2 Lerp(Vector2 from, Vector2 to, float weight)
     {
         return from + ((to - from) * weight);
+    }
+
+    private static Color Lerp(Color from, Color to, float weight)
+    {
+        return new Color(
+            from.R + ((to.R - from.R) * weight),
+            from.G + ((to.G - from.G) * weight),
+            from.B + ((to.B - from.B) * weight),
+            from.A + ((to.A - from.A) * weight));
     }
 }

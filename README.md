@@ -18,8 +18,8 @@ The current build includes character identity and progression, ability casting, 
 4. Build and run the automated test harness:
 
    ```powershell
-   dotnet build Tests/godotussy.Tests.csproj
-   dotnet run --project Tests/godotussy.Tests.csproj
+   dotnet build Tests/godotussy.Tests.csproj -p:UseGodotStubs=true
+   dotnet run --project Tests/godotussy.Tests.csproj -p:UseGodotStubs=true
    ```
 
 5. Open `project.godot` in Godot 4.5.2 Mono/.NET to inspect scenes, autoloads, and editor tools.
@@ -93,6 +93,13 @@ Verify formatting matches the repository style (CI enforces this):
 dotnet format --verify-no-changes godotussy.sln
 ```
 
+Run the CI warnings-as-errors compile checks locally:
+
+```powershell
+dotnet build godotussy.csproj -p:UseGodotStubs=true -p:RoguelitussyWarningsAsErrors=true
+dotnet build Tests/godotussy.Tests.csproj -p:RoguelitussyWarningsAsErrors=true
+```
+
 Validate JSON content syntax locally (CI runs the same check):
 
 ```powershell
@@ -102,20 +109,26 @@ Get-ChildItem -Recurse -Filter *.json -Path Content | ForEach-Object { python3 -
 Build the test project:
 
 ```powershell
-dotnet build Tests/godotussy.Tests.csproj
+dotnet build Tests/godotussy.Tests.csproj -p:UseGodotStubs=true
 ```
 
 Run the full test suite:
 
 ```powershell
-dotnet run --project Tests/godotussy.Tests.csproj
+dotnet run --project Tests/godotussy.Tests.csproj -p:UseGodotStubs=true
+```
+
+Run a filtered test subset:
+
+```powershell
+dotnet run --project Tests/godotussy.Tests.csproj -p:UseGodotStubs=true -- --filter Simulation.
 ```
 
 Run the rendering-focused compile profile:
 
 ```powershell
 dotnet restore godotussy.csproj -p:UseGodotStubs=true -p:RenderingValidation=true
-dotnet run --project Tests/godotussy.Tests.csproj -p:RenderingValidation=true
+dotnet run --project Tests/godotussy.Tests.csproj -p:UseGodotStubs=true -p:RenderingValidation=true
 ```
 
 The rendering validation profile intentionally excludes persistence implementation files and persistence-backed tests so rendering/UI code can compile against the Godot stubs without requiring the full save subsystem in that profile.

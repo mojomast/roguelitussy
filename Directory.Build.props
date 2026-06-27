@@ -1,4 +1,8 @@
 <Project>
+  <PropertyGroup Condition="'$(RoguelitussyWarningsAsErrors)' == 'true'">
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'godotussy' and '$(SolutionDir)' != ''">
     <UseGodotStubs>true</UseGodotStubs>
   </PropertyGroup>

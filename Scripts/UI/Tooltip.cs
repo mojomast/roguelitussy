@@ -44,14 +44,14 @@ public partial class Tooltip : Control
     public void ShowItemTooltip(ItemTemplate template, ItemInstance instance, Vector2 screenPos,
         string? comparisonText = null, bool equipped = false, string equippedSlot = "None")
     {
-        TitleText = template.DisplayName;
+        TitleText = ItemRarityPresentation.ResolveDecoratedName(template.DisplayName, template.Rarity);
         var rarityLabel = ItemRarityPresentation.ResolveDisplayLabel(template.Rarity);
-        TitleMarkup = $"[b][color={UiStyle.ToHex(UiStyle.BrightGold())}]{ItemRarityPresentation.EscapeBBCode(template.DisplayName)}[/color][/b] "
+        TitleMarkup = $"[b][color={UiStyle.ToHex(UiStyle.BrightGold())}]{ItemRarityPresentation.ResolveDecoratedNameMarkup(template.DisplayName, template.Rarity)}[/color][/b] "
             + $"[i][color={ItemRarityPresentation.ResolveHexColor(template.Rarity)}]{ItemRarityPresentation.EscapeBBCode(rarityLabel)}[/color][/i]";
 
         var lines = new List<string>
         {
-            $"Rarity: {ItemRarityPresentation.ResolveDisplayLabel(template.Rarity)}",
+            $"Rarity: {ItemRarityPresentation.ResolveBracketedAbbreviation(template.Rarity)} {ItemRarityPresentation.ResolveDisplayLabel(template.Rarity)}",
             template.Description,
         };
         foreach (var modifier in template.StatModifiers)

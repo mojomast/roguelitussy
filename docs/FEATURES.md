@@ -7,15 +7,19 @@
 | GameOverScreen | Implemented | Displays finalized run stats through `GameOverWithStats`. | Add death-specific learning tips if desired. |
 | FloorSummaryUI | Implemented | Shows per-floor stats during floor travel. | None required for current behavior. |
 | Pause menu run stats | Implemented | Shows compact current-run stats in pause menu. | None required for current behavior. |
-| CombatLog category coloring | Partial | `LogCategory` colors, critical emphasis, and age fading are implemented. | Category filtering remains planned. |
+| CombatLog category coloring/filtering | Implemented | `LogCategory` colors, critical emphasis, age fading, and `L` key filter cycling are implemented. | None required for current behavior. |
 | ExaminePanel | Implemented | `X` opens examine mode; cursor movement is non-mutating. | None required for current behavior. |
 | RunUntilBlocked | Implemented | `R` then direction runs until blocked/interrupted. | Historical `Shift`+direction references are stale. |
 | RestUntilHealed | Implemented | `Z` rests until healed/interrupted/capped. | Historical `R`-rest references are stale. |
 | AutoExplore | Implemented | `O` autoexplores through normal move processing. | None required for current behavior. |
 | Quick-use hotbar | Implemented | `QuickSlotHotbar` and HUD text derive the first five usable items; keys `1`-`5` use them. | None required for current behavior. |
 | Minimap legend | Implemented | Legend exists inside the minimap and has an independent normal-gameplay toggle. | None required for current behavior. |
-| ChestUI `MenuBase` refactor | Planned | Chest UI is functional but extends `Control` directly. | Refactor onto shared menu chrome/input conventions. |
-| Animated HUD bars | Implemented | HP/energy bars interpolate and pulse on changes. | None required for current behavior. |
+| ChestUI `MenuBase` refactor | Implemented | Chest UI now extends `MenuBase` with shared modal chrome, footer hints, and selectable actions. | Persistent per-item chest contents remain a separate design item. |
+| Animated HUD bars | Implemented | HP/energy bars interpolate, pulse on changes, and show subtle trailing loss fills. | None required for current behavior. |
+| Colorblind-safe rarity/HP indicators | Implemented | Item rarity includes non-color `[C]`/`[R]` markers across inventory, tooltips, combat log pickups, and shop rows; low HP shows a stripe pattern state. | None required for current behavior. |
+| Hit flash game feel | Implemented | Damage events apply a short bright/white defender flash that remains visible across refreshes and restores to white after the timed window. | Camera shake, projectile travel, and richer SFX/VFX remain separate polish items. |
+| Character creation preview clarity | Implemented | Training copy shows exact effects; starter kits show content names/descriptions, `Equipped:` / `Pack:` grouping, stack counts, aimed-scroll targeting notes, and a main-menu `Tab` tooltip. | None required for current behavior. |
+| Overlay close/hotkey consistency | Implemented | `F` is the sole normal-gameplay interact key, UI-4 modal overlays close with `Escape`, floor summary treats `Escape` as continue, and inventory/level-up hints advertise their active hotkeys. | None required for current behavior. |
 
 The current keybind source of truth is `docs/KEYBINDS.md`.
 
@@ -33,9 +37,9 @@ The death screen displays run stats from `GameManager.CurrentRunStats`, includin
 
 **Block:** 2  **Status:** Implemented
 
-**Keybinds:** `Enter`/`Space` continue, any key stops auto-dismiss countdown
+**Keybinds:** `Enter`/`Space`/`Escape` continue, other keys stop auto-dismiss countdown
 
-The floor summary displays per-floor stats from `FloorStats`, including floor number, kills, items found, gold, damage taken, turns spent, opened chests, and triggered traps. It is surfaced through `EventBus.FloorSummaryReady` during floor travel and dismisses through `EventBus.FloorTransitionConfirmed`; the transition itself is not delayed, but gameplay input is blocked while the summary is visible.
+The floor summary displays per-floor stats from `FloorStats`, including floor number, kills, items found, gold, damage taken, turns spent, opened chests, and triggered traps. It is surfaced through `EventBus.FloorSummaryReady` during floor travel and dismisses through `EventBus.FloorTransitionConfirmed`; the transition itself is not delayed, but gameplay input is blocked while the summary is visible. Non-confirm keys mark the player as engaged and stop the auto-dismiss countdown without closing the summary.
 
 **Files modified:** `Scripts/UI/FloorSummaryUI.cs`, `Scripts/Autoloads/GameManager.cs`, `Scripts/Autoloads/EventBus.cs`, `Scripts/UI/UIRoot.cs`, `Tests/UITests/FloorSummaryTests.cs`.
 
@@ -53,7 +57,7 @@ The pause menu displays a compact `CURRENT RUN` snapshot from `GameManager.Curre
 
 **Block:** 4  **Status:** Implemented
 
-The combat log now renders categorized messages from `EventBus.LogMessage`. Categories color system, player, enemy, loot, status, warning, and critical entries distinctly; critical entries are bold, and older visible lines fade using BBCode alpha. The existing `EmitLogMessage(string)` overload remains supported and defaults to `System`.
+The combat log now renders categorized messages from `EventBus.LogMessage`. Categories color system, player, enemy, loot, status, warning, and critical entries distinctly; critical entries are bold, and older visible lines fade using BBCode alpha. Pressing `L` cycles the local render filter through All, Combat, Loot, and System while preserving stored messages. The existing `EmitLogMessage(string)` overload remains supported and defaults to `System`.
 
 **Files modified:** `Scripts/UI/CombatLog.cs`, `Scripts/Autoloads/EventBus.cs`, `Scripts/Autoloads/GameManager.cs`, `Scripts/UI/UiStyle.cs`, `Tests/UITests/CombatLogTests.cs`.
 
@@ -91,9 +95,19 @@ The minimap keeps the existing HUD summary and gameplay toggle behavior. The leg
 
 **Block:** 8  **Status:** Implemented
 
-The HUD keeps HP and energy text values immediate, but the visible bar fills now interpolate toward their latest targets over `_Process(...)` frames. HP changes trigger a short red damage pulse or green healing pulse; energy changes trigger a warning/gold pulse. The state is exposed through HUD properties so UITests can verify target values, displayed values, and pulse behavior without relying on Godot rendering output.
+The HUD keeps HP and energy text values immediate, but the visible bar fills now interpolate toward their latest targets over `_Process(...)` frames. HP changes trigger a short red damage pulse or green healing pulse; energy changes trigger a warning/gold pulse. HP damage and energy spending also leave a subtle trailing fill behind the main fill so losses read clearly without changing bar layout. Healing and energy gain snap the trail out of the way to avoid inverse-loss feedback. The state is exposed through HUD properties so UITests can verify target values, displayed values, pulse behavior, and trailing-fill convergence without relying on Godot rendering output.
 
-**Files modified:** `Scripts/UI/HUD.cs`, `Tests/UITests/UISmokeTests.cs`, `docs/SYSTEMS.md`, `docs/FEATURES.md`.
+**Files modified:** `Scripts/UI/HUD.cs`, `Tests/UITests/UISmokeTests.cs`, `Tests/UITests/HUDBarTests.cs`, `docs/SYSTEMS.md`, `docs/FEATURES.md`.
+
+## Colorblind-Safe Rarity And HP Indicators
+
+**Block:** E5 / UI-5  **Status:** Implemented
+
+Item rarity presentation now has centralized abbreviation helpers. Inventory text/markup and slot visuals, selected item descriptions, item tooltips, combat-log pickup messages, and shop buy/sell rows include bracketed rarity markers such as `[C]` and `[R]` while preserving the existing rarity colors as supplemental information. BBCode contexts use escaped bracket markers so authored item names remain safe.
+
+The HUD keeps numeric HP text and existing bar colors/pulse/trailing-fill behavior, and adds a deterministic stripe overlay state when current HP is below the existing danger threshold of `0.3`. `HUD.HPBarDangerPatternVisible` exposes the same state for UI regression tests.
+
+**Files modified:** `Scripts/UI/ItemRarityPresentation.cs`, `Scripts/UI/InventoryUI.cs`, `Scripts/UI/Tooltip.cs`, `Scripts/UI/CombatLog.cs`, `Scripts/UI/ShopUI.cs`, `Scripts/UI/HUD.cs`, `Tests/UITests/UISmokeTests.cs`, `Tests/UITests/HUDBarTests.cs`, `docs/IMPROVEMENT_SUGGESTIONS.md`, `docs/TODO.md`, `docs/FEATURES.md`, `docs/SYSTEMS.md`, `DEVELOPMENT_RESUME_REPORT.md`.
 
 ## Run-Until-Blocked Movement
 
@@ -125,10 +139,31 @@ Autoexplore recomputes deterministic BFS each step from the current player posit
 
 **Files modified:** `Scripts/UI/InputHandler.cs`, `Scripts/Autoloads/GameManager.cs`, `Compat/Godot/GodotStubs.cs`, `Tests/UITests/UISmokeTests.cs`, `docs/SYSTEMS.md`, `docs/EVENTS.md`, `docs/FEATURES.md`.
 
+## Character Creation Preview Clarity
+
+**Block:** E3  **Status:** Implemented
+
+**Keybinds:** `Tab` toggles the Starter Kit tooltip on the main menu.
+
+The main menu character foundry now states exact training effects in both option labels and body/help copy: VIT grants `+3 Max HP`, POW grants `+1 Attack`, GRD grants `+1 Defense`, and FIN grants `+1 Accuracy` plus `+1 Evasion`. The starter-kit preview resolves authored item IDs through content when available, shows display names, concise descriptions, repeated stack counts, and falls back to prettified IDs only if content is missing.
+
+Starter gear is split into `Equipped:` and `Pack:` sections. Pack contents are calculated after subtracting equipped archetype items from the full starting-item multiset, so ready gear is not duplicated as carried supplies. Aimed scrolls such as fireball and blink include a `Requires targeting.` note in the creation preview, main-menu help, and the `Tab` Starter Kit tooltip.
+
+**Files modified:** `Scripts/UI/MainMenu.cs`, `Scripts/UI/HelpOverlay.cs`, `Tests/UITests/CharacterUXTests.cs`, `Tests/ContentTests/ContentValidationTests.cs`, `docs/IMPROVEMENT_SUGGESTIONS.md`, `docs/TODO.md`, `docs/FEATURES.md`, `DEVELOPMENT_RESUME_REPORT.md`.
+
+## Overlay Close And Hotkey Consistency
+
+**Block:** E4  **Status:** Implemented
+
+**Keybinds:** `F` interact during gameplay; `Escape` closes inventory, character sheet, help, pause, level-up, dialog, shop, chest, and floor summary overlays.
+
+Normal gameplay no longer treats `E` as an alternate interact key. Inventory footer hints now include the active keyboard routes for use/equip, drop, auto-equip, sort, and close. The level-up overlay advertises `Esc close`; closing it with Escape dismisses the panel without selecting a perk and leaves pending choices available. Floor summary advertises `ENTER/SPACE/ESC Continue`; Escape follows the same dismissal path as Enter and Space.
+
+**Files modified:** `Scripts/UI/InputHandler.cs`, `Scripts/UI/LevelUpOverlay.cs`, `Scripts/UI/InventoryUI.cs`, `Tests/UITests/UISmokeTests.cs`, `docs/KEYBINDS.md`, `docs/FEATURES.md`, `docs/IMPROVEMENT_SUGGESTIONS.md`, `docs/TODO.md`, `DEVELOPMENT_RESUME_REPORT.md`.
+
 ## Planned UI Follow-ups
 
 | Feature | Status | Notes |
 |---|---|---|
-| ChestUI `MenuBase` refactor | Planned | Align chest UI with shared menu chrome, footer hints, and close behavior. |
-| CombatLog category filtering | Planned | Category colors exist; user-controlled category visibility does not. |
+| ChestUI persistent contents | Planned | Per-item chest selection should wait for persistent chest contents and leave-behind semantics. |
 | QuickSlotHotbar class extraction | Implemented | Dedicated overlay exists; quick-use still routes through the existing action path. |

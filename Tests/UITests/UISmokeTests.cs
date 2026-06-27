@@ -23,6 +23,7 @@ public sealed class UISmokeTests : ITestSuite
         registry.Add("UI.HUD shows derived quick-use hotbar", HudShowsDerivedQuickUseHotbar);
         registry.Add("UI.Quick-use number key submits potion action", QuickUseNumberKeySubmitsPotionAction);
         registry.Add("UI.Quick-use rejects aimed and empty slots safely", QuickUseRejectsAimedAndEmptySlotsSafely);
+        registry.Add("UI.InputHandler uses F only for interact", InputHandlerUsesFOnlyForInteract);
         registry.Add("UI.Run prefix enters and cancels without submitting movement", RunPrefixEntersAndCancels);
         registry.Add("UI.Run moves through normal action processing until blocked", RunMovesThroughNormalActionProcessingUntilBlocked);
         registry.Add("UI.Run stops when a hostile becomes visible or adjacent", RunStopsWhenHostileBecomesVisibleOrAdjacent);
@@ -62,6 +63,8 @@ public sealed class UISmokeTests : ITestSuite
         registry.Add("UI.UIRoot accepts numpad enter on the title screen", UIRootAcceptsNumpadEnter);
         registry.Add("UI.UIRoot ignores repeated key echo events", UIRootIgnoresEchoedKeys);
         registry.Add("UI.UIRoot load reopens pending perk choices", UIRootLoadReopensPendingPerkChoices);
+        registry.Add("UI.Escape closes standardized overlays", EscapeClosesStandardizedOverlays);
+        registry.Add("UI.Level-up Escape closes without selecting perk", LevelUpEscapeClosesWithoutSelectingPerk);
         registry.Add("UI.UIRoot routes keyboard between title, overlays, and gameplay", UIRootRoutesKeyboard);
     }
 
@@ -360,6 +363,23 @@ public sealed class UISmokeTests : ITestSuite
 
         Expect.True(input.HandleKey(Key.Five), "Empty quick-use slot should still handle the hotkey.");
         Expect.True(logs.Any(message => message.Contains("Quick slot 5 is empty", System.StringComparison.Ordinal)), "Empty quick-use slot should log a safe warning.");
+    }
+
+    private static void InputHandlerUsesFOnlyForInteract()
+    {
+        var context = CreateContext();
+        context.GameManager.LoadWorld(context.World);
+        var input = new InputHandler();
+        input.Bind(context.GameManager, context.Bus);
+
+        var interactRequests = 0;
+        input.InteractRequested += () => interactRequests++;
+
+        Expect.False(input.HandleKey(Key.E), "E should not be bound to interact during normal gameplay.");
+        Expect.Equal(0, interactRequests, "Pressing E should not fire InteractRequested.");
+
+        Expect.True(input.HandleKey(Key.F), "F should remain the dedicated interact key.");
+        Expect.Equal(1, interactRequests, "Pressing F should fire InteractRequested once.");
     }
 
     private static void RunPrefixEntersAndCancels()
@@ -740,15 +760,20 @@ public sealed class UISmokeTests : ITestSuite
             inventory.Bind(context.GameManager, context.Bus, context.Content, tooltip);
             inventory.Open();
 
-            Expect.True(inventory.DescriptionText.Contains("Rarity: Rare"), "Inventory descriptions should expose the selected item's rarity tier.");
+            Expect.True(inventory.DescriptionText.Contains("Rarity: [R] Rare"), "Inventory descriptions should expose the selected item's rarity tier with a non-color marker.");
             Expect.True(inventory.DescriptionText.Contains("Requires targeting"), "Aimed consumables should explain why they cannot fire directly from the inventory.");
+            Expect.True(inventory.GridText.Contains("[R]"), "Inventory grid text should expose a non-color rarity marker.");
             Expect.True(inventory.GridMarkup.Contains("[color="), "Inventory grid markup should colorize loot by rarity.");
+            Expect.True(inventory.GridMarkup.Contains("[lb]R[rb]"), "Inventory grid markup should include a BBCode-safe rarity marker.");
             Expect.True(inventory.GridMarkup.Contains(UiStyle.LegendaryHex), "Inventory grid should use the shared gold accent for selected slots and headers.");
             Expect.True(inventory.GridText.Contains("▤"), "Scrolls should use a stable category glyph instead of a display-name initial.");
-            Expect.True(tooltip.BodyText.Contains("Rarity: Rare"), "Item tooltips should expose rarity details.");
+            Expect.True(tooltip.TitleText.Contains("[R]"), "Item tooltip title text should expose a non-color rarity marker.");
+            Expect.True(tooltip.TitleMarkup.Contains("[lb]R[rb]"), "Item tooltip title markup should include a BBCode-safe rarity marker.");
+            Expect.True(tooltip.BodyText.Contains("Rarity: [R] Rare"), "Item tooltips should expose rarity details with a non-color marker.");
             Expect.True(tooltip.BodyText.Contains("Status: Carried"), "Item tooltips should expose carried/equipped state.");
             Expect.True(tooltip.TitleMarkup.Contains("[color="), "Item tooltip titles should be colorized by rarity.");
             Expect.True(tooltip.TitleMarkup.Contains(UiStyle.RareHex), "Rare item tooltip titles should use the Diablo-style rare blue.");
+            Expect.Equal("[C]", ItemRarityPresentation.ResolveBracketedAbbreviation("common"), "Common rarity should use the stable [C] marker.");
             AssertColor(UiStyle.GoldTrim(), ((Panel)tooltip.Children[0]).Modulate, "Tooltip panel should use the shared carved gold trim.");
             Expect.Equal(new Vector2(viewportSize.X - tooltip.Size.X - 24f, viewportSize.Y - tooltip.Size.Y - 24f), tooltip.ScreenPosition,
                 "Inventory comparison and detail tooltips should anchor to the bottom-right corner of the viewport.");
@@ -906,6 +931,7 @@ public sealed class UISmokeTests : ITestSuite
         Expect.True(log.RenderedText.Contains("[lb]trap[rb]"), "Combat log should escape BBCode brackets");
         Expect.True(log.RenderedText.Contains("hits Skeleton for 4 damage"), "Combat log should append derived combat messages");
         Expect.True(log.RenderedText.Contains("rare loot"), "Combat log should call out higher-rarity pickups.");
+        Expect.True(log.RenderedText.Contains("[lb]R[rb]"), "Combat log pickup messages should include a BBCode-safe rarity marker.");
         Expect.True(log.RenderedText.Contains("Scroll of Fireball"), "Combat log should include the picked-up item name.");
     }
 
@@ -1318,6 +1344,91 @@ public sealed class UISmokeTests : ITestSuite
         Expect.True(root.LevelUpOverlay.Visible, "A successful load should reopen saved pending perk choices.");
     }
 
+    private static void EscapeClosesStandardizedOverlays()
+    {
+        var context = CreateContext();
+        context.GameManager.LoadWorld(context.World);
+
+        var inventory = new InventoryUI();
+        inventory.Bind(context.GameManager, context.Bus, context.Content, new Tooltip());
+        inventory.Open();
+        Expect.True(inventory.HandleKey(Key.Escape), "Escape should be handled by inventory.");
+        Expect.False(inventory.Visible, "Escape should close inventory.");
+
+        var characterSheet = new CharacterSheet();
+        characterSheet.Bind(context.GameManager, context.Bus, context.Content);
+        characterSheet.Open();
+        Expect.True(characterSheet.HandleKey(Key.Escape), "Escape should be handled by character sheet.");
+        Expect.False(characterSheet.Visible, "Escape should close character sheet.");
+
+        var help = new HelpOverlay();
+        help.OpenGameplayHelp();
+        Expect.True(help.HandleKey(Key.Escape), "Escape should be handled by help.");
+        Expect.False(help.Visible, "Escape should close help.");
+
+        var pause = new PauseMenu();
+        pause.Bind(context.GameManager, context.Bus);
+        pause.Open();
+        Expect.True(pause.HandleKey(Key.Escape), "Escape should be handled by pause menu.");
+        Expect.False(pause.Visible, "Escape should close pause menu.");
+
+        context.Player.SetComponent(new ProgressionComponent { Level = 2, UnspentPerkChoices = 1 });
+        var levelUp = new LevelUpOverlay();
+        levelUp.Bind(context.GameManager);
+        levelUp.Open();
+        Expect.True(levelUp.HandleKey(Key.Escape), "Escape should be handled by level-up overlay.");
+        Expect.False(levelUp.Visible, "Escape should close level-up overlay.");
+
+        var dialog = new DialogUI();
+        dialog.Open(CreateDialogContext(isMerchant: false));
+        Expect.True(dialog.HandleKey(Key.Escape), "Escape should be handled by dialog.");
+        Expect.False(dialog.Visible, "Escape should close dialog.");
+
+        var merchant = new Entity("Loaded Merchant", new Position(2, 1), new Stats { HP = 1, MaxHP = 1, Speed = 100 }, Faction.Neutral);
+        merchant.SetComponent(new MerchantComponent(new List<MerchantOfferState>()));
+        context.World.AddEntity(merchant);
+        var shop = new ShopUI();
+        shop.Bind(context.GameManager, context.Bus, context.Content);
+        shop.Open(merchant.Id);
+        Expect.True(shop.HandleKey(Key.Escape), "Escape should be handled by shop.");
+        Expect.False(shop.Visible, "Escape should close shop.");
+
+        var chest = new Entity("Ancient Chest", new Position(2, 2), new Stats { HP = 1, MaxHP = 1, Speed = 100 }, Faction.Neutral);
+        chest.SetComponent(new ChestComponent { LootTableId = "starter_chest" });
+        context.World.AddEntity(chest);
+        var chestUi = new ChestUI();
+        chestUi.Bind(context.GameManager, context.Bus, context.Content);
+        chestUi.Open(chest.Id);
+        Expect.True(chestUi.HandleKey(Key.Escape), "Escape should be handled by chest UI.");
+        Expect.False(chestUi.Visible, "Escape should close chest UI.");
+
+        var floorSummary = new FloorSummaryUI();
+        var transitionConfirmations = 0;
+        context.Bus.FloorTransitionConfirmed += () => transitionConfirmations++;
+        floorSummary.Bind(context.Bus);
+        floorSummary.Open(new FloorStats(2, 1, 1, 10, 0, 25, 1, 0));
+        Expect.True(floorSummary.HandleKey(Key.Escape), "Escape should be handled by floor summary.");
+        Expect.False(floorSummary.Visible, "Escape should close floor summary.");
+        Expect.Equal(1, transitionConfirmations, "Escape should confirm floor summary dismissal once.");
+    }
+
+    private static void LevelUpEscapeClosesWithoutSelectingPerk()
+    {
+        var context = CreateContext();
+        var progression = new ProgressionComponent { Level = 2, UnspentPerkChoices = 1 };
+        context.Player.SetComponent(progression);
+        var overlay = new LevelUpOverlay();
+        overlay.Bind(context.GameManager);
+        overlay.Open();
+
+        Expect.True(overlay.SummaryText.Contains("Esc close", System.StringComparison.Ordinal), "Level-up overlay footer should advertise Escape close.");
+        Expect.True(overlay.HandleKey(Key.Escape), "Escape should close level-up overlay.");
+
+        Expect.False(overlay.Visible, "Escape should close the level-up overlay.");
+        Expect.Equal(1, progression.UnspentPerkChoices, "Closing level-up with Escape should leave the pending perk choice intact.");
+        Expect.Equal(0, progression.SelectedPerkIds.Count, "Closing level-up with Escape should not select a perk.");
+    }
+
     private static void UIRootRoutesKeyboard()
     {
         var context = CreateContext();
@@ -1403,7 +1514,10 @@ public sealed class UISmokeTests : ITestSuite
         Expect.False(root.ShopUI.Visible, "Interact should close an open shop overlay.");
 
         root._UnhandledInput(new InputEventKey { Pressed = true, PhysicalKeycode = Key.E });
-        Expect.True(root.DialogUI.Visible, "The dedicated interact key should also open dialog when an NPC is adjacent.");
+        Expect.False(root.DialogUI.Visible, "E should not open dialog when an NPC is adjacent.");
+
+        root._UnhandledInput(new InputEventKey { Pressed = true, PhysicalKeycode = Key.F });
+        Expect.True(root.DialogUI.Visible, "F should remain the dedicated interact key for nearby NPC dialog.");
     }
 
     private static void ShopAppliesPerkDiscounts()
@@ -1477,6 +1591,14 @@ public sealed class UISmokeTests : ITestSuite
             "Authored chest spawn details should preserve authored loot tables.");
         Expect.Equal(1, world.Entities.Count(entity => entity.GetComponent<NpcComponent>()?.TemplateId == "field_chronicler"),
             "Ambient NPC spawning should not duplicate already-authored NPC templates.");
+    }
+
+    private static GameManager.InteractionContext CreateDialogContext(bool isMerchant)
+    {
+        var node = new DialogueNode("start", "Choose a path.", new[] { new DialogueOption("Close", null, "close") });
+        var dialogTemplate = new DialogueTemplate("test_dialog", "start", new Dictionary<string, DialogueNode> { ["start"] = node });
+        var npcTemplate = new NpcTemplate("guide", "Guide", "Test guide.", "Guide", 0, -1, "test_dialog", "human", "neutral", "plain", "wanderer");
+        return new GameManager.InteractionContext(EntityId.New(), "Guide", "Guide", isMerchant, npcTemplate, dialogTemplate);
     }
 
     private static UIContext CreateContext(params ItemInstance[] items)
