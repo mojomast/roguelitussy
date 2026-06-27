@@ -113,6 +113,8 @@ The rendering layer is event-driven.
 - `Scripts/World/WorldView.cs` and related world scripts react to those events to move entities, refresh visuals, and spawn presentation effects.
 - `Scripts/World/AnimationController.cs` owns lightweight world-side effects such as the damage popup.
 - `Scripts/UI/UIRoot.cs` binds the HUD, menus, overlays, combat log, tooltip, debug console, and input handler to the current runtime services.
+- `UIRoot` also owns modal interaction surfaces such as dialog, shop, inventory, targeting, and the chest-open confirmation panel. Pressing `F`/`E` near an NPC opens dialog; pressing it near a chest opens the chest panel, which submits the existing `OpenChestAction`.
+- `HUD` derives a nearby interaction prompt from current world state on turn/UI refresh (`[F] Talk`, `[F] Open Chest`, `[Enter] Descend/Ascend`) and exposes it as a clickable shortcut without changing the underlying keyboard actions.
 
 Current presentation-specific behavior worth knowing:
 

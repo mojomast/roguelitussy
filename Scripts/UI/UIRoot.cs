@@ -5,11 +5,20 @@ namespace Godotussy;
 
 public partial class UIRoot : CanvasLayer
 {
+    private enum InteractionPromptAction
+    {
+        None,
+        Talk,
+        OpenChest,
+        Stairs,
+    }
+
     private EventBus? _eventBus;
     private GameManager? _gameManager;
     private IContentDatabase? _content;
     private int _enemiesKilled;
     private bool _restoreMainMenuAfterDevTools;
+    private InteractionPromptAction _currentPromptAction;
 
     public UIRoot()
     {
@@ -29,6 +38,8 @@ public partial class UIRoot : CanvasLayer
     public DialogUI DialogUI { get; } = new();
 
     public ShopUI ShopUI { get; } = new();
+
+    public ChestUI ChestUI { get; } = new();
 
     public MainMenu MainMenu { get; } = new();
 
@@ -75,6 +86,8 @@ public partial class UIRoot : CanvasLayer
         _content = content ?? gameManager?.Content;
 
         HUD.Bind(_gameManager, _eventBus);
+        HUD.InteractionPromptActivated -= OnInteractionPromptActivated;
+        HUD.InteractionPromptActivated += OnInteractionPromptActivated;
         CombatLog.Bind(_gameManager, _eventBus);
         Inventory.Bind(_gameManager, _eventBus, _content, Tooltip, TargetingOverlay);
         CharacterSheet.Bind(_gameManager, _eventBus, _content);
@@ -82,6 +95,7 @@ public partial class UIRoot : CanvasLayer
         DialogUI.ShopRequested -= OpenShopFromDialog;
         DialogUI.ShopRequested += OpenShopFromDialog;
         ShopUI.Bind(_gameManager, _eventBus, _content);
+        ChestUI.Bind(_gameManager, _eventBus, _content);
         Minimap.Bind(_gameManager, _eventBus);
         DevToolsWorkbench.Bind(_gameManager, _eventBus, _content);
         MainMenu.Bind(_gameManager, _eventBus);
@@ -185,6 +199,7 @@ public partial class UIRoot : CanvasLayer
         AddIfMissing(LevelUpOverlay);
         AddIfMissing(DialogUI);
         AddIfMissing(ShopUI);
+        AddIfMissing(ChestUI);
         AddIfMissing(Minimap);
         AddIfMissing(DevToolsWorkbench);
         AddIfMissing(MainMenu);
@@ -338,6 +353,17 @@ public partial class UIRoot : CanvasLayer
             return handled;
         }
 
+        if (ChestUI.Visible)
+        {
+            var handled = ChestUI.HandleKey(key);
+            if (handled)
+            {
+                RefreshInputGate();
+            }
+
+            return handled;
+        }
+
         if (CharacterSheet.Visible)
         {
             var handled = CharacterSheet.HandleKey(key);
@@ -417,6 +443,7 @@ public partial class UIRoot : CanvasLayer
         LevelUpOverlay.Close();
         DialogUI.Close();
         ShopUI.Close();
+        ChestUI.Close();
         TargetingOverlay.Cancel();
         Tooltip.Hide();
         CombatLog.RefreshConsole();
@@ -427,6 +454,7 @@ public partial class UIRoot : CanvasLayer
     private void OnFloorChanged(int floor)
     {
         GameOverScreen.Close();
+        ChestUI.Close();
         CombatLog.RefreshConsole();
         RefreshInputGate();
     }
@@ -451,6 +479,7 @@ public partial class UIRoot : CanvasLayer
         LevelUpOverlay.Close();
         DialogUI.Close();
         ShopUI.Close();
+        ChestUI.Close();
         GameOverScreen.Close();
         HelpOverlay.Close();
         TargetingOverlay.Cancel();
@@ -484,6 +513,7 @@ public partial class UIRoot : CanvasLayer
         LevelUpOverlay.Close();
         DialogUI.Close();
         ShopUI.Close();
+        ChestUI.Close();
         TargetingOverlay.Cancel();
         Inventory.Toggle();
         if (!Inventory.Visible)
@@ -506,6 +536,7 @@ public partial class UIRoot : CanvasLayer
         LevelUpOverlay.Close();
         DialogUI.Close();
         ShopUI.Close();
+        ChestUI.Close();
         TargetingOverlay.Cancel();
         Tooltip.Hide();
         CharacterSheet.Toggle();
@@ -531,6 +562,10 @@ public partial class UIRoot : CanvasLayer
         else if (ShopUI.Visible)
         {
             ShopUI.Close();
+        }
+        else if (ChestUI.Visible)
+        {
+            ChestUI.Close();
         }
         else if (DialogUI.Visible)
         {
@@ -592,6 +627,7 @@ public partial class UIRoot : CanvasLayer
         LevelUpOverlay.Close();
         DialogUI.Close();
         ShopUI.Close();
+        ChestUI.Close();
         TargetingOverlay.Cancel();
         Tooltip.Hide();
         MainMenu.Close();
@@ -619,6 +655,7 @@ public partial class UIRoot : CanvasLayer
         MainMenu.Close();
         PauseMenu.Close();
         HelpOverlay.Close();
+        ChestUI.Close();
         Tooltip.Hide();
         RefreshInputGate();
     }
@@ -629,6 +666,7 @@ public partial class UIRoot : CanvasLayer
         MainMenu.Close();
         PauseMenu.Close();
         HelpOverlay.Close();
+        ChestUI.Close();
         Tooltip.Hide();
         RefreshInputGate();
     }
@@ -650,6 +688,9 @@ public partial class UIRoot : CanvasLayer
         Inventory.Close();
         CharacterSheet.Close();
         LevelUpOverlay.Close();
+        DialogUI.Close();
+        ShopUI.Close();
+        ChestUI.Close();
         GameOverScreen.Close();
         HelpOverlay.Close();
         DevToolsWorkbench.Close();
@@ -702,6 +743,7 @@ public partial class UIRoot : CanvasLayer
         LevelUpOverlay.Close();
         DialogUI.Close();
         ShopUI.Close();
+        ChestUI.Close();
         HelpOverlay.Close();
         DevToolsWorkbench.Close();
         TargetingOverlay.Cancel();
@@ -728,11 +770,13 @@ public partial class UIRoot : CanvasLayer
             && !CharacterSheet.Visible
             && !DialogUI.Visible
             && !ShopUI.Visible
+            && !ChestUI.Visible
             && !GameOverScreen.Visible
             && !HelpOverlay.Visible
             && !DevToolsWorkbench.Visible
             && !DebugConsole.Visible
             && !TargetingOverlay.IsActive);
+        RefreshInteractionPrompt();
     }
 
     private void RefreshGameplayChromeVisibility()
@@ -744,6 +788,7 @@ public partial class UIRoot : CanvasLayer
             || CharacterSheet.Visible
             || DialogUI.Visible
             || ShopUI.Visible
+            || ChestUI.Visible
             || GameOverScreen.Visible
             || HelpOverlay.Visible
             || DevToolsWorkbench.Visible
@@ -751,6 +796,84 @@ public partial class UIRoot : CanvasLayer
 
         Minimap.SetSuppressed(suppressGameplayChrome);
         CombatLog.SetSuppressed(suppressGameplayChrome);
+    }
+
+    private void RefreshInteractionPrompt()
+    {
+        if (_gameManager?.CurrentState != GameManager.GameState.Playing
+            || MainMenu.Visible
+            || PauseMenu.Visible
+            || LevelUpOverlay.Visible
+            || Inventory.Visible
+            || CharacterSheet.Visible
+            || DialogUI.Visible
+            || ShopUI.Visible
+            || ChestUI.Visible
+            || GameOverScreen.Visible
+            || HelpOverlay.Visible
+            || DevToolsWorkbench.Visible
+            || DebugConsole.Visible
+            || TargetingOverlay.IsActive)
+        {
+            _currentPromptAction = InteractionPromptAction.None;
+            HUD.SetInteractionPrompt(string.Empty);
+            return;
+        }
+
+        var context = _gameManager.GetInteractionContext();
+        if (context is not null)
+        {
+            _currentPromptAction = InteractionPromptAction.Talk;
+            HUD.SetInteractionPrompt(context.IsMerchant ? "[F] Talk / Trade" : "[F] Talk");
+            return;
+        }
+
+        if (FindNearbyChest() is not null)
+        {
+            _currentPromptAction = InteractionPromptAction.OpenChest;
+            HUD.SetInteractionPrompt("[F] Open Chest");
+            return;
+        }
+
+        var world = _gameManager.World;
+        var player = world?.Player;
+        if (world is not null && player is not null)
+        {
+            switch (world.GetTile(player.Position))
+            {
+                case TileType.StairsDown:
+                    _currentPromptAction = InteractionPromptAction.Stairs;
+                    HUD.SetInteractionPrompt("[Enter] Descend");
+                    return;
+                case TileType.StairsUp:
+                    _currentPromptAction = InteractionPromptAction.Stairs;
+                    HUD.SetInteractionPrompt("[Enter] Ascend");
+                    return;
+            }
+        }
+
+        _currentPromptAction = InteractionPromptAction.None;
+        HUD.SetInteractionPrompt(string.Empty);
+    }
+
+    private void OnInteractionPromptActivated()
+    {
+        switch (_currentPromptAction)
+        {
+            case InteractionPromptAction.Talk:
+            case InteractionPromptAction.OpenChest:
+                Interact();
+                break;
+            case InteractionPromptAction.Stairs:
+                var world = _gameManager?.World;
+                var player = world?.Player;
+                var action = player is null ? null : UIActionFactory.CreateStairsAction(world, player.Id);
+                if (action is not null)
+                {
+                    _eventBus?.EmitPlayerActionSubmitted(action);
+                }
+                break;
+        }
     }
 
     private void Interact()
@@ -774,6 +897,13 @@ public partial class UIRoot : CanvasLayer
             return;
         }
 
+        if (ChestUI.Visible)
+        {
+            ChestUI.Close();
+            RefreshInputGate();
+            return;
+        }
+
         Inventory.Close();
         CharacterSheet.Close();
         TargetingOverlay.Cancel();
@@ -782,13 +912,78 @@ public partial class UIRoot : CanvasLayer
         var context = _gameManager?.GetInteractionContext();
         if (context is null)
         {
-            _eventBus?.EmitLogMessage("No one nearby wants to talk.");
+            var chest = FindNearbyChest();
+            if (chest is not null)
+            {
+                OpenChest(chest.Id);
+                return;
+            }
+
+            _eventBus?.EmitLogMessage("Nothing nearby to interact with.");
             RefreshInputGate();
             return;
         }
 
         DialogUI.Open(context);
         RefreshInputGate();
+    }
+
+    public void OpenChest(EntityId chestId)
+    {
+        if (MainMenu.Visible || PauseMenu.Visible || GameOverScreen.Visible || HelpOverlay.Visible || DevToolsWorkbench.Visible || DebugConsole.Visible)
+        {
+            return;
+        }
+
+        Inventory.Close();
+        CharacterSheet.Close();
+        DialogUI.Close();
+        ShopUI.Close();
+        TargetingOverlay.Cancel();
+        Tooltip.Hide();
+        ChestUI.Open(chestId);
+        RefreshInputGate();
+    }
+
+    public void CloseChest()
+    {
+        ChestUI.Close();
+        RefreshInputGate();
+    }
+
+    private IEntity? FindNearbyChest()
+    {
+        var world = _gameManager?.World;
+        var player = world?.Player;
+        if (world is null || player is null)
+        {
+            return null;
+        }
+
+        foreach (var position in EnumerateInteractionPositions(player.Position))
+        {
+            if (!world.InBounds(position))
+            {
+                continue;
+            }
+
+            var entity = world.GetEntityAt(position);
+            if (entity?.GetComponent<ChestComponent>() is not null)
+            {
+                return entity;
+            }
+        }
+
+        return null;
+    }
+
+    private static System.Collections.Generic.IEnumerable<Position> EnumerateInteractionPositions(Position origin)
+    {
+        yield return origin;
+        foreach (var delta in Position.Cardinals)
+        {
+            yield return origin + delta;
+        }
     }
 
     private void OpenShopFromDialog(EntityId merchantId)
@@ -814,6 +1009,7 @@ public partial class UIRoot : CanvasLayer
         CharacterSheet.Close();
         DialogUI.Close();
         ShopUI.Close();
+        ChestUI.Close();
         TargetingOverlay.Cancel();
         Tooltip.Hide();
         if (!LevelUpOverlay.Visible)

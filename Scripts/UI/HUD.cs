@@ -29,6 +29,7 @@ public partial class HUD : Control
     private Label? _effectsLabel;
     private HBoxContainer? _statusIconsContainer;
     private Label? _mapLabel;
+    private UiMouseLabel? _interactionPromptLabel;
     private readonly List<ColorRect> _statPillBackgrounds = new();
     private readonly List<Label> _statPillLabels = new();
     private EventBus? _eventBus;
@@ -60,9 +61,13 @@ public partial class HUD : Control
 
     public string MinimapText { get; private set; } = "Map hidden";
 
+    public string InteractionPromptText { get; private set; } = string.Empty;
+
     public Color HPColor { get; private set; } = Colors.White;
 
     public bool MinimapVisible { get; private set; } = true;
+
+    public event System.Action? InteractionPromptActivated;
 
     public HUD()
     {
@@ -133,7 +138,19 @@ public partial class HUD : Control
         }
 
         builder.Append(MinimapText);
+        if (!string.IsNullOrWhiteSpace(InteractionPromptText))
+        {
+            builder.AppendLine();
+            builder.Append(InteractionPromptText);
+        }
+
         return builder.ToString().TrimEnd();
+    }
+
+    public void SetInteractionPrompt(string prompt)
+    {
+        InteractionPromptText = string.IsNullOrWhiteSpace(prompt) ? string.Empty : prompt.Trim();
+        UpdateInteractionPromptVisual();
     }
 
     private void OnTurnCompleted()
@@ -347,6 +364,18 @@ public partial class HUD : Control
         _statsLabel = CreateLabel("StatsLabel", new Vector2(12f, 90f), new Vector2(416f, 18f));
         _effectsLabel = CreateLabel("EffectsLabel", new Vector2(12f, 112f), new Vector2(416f, 18f));
         _mapLabel = CreateLabel("MapLabel", new Vector2(12f, 134f), new Vector2(416f, 18f));
+        _interactionPromptLabel = new UiMouseLabel
+        {
+            Name = "InteractionPromptLabel",
+            Modulate = UiStyle.BrightGold(),
+            InputSubmitted = input =>
+            {
+                if (input is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
+                {
+                    InteractionPromptActivated?.Invoke();
+                }
+            },
+        };
 
         CreateStatPills();
 
@@ -373,6 +402,7 @@ public partial class HUD : Control
         _panel.AddChild(_statusIconsContainer);
 
         _panel.AddChild(_mapLabel);
+        AddChild(_interactionPromptLabel);
         ApplyResponsiveLayout();
     }
 
@@ -542,6 +572,7 @@ public partial class HUD : Control
         _effectsLabel.Modulate = UiStyle.WarningOrange();
         _mapLabel.Text = MinimapText;
         _mapLabel.Modulate = UiStyle.FaintText();
+        UpdateInteractionPromptVisual();
     }
 
     private void UpdateHPVisuals()
@@ -632,6 +663,34 @@ public partial class HUD : Control
         }
 
         SetControlBounds(_mapLabel, 12f, 150f, contentWidth, 18f);
+        LayoutInteractionPrompt();
+    }
+
+    private void LayoutInteractionPrompt()
+    {
+        if (_interactionPromptLabel is null)
+        {
+            return;
+        }
+
+        var viewportWidth = ResolveViewportWidth();
+        var viewportHeight = ResolveViewportHeight();
+        var width = System.Math.Min(360f, System.Math.Max(180f, viewportWidth * 0.34f));
+        _interactionPromptLabel.Position = new Vector2(System.Math.Max(8f, (viewportWidth - width) * 0.5f), System.Math.Max(120f, viewportHeight - 148f));
+        _interactionPromptLabel.Size = new Vector2(width, 24f);
+    }
+
+    private void UpdateInteractionPromptVisual()
+    {
+        if (_interactionPromptLabel is null)
+        {
+            return;
+        }
+
+        LayoutInteractionPrompt();
+        _interactionPromptLabel.Visible = !string.IsNullOrWhiteSpace(InteractionPromptText);
+        _interactionPromptLabel.Text = InteractionPromptText;
+        _interactionPromptLabel.Modulate = UiStyle.BrightGold();
     }
 
     private void LayoutPanelChrome(Vector2 size)
@@ -700,6 +759,11 @@ public partial class HUD : Control
     private float ResolveViewportWidth()
     {
         return GetParent() is not null && GetTree() is not null ? GetViewportRect().Size.X : 1280f;
+    }
+
+    private float ResolveViewportHeight()
+    {
+        return GetParent() is not null && GetTree() is not null ? GetViewportRect().Size.Y : 720f;
     }
 
     private static string BuildStatsText(IEntity player, ProgressionComponent? progression)
