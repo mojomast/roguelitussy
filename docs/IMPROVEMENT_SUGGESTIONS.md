@@ -754,6 +754,7 @@
 ### UI-2 — Add message categories and filtering to combat log
 
 - **Priority:** P1
+- **Status:** partial. Message categories, category colors, critical emphasis, and age fading are implemented via `LogCategory`, `EventBus.LogMessage`, and `CombatLog` tests. Category filtering remains open.
 - **Target files:**
   - `Scripts/UI/CombatLog.cs`
   - `Scripts/Autoloads/EventBus.cs`
@@ -1517,12 +1518,14 @@ Build on Wave 1–2 to make combat/AI more interesting.
 1. UI-4 — Standardize overlay close keys
 2. UI-5 — Colorblind-safe rarity/HP
 3. UI-3 — Status effect visuals
-4. UI-2 — Combat log categories
+4. UI-2 — Combat log categories (**partial:** categories/coloring done; filtering remains)
 5. UI-1 — Mouse inventory interaction
 6. INV-4 — Render ground items
 7. INV-1 — Inventory filters
 8. INV-2 — Bulk use/drop
 9. INV-5 — Pickup radius
+
+Recent QOL features outside the original numbered backlog are tracked in `docs/FEATURES.md`: rebuilt game-over stats, floor summaries, pause-run stats, examine cursor, quick-use hotbar, minimap legend, animated HUD bars, run movement, rest-until-healed, and autoexplore. These are implemented and covered by `Tests/UITests` smoke/regression tests.
 
 ### Wave 6 — Generation and Tools
 

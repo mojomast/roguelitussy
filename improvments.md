@@ -18,6 +18,8 @@
 
 > Wave 4 follow-up note (2026-06-26): trap state has been reconciled onto `TrapComponent` as the single source of truth (save version 12); themed floor sets (`prison`/`crypt`/`magma` tag filtering, GEN-2) and locked doors with key placement (GEN-4) are implemented; status visuals are wired into HUD and entity renderer (STA-4/UI-3) with corrected event payloads and removal emissions (STA-5); ambush, ranged kiting, support, and group aggro AI behaviors are live (AI-2 through AI-5); CI is hardened with SDK pinning, formatting, JSON validation, caching, and failure artifacts. Remaining high-value work is still finite perk pools, build warnings-as-errors (one CS0109 warning remains), and broad content expansion only after the current authored systems stay green.
 
+> UI/QOL follow-up note (2026-06-27): the latest feature pass added game-over run stats, floor summary, pause run stats, categorized combat log coloring, examine cursor (`X`), quick-use hotbar (`1`-`5`), minimap legend, animated HUD bars, run movement (`R` then direction), rest-until-healed (`Z`), and autoexplore (`O`). Current docs for these live in `docs/FEATURES.md`, `docs/SYSTEMS.md`, and `docs/EVENTS.md`; this historical backlog should not be used as the source of truth for those UI controls.
+
 ## Purpose
 
 This document is the current-state improvement spec for turning the existing project into a more complete, playable roguelike. It is intentionally written for parallel subagents. It replaces vague backlog work with concrete, codebase-specific workstreams, ordering, file targets, and acceptance criteria.
