@@ -1018,7 +1018,7 @@ public partial class InventoryUI : Control
             var label = _footerHintLabels[i];
             label.Position = new Vector2(x, _footerBar.Position.Y + 3f);
             label.Size = new Vector2(available, FooterHeight);
-            var action = i switch
+            System.Action action = i switch
             {
                 0 => SubmitEquip,
                 1 => SubmitDrop,
