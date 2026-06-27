@@ -109,6 +109,8 @@ public static class UiStyle
 
     public static Color MapGold(float alpha = 1f) => BrightGold(alpha);
 
+    public static Color MapTrapRed(float alpha = 1f) => WithAlpha(new Color(0.72f, 0.18f, 0.28f), alpha);
+
     public static string CommonHex => ToHex(RarityCommon());
 
     public static string UncommonHex => ToHex(RarityUncommon());

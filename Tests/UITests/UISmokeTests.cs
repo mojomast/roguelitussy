@@ -401,6 +401,19 @@ public sealed class UISmokeTests : ITestSuite
     {
         var context = CreateContext();
         context.GameManager.LoadWorld(context.World);
+        context.World.SetTile(new Position(4, 1), TileType.Trap);
+        context.World.SetTile(new Position(5, 1), TileType.Door);
+        context.World.AddEntity(new StubEntity("Goblin", new Position(2, 1), Faction.Enemy));
+
+        var chest = new StubEntity("Chest", new Position(3, 1), Faction.Neutral);
+        chest.SetComponent(new ChestComponent { LootTableId = "starter_chest" });
+        context.World.AddEntity(chest);
+
+        var npc = new StubEntity("Guide", new Position(1, 2), Faction.Neutral);
+        npc.SetComponent(new NpcComponent { TemplateId = "field_chronicler", Role = "advisor", DialogueId = "field_chronicler_intro" });
+        context.World.AddEntity(npc);
+
+        context.World.DropItem(new Position(6, 1), new ItemInstance { TemplateId = "potion_health", IsIdentified = true });
 
         var minimap = new Minimap();
         minimap.Bind(context.GameManager, context.Bus);
@@ -409,6 +422,22 @@ public sealed class UISmokeTests : ITestSuite
         Expect.True(minimap.VisibleTileCount > 0, "The minimap should reflect currently visible tiles.");
         Expect.True(minimap.ExploredTileCount >= minimap.VisibleTileCount, "Explored tiles should include the current visible region.");
         Expect.True(minimap.PlayerWorldPosition != Position.Invalid, "The minimap should track the player marker.");
+        Expect.True(minimap.LegendText.Contains("Trap", System.StringComparison.Ordinal), "The minimap legend should identify trap coloring.");
+        Expect.True(minimap.LegendText.Contains("Player", System.StringComparison.Ordinal), "The minimap legend should identify the player marker.");
+        Expect.True(minimap.LegendText.Contains("Enemy", System.StringComparison.Ordinal), "The minimap legend should identify enemy markers.");
+        Expect.True(minimap.LegendText.Contains("NPC", System.StringComparison.Ordinal), "The minimap legend should identify NPC markers.");
+        Expect.True(minimap.LegendText.Contains("Item", System.StringComparison.Ordinal), "The minimap legend should identify item markers.");
+        Expect.True(minimap.LegendText.Contains("Chest", System.StringComparison.Ordinal), "The minimap legend should identify chest markers.");
+        Expect.True(minimap.LegendEntries.Any(entry => entry.Marker == "stairs"), "The minimap legend should include stairs.");
+        Expect.True(minimap.DoorTileCount > 0, "The minimap should count explored door tiles for the legend state.");
+        Expect.True(minimap.StairTileCount > 0, "The minimap should count explored stair tiles for the legend state.");
+        Expect.True(minimap.TrapTileCount > 0, "The minimap should count explored trap tiles for the legend state.");
+        Expect.True(minimap.EnemyMarkerCount > 0, "The minimap should expose visible enemy marker counts.");
+        Expect.True(minimap.NpcMarkerCount > 0, "The minimap should expose visible NPC marker counts.");
+        Expect.True(minimap.ItemMarkerCount > 0, "The minimap should expose visible item marker counts.");
+        Expect.True(minimap.ChestMarkerCount > 0, "The minimap should expose visible chest marker counts.");
+        AssertColor(minimap.GetLegendColor("trap"), minimap.GetTileColor(new Position(4, 1)), "Trap tiles should use the legend trap color.");
+        AssertColor(minimap.GetLegendColor("stairs"), minimap.GetTileColor(new Position(6, 6)), "Down stairs should use the legend stairs color.");
 
         minimap.Toggle();
         Expect.False(minimap.Visible, "Toggling the minimap should hide the overlay.");

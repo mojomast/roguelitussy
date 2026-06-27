@@ -57,3 +57,13 @@ Examine mode opens a `MenuBase` panel at the player's position and lets the play
 The HUD shows a small runtime hotbar derived from the first five usable non-equipment inventory entries. Number keys submit the same `UseItemAction` path as inventory use for safe consumables such as potions. Aimed scrolls remain visible but marked `(aim)` and are not consumed blindly; pressing their hotkey logs a warning and instructs the player to aim them from inventory.
 
 **Files modified:** `Scripts/UI/HUD.cs`, `Scripts/UI/InputHandler.cs`, `Scripts/UI/UIActionFactory.cs`, `Tests/UITests/UISmokeTests.cs`, `docs/SYSTEMS.md`, `docs/FEATURES.md`.
+
+## Minimap Legend
+
+**Block:** 7  **Status:** Implemented
+
+**Keybinds:** `M`/`Tab` toggle minimap visibility during normal gameplay
+
+The minimap keeps the existing HUD summary and gameplay toggle behavior, but now reserves a compact legend band inside the overlay. The legend identifies floor, door, stairs, trap, player, enemy, NPC, item, and chest markers. Visible enemies, NPCs, items, and chests draw small colored markers over explored tile colors; trap, door, and stair tiles keep distinct colors aligned with the legend.
+
+**Files modified:** `Scripts/UI/Minimap.cs`, `Scripts/UI/UiStyle.cs`, `Tests/UITests/UISmokeTests.cs`, `docs/SYSTEMS.md`, `docs/FEATURES.md`.
