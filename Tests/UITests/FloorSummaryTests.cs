@@ -10,6 +10,7 @@ public sealed class FloorSummaryTests : ITestSuite
     {
         registry.Add("UI.FloorSummary opens populated stats", OpensPopulatedStats);
         registry.Add("UI.FloorSummary body includes key stats", BodyIncludesKeyStats);
+        registry.Add("UI.FloorSummary body renders BBCode in rich text", BodyRendersBbcodeInRichText);
         registry.Add("UI.FloorSummary perfect floor flavor", PerfectFloorFlavor);
         registry.Add("UI.FloorSummary bloodbath flavor", BloodbathFlavor);
         registry.Add("UI.FloorSummary timer starts at six seconds", TimerStartsAtSixSeconds);
@@ -49,6 +50,18 @@ public sealed class FloorSummaryTests : ITestSuite
         Expect.True(markup.Contains("3"), "Markup should contain enemy count.");
         Expect.True(markup.Contains("Turns spent"), "Markup should contain turns label.");
         Expect.True(markup.Contains("37"), "Markup should contain turns spent.");
+    }
+
+    private static void BodyRendersBbcodeInRichText()
+    {
+        var screen = new FloorSummaryUI();
+        screen.Open(SampleStats());
+
+        var body = FindChild<RichTextLabel>(screen, "Label");
+
+        Expect.NotNull(body, "Floor summary body should use a RichTextLabel.");
+        Expect.True(body!.BbcodeEnabled, "Floor summary body should parse BBCode instead of displaying color tags literally.");
+        Expect.True(body.Text.Contains("[color=", System.StringComparison.Ordinal), "Floor summary body text should retain authored BBCode markup for RichTextLabel parsing.");
     }
 
     private static void PerfectFloorFlavor()
@@ -134,5 +147,24 @@ public sealed class FloorSummaryTests : ITestSuite
 
         Expect.Equal(1, count, "Timer expiry should emit exactly one transition confirmation.");
         Expect.False(screen.Visible, "Timer expiry should close the summary.");
+    }
+
+    private static T? FindChild<T>(Node node, string name) where T : Node
+    {
+        foreach (var child in node.GetChildren())
+        {
+            if (child is T match && string.Equals(child.Name, name, System.StringComparison.Ordinal))
+            {
+                return match;
+            }
+
+            var nested = FindChild<T>(child, name);
+            if (nested is not null)
+            {
+                return nested;
+            }
+        }
+
+        return null;
     }
 }

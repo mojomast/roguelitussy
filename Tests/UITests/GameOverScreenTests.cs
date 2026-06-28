@@ -10,6 +10,7 @@ public sealed class GameOverScreenTests : ITestSuite
     {
         registry.Add("UI.GameOverScreen opens populated run stats", OpensPopulatedRunStats);
         registry.Add("UI.GameOverScreen body includes key run stats", BodyIncludesKeyRunStats);
+        registry.Add("UI.GameOverScreen body renders BBCode in rich text", BodyRendersBbcodeInRichText);
         registry.Add("UI.GameOverScreen zero damage flavor", ZeroDamageFlavor);
         registry.Add("UI.GameOverScreen no kills flavor", NoKillsFlavor);
         registry.Add("UI.GameOverScreen omits empty best item", OmitsEmptyBestItem);
@@ -49,6 +50,19 @@ public sealed class GameOverScreenTests : ITestSuite
         Expect.True(markup.Contains("Floor 4"), "Markup should contain floor reached.");
         Expect.True(markup.Contains("Turn 1,306"), "Markup should format turn count.");
         Expect.True(markup.Contains("SEED:1337"), "Markup should contain seed.");
+        Expect.False(markup.Contains("[SEED:", System.StringComparison.Ordinal), "Seed marker should be BBCode-safe when the body parses rich text.");
+    }
+
+    private static void BodyRendersBbcodeInRichText()
+    {
+        var screen = new GameOverScreen();
+        screen.Open(SampleStats());
+
+        var body = FindChild<RichTextLabel>(screen, "Label");
+
+        Expect.NotNull(body, "Game-over body should use a RichTextLabel.");
+        Expect.True(body!.BbcodeEnabled, "Game-over body should parse BBCode instead of displaying color tags literally.");
+        Expect.True(body.Text.Contains("[color=", System.StringComparison.Ordinal), "Game-over body text should retain authored BBCode markup for RichTextLabel parsing.");
     }
 
     private static void ZeroDamageFlavor()
@@ -97,5 +111,24 @@ public sealed class GameOverScreenTests : ITestSuite
         screen.HandleKey(Key.Escape);
 
         Expect.Equal(1, count, "Escape should request exactly one main-menu transition.");
+    }
+
+    private static T? FindChild<T>(Node node, string name) where T : Node
+    {
+        foreach (var child in node.GetChildren())
+        {
+            if (child is T match && string.Equals(child.Name, name, System.StringComparison.Ordinal))
+            {
+                return match;
+            }
+
+            var nested = FindChild<T>(child, name);
+            if (nested is not null)
+            {
+                return nested;
+            }
+        }
+
+        return null;
     }
 }

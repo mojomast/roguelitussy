@@ -162,6 +162,12 @@ public partial class InputHandler : Node
 
     private bool HandleDirectionalInput(IWorldState world, EntityId playerId, Position delta)
     {
+        var actor = world.GetEntity(playerId);
+        if (actor is not null && world.GetEntityAt(actor.Position + delta)?.GetComponent<ChestComponent>() is not null)
+        {
+            return Raise(InteractRequested);
+        }
+
         return Submit(UIActionFactory.CreateDirectionalAction(world, playerId, delta));
     }
 

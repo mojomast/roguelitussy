@@ -57,7 +57,7 @@ public partial class GameOverScreen : MenuBase
             ? string.Empty
             : $"\n[color={muted}]Best find:[/color] [color={parchment}]{ItemRarityPresentation.EscapeBBCode(_stats.BestItemName)} ({_stats.BestItemValue}g)[/color]";
 
-        return $"[color={danger}][b]✝ {ItemRarityPresentation.EscapeBBCode(_stats.CharacterName).ToUpperInvariant()} HAS FALLEN[/b][/color]   [color={muted}][SEED:{_stats.Seed}][/color]\n" +
+        return $"[color={danger}][b]✝ {ItemRarityPresentation.EscapeBBCode(_stats.CharacterName).ToUpperInvariant()} HAS FALLEN[/b][/color]   [color={muted}][lb]SEED:{_stats.Seed}[rb][/color]\n" +
             $"────────────────────────────────────────\n" +
             $"[color={muted}]Delver:[/color] [color={parchment}]{ItemRarityPresentation.EscapeBBCode(_stats.CharacterName)}[/color]\n" +
             $"[color={muted}]Slain by:[/color] [color={parchment}]{ItemRarityPresentation.EscapeBBCode(_stats.CauseOfDeath)}[/color]    [color={muted}]Floor {_stats.FloorReached} · Turn {_stats.TotalTurns:N0}[/color]" +

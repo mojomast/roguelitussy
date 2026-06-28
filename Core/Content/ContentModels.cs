@@ -354,6 +354,9 @@ public sealed class DialogueDefinition
     [JsonPropertyName("start_node")]
     public string StartNode { get; set; } = string.Empty;
 
+    [JsonPropertyName("start_nodes")]
+    public List<string> StartNodes { get; set; } = new();
+
     [JsonPropertyName("nodes")]
     public List<DialogueNodeDefinition> Nodes { get; set; } = new();
 }

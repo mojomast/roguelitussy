@@ -264,7 +264,7 @@
     {
       "id": "chest_loot",
       "description": "Guaranteed treasure from generated chests on early dungeon depths.",
-      "rolls": 1,
+      "rolls": 3,
       "entries": [
         {
           "item_id": "potion_health",
@@ -669,7 +669,7 @@
     {
       "id": "deep_chest_loot",
       "description": "Guaranteed treasure from generated chests on depth 4 and deeper.",
-      "rolls": 1,
+      "rolls": 3,
       "entries": [
         {
           "item_id": "potion_health",

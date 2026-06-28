@@ -18,7 +18,42 @@
         {
           "item_id": "potion_health",
           "price": 24,
-          "quantity": 5
+          "quantity": 6
+        },
+        {
+          "item_id": "potion_haste",
+          "price": 34,
+          "quantity": 2
+        },
+        {
+          "item_id": "potion_might",
+          "price": 38,
+          "quantity": 2
+        },
+        {
+          "item_id": "scroll_blink",
+          "price": 58,
+          "quantity": 2
+        },
+        {
+          "item_id": "scroll_fireball",
+          "price": 72,
+          "quantity": 1
+        },
+        {
+          "item_id": "scroll_phase",
+          "price": 64,
+          "quantity": 1
+        },
+        {
+          "item_id": "boots_leather",
+          "price": 42,
+          "quantity": 1
+        },
+        {
+          "item_id": "helm_iron",
+          "price": 44,
+          "quantity": 1
         },
         {
           "item_id": "shield_wooden",
@@ -28,6 +63,11 @@
         {
           "item_id": "sword_iron",
           "price": 70,
+          "quantity": 1
+        },
+        {
+          "item_id": "dagger_venom",
+          "price": 86,
           "quantity": 1
         }
       ]

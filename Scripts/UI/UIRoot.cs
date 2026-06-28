@@ -1056,6 +1056,32 @@ public partial class UIRoot : CanvasLayer
         ShopUI.Close();
         TargetingOverlay.Cancel();
         Tooltip.Hide();
+        var world = _gameManager?.World;
+        var player = world?.Player;
+        var chest = world?.GetEntity(chestId);
+        var chestComponent = chest?.GetComponent<ChestComponent>();
+        if (world is null || player is null || chestComponent is null)
+        {
+            return;
+        }
+
+        if (!chestComponent.HasRolled)
+        {
+            var outcome = _gameManager!.ProcessPlayerAction(new OpenChestAction(player.Id, chestId));
+            if (outcome.Result != ActionResult.Success)
+            {
+                _eventBus?.EmitLogMessage("Move closer to open this chest.", LogCategory.Warning);
+                RefreshInputGate();
+                return;
+            }
+        }
+
+        if (_gameManager?.World?.GetEntity(chestId)?.GetComponent<ChestComponent>() is null)
+        {
+            RefreshInputGate();
+            return;
+        }
+
         ChestUI.Open(chestId);
         RefreshInputGate();
     }

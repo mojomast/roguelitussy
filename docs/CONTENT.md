@@ -22,11 +22,11 @@ The project uses flat JSON documents under `Content/` as the source of truth for
 - `enemies.json` defines enemy stats, AI type, spawn ranges, abilities, loot, tags, and visuals. Current enemy `sprite_path` entries point at committed 0x72 sprites under `Assets/Sprites/0x72/`.
 - `abilities.json` defines targeting, costs, effects, and audiovisual identifiers for abilities.
 - `status_effects.json` defines status effect metadata used by simulation and content references.
-- `loot_tables.json` defines weighted loot outcomes, including guaranteed chest-specific tables and tuned recovery drops such as more available health potions.
+- `loot_tables.json` defines weighted loot outcomes, including guaranteed multi-roll chest-specific tables and tuned recovery drops such as more available health potions.
 - `room_prefabs.json` defines prefab rooms and the tile legend used to interpret them.
 - `perks.json` defines progression perk metadata and effects.
-- `dialogs.json` defines NPC dialogue graphs.
-- `npcs.json` defines NPC metadata, roles, service hooks, and dialogue references.
+- `dialogs.json` defines NPC dialogue graphs, including optional rotating `start_nodes` for repeated greetings.
+- `npcs.json` defines NPC metadata, roles, service hooks, merchant stock, and dialogue references.
 
 The current repository content set includes expanded mid- and late-game coverage. Use the loader/tests or the runtime validation tools for current generated counts instead of copying exact numbers into docs.
 
@@ -120,6 +120,16 @@ When linking abilities or status effects from other content, make sure the refer
 Supported ability targeting types currently in runtime use are `self`, `single`, `tile`, and `aoe_circle`. Supported effect types currently executed by the runtime are `damage`, `apply_status`, `teleport`, and `heal_self`. Targeting is validated by `CastAbilityAction`; keep content targeting definitions precise so direct casts and item-delegated casts behave the same way. For harmful area damage or harmful statuses, `hits_allies: false` defaults unfiltered effects to enemies only, while explicit effect filters and `hits_allies: true` preserve broader targeting.
 
 Status-effect runtime behavior currently includes authored corroded stacking up to three stacks and burning/frozen mutual removal on apply. Status effects applied by melee on-hit effects or abilities retain source attribution for delayed poison/burning kill credit and save/load round-trips.
+
+### Loot Tables, Chests, And Merchants
+
+Chest-specific loot tables should not contain no-drop entries. `chest_loot` and `deep_chest_loot` currently roll multiple rewards per chest, and runtime chests persist rolled contents so players can take selected items and leave the rest behind. Chest contents are save-facing item instances once rolled, so changing chest behavior requires persistence coverage.
+
+Merchant stock is authored on NPC definitions in `npcs.json`. Stock entries must reference existing item IDs and use positive price/quantity values. Prefer a spread of recovery items, scrolls, armor, and weapons so vendors provide build correction rather than only one starter weapon and potion.
+
+### NPC Dialogs
+
+Dialog definitions require `start_node` for compatibility. They may also provide `start_nodes`, a list of valid node IDs that `DialogUI` rotates through on repeated openings for greeting variety. Every start node and option `next` target must exist in the same dialog graph. Keep shop-opening options authored with `action: "shop"` and close options with `action: "close"`.
 
 ### Traps
 

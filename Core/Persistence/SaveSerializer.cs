@@ -137,6 +137,10 @@ internal sealed class EnemySaveData
 internal sealed class ChestSaveData
 {
     public string LootTableId { get; set; } = string.Empty;
+
+    public bool HasRolled { get; set; }
+
+    public List<ItemSaveData> Contents { get; set; } = new();
 }
 
 internal sealed class TrapSaveData
@@ -323,7 +327,7 @@ internal sealed class PositionSaveData
 
 public static class SaveSerializer
 {
-    public const int CurrentVersion = 12;
+    public const int CurrentVersion = 13;
 
     internal static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -658,6 +662,8 @@ public static class SaveSerializer
             Chest = chest is null ? null : new ChestSaveData
             {
                 LootTableId = chest.LootTableId,
+                HasRolled = chest.HasRolled,
+                Contents = chest.Contents.Select(ToSaveData).ToList(),
             },
             XpValue = xpValue is null ? null : new XpValueSaveData
             {
@@ -961,7 +967,17 @@ public static class SaveSerializer
 
         if (data.Chest is not null)
         {
-            entity.SetComponent(new ChestComponent { LootTableId = data.Chest.LootTableId });
+            var chest = new ChestComponent
+            {
+                LootTableId = data.Chest.LootTableId,
+                HasRolled = data.Chest.HasRolled,
+            };
+            foreach (var itemData in data.Chest.Contents)
+            {
+                chest.Contents.Add(ToItemInstance(itemData));
+            }
+
+            entity.SetComponent(chest);
         }
 
         if (data.XpValue is not null)

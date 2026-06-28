@@ -242,23 +242,12 @@ public partial class MainMenu : MenuBase
         return string.Join(
             "\n",
             "EXPEDITION",
-            $"Candidate: {NameOptions[_nameIndex]}",
-            $"Seed: {PendingSeed}",
-            "",
-            "BUILD",
+            $"Candidate: {NameOptions[_nameIndex]}  Seed: {PendingSeed}",
             $"Build: {archetype.DisplayName} / {origin.DisplayName} / {trait.DisplayName}",
             $"Identity: {RaceOptions[_raceIndex]} / {GenderOptions[_genderIndex]} / {AppearanceOptions[_appearanceIndex]}",
             $"Training: VIT {_vitalityPoints}  POW {_powerPoints}  GRD {_guardPoints}  FIN {_finessePoints}",
             $"Points Remaining: {RemainingPoints}",
             "Training effects: VIT +3 Max HP, POW +1 Attack, GRD +1 Defense, FIN +1 Accuracy and +1 Evasion.",
-            string.Empty,
-            "READOUT",
-            archetype.Summary,
-            origin.Summary,
-            trait.Summary,
-            string.Empty,
-            BuildStatPreview(),
-            string.Empty,
             "Use Left/Right or +/- to edit the highlighted field.");
     }
 
@@ -530,10 +519,16 @@ public partial class MainMenu : MenuBase
     protected override Vector2 ResolveDesiredPanelSize(Vector2 viewportSize)
     {
         var baseSize = base.ResolveDesiredPanelSize(viewportSize);
-        return new Vector2(System.Math.Max(baseSize.X, 860f), System.Math.Max(baseSize.Y, 500f));
+        return new Vector2(System.Math.Max(baseSize.X, 920f), System.Math.Max(baseSize.Y, 660f));
     }
 
-    protected override void OnVisualStateRefreshed(Panel panel, Label label, Vector2 viewportSize, Vector2 panelSize)
+    protected override float ResolveApproxLineHeight()
+    {
+        var viewportHeight = GetParent() is not null && GetTree() is not null ? GetViewportRect().Size.Y : 720f;
+        return viewportHeight >= 600f ? 14f : base.ResolveApproxLineHeight();
+    }
+
+    protected override void OnVisualStateRefreshed(Panel panel, RichTextLabel label, Vector2 viewportSize, Vector2 panelSize)
     {
         EnsurePreviewVisuals(panel);
 
@@ -585,7 +580,8 @@ public partial class MainMenu : MenuBase
         label.Size = new Vector2(
             System.Math.Max(0f, BodyCard.Size.X - 36f),
             System.Math.Max(0f, BodyCard.Size.Y - 32f));
-        label.Text = BuildHeroSummary();
+        label.Clear();
+        label.AppendText(BuildHeroSummary());
         label.Modulate = UiStyle.Parchment();
 
         OptionsCard.Color = UiStyle.CathedralBlack(0.99f);

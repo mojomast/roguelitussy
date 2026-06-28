@@ -27,6 +27,7 @@ public static class SaveMigrator
             9 => MigrateV9(root),
             10 => MigrateV10(root),
             11 => MigrateV11(root),
+            12 => MigrateV12(root),
             SaveSerializer.CurrentVersion => JsonSerializer.Deserialize<SaveFileData>(json, SaveSerializer.JsonOptions)
                 ?? throw new InvalidOperationException("Unable to deserialize save data."),
             _ => throw new InvalidOperationException($"Unsupported save version {version}.")
@@ -182,6 +183,14 @@ public static class SaveMigrator
         var result = FinalizeSingleFloor(data);
         ConvertLegacyTrapsToEntities(result, root);
         return result;
+    }
+
+    private static SaveFileData MigrateV12(JsonElement root)
+    {
+        var data = JsonSerializer.Deserialize<SaveFileData>(root.GetRawText(), SaveSerializer.JsonOptions)
+            ?? throw new InvalidOperationException("Unable to deserialize version 12 save data.");
+
+        return FinalizeSingleFloor(data);
     }
 
     private static void ConvertLegacyTrapsToEntities(SaveFileData data, JsonElement root)

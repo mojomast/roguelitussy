@@ -18,6 +18,7 @@ public sealed class UISmokeTests : ITestSuite
         registry.Add("UI.GameManager load warns on content metadata mismatch", GameManagerLoadWarnsOnContentMetadataMismatch);
         registry.Add("UI.GameManager floor travel succeeds when arrival stair is occupied", GameManagerFloorTravelFindsNearbyArrival);
         registry.Add("UI.GameManager floor travel restores mutated arrival stairs", GameManagerFloorTravelRepairsMutatedArrivalTile);
+        registry.Add("UI.GameManager floor travel leaves returned stairs usable", GameManagerFloorTravelLeavesReturnedStairsUsable);
         registry.Add("UI.HUD updates from bus and exposes keyboard toggles", HudUpdatesFromBus);
         registry.Add("UI.HUD animates HP and energy bar state", HudAnimatesHpAndEnergyBars);
         registry.Add("UI.HUD shows derived quick-use hotbar", HudShowsDerivedQuickUseHotbar);
@@ -39,21 +40,26 @@ public sealed class UISmokeTests : ITestSuite
         registry.Add("UI.Inventory exposes auto-equip toggle state", InventoryExposesAutoEquipToggleState);
         registry.Add("UI.Inventory and tooltip surface item rarity", InventorySurfacesItemRarity);
         registry.Add("UI.Inventory uses category glyphs and full stack details", InventoryUsesCategoryGlyphsAndStackDetails);
+        registry.Add("UI.Inventory footer hints wrap without overlap", InventoryFooterHintsWrapWithoutOverlap);
         registry.Add("UI.Help overlay opens from menu and gameplay", HelpOverlayOpensFromMenuAndGameplay);
         registry.Add("UI.Pause menu groups run actions without changing routing", PauseMenuGroupsRunActions);
         registry.Add("UI.Character sheet uses sectioned visual chrome", CharacterSheetUsesSectionedVisualChrome);
         registry.Add("UI.CombatLog escapes BBCode and reacts to combat events", CombatLogReactsToEvents);
         registry.Add("UI.CombatLog exposes a live console panel", CombatLogExposesLiveConsolePanel);
+        registry.Add("UI.WorldView clears damage popups on world rebind", WorldViewClearsDamagePopupsOnWorldRebind);
         registry.Add("UI.Chest interactions report loot to the combat log", ChestInteractionsReportLootToCombatLog);
         registry.Add("UI.Inventory pages items that exceed the visible grid", InventoryPagesItemsBeyondVisibleGrid);
         registry.Add("UI.Dialog and shop window long option lists", DialogAndShopWindowLongLists);
         registry.Add("UI.Tooltip clamps long bodies", TooltipClampsLongBodies);
+        registry.Add("UI.Tooltip keeps equipment comparison lines visible", TooltipKeepsEquipmentComparisonLinesVisible);
         registry.Add("UI.Overlays clamp to the viewport", OverlaysClampToViewport);
         registry.Add("UI.Workbench windows content for small viewports", WorkbenchWindowsContentForSmallViewports);
         registry.Add("UI.MainMenu scrolls option list within the viewport", MainMenuScrollsOptionListWithinViewport);
+        registry.Add("UI.MainMenu fits all choices at normal viewport", MainMenuFitsAllChoicesAtNormalViewport);
         registry.Add("UI.Dialog and shop overlays route interaction flow", DialogAndShopOverlaysRouteInteractionFlow);
         registry.Add("UI.Shop applies perk-based merchant discounts", ShopAppliesPerkDiscounts);
         registry.Add("UI.Dialog overlay traverses authored advisor dialog nodes", DialogOverlayTraversesAdvisorDialogNodes);
+        registry.Add("UI.Dialog overlay rotates authored start nodes", DialogOverlayRotatesAuthoredStartNodes);
         registry.Add("UI.GameManager honors detailed authored generator spawns", GameManagerHonorsDetailedAuthoredGeneratorSpawns);
         registry.Add("UI.GameManager starts correctly with repository content", GameManagerStartsWithRepositoryContent);
         registry.Add("UI.GameManager seed 1337 descends cleanly with repository content", GameManagerRepositorySeed1337DescendsCleanly);
@@ -611,6 +617,29 @@ public sealed class UISmokeTests : ITestSuite
         Expect.Equal(TileType.StairsUp, gameManager.World!.GetTile(new Position(1, 1)), "Travel should restore the expected stair tile when the cached arrival tile was overwritten.");
     }
 
+    private static void GameManagerFloorTravelLeavesReturnedStairsUsable()
+    {
+        var gameManager = new GameManager();
+        var bus = new EventBus();
+        gameManager.AttachServices(new WorldState(), new TurnScheduler(), new StubGenerator(), new FOVCalculator(), new StubContentDatabase(), new StubSaveManager(), bus);
+        gameManager.StartNewGame(6060);
+
+        var floorZeroDown = FindTile(gameManager.World!, TileType.StairsDown);
+        gameManager.World!.MoveEntity(gameManager.World.Player.Id, floorZeroDown);
+        var descend = gameManager.ProcessPlayerAction(new DescendAction(gameManager.World.Player.Id));
+        Expect.Equal(ActionResult.Success, descend.Result, "Initial descend should succeed.");
+
+        var floorOneUp = FindTile(gameManager.World!, TileType.StairsUp);
+        gameManager.World.MoveEntity(gameManager.World.Player.Id, floorOneUp);
+        var ascend = gameManager.ProcessPlayerAction(new AscendAction(gameManager.World.Player.Id));
+        Expect.Equal(ActionResult.Success, ascend.Result, "Ascending back to the cached floor should succeed.");
+        Expect.Equal(0, gameManager.World!.Depth, "Player should return to floor zero.");
+        Expect.Equal(floorZeroDown, gameManager.World.Player.Position, "Returned player should stand on the floor-zero down stairs, not next to a ghost blocker.");
+
+        var descendAgain = gameManager.ProcessPlayerAction(new DescendAction(gameManager.World.Player.Id));
+        Expect.Equal(ActionResult.Success, descendAgain.Result, "Returned stairs should remain usable for descending again.");
+    }
+
     private static void MinimapReflectsExplorationAndToggles()
     {
         var context = CreateContext();
@@ -796,6 +825,50 @@ public sealed class UISmokeTests : ITestSuite
 
         Expect.True(inventory.GridText.Contains("Groups:"), "Category sorting should expose readable category grouping context.");
         Expect.True(inventory.GridText.Contains("! Consumable"), "Category grouping should use the same stable glyph language as slots.");
+    }
+
+    private static void InventoryFooterHintsWrapWithoutOverlap()
+    {
+        WithViewportSize(new Vector2(640f, 360f), _ =>
+        {
+            var context = CreateContext(new ItemInstance { TemplateId = "potion_health", IsIdentified = true });
+            var root = new Control();
+            var inventory = new InventoryUI();
+            root.AddChild(inventory);
+            inventory.Bind(context.GameManager, context.Bus, context.Content, new Tooltip());
+            inventory.Open();
+
+            var panel = FindChild<Panel>(inventory, "Panel");
+            Expect.NotNull(panel, "Inventory should have a root panel.");
+            var footerHints = panel!.Children
+                .OfType<Label>()
+                .Where(label => label.Name.StartsWith("FooterHint_", System.StringComparison.Ordinal))
+                .OrderBy(label => label.Position.Y)
+                .ThenBy(label => label.Position.X)
+                .ToList();
+            Expect.True(footerHints.Count >= 6, "Inventory should expose every footer hint as a label.");
+
+            foreach (var label in footerHints)
+            {
+                Expect.True(label.Position.X >= 0f && label.Position.X + label.Size.X <= panel.Size.X + 0.1f, $"{label.Name} should fit horizontally inside the panel.");
+                Expect.True(label.Position.Y >= 0f && label.Position.Y + label.Size.Y <= panel.Size.Y + 0.1f, $"{label.Name} should fit vertically inside the panel.");
+            }
+
+            for (var i = 0; i < footerHints.Count; i++)
+            {
+                for (var j = i + 1; j < footerHints.Count; j++)
+                {
+                    if (System.Math.Abs(footerHints[i].Position.Y - footerHints[j].Position.Y) > 0.1f)
+                    {
+                        continue;
+                    }
+
+                    Expect.True(footerHints[i].Position.X + footerHints[i].Size.X <= footerHints[j].Position.X + 0.1f
+                        || footerHints[j].Position.X + footerHints[j].Size.X <= footerHints[i].Position.X + 0.1f,
+                        "Inventory footer hint labels should not overlap on the same row.");
+                }
+            }
+        });
     }
 
     private static void MainMenuCharacterCreationAffectsStartingRun()
@@ -996,6 +1069,31 @@ public sealed class UISmokeTests : ITestSuite
             "Opening a chest through gameplay input should add an explicit loot message to the combat log.");
         Expect.True(root.CombatLog.RenderedText.Contains("Loot found:", System.StringComparison.OrdinalIgnoreCase),
             "Chest feedback should explicitly list the found loot.");
+        Expect.True(root.ChestUI.Visible, "Interacting with a chest should open the loot chooser after rolling contents.");
+    }
+
+    private static void WorldViewClearsDamagePopupsOnWorldRebind()
+    {
+        var world = new WorldState();
+        world.InitGrid(4, 4);
+        for (var y = 0; y < world.Height; y++)
+        {
+            for (var x = 0; x < world.Width; x++)
+            {
+                world.SetTile(new Position(x, y), TileType.Floor);
+            }
+        }
+
+        var view = new WorldView();
+        view.BindWorld(world);
+        view.Animations.SpawnDamagePopup(view.EntityLayerNode, new Vector2(12f, 12f), 7, isCrit: false, isHeal: false);
+        Expect.Equal(1, view.Animations.ActivePopupCount, "Damage popup should be tracked after spawning.");
+        Expect.True(view.EntityLayerNode.GetChildren().OfType<DamagePopup>().Any(), "Damage popup should be attached to the entity layer.");
+
+        view.BindWorld(world);
+
+        Expect.Equal(0, view.Animations.ActivePopupCount, "World rebind should clear tracked damage popups.");
+        Expect.False(view.EntityLayerNode.GetChildren().OfType<DamagePopup>().Any(), "World rebind should remove popup nodes from the entity layer.");
     }
 
     private static void InventoryPagesItemsBeyondVisibleGrid()
@@ -1095,6 +1193,31 @@ public sealed class UISmokeTests : ITestSuite
         Expect.False(tooltip.BodyText.Contains("Line 20", System.StringComparison.Ordinal), "Long tooltip bodies should not render off-panel tail lines.");
     }
 
+    private static void TooltipKeepsEquipmentComparisonLinesVisible()
+    {
+        var tooltip = new Tooltip();
+        var template = new ItemTemplate(
+            "test_blade",
+            "Test Blade",
+            "A comparison-heavy weapon.",
+            ItemCategory.Weapon,
+            EquipSlot.MainHand,
+            new Dictionary<string, int> { ["attack"] = 4, ["accuracy"] = 6, ["crit_chance"] = 3 },
+            null,
+            -1,
+            1,
+            "rare");
+        var comparison = "Equipped: Old Sword\nAttack: +2 -> +4\nAccuracy: +0 -> +6\nCrit chance: +0 -> +3";
+
+        tooltip.ShowItemTooltip(template, new ItemInstance { TemplateId = "test_blade", IsIdentified = true }, new Vector2(0f, 0f), comparisonText: comparison);
+
+        Expect.True(tooltip.Size.Y >= 300f, "Equipment tooltip should be tall enough for comparison details.");
+        Expect.True(tooltip.BodyText.Contains("Equipped: Old Sword", System.StringComparison.Ordinal), "Tooltip should show the equipped item comparison header.");
+        Expect.True(tooltip.BodyText.Contains("Attack: +2 -> +4", System.StringComparison.Ordinal), "Tooltip should preserve attack comparison text.");
+        Expect.True(tooltip.BodyText.Contains("Accuracy: +0 -> +6", System.StringComparison.Ordinal), "Tooltip should preserve accuracy comparison text.");
+        Expect.True(tooltip.BodyText.Contains("Crit chance: +0 -> +3", System.StringComparison.Ordinal), "Tooltip should preserve crit comparison text.");
+    }
+
     private static void OverlaysClampToViewport()
     {
         WithViewportSize(new Vector2(640f, 360f), viewportSize =>
@@ -1164,6 +1287,33 @@ public sealed class UISmokeTests : ITestSuite
         });
     }
 
+    private static void MainMenuFitsAllChoicesAtNormalViewport()
+    {
+        WithViewportSize(new Vector2(1280f, 720f), _ =>
+        {
+            var gameManager = new GameManager();
+            var bus = new EventBus();
+            gameManager.AttachServices(new WorldState(), new TurnScheduler(), new StubGenerator(), new FOVCalculator(), new StubContentDatabase(), new StubSaveManager(), bus);
+
+            var root = new Control();
+            var menu = new MainMenu();
+            root.AddChild(menu);
+            menu.Bind(gameManager, bus);
+            menu.Open();
+
+            for (var i = 0; i < 18; i++)
+            {
+                menu.HandleKey(Key.Down);
+            }
+
+            Expect.True(menu.MenuText.Contains("Start Expedition", System.StringComparison.Ordinal), "Normal-sized main menu should keep the first choice visible instead of scrolling on selection changes.");
+            Expect.True(menu.MenuText.Contains("> Quit", System.StringComparison.Ordinal), "Normal-sized main menu should keep the bottom choice visible at the same time.");
+            var panel = FindChild<Panel>(menu, "Panel");
+            Expect.NotNull(panel, "Main menu should still create a panel at normal viewport size.");
+            Expect.True(panel!.Size.Y > 600f, "Normal-sized main menu should use available height to fit all choices.");
+        });
+    }
+
     private static void WorkbenchWindowsContentForSmallViewports()
     {
         WithViewportSize(new Vector2(640f, 360f), _ =>
@@ -1178,7 +1328,7 @@ public sealed class UISmokeTests : ITestSuite
             var panel = FindChild<Panel>(workbench, "Panel");
             var bodyCard = panel is null ? null : FindChild<ColorRect>(panel, "BodyCard");
             var optionsCard = panel is null ? null : FindChild<ColorRect>(panel, "OptionsCard");
-            var bodyLabel = bodyCard is null ? null : FindChild<Label>(bodyCard, "Label");
+            var bodyLabel = bodyCard is null ? null : FindChild<RichTextLabel>(bodyCard, "Label");
             var optionsLabel = optionsCard is null ? null : FindChild<Label>(optionsCard, "OptionsLabel");
 
             Expect.NotNull(bodyLabel, "Workbench should create a body label.");
@@ -1566,6 +1716,28 @@ public sealed class UISmokeTests : ITestSuite
 
         root._UnhandledInput(new InputEventKey { Pressed = true, PhysicalKeycode = Key.Enter });
         Expect.False(root.DialogUI.Visible, "Selecting the authored closing option should close the advisor dialog.");
+    }
+
+    private static void DialogOverlayRotatesAuthoredStartNodes()
+    {
+        var nodes = new Dictionary<string, DialogueNode>
+        {
+            ["start"] = new("start", "First greeting.", new[] { new DialogueOption("Bye.", null, "close") }),
+            ["alt"] = new("alt", "Second greeting.", new[] { new DialogueOption("Bye.", null, "close") }),
+        };
+        var template = new DialogueTemplate("variant_dialog", "start", nodes, new[] { "start", "alt" });
+        var npcTemplate = new NpcTemplate("guide", "Guide", "Test guide.", "advisor", 0, -1, "variant_dialog", "human", "neutral", "plain", "wanderer");
+        var context = new GameManager.InteractionContext(EntityId.New(), "Guide", "advisor", false, npcTemplate, template);
+        var dialog = new DialogUI();
+
+        dialog.Open(context);
+        var first = dialog.SnapshotBodyMarkup();
+        dialog.Close();
+        dialog.Open(context);
+        var second = dialog.SnapshotBodyMarkup();
+
+        Expect.True(first.Contains("First greeting.", System.StringComparison.Ordinal), "First dialog opening should use the primary greeting.");
+        Expect.True(second.Contains("Second greeting.", System.StringComparison.Ordinal), "Second dialog opening should rotate to the alternate greeting.");
     }
 
     private static void GameManagerHonorsDetailedAuthoredGeneratorSpawns()

@@ -43,11 +43,22 @@ public sealed class OpenChestAction : IAction
         var actor = world.GetEntity(ActorId)!;
         var chest = world.GetEntity(ChestId)!;
         var chestComponent = chest.GetComponent<ChestComponent>()!;
-        var rolledItemCount = 0;
         var foundDescriptions = new List<string>();
-        var stowedDescriptions = new List<string>();
-        var spilledDescriptions = new List<string>();
-        var inventory = actor.GetComponent<InventoryComponent>();
+        var rolledItemCount = 0;
+
+        var outcome = new ActionOutcome
+        {
+            Result = ActionResult.Success,
+            DirtyPositions = { actor.Position, chest.Position },
+        };
+
+        if (chestComponent.HasRolled)
+        {
+            outcome.LogMessages.Add(chestComponent.Contents.Count > 0
+                ? $"{actor.Name} checks the open chest. Loot inside: {DescribeLoot(world.ContentDatabase, chestComponent.Contents)}."
+                : $"{actor.Name} checks the open chest, but it is empty.");
+            return outcome;
+        }
 
         if (world.ContentDatabase is ContentLoader loader && loader.LootTables.ContainsKey(chestComponent.LootTableId))
         {
@@ -66,26 +77,11 @@ public sealed class OpenChestAction : IAction
                 rolledItemCount += stackCount;
                 var description = DescribeLoot(loader, roll.ItemId, stackCount);
                 foundDescriptions.Add(description);
-
-                if (TryAddToInventory(world, inventory, loader, item))
-                {
-                    stowedDescriptions.Add(description);
-                }
-                else
-                {
-                    world.DropItem(chest.Position, item);
-                    spilledDescriptions.Add(description);
-                }
+                chestComponent.Contents.Add(item);
             }
         }
 
-        world.RemoveEntity(chest.Id);
-
-        var outcome = new ActionOutcome
-        {
-            Result = ActionResult.Success,
-            DirtyPositions = { actor.Position, chest.Position },
-        };
+        chestComponent.HasRolled = true;
 
         if (rolledItemCount <= 0)
         {
@@ -93,21 +89,8 @@ public sealed class OpenChestAction : IAction
             return outcome;
         }
 
-        var stowedText = JoinDistinct(stowedDescriptions);
-        var spilledText = JoinDistinct(spilledDescriptions);
         var foundText = JoinDistinct(foundDescriptions);
-        if (!string.IsNullOrWhiteSpace(stowedText) && !string.IsNullOrWhiteSpace(spilledText))
-        {
-            outcome.LogMessages.Add($"{actor.Name} opens the chest. Loot found: {foundText}. Stowed: {stowedText}. Spilled onto the floor: {spilledText}.");
-        }
-        else if (!string.IsNullOrWhiteSpace(stowedText))
-        {
-            outcome.LogMessages.Add($"{actor.Name} opens the chest. Loot found: {foundText}. Stowed: {stowedText}.");
-        }
-        else
-        {
-            outcome.LogMessages.Add($"{actor.Name} opens the chest. Loot found: {foundText}. Spilled onto the floor: {spilledText}.");
-        }
+        outcome.LogMessages.Add($"{actor.Name} opens the chest. Loot found: {foundText}. Choose what to take.");
 
         return outcome;
     }
@@ -122,18 +105,6 @@ public sealed class OpenChestAction : IAction
         }
     }
 
-    private static bool TryAddToInventory(WorldState world, InventoryComponent? inventory, ContentLoader loader, ItemInstance item)
-    {
-        if (inventory is null || !loader.TryGetItemTemplate(item.TemplateId, out var template))
-        {
-            return false;
-        }
-
-        return template.MaxStack > 1
-            ? inventory.AddWithStacking(item, template.MaxStack, world.AllocateItemInstanceId)
-            : inventory.Add(item);
-    }
-
     private static string DescribeLoot(ContentLoader loader, string itemId, int stackCount)
     {
         if (loader.TryGetItemTemplate(itemId, out var itemTemplate))
@@ -144,6 +115,30 @@ public sealed class OpenChestAction : IAction
         }
 
         return stackCount > 1 ? $"{stackCount}x {itemId}" : itemId;
+    }
+
+    private static string DescribeLoot(IContentDatabase? content, IReadOnlyList<ItemInstance> items)
+    {
+        var descriptions = new List<string>();
+        foreach (var item in items)
+        {
+            descriptions.Add(DescribeLoot(content, item));
+        }
+
+        return JoinDistinct(descriptions);
+    }
+
+    internal static string DescribeLoot(IContentDatabase? content, ItemInstance item)
+    {
+        var stackCount = Math.Max(1, item.StackCount);
+        if (content is not null && content.TryGetItemTemplate(item.TemplateId, out var itemTemplate))
+        {
+            return stackCount > 1
+                ? $"{stackCount}x {itemTemplate.DisplayName}"
+                : itemTemplate.DisplayName;
+        }
+
+        return stackCount > 1 ? $"{stackCount}x {item.TemplateId}" : item.TemplateId;
     }
 
     private static string JoinDistinct(List<string> entries)

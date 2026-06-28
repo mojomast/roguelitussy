@@ -187,6 +187,7 @@ public partial class WorldView : Node2D
     public void RenderFullMap(IWorldState world)
     {
         _world = world;
+        ClearTransientEffects();
 
         _floorLayer.Clear();
         _wallLayer.Clear();
@@ -208,6 +209,16 @@ public partial class WorldView : Node2D
         _entityRenderer.BindWorld(world);
         SnapshotEntities();
         SyncVisibilityFromWorld();
+    }
+
+    private void ClearTransientEffects()
+    {
+        _animationController.CompleteAll();
+        foreach (var child in _entityLayer.GetChildren().OfType<DamagePopup>().ToArray())
+        {
+            _entityLayer.RemoveChild(child);
+            child.QueueFree();
+        }
     }
 
     public void RecalculateFov()

@@ -1748,9 +1748,9 @@ public partial class GameManager : Node
             var arrivalTile = targetFloor > previousFloor ? TileType.StairsUp : TileType.StairsDown;
             var entrances = ResolveFloorEntrances(targetFloor, targetWorld);
             var arrivalPosition = arrivalTile == TileType.StairsUp ? entrances.StairsUp : entrances.StairsDown;
+            currentWorld.RemoveEntity(player.Id);
             PlacePlayerInWorld(targetWorld, player, arrivalPosition, arrivalTile);
 
-            currentWorld.RemoveEntity(player.Id);
             _cachedFloors[previousFloor] = currentWorld;
             _cachedFloors[targetFloor] = targetWorld;
             Scheduler = new TurnScheduler();
@@ -2374,7 +2374,7 @@ public partial class GameManager : Node
                 }
 
                 if (inventoryBefore.Count != inventoryAfter.Items.Count
-                    || action.Type is ActionType.UseItem or ActionType.ToggleEquip or ActionType.DropItem or ActionType.PickupItem or ActionType.OpenChest)
+                    || action.Type is ActionType.UseItem or ActionType.ToggleEquip or ActionType.DropItem or ActionType.PickupItem or ActionType.OpenChest or ActionType.TakeChestLoot)
                 {
                     Bus?.EmitInventoryChanged(actorAfter.Id);
                 }

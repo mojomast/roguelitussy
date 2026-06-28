@@ -28,7 +28,10 @@ public sealed class ComponentPersistenceTests : ITestSuite
         var manager = new SaveManager(sandbox.DirectoryPath, sandbox.Clock);
         var world = CreateWorld(4, 4);
         var chest = CreateEntity("Chest", new Position(1, 0), Faction.Neutral, speed: 0, blocksMovement: false);
-        chest.SetComponent(new ChestComponent { LootTableId = "vault_loot" });
+        var chestComponent = new ChestComponent { LootTableId = "vault_loot", HasRolled = true };
+        var gem = new ItemInstance { TemplateId = "potion_health", StackCount = 2, IsIdentified = true };
+        chestComponent.Contents.Add(gem);
+        chest.SetComponent(chestComponent);
         world.AddEntity(chest);
 
         Expect.True(manager.SaveGame(world, SaveSlots.Slot1).GetAwaiter().GetResult(), "Save should allow non-actor chests with speed zero.");
@@ -37,7 +40,12 @@ public sealed class ComponentPersistenceTests : ITestSuite
         Expect.NotNull(restored, "Saved world should load again.");
         var restoredChest = restored!.GetEntity(chest.Id);
         Expect.NotNull(restoredChest, "Chest entity should survive round-trip.");
-        Expect.Equal("vault_loot", restoredChest!.GetComponent<ChestComponent>()?.LootTableId ?? string.Empty, "Chest loot table should survive round-trip.");
+        var restoredComponent = restoredChest!.GetComponent<ChestComponent>();
+        Expect.Equal("vault_loot", restoredComponent?.LootTableId ?? string.Empty, "Chest loot table should survive round-trip.");
+        Expect.True(restoredComponent?.HasRolled == true, "Rolled chest state should survive round-trip.");
+        Expect.Equal(1, restoredComponent?.Contents.Count ?? 0, "Rolled chest contents should survive round-trip.");
+        Expect.Equal(gem.InstanceId, restoredComponent!.Contents[0].InstanceId, "Chest item instance ids should survive round-trip.");
+        Expect.Equal(2, restoredComponent.Contents[0].StackCount, "Chest item stack counts should survive round-trip.");
         Expect.Equal(0, restoredChest.Stats.Speed, "Chest speed zero should survive round-trip.");
     }
 

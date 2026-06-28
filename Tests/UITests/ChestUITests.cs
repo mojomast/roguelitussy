@@ -1,3 +1,4 @@
+using System;
 using Godot;
 using Godotussy;
 using Roguelike.Core;
@@ -11,8 +12,9 @@ public sealed class ChestUITests : ITestSuite
     public void Register(TestRegistry registry)
     {
         registry.Add("UI.ChestUI initializes title and actions", InitializesTitleAndActions);
-        registry.Add("UI.ChestUI selected take all emits chest action", SelectedTakeAllEmitsChestAction);
-        registry.Add("UI.ChestUI title click emits chest action", TitleClickEmitsChestAction);
+        registry.Add("UI.ChestUI toggles selected loot rows", TogglesSelectedLootRows);
+        registry.Add("UI.ChestUI take all hotkey emits loot action", TakeAllHotkeyEmitsLootAction);
+        registry.Add("UI.ChestUI title click emits loot action", TitleClickEmitsLootAction);
         registry.Add("UI.ChestUI close option and hotkeys close", CloseOptionAndHotkeysClose);
         registry.Add("UI.ChestUI opens and closes safely", OpensAndClosesSafely);
     }
@@ -26,43 +28,60 @@ public sealed class ChestUITests : ITestSuite
 
         Expect.True(ui.Visible, "Chest UI should be visible after opening.");
         Expect.Equal("ANCIENT CHEST", ui.Title, "Chest UI title should use the opened chest name.");
-        Expect.Equal(2, ui.Options.Count, "Chest UI should expose Take All and Close menu options.");
-        Expect.Equal("Take All", ui.Options[0], "First option should take all loot.");
-        Expect.Equal("Close", ui.Options[1], "Second option should close the modal.");
+        Expect.Equal(5, ui.Options.Count, "Chest UI should expose two loot rows plus Take Selected, Take All, and Close.");
+        Expect.True(ui.Options[0].Contains("Health Potion"), "First option should show rolled loot.");
+        Expect.Equal("Take Selected", ui.Options[2], "Chooser should expose selected-loot pickup.");
+        Expect.Equal("Take All", ui.Options[3], "Chooser should expose take-all pickup.");
+        Expect.Equal("Close", ui.Options[4], "Last option should close the modal.");
     }
 
-    private static void SelectedTakeAllEmitsChestAction()
+    private static void TogglesSelectedLootRows()
     {
         var context = CreateContext();
         var ui = CreateUi(context);
-        OpenChestAction? submitted = null;
-        context.Bus.PlayerActionSubmitted += action => submitted = action as OpenChestAction;
 
         ui.Open(context.Chest.Id);
         var handled = ui.HandleKey(Key.Enter);
 
-        Expect.True(handled, "Enter should activate the selected Take All option.");
-        Expect.NotNull(submitted, "Take All should submit an OpenChestAction through EventBus.");
-        Expect.Equal(context.Player.Id, submitted!.ActorId, "Submitted action should use the player as actor.");
-        Expect.Equal(context.Chest.Id, submitted.ChestId, "Submitted action should target the opened chest.");
-        Expect.False(ui.Visible, "Submitting Take All should close the chest UI.");
+        Expect.True(handled, "Enter should toggle the selected loot row.");
+        Expect.True(ui.Visible, "Toggling loot should keep the chooser open.");
+        Expect.True(ui.Options[0].StartsWith("[x]", StringComparison.Ordinal), "Toggled loot should show a checked marker.");
     }
 
-    private static void TitleClickEmitsChestAction()
+    private static void TakeAllHotkeyEmitsLootAction()
     {
         var context = CreateContext();
         var ui = CreateUi(context);
-        OpenChestAction? submitted = null;
-        context.Bus.PlayerActionSubmitted += action => submitted = action as OpenChestAction;
+        TakeChestLootAction? submitted = null;
+        context.Bus.PlayerActionSubmitted += action => submitted = action as TakeChestLootAction;
+
+        ui.Open(context.Chest.Id);
+        var handled = ui.HandleKey(Key.T);
+
+        Expect.True(handled, "T should activate Take All.");
+        Expect.NotNull(submitted, "Take All should submit a TakeChestLootAction through EventBus.");
+        Expect.Equal(context.Player.Id, submitted!.ActorId, "Submitted action should use the player as actor.");
+        Expect.Equal(context.Chest.Id, submitted.ChestId, "Submitted action should target the opened chest.");
+        Expect.True(submitted.TakeAll, "Take-all hotkey should request all chest contents.");
+        Expect.False(ui.Visible, "Taking all loot should close the emptied chest UI.");
+    }
+
+    private static void TitleClickEmitsLootAction()
+    {
+        var context = CreateContext();
+        var ui = CreateUi(context);
+        TakeChestLootAction? submitted = null;
+        context.Bus.PlayerActionSubmitted += action => submitted = action as TakeChestLootAction;
 
         ui.Open(context.Chest.Id);
         var titleClickTarget = FindChild<UiMouseColorRect>(ui, "TitleClickTarget");
         Expect.NotNull(titleClickTarget, "Chest UI should expose a local title click target.");
         titleClickTarget!._GuiInput(new InputEventMouseButton { Pressed = true, ButtonIndex = MouseButton.Left });
 
-        Expect.NotNull(submitted, "Clicking the chest title should submit an OpenChestAction.");
+        Expect.NotNull(submitted, "Clicking the chest title should submit a TakeChestLootAction.");
         Expect.Equal(context.Player.Id, submitted!.ActorId, "Title click action should use the player as actor.");
         Expect.Equal(context.Chest.Id, submitted.ChestId, "Title click action should target the opened chest.");
+        Expect.True(submitted.TakeAll, "Title click should request all chest contents.");
         Expect.False(ui.Visible, "Title click Take All should close the chest UI.");
     }
 
@@ -72,7 +91,11 @@ public sealed class ChestUITests : ITestSuite
         var ui = CreateUi(context);
 
         ui.Open(context.Chest.Id);
-        ui.HandleKey(Key.Down);
+        for (var i = 0; i < 4; i++)
+        {
+            ui.HandleKey(Key.Down);
+        }
+
         var handled = ui.HandleKey(Key.Enter);
 
         Expect.True(handled, "Enter should activate the selected Close option.");
@@ -129,7 +152,10 @@ public sealed class ChestUITests : ITestSuite
         world.AddEntity(player);
 
         var chest = new StubEntity("Ancient Chest", new Position(2, 1), Faction.Neutral);
-        chest.SetComponent(new ChestComponent { LootTableId = "starter_chest" });
+        var chestComponent = new ChestComponent { LootTableId = "starter_chest", HasRolled = true };
+        chestComponent.Contents.Add(new ItemInstance { TemplateId = "potion_health", StackCount = 1, IsIdentified = true });
+        chestComponent.Contents.Add(new ItemInstance { TemplateId = "scroll_blink", StackCount = 1, IsIdentified = true });
+        chest.SetComponent(chestComponent);
         world.AddEntity(chest);
 
         var gameManager = new GameManager();

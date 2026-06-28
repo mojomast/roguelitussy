@@ -16,7 +16,7 @@ public abstract partial class MenuBase : Control
     private ColorRect? _bodyCard;
     private ColorRect? _optionsCard;
     private Label? _titleLabel;
-    private Label? _label;
+    private RichTextLabel? _label;
     private Label? _optionsLabel;
     private Label? _footerLabel;
     private readonly List<Panel> _optionRows = new();
@@ -50,7 +50,7 @@ public abstract partial class MenuBase : Control
 
     protected Label? TitleLabel => _titleLabel;
 
-    protected Label? BodyLabel => _label;
+    protected RichTextLabel? BodyLabel => _label;
 
     protected Label? OptionsLabel => _optionsLabel;
 
@@ -293,9 +293,10 @@ public abstract partial class MenuBase : Control
             Modulate = UiStyle.BrightGold(),
         };
 
-        _label = new Label
+        _label = new RichTextLabel
         {
             Name = "Label",
+            BbcodeEnabled = true,
             Modulate = UiStyle.Parchment(),
         };
         _optionsLabel = new Label
@@ -399,7 +400,8 @@ public abstract partial class MenuBase : Control
         _label.Size = new Vector2(
             Math.Max(0f, _bodyCard.Size.X - (CardPadding * 2f)),
             Math.Max(0f, _bodyCard.Size.Y - (CardPadding * 2f)));
-        _label.Text = _visibleBodyText;
+        _label.Clear();
+        _label.AppendText(_visibleBodyText);
         _label.Visible = _bodyCard.Visible;
 
         var optionsTop = _bodyCard.Visible
@@ -430,7 +432,7 @@ public abstract partial class MenuBase : Control
         _optionsLabel.Visible = false;
     }
 
-    protected virtual void OnVisualStateRefreshed(Panel panel, Label label, Vector2 viewportSize, Vector2 panelSize)
+    protected virtual void OnVisualStateRefreshed(Panel panel, RichTextLabel label, Vector2 viewportSize, Vector2 panelSize)
     {
     }
 

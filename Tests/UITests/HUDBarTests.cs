@@ -1,3 +1,4 @@
+using Godot;
 using Godotussy;
 using Roguelike.Core;
 using Roguelike.Tests.Stubs;
@@ -16,6 +17,7 @@ public sealed class HUDBarTests : ITestSuite
         registry.Add("UI.HUD HP danger pattern appears below thirty percent", HpDangerPatternAppearsBelowThirtyPercent);
         registry.Add("UI.HUD HP danger pattern clears above thirty percent", HpDangerPatternClearsAboveThirtyPercent);
         registry.Add("UI.HUD energy ghost trails spending", EnergyGhostTrailsSpending);
+        registry.Add("UI.HUD bottom status shows HP and XP above hotbar", BottomStatusShowsHpAndXpAboveHotbar);
     }
 
     private static void HpDamageKeepsDisplayedValueBeforeTicks()
@@ -126,6 +128,30 @@ public sealed class HUDBarTests : ITestSuite
         Expect.False(hud.HPBarDangerPatternVisible, "Healing above thirty percent should clear the non-color danger pattern state.");
     }
 
+    private static void BottomStatusShowsHpAndXpAboveHotbar()
+    {
+        WithViewportSize(new Vector2(1280f, 720f), viewportSize =>
+        {
+            var context = CreateContext(hp: 24, maxHp: 40, energy: 800);
+            context.Player.SetComponent(new ProgressionComponent { Level = 2, Experience = 18, ExperienceToNextLevel = 30 });
+            var root = new Control();
+            var hud = new HUD();
+            root.AddChild(hud);
+            hud.Bind(context.GameManager, context.Bus);
+
+            var bottomPanel = FindChild<Panel>(hud, "BottomStatusPanel");
+            var hpLabel = bottomPanel is null ? null : FindChild<Label>(bottomPanel, "BottomHPLabel");
+            var xpLabel = bottomPanel is null ? null : FindChild<Label>(bottomPanel, "BottomXPLabel");
+
+            Expect.NotNull(bottomPanel, "HUD should create a bottom status strip for glanceable combat state.");
+            Expect.True(bottomPanel!.Position.Y + bottomPanel.Size.Y <= viewportSize.Y - 54f - 12f - 7.9f, "Bottom HP/XP strip should sit directly above the quick-use hotbar lane.");
+            Expect.Equal("HP: 24/40", hpLabel!.Text, "Bottom status strip should mirror current HP.");
+            Expect.True(xpLabel!.Text.Contains("XP: 18/30", System.StringComparison.Ordinal), "Bottom status strip should show XP progress text.");
+            Expect.Equal(18d, hud.XPBarValue, "HUD should expose XP bar progress for tests and UI layout.");
+            Expect.Equal(30d, hud.XPBarMaxValue, "HUD should expose XP bar max for tests and UI layout.");
+        });
+    }
+
     private static HUD CreateHud(HudBarContext context)
     {
         var hud = new HUD();
@@ -166,4 +192,33 @@ public sealed class HUDBarTests : ITestSuite
     }
 
     private sealed record HudBarContext(GameManager GameManager, EventBus Bus, TurnScheduler Scheduler, StubEntity Player);
+
+    private static T? FindChild<T>(Node parent, string name) where T : Node
+    {
+        foreach (var child in parent.Children)
+        {
+            if (child is T typed && typed.Name == name)
+            {
+                return typed;
+            }
+        }
+
+        return null;
+    }
+
+    private static void WithViewportSize(Vector2 viewportSize, System.Action<Vector2> action)
+    {
+        var viewport = new Control().GetViewport();
+        var originalSize = viewport.Size;
+        viewport.Size = viewportSize;
+
+        try
+        {
+            action(viewportSize);
+        }
+        finally
+        {
+            viewport.Size = originalSize;
+        }
+    }
 }

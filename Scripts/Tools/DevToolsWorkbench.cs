@@ -34,7 +34,7 @@ public partial class DevToolsWorkbench : Control
     private ColorRect? _bodyCard;
     private ColorRect? _optionsCard;
     private ColorRect? _statusCard;
-    private Label? _label;
+    private RichTextLabel? _label;
     private Label? _titleLabel;
     private Label? _modeLabel;
     private Label? _optionsLabel;
@@ -922,9 +922,10 @@ public partial class DevToolsWorkbench : Control
             Name = "StatusCard",
             Color = new Color(0.09f, 0.11f, 0.14f, 0.99f),
         };
-        _label = new Label
+        _label = new RichTextLabel
         {
             Name = "Label",
+            BbcodeEnabled = true,
             Modulate = new Color(0.95f, 0.97f, 0.99f, 1f),
         };
         _titleLabel = new Label
@@ -1337,7 +1338,8 @@ public partial class DevToolsWorkbench : Control
         _label.Size = new Vector2(
             Math.Max(0f, _bodyCard.Size.X - 28f),
             Math.Max(0f, _bodyCard.Size.Y - 24f));
-        _label.Text = BuildVisibleBodyPanelText(_label.Size, compactLayout);
+        _label.Clear();
+        _label.AppendText(BuildVisibleBodyPanelText(_label.Size, compactLayout));
 
         _optionsLabel.Position = new Vector2(14f, 12f);
         _optionsLabel.Size = new Vector2(

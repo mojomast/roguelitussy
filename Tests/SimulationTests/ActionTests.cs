@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Roguelike.Core;
 using Roguelike.Tests.Stubs;
 using Roguelike.Tests.TestFramework;
@@ -32,7 +33,8 @@ public sealed class ActionTests : ITestSuite
         registry.Add("Simulation.Actions open door moves through when exit tile is clear", OpenDoorMovesThroughWhenExitTileIsClear);
         registry.Add("Simulation.Actions open locked door consumes key", OpenLockedDoorConsumesKey);
         registry.Add("Simulation.Actions open locked door fails without key", OpenLockedDoorFailsWithoutKey);
-        registry.Add("Simulation.Actions open chest drops loot and removes chest", OpenChestDropsLootAndRemovesChest);
+        registry.Add("Simulation.Actions open chest rolls persistent selectable loot", OpenChestRollsPersistentSelectableLoot);
+        registry.Add("Simulation.Actions take chest loot transfers selected items", TakeChestLootTransfersSelectedItems);
         registry.Add("Simulation.Actions open chest reports loot names in the log", OpenChestReportsLootNamesInLog);
         registry.Add("Simulation.Actions stairs validation requires matching tile", StairsValidationRequiresMatchingTile);
     }
@@ -543,7 +545,7 @@ public sealed class ActionTests : ITestSuite
         Expect.Equal(new Position(1, 1), actor.Position, "Actor should not move when unlocking fails");
     }
 
-    private static void OpenChestDropsLootAndRemovesChest()
+    private static void OpenChestRollsPersistentSelectableLoot()
     {
         var world = CreateWorld(seed: 42);
         world.Depth = 2;
@@ -560,11 +562,53 @@ public sealed class ActionTests : ITestSuite
         var outcome = new OpenChestAction(actor.Id, chest.Id).Execute(world);
 
         var inventory = actor.GetComponent<InventoryComponent>()!;
+        var chestComponent = world.GetEntity(chest.Id)?.GetComponent<ChestComponent>();
 
         Expect.Equal(ActionResult.Success, outcome.Result, "Opening an adjacent chest should succeed.");
-        Expect.True(world.GetEntity(chest.Id) is null, "Opened chests should be removed from the world.");
-        Expect.True(inventory.Items.Count > 0, "Opening a chest with room in the pack should move loot directly into the actor inventory.");
-        Expect.False(world.HasGroundItems(new Position(2, 1)), "Opening a chest with room in the pack should not leave the loot on the floor.");
+        Expect.NotNull(chestComponent, "Opened chests should remain in the world while they contain selectable loot.");
+        Expect.True(chestComponent!.HasRolled, "Opening should mark chest contents as rolled.");
+        Expect.True(chestComponent.Contents.Count > 0, "Opening should roll loot into persistent chest contents.");
+        Expect.Equal(0, inventory.Items.Count, "Opening should not auto-stow loot before the player chooses it.");
+        Expect.False(world.HasGroundItems(new Position(2, 1)), "Opening should not spill loot before the player chooses it.");
+
+        var rolledIds = string.Join(",", chestComponent.Contents.Select(item => item.InstanceId.Value.ToString("N")));
+        new OpenChestAction(actor.Id, chest.Id).Execute(world);
+        var rerollIds = string.Join(",", chestComponent.Contents.Select(item => item.InstanceId.Value.ToString("N")));
+        Expect.Equal(rolledIds, rerollIds, "Reopening an already rolled chest must not duplicate or reroll contents.");
+    }
+
+    private static void TakeChestLootTransfersSelectedItems()
+    {
+        var world = CreateWorld(seed: 42);
+        world.Depth = 2;
+        world.ContentDatabase = ContentLoader.LoadFromDirectory(ContentLoader.FindContentDirectory());
+
+        var actor = CreateActor("Player", new Position(1, 1), Faction.Player);
+        var chest = new Entity("Treasure Chest", new Position(2, 1), new Stats { HP = 1, MaxHP = 1, Attack = 0, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 0 }, Faction.Neutral);
+        chest.SetComponent(new ChestComponent { LootTableId = "chest_loot" });
+
+        world.Player = actor;
+        world.AddEntity(actor);
+        world.AddEntity(chest);
+
+        new OpenChestAction(actor.Id, chest.Id).Execute(world);
+        var chestComponent = chest.GetComponent<ChestComponent>()!;
+        var firstItem = chestComponent.Contents[0];
+        var remainingBefore = chestComponent.Contents.Count;
+
+        var takeOne = new TakeChestLootAction(actor.Id, chest.Id, new[] { firstItem.InstanceId });
+        var takeOutcome = takeOne.Execute(world);
+
+        var inventory = actor.GetComponent<InventoryComponent>()!;
+        Expect.Equal(ActionResult.Success, takeOutcome.Result, "Taking a selected chest item should succeed.");
+        Expect.True(inventory.Contains(firstItem.InstanceId), "Selected loot should move into inventory.");
+        Expect.Equal(remainingBefore - 1, chestComponent.Contents.Count, "Unselected chest loot should remain in the chest.");
+        Expect.NotNull(world.GetEntity(chest.Id), "Non-empty chests should stay in the world.");
+
+        var takeAll = new TakeChestLootAction(actor.Id, chest.Id, takeAll: true);
+        var takeAllOutcome = takeAll.Execute(world);
+        Expect.Equal(ActionResult.Success, takeAllOutcome.Result, "Taking all remaining chest loot should succeed.");
+        Expect.True(world.GetEntity(chest.Id) is null, "Empty chests should be removed after the last item is taken.");
     }
 
     private static void OpenChestReportsLootNamesInLog()
@@ -585,7 +629,7 @@ public sealed class ActionTests : ITestSuite
 
         Expect.True(outcome.LogMessages.Count > 0, "Opening a chest should emit a log message.");
         Expect.True(outcome.LogMessages[0].Contains("Loot found:", System.StringComparison.Ordinal), "Chest logs should explicitly call out the found loot.");
-        Expect.True(outcome.LogMessages[0].Contains("Stowed:", System.StringComparison.Ordinal) || outcome.LogMessages[0].Contains("Spilled onto the floor:", System.StringComparison.Ordinal), "Chest logs should explain where the loot went instead of only removing the chest.");
+        Expect.True(outcome.LogMessages[0].Contains("Choose what to take", System.StringComparison.Ordinal), "Chest logs should tell the player that rolled loot is now selectable.");
     }
 
     private static void StairsValidationRequiresMatchingTile()

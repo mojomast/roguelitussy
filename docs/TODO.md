@@ -4,7 +4,6 @@ This document is a concise planning view for remaining work. `docs/IMPROVEMENT_S
 
 | Priority | Feature | Description | Blocking Dependencies |
 |---|---|---|---|
-| P1 | ChestUI persistent contents | Support per-item chest selection and leave-behind semantics once chest contents persist safely. | Chest contents must survive save/load and floor transitions before partial looting is safe. |
 | P1 | Inventory mouse interaction | Support click selection, double-click activate, and right-click drop behavior. | Inventory action paths should stay routed through existing action factories. |
 | P1 | Ranged weapons | Make authored ranged weapons attack beyond adjacency with range/LOS validation. | Item schema/runtime support for weapon range. |
 | P1 | Weapon archetypes | Add cleave/reach-style weapon properties for tactical differentiation. | Combat resolver/action updates and content validation. |

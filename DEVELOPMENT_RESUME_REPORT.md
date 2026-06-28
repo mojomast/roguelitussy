@@ -122,7 +122,7 @@ godot --headless --path . --quit
 - Completed: loading a save with pending perk choices reopens the level-up overlay, and Core pickup actions now resolve stack metadata from world content instead of relying on UI-supplied templates.
 - Completed: UI chrome received an incremental Diablo II-inspired pass in Godot-facing scripts only: shared gothic palette, gold/parchment menu and sheet chrome, blood-red HUD HP styling, rarity-tinted inventory/tooltip text, muted combat log frame, and darker framed minimap colors. Core simulation behavior was not changed.
 - Completed: Block E4 / UI-4 standardized overlay hotkeys: normal gameplay interact is now `F` only, level-up closes with `Escape` without selecting a perk, and inventory/level-up hints advertise their active close/action keys.
-- Deferred: per-item chest loot selection needs persistent chest contents for safe leave-behind semantics; current v8-compatible behavior remains atomic open with inventory stow plus ground spill.
+- Completed: per-item chest loot selection now uses persistent rolled chest contents for safe leave-behind semantics instead of atomic open-and-remove behavior.
 
 ### Follow-up Status - GEN-1 Trap Persistence and Rendering
 
@@ -132,7 +132,7 @@ godot --headless --path . --quit
 - Completed: `SaveMigrator.MigrateV11` converts legacy v10/v11 standalone `Traps` arrays into trap entities with `TrapComponent`; `SaveMigrator.MigrateV10` was updated to perform the same conversion so legacy v10 saves load correctly under version 12.
 - Completed: `SaveValidator` validates trap entities (must sit on a `Trap` tile and have a non-empty template id) and allows non-blocking trap entities to share tiles with other entities.
 - Completed: added persistence tests for trap component round-trip, multi-floor trap entities, v10/v11 migration to trap entities, validator tile consistency, and post-load trap triggering.
-- Documentation: updated `docs/SYSTEMS.md` to save version `12` and revised the Traps persistence subsection to describe entity-owned `TrapComponent`.
+- Documentation: documented trap persistence introduced in save version `12` and revised the Traps persistence subsection to describe entity-owned `TrapComponent`; the current normalized save version has since advanced.
 
 
 
@@ -161,7 +161,7 @@ godot --headless --path . --quit
 
 ### Follow-up Status - Wave 4 Simulation And Generation Polish
 
-- Completed: trap state reconciliation. `TrapComponent` is now the single source of truth for trap state (`TemplateId`, `IsArmed`, `IsRevealed`, `TriggerCount`); the redundant `WorldState._traps` / `TrapState` runtime dictionary was removed. Save version bumped to `12`; legacy v10/v11 standalone trap arrays migrate into trap entities via `SaveMigrator.MigrateV11` (and `MigrateV10` updated for the same conversion). `SaveValidator` enforces trap entities sit on `TileType.Trap` tiles and carry a non-empty template id.
+- Completed: trap state reconciliation. `TrapComponent` is now the single source of truth for trap state (`TemplateId`, `IsArmed`, `IsRevealed`, `TriggerCount`); the redundant `WorldState._traps` / `TrapState` runtime dictionary was removed. Trap persistence was introduced in save version `12`; legacy v10/v11 standalone trap arrays migrate into trap entities via `SaveMigrator.MigrateV11` (and `MigrateV10` updated for the same conversion). `SaveValidator` enforces trap entities sit on `TileType.Trap` tiles and carry a non-empty template id.
 - Completed: GEN-2 themed floor sets. `RoomPrefab.Tags` and `RoomData.Tags` are projected from content; `DungeonGenerator` maps depth to theme (`prison` 1–3, `crypt` 4–6, `magma` 7+) and prefers theme-matching prefabs when at least four fit the BSP leaves, falling back to all valid prefabs otherwise. Six new themed rooms added to `Content/room_prefabs.json` and covered by generation tests.
 - Completed: GEN-4 locked doors and keys. Added `TileType.LockedDoor`; `DungeonGenerator.PlaceLockedDoorsAndKeys` converts connecting doors for rooms with `lock_doors_on_enter: true` into locked doors and places a `dungeon_key` item in a reachable non-locked room. `OpenDoorAction` consumes one key from the actor's inventory and unlocks the door permanently. Locked state persists as map tiles and ground items.
 - Completed: STA-4 / UI-3 status visuals. HUD renders a status badge row; `EntityRenderer` attaches status icon children to entity sprites; `EventBus.StatusEffectApplied` payload now carries the correct target id; `StatusEffectRemoved` is emitted when a status expires or is cleared.
@@ -189,7 +189,7 @@ godot --headless --path . --quit
 
 ### Follow-up Status - Block E1 Backlog Sync
 
-- Completed: stale TODO/feature tracking was synchronized so implemented Minimap legend, ChestUI `MenuBase`, CombatLog filtering, and HUD bar polish work no longer appears as remaining backlog; persistent chest contents remains tracked as future work.
+- Completed: stale TODO/feature tracking was synchronized so implemented Minimap legend, ChestUI `MenuBase`, CombatLog filtering, HUD bar polish, and persistent chest contents work no longer appears as remaining backlog.
 
 ### Follow-up Status - Block E2 Test Harness Polish
 
@@ -238,6 +238,19 @@ godot --headless --path . --quit
 - Completed: PauseMenu no longer resolves `/root/GameManager` or autoloads while its constructor builds initial menu text, preventing exported startup from crashing before `UIRoot` enters the active scene tree.
 - Completed: `AutoloadResolver` now treats a missing viewport as unresolved instead of throwing, keeping pre-tree UI construction defensive.
 - Verification: full stub test suite passes with startup regression coverage for constructing `PauseMenu` and `UIRoot` before scene-tree entry.
+
+### Follow-up Status - UI Layout Readability Pass
+
+- Completed: `QuickSlotHotbar` is viewport-aware and anchored at the bottom center of the screen; HUD now mirrors HP and XP progress in a bottom status strip directly above that hotbar.
+- Completed: Inventory footer hints wrap on narrow overlays so use/equip/drop/sort/close text does not overlap.
+- Completed: Main menu uses normal desktop viewport height to keep all choices visible at once, while preserving small-viewport option windowing.
+
+### Follow-up Status - Chest/NPC/UI Bugfix Pass
+
+- Completed: chests now roll persistent contents on interaction, open a selectable `ChestUI` loot chooser, and use `TakeChestLootAction` to transfer selected or all items without rerolling leave-behind contents. Save version is now `13` so rolled chest contents round-trip.
+- Completed: generated chest tables now roll multiple treasures, Quartermaster Vale stocks a broader set of potions, scrolls, armor, and weapons, and NPC dialogs can rotate through authored `start_nodes` for greeting variety.
+- Completed: damage popups are cleared on world rebind/floor redraw, cached-floor travel removes the player from the source floor before destination placement so returned stairs remain usable, and regression tests cover both cases.
+- Completed: shared menu body text now renders BBCode correctly for floor summary and game-over screens, UI text colors are brighter, and the bottom-right item tooltip is taller with smaller rich text so equipment comparisons stay visible.
 
 ## Current Strengths
 

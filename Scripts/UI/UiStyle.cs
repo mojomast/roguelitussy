@@ -29,17 +29,17 @@ public static class UiStyle
         => new(0.22f, 0.19f, 0.13f, alpha);
 
     public static Color Parchment()
-        => new(0.85f, 0.82f, 0.74f);
+        => new(0.94f, 0.91f, 0.82f);
 
     public static Color Parchment(float alpha) => WithAlpha(Parchment(), alpha);
 
     public static Color MutedText()
-        => new(0.58f, 0.55f, 0.48f);
+        => new(0.75f, 0.72f, 0.64f);
 
     public static Color MutedText(float alpha) => WithAlpha(MutedText(), alpha);
 
     public static Color FaintText()
-        => new(0.35f, 0.33f, 0.28f);
+        => new(0.64f, 0.61f, 0.54f);
 
     public static Color FaintText(float alpha) => WithAlpha(FaintText(), alpha);
 
@@ -47,12 +47,12 @@ public static class UiStyle
         => new(0.07f, 0.06f, 0.05f);
 
     public static Color BrightGold()
-        => new(0.87f, 0.72f, 0.28f);
+        => new(1.00f, 0.86f, 0.38f);
 
     public static Color BrightGold(float alpha) => WithAlpha(BrightGold(), alpha);
 
     public static Color DimGold()
-        => new(0.52f, 0.42f, 0.16f);
+        => new(0.78f, 0.62f, 0.24f);
 
     public static Color DimGold(float alpha) => WithAlpha(DimGold(), alpha);
 
@@ -90,7 +90,7 @@ public static class UiStyle
         => new(0.22f, 0.20f, 0.17f, 0.9f);
 
     public static Color BorderActive()
-        => new(0.42f, 0.38f, 0.28f, 1.0f);
+        => new(0.70f, 0.62f, 0.42f, 1.0f);
 
     public static Color HpColor(float fraction) => fraction switch
     {

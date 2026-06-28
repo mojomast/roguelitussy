@@ -47,7 +47,7 @@ public partial class InventoryUI : Control
     private const float PanelPadding = 18f;
     private const float OuterMargin = 24f;
     private const float HeaderHeight = 28f;
-    private const float FooterHeight = 22f;
+    private const float FooterHeight = 42f;
     private const float SlotSize = 52f;
     private const float SlotGap = 8f;
 
@@ -1028,20 +1028,24 @@ public partial class InventoryUI : Control
 
         _footerBar.Position = new Vector2(PanelPadding, panelSize.Y - PanelPadding - FooterHeight);
         _footerBar.Size = new Vector2(panelSize.X - (PanelPadding * 2f), FooterHeight);
-        var x = _footerBar.Position.X + 10f;
-        var available = System.Math.Max(48f, (_footerBar.Size.X - 54f) / System.Math.Max(1, _footerHintLabels.Count));
+        var compact = _footerBar.Size.X < 720f;
+        var columns = compact ? 3 : System.Math.Max(1, _footerHintLabels.Count);
+        var rows = compact ? 2 : 1;
+        var labelWidth = System.Math.Max(48f, (_footerBar.Size.X - 20f) / columns);
+        var rowHeight = FooterHeight / rows;
         for (var i = 0; i < _footerHintLabels.Count; i++)
         {
             var label = _footerHintLabels[i];
-            label.Position = new Vector2(x, _footerBar.Position.Y + 3f);
-            label.Size = new Vector2(available, FooterHeight);
-            x += label.Size.X + 4f;
+            var column = compact ? i % columns : i;
+            var row = compact ? i / columns : 0;
+            label.Position = new Vector2(_footerBar.Position.X + 10f + (column * labelWidth), _footerBar.Position.Y + 3f + (row * rowHeight));
+            label.Size = new Vector2(System.Math.Max(0f, labelWidth - 6f), rowHeight);
             if (i < _footerDividers.Count)
             {
                 var divider = _footerDividers[i];
-                divider.Position = new Vector2(x, _footerBar.Position.Y + 4f);
+                divider.Visible = !compact;
+                divider.Position = new Vector2(label.Position.X + label.Size.X + 2f, _footerBar.Position.Y + 4f);
                 divider.Size = new Vector2(1f, FooterHeight - 8f);
-                x += 6f;
             }
         }
     }

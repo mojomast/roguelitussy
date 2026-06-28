@@ -17,6 +17,15 @@ public partial class HUD : Control
     private ColorRect? _panelBorderBottom;
     private ColorRect? _panelBorderLeft;
     private ColorRect? _panelBorderRight;
+    private Panel? _bottomStatusPanel;
+    private ColorRect? _bottomStatusBackground;
+    private Label? _bottomHPLabel;
+    private ColorRect? _bottomHPBarBackground;
+    private ColorRect? _bottomHPBarGhostFill;
+    private ColorRect? _bottomHPBarFill;
+    private Label? _bottomXPLabel;
+    private ColorRect? _bottomXPBarBackground;
+    private ColorRect? _bottomXPBarFill;
     private Label? _headerLabel;
     private Label? _hpLabel;
     private ProgressBar? _hpBarCompat;
@@ -71,6 +80,10 @@ public partial class HUD : Control
     public string TurnText { get; private set; } = "Turn: --";
 
     public string LevelText { get; private set; } = string.Empty;
+
+    public double XPBarValue { get; private set; }
+
+    public double XPBarMaxValue { get; private set; } = 1d;
 
     public string StatsText { get; private set; } = string.Empty;
 
@@ -285,6 +298,7 @@ public partial class HUD : Control
             FloorText = "Floor: --";
             TurnText = "Turn: --";
             LevelText = string.Empty;
+            SetXPBarTarget(0d, 1d);
             StatsText = string.Empty;
             GoldText = string.Empty;
             StatusEffectsText = string.Empty;
@@ -305,6 +319,8 @@ public partial class HUD : Control
             EnergyText = "Energy: --";
             FloorText = $"Floor: {world.Depth}";
             TurnText = $"Turn: {world.TurnNumber}";
+            LevelText = string.Empty;
+            SetXPBarTarget(0d, 1d);
             StatsText = string.Empty;
             GoldText = string.Empty;
             StatusEffectsText = string.Empty;
@@ -333,11 +349,18 @@ public partial class HUD : Control
         var progression = player.GetComponent<ProgressionComponent>();
         var wallet = player.GetComponent<WalletComponent>();
         GoldText = wallet is null ? string.Empty : $"Gold: {wallet.Gold}";
-        LevelText = progression is not null
-            ? (progression.UnspentStatPoints > 0 || progression.UnspentPerkChoices > 0
+        if (progression is not null)
+        {
+            LevelText = progression.UnspentStatPoints > 0 || progression.UnspentPerkChoices > 0
                 ? $"Lv: {progression.Level}  XP: {progression.Experience}/{progression.ExperienceToNextLevel}  LV UP!"
-                : $"Lv: {progression.Level}  XP: {progression.Experience}/{progression.ExperienceToNextLevel}")
-            : string.Empty;
+                : $"Lv: {progression.Level}  XP: {progression.Experience}/{progression.ExperienceToNextLevel}";
+            SetXPBarTarget(progression.Experience, progression.ExperienceToNextLevel);
+        }
+        else
+        {
+            LevelText = string.Empty;
+            SetXPBarTarget(0d, 1d);
+        }
         StatsText = BuildStatsText(player, progression);
         HotbarText = BuildHotbarText(world, player.Id, _gameManager?.Content);
 
@@ -445,6 +468,12 @@ public partial class HUD : Control
                 ? System.Math.Max(EnergyBarGhostValue, System.Math.Max(EnergyBarDisplayedValue, previous))
                 : EnergyBarDisplayedValue;
         }
+    }
+
+    private void SetXPBarTarget(double value, double maxValue)
+    {
+        XPBarMaxValue = System.Math.Max(1d, maxValue);
+        XPBarValue = System.Math.Clamp(value, 0d, XPBarMaxValue);
     }
 
     private bool AdvanceBarAnimation(float delta)
@@ -608,7 +637,36 @@ public partial class HUD : Control
 
         _panel.AddChild(_mapLabel);
         AddChild(_interactionPromptLabel);
+        EnsureBottomStatusVisuals();
         ApplyResponsiveLayout();
+    }
+
+    private void EnsureBottomStatusVisuals()
+    {
+        if (_bottomStatusPanel is not null)
+        {
+            return;
+        }
+
+        _bottomStatusPanel = new Panel { Name = "BottomStatusPanel", Modulate = UiStyle.GoldTrim(), ZIndex = 9 };
+        _bottomStatusBackground = new ColorRect { Name = "BottomStatusBackground", Color = UiStyle.PanelBlack(0.88f) };
+        _bottomHPLabel = CreateLabel("BottomHPLabel", Vector2.Zero, Vector2.Zero);
+        _bottomHPBarBackground = new ColorRect { Name = "BottomHPBarBackground", Color = UiStyle.PanelBlack() };
+        _bottomHPBarGhostFill = new ColorRect { Name = "BottomHPBarGhostFill", Color = UiStyle.BloodRed(0.38f) };
+        _bottomHPBarFill = new ColorRect { Name = "BottomHPBarFill", Color = UiStyle.ActiveGreen() };
+        _bottomXPLabel = CreateLabel("BottomXPLabel", Vector2.Zero, Vector2.Zero);
+        _bottomXPBarBackground = new ColorRect { Name = "BottomXPBarBackground", Color = UiStyle.PanelBlack() };
+        _bottomXPBarFill = new ColorRect { Name = "BottomXPBarFill", Color = UiStyle.BrightGold() };
+
+        _bottomStatusPanel.AddChild(_bottomStatusBackground);
+        _bottomStatusPanel.AddChild(_bottomHPLabel);
+        _bottomStatusPanel.AddChild(_bottomHPBarBackground);
+        _bottomStatusPanel.AddChild(_bottomHPBarGhostFill);
+        _bottomStatusPanel.AddChild(_bottomHPBarFill);
+        _bottomStatusPanel.AddChild(_bottomXPLabel);
+        _bottomStatusPanel.AddChild(_bottomXPBarBackground);
+        _bottomStatusPanel.AddChild(_bottomXPBarFill);
+        AddChild(_bottomStatusPanel);
     }
 
     private void CreateStatPills()
@@ -779,6 +837,7 @@ public partial class HUD : Control
         _hotbarLabel.Modulate = UiStyle.BrightGold();
         _mapLabel.Text = MinimapText;
         _mapLabel.Modulate = UiStyle.FaintText();
+        UpdateBottomStatusVisuals();
         UpdateInteractionPromptVisual();
     }
 
@@ -824,6 +883,7 @@ public partial class HUD : Control
         var energyGhostColor = BlendColor(UiStyle.WarningOrange(), UiStyle.DimGold(), 0.35f);
         LayoutBar(_hpBarBackground, _hpBarGhostFill, HPBarGhostValue, HPBarMaxValue, hpGhostColor);
         LayoutBar(_hpBarBackground, _hpBarFill, HPBarDisplayedValue, HPBarMaxValue, HPBarFillColor);
+        LayoutBottomBars();
         LayoutHPDangerPattern();
         LayoutBar(_energyBarBackground, _energyBarGhostFill, EnergyBarGhostValue, EnergyBarMaxValue, energyGhostColor, y: 37f);
         LayoutBar(_energyBarBackground, _energyBarFill, EnergyBarDisplayedValue, EnergyBarMaxValue, EnergyBarFillColor, y: 37f);
@@ -929,7 +989,77 @@ public partial class HUD : Control
         }
 
         SetControlBounds(_mapLabel, 12f, 172f, contentWidth, 18f);
+        LayoutBottomStatusPanel(viewportWidth, ResolveViewportHeight());
         LayoutInteractionPrompt();
+    }
+
+    private void LayoutBottomStatusPanel(float viewportWidth, float viewportHeight)
+    {
+        EnsureBottomStatusVisuals();
+        if (_bottomStatusPanel is null || _bottomStatusBackground is null)
+        {
+            return;
+        }
+
+        var width = System.Math.Min(640f, System.Math.Max(300f, viewportWidth - 32f));
+        var height = 48f;
+        _bottomStatusPanel.Size = new Vector2(width, height);
+        _bottomStatusPanel.Position = new Vector2(
+            System.Math.Max(8f, (viewportWidth - width) * 0.5f),
+            System.Math.Max(8f, viewportHeight - 54f - 12f - 8f - height));
+        _bottomStatusBackground.Position = Vector2.Zero;
+        _bottomStatusBackground.Size = _bottomStatusPanel.Size;
+        UpdateBottomStatusVisuals();
+        LayoutBottomBars();
+    }
+
+    private void UpdateBottomStatusVisuals()
+    {
+        if (_bottomHPLabel is not null)
+        {
+            _bottomHPLabel.Text = HPText;
+            _bottomHPLabel.Modulate = HPColor;
+        }
+
+        if (_bottomXPLabel is not null)
+        {
+            _bottomXPLabel.Text = string.IsNullOrWhiteSpace(LevelText) ? "XP: --/--" : LevelText;
+            _bottomXPLabel.Modulate = LevelText.Contains("LV UP!", System.StringComparison.Ordinal) ? UiStyle.BrightGold() : UiStyle.Parchment();
+        }
+    }
+
+    private void LayoutBottomBars()
+    {
+        if (_bottomStatusPanel is null)
+        {
+            return;
+        }
+
+        var labelWidth = 104f;
+        var barX = labelWidth + 10f;
+        var barWidth = System.Math.Max(80f, _bottomStatusPanel.Size.X - barX - 12f);
+        SetControlBounds(_bottomHPLabel, 10f, 5f, labelWidth, 16f);
+        SetControlBounds(_bottomXPLabel, 10f, 27f, labelWidth, 16f);
+        LayoutBottomBar(_bottomHPBarBackground, _bottomHPBarGhostFill, HPBarGhostValue, HPBarMaxValue, UiStyle.BloodRed(0.38f), barX, 9f, barWidth);
+        LayoutBottomBar(_bottomHPBarBackground, _bottomHPBarFill, HPBarDisplayedValue, HPBarMaxValue, HPBarFillColor, barX, 9f, barWidth);
+        LayoutBottomBar(_bottomXPBarBackground, _bottomXPBarFill, XPBarValue, XPBarMaxValue, UiStyle.BrightGold(), barX, 31f, barWidth);
+    }
+
+    private static void LayoutBottomBar(ColorRect? background, ColorRect? fill, double value, double maxValue, Color fillColor, float x, float y, float width)
+    {
+        if (background is null || fill is null)
+        {
+            return;
+        }
+
+        const float height = 10f;
+        background.Position = new Vector2(x, y);
+        background.Size = new Vector2(width, height);
+        background.Color = UiStyle.SlotBackground();
+        var fraction = maxValue <= 0d ? 0f : (float)System.Math.Clamp(value / maxValue, 0d, 1d);
+        fill.Position = background.Position + new Vector2(1f, 1f);
+        fill.Size = new Vector2(System.Math.Max(0f, (width - 2f) * fraction), height - 2f);
+        fill.Color = fillColor;
     }
 
     private void LayoutInteractionPrompt()

@@ -75,12 +75,17 @@ public sealed class ContentValidationTests : ITestSuite
         Expect.True(content.TryGetNpcTemplate("quartermaster_vale", out var vendor), "Quartermaster Vale should project into the NPC surface");
         Expect.True(vendor.IsMerchant, "Quartermaster Vale should project merchant stock");
         Expect.Equal("merchant_intro", vendor.DialogueId, "NPC dialog ids should survive projection");
+        Expect.True(vendor.MerchantOffers?.Count >= 10, "Quartermaster stock should cover more than the original three-item starter set.");
+        Expect.True(vendor.MerchantOffers?.Any(offer => offer.ItemTemplateId.StartsWith("potion_", System.StringComparison.Ordinal)) == true, "Quartermaster stock should include consumables.");
+        Expect.True(vendor.MerchantOffers?.Any(offer => offer.ItemTemplateId.StartsWith("scroll_", System.StringComparison.Ordinal)) == true, "Quartermaster stock should include scrolls.");
+        Expect.True(vendor.MerchantOffers?.Any(offer => offer.ItemTemplateId is "boots_leather" or "helm_iron" or "shield_wooden") == true, "Quartermaster stock should include armor choices.");
 
         Expect.True(content.TryGetPerkTemplate("quartermasters_eye", out var perk), "Quartermaster's Eye should project into the perk surface");
         Expect.Equal(2, perk.UnlockLevel, "Perk unlock levels should survive projection");
 
         Expect.True(content.TryGetDialogueTemplate("merchant_intro", out var dialog), "Merchant intro dialog should project into the dialogue surface");
         Expect.True(dialog.Nodes.ContainsKey(dialog.StartNodeId), "Dialog templates should retain their start node");
+        Expect.True(dialog.StartNodeIds.Count >= 3, "Merchant dialog should project authored greeting variants.");
 
         Expect.True(content.TryGetTrapTemplate("spike_trap", out var spikeTrap), "Spike trap should project into the trap surface");
         Expect.Equal("spike_trap", spikeTrap?.AbilityId ?? string.Empty, "Trap templates should preserve their referenced ability");

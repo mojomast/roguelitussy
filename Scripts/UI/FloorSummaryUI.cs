@@ -109,7 +109,7 @@ public partial class FloorSummaryUI : MenuBase
             : $"[ENTER/SPACE/ESC] Continue     Auto in {CountdownSeconds:0.0}s";
     }
 
-    protected override void OnVisualStateRefreshed(Panel panel, Label label, Vector2 viewportSize, Vector2 panelSize)
+    protected override void OnVisualStateRefreshed(Panel panel, RichTextLabel label, Vector2 viewportSize, Vector2 panelSize)
     {
         EnsureCountdownBar(panel);
         if (_countdownTrack is null || _countdownFill is null)

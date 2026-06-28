@@ -8,7 +8,7 @@
 
 > UI chrome follow-up note (2026-06-10): gameplay chrome now has an incremental Diablo II-inspired procedural style pass in `Scripts/UI`: dark gothic panel colors, gold trim/title accents, parchment text, blood-red HUD HP treatment, rarity-tinted inventory/tooltip details, and darker minimap colors. Remaining high-value UI work is still a real focusable/icon inventory grid, richer HUD orb/status presentation, and optional full map overlay rather than changing Core rules.
 
-> Chest/overflow follow-up note (2026-06-10): mobs now ignore and cannot melee neutral chests, chest-opening logs explicitly list `Loot found:` plus stowed/spilled destinations, and text-driven inventory/dialog/shop/tooltip surfaces window or clamp long content. A per-item chest-loot modal remains open work because safe leave-behind behavior requires persistent chest contents rather than the current atomic open-and-remove chest semantics.
+> Chest/overflow follow-up note (2026-06-28): mobs ignore and cannot melee neutral chests. Chests now roll persistent contents on interaction, show a selectable loot modal, and preserve leave-behind contents through save/load. Text-driven inventory/dialog/shop/tooltip surfaces window or clamp long content, and the bottom-right tooltip is taller for equipment comparison text.
 
 > Consumable stack follow-up note (2026-06-10): stacked consumables and scrolls now consume one item per successful use, leaving the remaining stack in inventory.
 

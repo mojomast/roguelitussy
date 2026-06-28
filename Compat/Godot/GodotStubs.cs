@@ -216,6 +216,10 @@ public class Control : Node
     {
     }
 
+    public void AddThemeFontSizeOverride(string name, int fontSize)
+    {
+    }
+
     public void QueueRedraw()
     {
     }

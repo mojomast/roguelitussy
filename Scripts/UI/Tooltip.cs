@@ -32,7 +32,7 @@ public partial class Tooltip : Control
     {
         Name = "Tooltip";
         Visible = false;
-        Size = new Vector2(300f, 232f);
+        Size = new Vector2(320f, 300f);
     }
 
     public override void _Ready()
@@ -69,7 +69,10 @@ public partial class Tooltip : Control
 
         if (!string.IsNullOrEmpty(comparisonText))
         {
-            lines.Add(comparisonText);
+            foreach (var line in comparisonText.Split('\n', System.StringSplitOptions.RemoveEmptyEntries))
+            {
+                lines.Add(line);
+            }
         }
 
         if (equipped)
@@ -81,7 +84,7 @@ public partial class Tooltip : Control
 
         lines.Add(equipped ? "[E] Unequip  [D] Drop" : "[E] Equip/Use  [D] Drop");
 
-        var visibleLines = ClampLines(lines, 11);
+        var visibleLines = ClampLines(lines, 16);
         BodyText = string.Join("\n", visibleLines);
         BodyMarkup = BuildItemBodyMarkup(template, visibleLines);
         ScreenPosition = ClampToScreen(screenPos);
@@ -169,6 +172,7 @@ public partial class Tooltip : Control
             BbcodeEnabled = true,
             Modulate = UiStyle.BrightGold(),
         };
+        _titleLabel.AddThemeFontSizeOverride("normal_font_size", 13);
         _bodyLabel = new RichTextLabel
         {
             Name = "BodyLabel",
@@ -177,6 +181,7 @@ public partial class Tooltip : Control
             BbcodeEnabled = true,
             Modulate = UiStyle.Parchment(),
         };
+        _bodyLabel.AddThemeFontSizeOverride("normal_font_size", 12);
         _panel.AddChild(_background);
         _panel.AddChild(_borderTop);
         _panel.AddChild(_borderBottom);

@@ -15,6 +15,7 @@ public partial class DialogUI : Control
 
     private Panel? _panel;
     private RichTextLabel? _bodyLabel;
+    private readonly Dictionary<string, int> _dialogOpenCounts = new(System.StringComparer.Ordinal);
     private GameManager.InteractionContext? _context;
     private string _currentNodeId = string.Empty;
     private int _selectedOptionIndex;
@@ -36,7 +37,7 @@ public partial class DialogUI : Control
     public void Open(GameManager.InteractionContext context)
     {
         _context = context;
-        _currentNodeId = context.DialogueTemplate.StartNodeId;
+        _currentNodeId = ResolveStartNode(context.DialogueTemplate);
         _selectedOptionIndex = 0;
         Visible = true;
         RefreshVisualState();
@@ -158,6 +159,22 @@ public partial class DialogUI : Control
     {
         node = null!;
         return _context is not null && _context.DialogueTemplate.Nodes.TryGetValue(_currentNodeId, out node!);
+    }
+
+    private string ResolveStartNode(DialogueTemplate template)
+    {
+        if (template.StartNodeIds.Count == 0)
+        {
+            return template.StartNodeId;
+        }
+
+        if (!_dialogOpenCounts.TryGetValue(template.TemplateId, out var count))
+        {
+            count = 0;
+        }
+
+        _dialogOpenCounts[template.TemplateId] = count + 1;
+        return template.StartNodeIds[count % template.StartNodeIds.Count];
     }
 
     private void EnsureVisuals()

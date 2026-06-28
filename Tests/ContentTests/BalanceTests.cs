@@ -126,6 +126,7 @@ public sealed class BalanceTests : ITestSuite
 
         Expect.True(entries.Count > 0, $"{tableId} should have eligible entries at depth {depth}.");
         Expect.False(entries.Any(entry => entry.ItemId is null), $"{tableId} should not include no-drop entries.");
+        Expect.True(content.LootTables[tableId].Rolls >= 3, $"{tableId} should roll multiple treasures per chest.");
 
         for (var seed = 0; seed < 50; seed++)
         {

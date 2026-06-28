@@ -30,6 +30,7 @@ public enum ActionType : byte
     Descend,
     Ascend,
     CastAbility,
+    TakeChestLoot,
 }
 
 public enum ActionResult : byte

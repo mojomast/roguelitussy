@@ -560,7 +560,10 @@ public sealed class ContentLoader : IContentDatabase
                 node.Options.Select(option => new DialogueOption(option.Text, option.Next, option.Action)).ToArray());
         }
 
-        return new DialogueTemplate(dialogue.Id, dialogue.StartNode, new ReadOnlyDictionary<string, DialogueNode>(nodes));
+        var startNodes = dialogue.StartNodes.Count > 0
+            ? dialogue.StartNodes.Where(nodeId => !string.IsNullOrWhiteSpace(nodeId)).Distinct(StringComparer.Ordinal).ToArray()
+            : Array.Empty<string>();
+        return new DialogueTemplate(dialogue.Id, dialogue.StartNode, new ReadOnlyDictionary<string, DialogueNode>(nodes), startNodes);
     }
 
     private static NpcTemplate BuildNpcTemplate(NpcDefinition npc)
@@ -1585,6 +1588,18 @@ public sealed class ContentLoader : IContentDatabase
             if (!nodeIds.Contains(dialog.StartNode))
             {
                 errors.Add($"Dialog '{id}' start_node '{dialog.StartNode}' does not exist.");
+            }
+
+            foreach (var startNode in dialog.StartNodes)
+            {
+                if (string.IsNullOrWhiteSpace(startNode))
+                {
+                    errors.Add($"Dialog '{id}' start_nodes contains an empty node id.");
+                }
+                else if (!nodeIds.Contains(startNode))
+                {
+                    errors.Add($"Dialog '{id}' start_nodes entry '{startNode}' does not exist.");
+                }
             }
 
             foreach (var node in dialog.Nodes)

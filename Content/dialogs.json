@@ -5,10 +5,51 @@
     {
       "id": "merchant_intro",
       "start_node": "start",
+      "start_nodes": [
+        "start",
+        "start_supplies",
+        "start_warning"
+      ],
       "nodes": [
         {
           "id": "start",
           "text": "I trade in things that keep you alive: medicine, steel, and one spare shield when luck goes bad.",
+          "options": [
+            {
+              "text": "Show me what you have.",
+              "action": "shop"
+            },
+            {
+              "text": "What should I prioritize?",
+              "next": "advice"
+            },
+            {
+              "text": "I will be moving on.",
+              "action": "close"
+            }
+          ]
+        },
+        {
+          "id": "start_supplies",
+          "text": "Fresh bandages, questionable scrolls, and boots that have seen fewer corpses than most. Pick what solves your next problem.",
+          "options": [
+            {
+              "text": "Show me what you have.",
+              "action": "shop"
+            },
+            {
+              "text": "What should I prioritize?",
+              "next": "advice"
+            },
+            {
+              "text": "I will be moving on.",
+              "action": "close"
+            }
+          ]
+        },
+        {
+          "id": "start_warning",
+          "text": "Do not wait until you are bleeding to shop. The dungeon charges interest, and it collects in teeth.",
           "options": [
             {
               "text": "Show me what you have.",
@@ -43,10 +84,43 @@
     {
       "id": "chronicler_intro",
       "start_node": "start",
+      "start_nodes": [
+        "start",
+        "start_memory",
+        "start_warning"
+      ],
       "nodes": [
         {
           "id": "start",
           "text": "Every floor teaches the same lesson: carry fewer things, but know exactly why each one is in your pack.",
+          "options": [
+            {
+              "text": "Explain.",
+              "next": "pack_logic"
+            },
+            {
+              "text": "I have heard enough.",
+              "action": "close"
+            }
+          ]
+        },
+        {
+          "id": "start_memory",
+          "text": "I have recorded four deaths on this floor alone. Three were greed, one was a door opened too quickly.",
+          "options": [
+            {
+              "text": "Explain.",
+              "next": "pack_logic"
+            },
+            {
+              "text": "I have heard enough.",
+              "action": "close"
+            }
+          ]
+        },
+        {
+          "id": "start_warning",
+          "text": "The survivors all did one thing well: they left themselves an answer for when the plan failed.",
           "options": [
             {
               "text": "Explain.",

@@ -334,9 +334,14 @@ public static class SaveValidator
 
     private static void ValidateNewComponentPayloads(SaveFileData data, EntitySaveData entity, List<string> errors)
     {
-        if (entity.Chest is not null && string.IsNullOrWhiteSpace(entity.Chest.LootTableId))
+        if (entity.Chest is not null)
         {
-            errors.Add($"Entity '{entity.Name}' has a chest without a loot table id.");
+            if (string.IsNullOrWhiteSpace(entity.Chest.LootTableId))
+            {
+                errors.Add($"Entity '{entity.Name}' has a chest without a loot table id.");
+            }
+
+            ValidateChest(entity, errors);
         }
 
         if (entity.XpValue is not null && entity.XpValue.Value < 0)
@@ -429,6 +434,34 @@ public static class SaveValidator
         if (entity.SchedulerOrder < 0)
         {
             errors.Add($"Entity '{entity.Name}' has a negative scheduler order {entity.SchedulerOrder}.");
+        }
+    }
+
+    private static void ValidateChest(EntitySaveData entity, List<string> errors)
+    {
+        var itemIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in entity.Chest!.Contents)
+        {
+            if (string.IsNullOrWhiteSpace(item.InstanceId) || !Guid.TryParse(item.InstanceId, out _))
+            {
+                errors.Add($"Entity '{entity.Name}' contains a chest item with an invalid id.");
+                continue;
+            }
+
+            if (!itemIds.Add(item.InstanceId))
+            {
+                errors.Add($"Entity '{entity.Name}' contains duplicate chest item id '{item.InstanceId}'.");
+            }
+
+            if (string.IsNullOrWhiteSpace(item.TemplateId))
+            {
+                errors.Add($"Entity '{entity.Name}' contains a chest item without a template id.");
+            }
+
+            if (item.StackCount <= 0)
+            {
+                errors.Add($"Entity '{entity.Name}' contains a chest item with invalid stack count {item.StackCount}.");
+            }
         }
     }
 

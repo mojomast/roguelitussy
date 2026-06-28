@@ -15,6 +15,7 @@ public sealed class QuickSlotTests : ITestSuite
         registry.Add("UI.QuickSlot key 1 submits UseItemAction", KeyOneSubmitsUseItemAction);
         registry.Add("UI.QuickSlot empty key does not submit action", EmptyKeyDoesNotSubmitAction);
         registry.Add("UI.QuickSlotHotbar suppression toggles visibility", SuppressionTogglesVisibility);
+        registry.Add("UI.QuickSlotHotbar anchors to bottom edge", AnchorsToBottomEdge);
     }
 
     private static void InitializesEmptySlots()
@@ -86,6 +87,38 @@ public sealed class QuickSlotTests : ITestSuite
         Expect.False(hotbar.Visible, "Hotbar should hide when suppressed.");
         hotbar.SetSuppressed(false);
         Expect.True(hotbar.Visible, "Hotbar should show again when gameplay is active and suppression is cleared.");
+    }
+
+    private static void AnchorsToBottomEdge()
+    {
+        WithViewportSize(new Vector2(1280f, 720f), viewportSize =>
+        {
+            var context = CreateContext(new ItemInstance { TemplateId = "potion_health", IsIdentified = true });
+            context.GameManager.LoadWorld(context.World);
+            var root = new Control();
+            var hotbar = new QuickSlotHotbar();
+            root.AddChild(hotbar);
+            hotbar.Bind(context.GameManager, context.Bus, context.Content);
+
+            Expect.True(hotbar.Position.Y + hotbar.Size.Y <= viewportSize.Y - 11.9f, "Hotbar should leave only a small bottom margin.");
+            Expect.True(System.Math.Abs((hotbar.Position.X + (hotbar.Size.X * 0.5f)) - (viewportSize.X * 0.5f)) <= 0.1f, "Hotbar should be centered at the bottom.");
+        });
+    }
+
+    private static void WithViewportSize(Vector2 viewportSize, System.Action<Vector2> action)
+    {
+        var viewport = new Control().GetViewport();
+        var originalSize = viewport.Size;
+        viewport.Size = viewportSize;
+
+        try
+        {
+            action(viewportSize);
+        }
+        finally
+        {
+            viewport.Size = originalSize;
+        }
     }
 
     private static UIContext CreateContext(params ItemInstance[] items)

@@ -115,7 +115,7 @@ public partial class HelpOverlay : MenuBase
         return 20f;
     }
 
-    protected override void OnVisualStateRefreshed(Panel panel, Label label, Vector2 viewportSize, Vector2 panelSize)
+    protected override void OnVisualStateRefreshed(Panel panel, RichTextLabel label, Vector2 viewportSize, Vector2 panelSize)
     {
         panel.Modulate = UiStyle.GoldTrim();
         if (Backdrop is not null)
@@ -142,7 +142,8 @@ public partial class HelpOverlay : MenuBase
             BodyCard.Color = UiStyle.PanelInner(0.98f);
         }
 
-        label.Text = BuildReadableHelpText(_bodyText);
+        label.Clear();
+        label.AppendText(BuildReadableHelpText(_bodyText));
         label.Modulate = UiStyle.Parchment();
 
         if (OptionsCard is not null)

@@ -12,14 +12,14 @@
 | RunUntilBlocked | Implemented | `R` then direction runs until blocked/interrupted. | Historical `Shift`+direction references are stale. |
 | RestUntilHealed | Implemented | `Z` rests until healed/interrupted/capped. | Historical `R`-rest references are stale. |
 | AutoExplore | Implemented | `O` autoexplores through normal move processing. | None required for current behavior. |
-| Quick-use hotbar | Implemented | `QuickSlotHotbar` and HUD text derive the first five usable items; keys `1`-`5` use them. | None required for current behavior. |
+| Quick-use hotbar | Implemented | `QuickSlotHotbar` anchors to the bottom of the viewport; HUD text still derives the first five usable items and keys `1`-`5` use them. | None required for current behavior. |
 | Minimap legend | Implemented | Legend exists inside the minimap and has an independent normal-gameplay toggle. | None required for current behavior. |
-| ChestUI `MenuBase` refactor | Implemented | Chest UI now extends `MenuBase` with shared modal chrome, footer hints, and selectable actions. | Persistent per-item chest contents remain a separate design item. |
-| Animated HUD bars | Implemented | HP/energy bars interpolate, pulse on changes, and show subtle trailing loss fills. | None required for current behavior. |
+| ChestUI selectable loot | Implemented | Chest UI now extends `MenuBase`, rolls contents on interaction, persists rolled items, and lets players take selected loot or everything. | None required for current behavior. |
+| Animated HUD bars | Implemented | HP/energy bars interpolate, pulse on changes, show subtle trailing loss fills, and mirror HP/XP in a bottom combat strip above the quick-use bar. | None required for current behavior. |
 | Colorblind-safe rarity/HP indicators | Implemented | Item rarity includes non-color `[C]`/`[R]` markers across inventory, tooltips, combat log pickups, and shop rows; low HP shows a stripe pattern state. | None required for current behavior. |
 | Hit flash game feel | Implemented | Damage events apply a short bright/white defender flash that remains visible across refreshes and restores to white after the timed window. | Camera shake, projectile travel, and richer SFX/VFX remain separate polish items. |
 | Character creation preview clarity | Implemented | Training copy shows exact effects; starter kits show content names/descriptions, `Equipped:` / `Pack:` grouping, stack counts, aimed-scroll targeting notes, and a main-menu `Tab` tooltip. | None required for current behavior. |
-| Overlay close/hotkey consistency | Implemented | `F` is the sole normal-gameplay interact key, UI-4 modal overlays close with `Escape`, floor summary treats `Escape` as continue, and inventory/level-up hints advertise their active hotkeys. | None required for current behavior. |
+| Overlay close/hotkey consistency | Implemented | `F` is the sole normal-gameplay interact key, UI-4 modal overlays close with `Escape`, floor summary treats `Escape` as continue, and inventory/level-up hints advertise their active hotkeys without footer overlap. | None required for current behavior. |
 
 The current keybind source of truth is `docs/KEYBINDS.md`.
 
@@ -77,7 +77,7 @@ Examine mode opens a `MenuBase` panel at the player's position and lets the play
 
 **Keybinds:** `1`-`5` quick-use visible hotbar slots during normal gameplay
 
-`QuickSlotHotbar` shows five runtime slots derived from the first five usable non-equipment inventory entries, while HUD keeps its compact text summary for compatibility. Number keys submit the same `UseItemAction` path as inventory use for safe consumables such as potions. Aimed scrolls remain visible in the derived model and are not consumed blindly; pressing their hotkey logs a warning and instructs the player to aim them from inventory. Slot assignment is intentionally derived from current inventory order and is not persisted.
+`QuickSlotHotbar` shows five runtime slots derived from the first five usable non-equipment inventory entries, while HUD keeps its compact text summary for compatibility. The dedicated hotbar is viewport-aware, centered at the very bottom of the screen, and truncates only its visual labels so slot boxes do not collide. Number keys submit the same `UseItemAction` path as inventory use for safe consumables such as potions. Aimed scrolls remain visible in the derived model and are not consumed blindly; pressing their hotkey logs a warning and instructs the player to aim them from inventory. Slot assignment is intentionally derived from current inventory order and is not persisted.
 
 **Files modified:** `Scripts/UI/QuickSlotHotbar.cs`, `Scripts/UI/UIRoot.cs`, `Scripts/UI/HUD.cs`, `Scripts/UI/InputHandler.cs`, `Scripts/UI/UIActionFactory.cs`, `Tests/UITests/QuickSlotTests.cs`, `Tests/UITests/UISmokeTests.cs`, `docs/KEYBINDS.md`, `docs/FEATURES.md`, `docs/TODO.md`.
 
@@ -95,7 +95,7 @@ The minimap keeps the existing HUD summary and gameplay toggle behavior. The leg
 
 **Block:** 8  **Status:** Implemented
 
-The HUD keeps HP and energy text values immediate, but the visible bar fills now interpolate toward their latest targets over `_Process(...)` frames. HP changes trigger a short red damage pulse or green healing pulse; energy changes trigger a warning/gold pulse. HP damage and energy spending also leave a subtle trailing fill behind the main fill so losses read clearly without changing bar layout. Healing and energy gain snap the trail out of the way to avoid inverse-loss feedback. The state is exposed through HUD properties so UITests can verify target values, displayed values, pulse behavior, and trailing-fill convergence without relying on Godot rendering output.
+The HUD keeps HP and energy text values immediate, but the visible bar fills now interpolate toward their latest targets over `_Process(...)` frames. HP changes trigger a short red damage pulse or green healing pulse; energy changes trigger a warning/gold pulse. HP damage and energy spending also leave a subtle trailing fill behind the main fill so losses read clearly without changing bar layout. Healing and energy gain snap the trail out of the way to avoid inverse-loss feedback. A bottom status strip mirrors current HP and XP progress directly above the bottom quick-use hotbar so the most important combat state is easier to track. The state is exposed through HUD properties so UITests can verify target values, displayed values, pulse behavior, XP progress, and trailing-fill convergence without relying on Godot rendering output.
 
 **Files modified:** `Scripts/UI/HUD.cs`, `Tests/UITests/UISmokeTests.cs`, `Tests/UITests/HUDBarTests.cs`, `docs/SYSTEMS.md`, `docs/FEATURES.md`.
 
@@ -157,7 +157,9 @@ Starter gear is split into `Equipped:` and `Pack:` sections. Pack contents are c
 
 **Keybinds:** `F` interact during gameplay; `Escape` closes inventory, character sheet, help, pause, level-up, dialog, shop, chest, and floor summary overlays.
 
-Normal gameplay no longer treats `E` as an alternate interact key. Inventory footer hints now include the active keyboard routes for use/equip, drop, auto-equip, sort, and close. The level-up overlay advertises `Esc close`; closing it with Escape dismisses the panel without selecting a perk and leaves pending choices available. Floor summary advertises `ENTER/SPACE/ESC Continue`; Escape follows the same dismissal path as Enter and Space.
+Normal gameplay no longer treats `E` as an alternate interact key. Inventory footer hints now include the active keyboard routes for use/equip, drop, auto-equip, sort, and close; on narrow panels those hints wrap into two rows instead of overlapping. The level-up overlay advertises `Esc close`; closing it with Escape dismisses the panel without selecting a perk and leaves pending choices available. Floor summary advertises `ENTER/SPACE/ESC Continue`; Escape follows the same dismissal path as Enter and Space.
+
+The main menu uses available height at normal desktop sizes to keep all choices visible at once, preventing mouse hover selection changes from causing unnecessary option-window scrolling. Small viewports still window the option list so panels remain clamped to screen bounds.
 
 **Files modified:** `Scripts/UI/InputHandler.cs`, `Scripts/UI/LevelUpOverlay.cs`, `Scripts/UI/InventoryUI.cs`, `Tests/UITests/UISmokeTests.cs`, `docs/KEYBINDS.md`, `docs/FEATURES.md`, `docs/IMPROVEMENT_SUGGESTIONS.md`, `docs/TODO.md`, `DEVELOPMENT_RESUME_REPORT.md`.
 
@@ -165,5 +167,5 @@ Normal gameplay no longer treats `E` as an alternate interact key. Inventory foo
 
 | Feature | Status | Notes |
 |---|---|---|
-| ChestUI persistent contents | Planned | Per-item chest selection should wait for persistent chest contents and leave-behind semantics. |
+| ChestUI persistent contents | Implemented | Rolled chest item instances persist through save/load and support leave-behind semantics. |
 | QuickSlotHotbar class extraction | Implemented | Dedicated overlay exists; quick-use still routes through the existing action path. |
