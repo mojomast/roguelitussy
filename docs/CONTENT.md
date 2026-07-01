@@ -12,10 +12,13 @@ The project uses flat JSON documents under `Content/` as the source of truth for
 - `room_prefabs.json`
 - `traps.json`
 - `perks.json`
+- `relics.json`
+- `floor_events.json`
+- `meta_upgrades.json`
 - `dialogs.json`
 - `npcs.json`
 
-`ContentLoader` expects all of these files to exist and will fail loading if any are missing.
+`ContentLoader` expects the runtime gameplay files to exist and will fail loading if any are missing. `meta_upgrades.json` is loaded by the Godot-side `MetaProgressionManager` because it belongs to between-run state rather than deterministic floor simulation.
 
 ## File Roles
 
@@ -27,6 +30,9 @@ The project uses flat JSON documents under `Content/` as the source of truth for
 - `room_prefabs.json` defines prefab rooms and the tile legend used to interpret them.
 - `traps.json` defines trap templates referenced by room prefabs and spawned as trap entities at runtime.
 - `perks.json` defines progression perk metadata and effects.
+- `relics.json` defines passive relic templates and hook metadata used by the relic processor.
+- `floor_events.json` defines safe-floor, boss-floor, shrine, curse-room, and vault event metadata.
+- `meta_upgrades.json` defines Echo-purchased long-term upgrade nodes.
 - `dialogs.json` defines NPC dialogue graphs, including optional rotating `start_nodes` for repeated greetings.
 - `npcs.json` defines NPC metadata, roles, service hooks, merchant stock, and dialogue references.
 
@@ -57,7 +63,7 @@ This matters because:
 
 1. Reads all required JSON documents from the selected content directory.
 2. Deserializes them with strict casing and no trailing commas.
-3. Builds deterministic lookups for items, enemies, abilities, status effects, room prefabs, traps, loot tables, perks, dialogs, and NPCs.
+3. Builds deterministic lookups for items, enemies, abilities, status effects, room prefabs, traps, loot tables, perks, relics, floor events, dialogs, and NPCs.
 4. Produces simulation-facing item and enemy templates.
 5. Produces simulation-facing ability templates and validation-ready progression/NPC content lookups.
 6. Collects validation errors for malformed or inconsistent content.

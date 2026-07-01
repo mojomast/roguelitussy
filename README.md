@@ -33,7 +33,7 @@ The current build includes character identity and progression, ability casting, 
 - Layered 0x72 world rendering with contextual wall caps, trims, and sprite-backed entity presentation for the current enemy roster.
 - SVG-backed item/status icon source art and content-path validation for authored `res://` visuals.
 - An in-app developer workshop for creating room drafts and scaffolding item/enemy content directly from the runtime shell.
-- JSON-driven content for items, enemies, abilities, status effects, loot tables, room prefabs, perks, NPCs, and dialogs.
+- JSON-driven content for items, enemies, abilities, status effects, loot tables, room prefabs, perks, NPCs, dialogs, relics, floor events, and meta upgrades.
 - Save/load infrastructure with validation and migration support for progression and identity state.
 - A custom test runner covering simulation, AI, generation, content, persistence, rendering, UI, and integration flows.
 
@@ -54,6 +54,7 @@ The current build includes character identity and progression, ability casting, 
   - `GameManager` - simulation/session coordinator.
   - `EventBus` - cross-system event hub.
   - `ContentDatabase` - bridge from Godot autoload space to the loaded content database.
+  - `MetaProgressionManager` - persistent between-run Echo balance, upgrades, and recent run history.
 
 ## Documentation Index
 

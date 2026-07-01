@@ -1,0 +1,38 @@
+[
+  {
+    "event_id": "shrine_perk",
+    "type": "shrine",
+    "shrine_type": "perk",
+    "hp_cost": 10,
+    "description": "A glowing altar offers power at a price."
+  },
+  {
+    "event_id": "shrine_stat",
+    "type": "shrine",
+    "shrine_type": "stat",
+    "hp_cost": 8,
+    "description": "Runes pulse on the walls, offering a stat boon."
+  },
+  {
+    "event_id": "shrine_relic",
+    "type": "shrine",
+    "shrine_type": "relic",
+    "hp_cost": 15,
+    "description": "A sacred relic rests on a sacrificial stone."
+  },
+  {
+    "event_id": "curse_room",
+    "type": "curse",
+    "description": "Shadow seeps from the walls. Great danger, greater reward."
+  },
+  {
+    "event_id": "treasure_vault",
+    "type": "vault",
+    "description": "A locked vault. Break it open for exceptional loot."
+  },
+  {
+    "event_id": "boss_room",
+    "type": "boss",
+    "description": "A powerful guardian blocks your path. Defeat it for a powerful reward."
+  }
+]

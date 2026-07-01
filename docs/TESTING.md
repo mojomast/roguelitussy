@@ -56,6 +56,8 @@ dotnet run --project Tests/godotussy.Tests.csproj -p:UseGodotStubs=true -p:Rende
 
 The rendering profile defines `RENDERING_VALIDATION`, excludes `Core/Persistence/**/*.cs`, and skips persistence-dependent tests. It is a compile/runtime smoke for rendering and UI surfaces, not a replacement for the full persistence suite.
 
+`Core/Persistence/MetaProgressionData.cs` is explicitly re-included in the rendering profile so the `MetaProgressionManager` autoload compiles while the rest of the save subsystem stays excluded.
+
 Do not run the full harness and rendering-validation harness in parallel from the same checkout. They use different build profiles for the Godot-facing project and should be run sequentially to avoid shared output races.
 
 ## Continuous Integration Checks

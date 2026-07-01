@@ -67,6 +67,234 @@
           "value": 5
         }
       ]
+    },
+    {
+      "id": "perk_fortress",
+      "name": "Fortress",
+      "description": "+3 Defense, +10 Max HP.",
+      "unlock_level": 2,
+      "effects": [
+        {
+          "type": "stat_bonus",
+          "stat": "Defense",
+          "value": 3
+        },
+        {
+          "type": "stat_bonus",
+          "stat": "MaxHP",
+          "value": 10
+        }
+      ]
+    },
+    {
+      "id": "perk_undying",
+      "name": "Undying",
+      "description": "Survive lethal damage once per floor at 1 HP.",
+      "unlock_level": 3,
+      "effects": [
+        {
+          "type": "stat_bonus",
+          "stat": "MaxHP",
+          "value": 4
+        }
+      ]
+    },
+    {
+      "id": "perk_eagle_eye",
+      "name": "Eagle Eye",
+      "description": "+15 Accuracy, +2 View Radius.",
+      "unlock_level": 2,
+      "effects": [
+        {
+          "type": "stat_bonus",
+          "stat": "Accuracy",
+          "value": 15
+        },
+        {
+          "type": "stat_bonus",
+          "stat": "ViewRadius",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "id": "perk_volley",
+      "name": "Volley",
+      "description": "Ranged attacks hit all enemies in a line.",
+      "unlock_level": 3,
+      "effects": [
+        {
+          "type": "stat_bonus",
+          "stat": "Accuracy",
+          "value": 5
+        }
+      ]
+    },
+    {
+      "id": "perk_phantom_step",
+      "name": "Phantom Step",
+      "description": "+5 Evasion, +10 Speed.",
+      "unlock_level": 2,
+      "effects": [
+        {
+          "type": "stat_bonus",
+          "stat": "Evasion",
+          "value": 5
+        },
+        {
+          "type": "stat_bonus",
+          "stat": "Speed",
+          "value": 10
+        }
+      ]
+    },
+    {
+      "id": "perk_death_dance",
+      "name": "Death Dance",
+      "description": "Kill streak threshold reduced by 1.",
+      "unlock_level": 3,
+      "effects": [
+        {
+          "type": "stat_bonus",
+          "stat": "Speed",
+          "value": 5
+        }
+      ]
+    },
+    {
+      "id": "perk_arcane_surge",
+      "name": "Arcane Surge",
+      "description": "Abilities deal +30% damage.",
+      "unlock_level": 2,
+      "effects": [
+        {
+          "type": "stat_bonus",
+          "stat": "Attack",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "id": "perk_spell_echo",
+      "name": "Spell Echo",
+      "description": "10% chance to cast an ability again for free.",
+      "unlock_level": 3,
+      "effects": [
+        {
+          "type": "stat_bonus",
+          "stat": "Accuracy",
+          "value": 5
+        }
+      ]
+    },
+    {
+      "id": "perk_tough",
+      "name": "Tough",
+      "description": "+15 Max HP.",
+      "unlock_level": 2,
+      "effects": [
+        {
+          "type": "stat_bonus",
+          "stat": "MaxHP",
+          "value": 15
+        }
+      ]
+    },
+    {
+      "id": "perk_swift",
+      "name": "Swift",
+      "description": "+15 Speed, +5 Evasion.",
+      "unlock_level": 2,
+      "effects": [
+        {
+          "type": "stat_bonus",
+          "stat": "Speed",
+          "value": 15
+        },
+        {
+          "type": "stat_bonus",
+          "stat": "Evasion",
+          "value": 5
+        }
+      ]
+    },
+    {
+      "id": "perk_savage",
+      "name": "Savage",
+      "description": "+5 Attack.",
+      "unlock_level": 2,
+      "effects": [
+        {
+          "type": "stat_bonus",
+          "stat": "Attack",
+          "value": 5
+        }
+      ]
+    },
+    {
+      "id": "perk_sharpshooter",
+      "name": "Sharpshooter",
+      "description": "+20 Accuracy.",
+      "unlock_level": 2,
+      "effects": [
+        {
+          "type": "stat_bonus",
+          "stat": "Accuracy",
+          "value": 20
+        }
+      ]
+    },
+    {
+      "id": "perk_survivalist",
+      "name": "Survivalist",
+      "description": "Potions heal +5 bonus HP once runtime support lands.",
+      "unlock_level": 3,
+      "effects": [
+        {
+          "type": "stat_bonus",
+          "stat": "MaxHP",
+          "value": 5
+        }
+      ]
+    },
+    {
+      "id": "perk_treasure_sense",
+      "name": "Treasure Sense",
+      "description": "Chests should be revealed on floor enter once minimap support lands.",
+      "unlock_level": 3,
+      "effects": [
+        {
+          "type": "stat_bonus",
+          "stat": "ViewRadius",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": "perk_iron_gut",
+      "name": "Iron Gut",
+      "description": "Intended poison immunity; currently grants toughness until immunity support lands.",
+      "unlock_level": 3,
+      "effects": [
+        {
+          "type": "stat_bonus",
+          "stat": "Defense",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "id": "perk_berserker",
+      "name": "Berserker",
+      "description": "Intended missing-HP attack scaling; currently grants a flat attack bonus.",
+      "unlock_level": 4,
+      "effects": [
+        {
+          "type": "stat_bonus",
+          "stat": "Attack",
+          "value": 3
+        }
+      ]
     }
   ]
 }

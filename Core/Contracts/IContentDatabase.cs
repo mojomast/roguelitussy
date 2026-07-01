@@ -24,6 +24,10 @@ public interface IContentDatabase
 
     IReadOnlyDictionary<string, TrapTemplate> TrapTemplates { get; }
 
+    IReadOnlyDictionary<string, RelicTemplate> RelicTemplates { get; }
+
+    IReadOnlyDictionary<string, FloorEventDefinition> FloorEvents { get; }
+
     bool TryGetItemTemplate(string templateId, out ItemTemplate template);
 
     bool TryGetEnemyTemplate(string templateId, out EnemyTemplate template);
@@ -39,6 +43,10 @@ public interface IContentDatabase
     bool TryGetStatusEffect(string statusId, out StatusEffectDefinition definition);
 
     bool TryGetTrapTemplate(string templateId, out TrapTemplate template);
+
+    bool TryGetRelicTemplate(string relicId, out RelicTemplate template);
+
+    bool TryGetFloorEvent(string eventId, out FloorEventDefinition definition);
 
     IReadOnlyList<ItemTemplate> GetAvailableItems(int depth);
 

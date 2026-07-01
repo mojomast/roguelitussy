@@ -25,6 +25,8 @@ public sealed class ContentLoader : IContentDatabase
         "room_prefabs.json",
         "loot_tables.json",
         "traps.json",
+        "relics.json",
+        "floor_events.json",
     };
 
     private static readonly Regex StableIdPattern = new("^[a-z0-9_]+$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
@@ -75,6 +77,10 @@ public sealed class ContentLoader : IContentDatabase
 
     public IReadOnlyDictionary<string, TrapTemplate> TrapTemplates { get; }
 
+    public IReadOnlyDictionary<string, RelicTemplate> RelicTemplates { get; }
+
+    public IReadOnlyDictionary<string, FloorEventDefinition> FloorEvents { get; }
+
     public IReadOnlyDictionary<string, string> TileLegend { get; }
 
     public IReadOnlyList<string> ValidationErrors { get; }
@@ -93,6 +99,8 @@ public sealed class ContentLoader : IContentDatabase
         SortedDictionary<string, RoomPrefabDefinition> roomPrefabs,
         SortedDictionary<string, LootTableDefinition> lootTables,
         SortedDictionary<string, TrapDefinition> trapDefinitions,
+        SortedDictionary<string, RelicTemplate> relicTemplates,
+        SortedDictionary<string, FloorEventDefinition> floorEvents,
         SortedDictionary<string, string> tileLegend,
         SortedDictionary<string, ItemTemplate> itemTemplates,
         SortedDictionary<string, EnemyTemplate> enemyTemplates,
@@ -117,6 +125,8 @@ public sealed class ContentLoader : IContentDatabase
         RoomPrefabs = new ReadOnlyDictionary<string, RoomPrefabDefinition>(roomPrefabs);
         LootTables = new ReadOnlyDictionary<string, LootTableDefinition>(lootTables);
         TrapDefinitions = new ReadOnlyDictionary<string, TrapDefinition>(trapDefinitions);
+        RelicTemplates = new ReadOnlyDictionary<string, RelicTemplate>(relicTemplates);
+        FloorEvents = new ReadOnlyDictionary<string, FloorEventDefinition>(floorEvents);
         TileLegend = new ReadOnlyDictionary<string, string>(tileLegend);
         ItemTemplates = new ReadOnlyDictionary<string, ItemTemplate>(itemTemplates);
         EnemyTemplates = new ReadOnlyDictionary<string, EnemyTemplate>(enemyTemplates);
@@ -182,6 +192,8 @@ public sealed class ContentLoader : IContentDatabase
         var rooms = ReadDocument<RoomPrefabsDocument>("room_prefabs.json", readJson("room_prefabs.json"));
         var lootTables = ReadDocument<LootTablesDocument>("loot_tables.json", readJson("loot_tables.json"));
         var traps = ReadDocument<TrapsDocument>("traps.json", readJson("traps.json"));
+        var relics = ReadDocument<List<RelicTemplate>>("relics.json", readJson("relics.json"));
+        var floorEvents = ReadDocument<List<FloorEventDefinition>>("floor_events.json", readJson("floor_events.json"));
 
         var itemDefinitions = BuildLookup(items.Items, item => item.Id, "item");
         var enemyDefinitions = BuildLookup(enemies.Enemies, enemy => enemy.Id, "enemy");
@@ -193,6 +205,8 @@ public sealed class ContentLoader : IContentDatabase
         var roomDefinitions = BuildLookup(rooms.Rooms, room => room.Id, "room prefab");
         var lootDefinitions = BuildLookup(lootTables.LootTables, table => table.Id, "loot table");
         var trapDefinitions = BuildLookup(traps.Traps, trap => trap.Id, "trap");
+        var relicTemplates = BuildLookup(relics, relic => relic.RelicId, "relic");
+        var floorEventDefinitions = BuildLookup(floorEvents, evt => evt.EventId, "floor event");
         var tileLegend = new SortedDictionary<string, string>(rooms.TileLegend, StringComparer.Ordinal);
 
         var itemTemplates = new SortedDictionary<string, ItemTemplate>(StringComparer.Ordinal);
@@ -258,6 +272,8 @@ public sealed class ContentLoader : IContentDatabase
             roomDefinitions,
             lootDefinitions,
             trapDefinitions,
+            relicTemplates,
+            floorEventDefinitions,
             tileLegend);
 
         validationErrors.AddRange(DifficultyScaler.ValidateBalance(itemDefinitions, enemyDefinitions, lootDefinitions));
@@ -273,6 +289,8 @@ public sealed class ContentLoader : IContentDatabase
             roomDefinitions,
             lootDefinitions,
             trapDefinitions,
+            relicTemplates,
+            floorEventDefinitions,
             tileLegend,
             itemTemplates,
             enemyTemplates,
@@ -401,6 +419,20 @@ public sealed class ContentLoader : IContentDatabase
     {
         var found = TrapTemplates.TryGetValue(templateId, out var trapTemplate);
         template = trapTemplate!;
+        return found;
+    }
+
+    public bool TryGetRelicTemplate(string relicId, out RelicTemplate template)
+    {
+        var found = RelicTemplates.TryGetValue(relicId, out var relicTemplate);
+        template = relicTemplate!;
+        return found;
+    }
+
+    public bool TryGetFloorEvent(string eventId, out FloorEventDefinition definition)
+    {
+        var found = FloorEvents.TryGetValue(eventId, out var floorEvent);
+        definition = floorEvent!;
         return found;
     }
 
@@ -1007,6 +1039,8 @@ public sealed class ContentLoader : IContentDatabase
         IReadOnlyDictionary<string, RoomPrefabDefinition> roomDefinitions,
         IReadOnlyDictionary<string, LootTableDefinition> lootDefinitions,
         IReadOnlyDictionary<string, TrapDefinition> trapDefinitions,
+        IReadOnlyDictionary<string, RelicTemplate> relicTemplates,
+        IReadOnlyDictionary<string, FloorEventDefinition> floorEvents,
         IReadOnlyDictionary<string, string> tileLegend)
     {
         var errors = new List<string>();
@@ -1032,8 +1066,33 @@ public sealed class ContentLoader : IContentDatabase
         ValidateRooms(roomDefinitions, enemyDefinitions, itemDefinitions, npcDefinitions, lootDefinitions, trapDefinitions, tileLegend, errors);
         ValidateLootTables(lootDefinitions, itemDefinitions, errors);
         ValidateTraps(trapDefinitions, abilityDefinitions, errors);
+        ValidateRelics(relicTemplates, errors);
+        ValidateFloorEvents(floorEvents, errors);
 
         return errors;
+    }
+
+    private static void ValidateRelics(IReadOnlyDictionary<string, RelicTemplate> relics, ICollection<string> errors)
+    {
+        foreach (var (id, relic) in relics)
+        {
+            ValidateStableId(id, "Relic", errors);
+            ValidateRequiredText(relic.DisplayName, $"Relic '{id}' display_name", errors);
+            ValidateRequiredText(relic.Description, $"Relic '{id}' description", errors);
+            ValidateRequiredText(relic.Rarity, $"Relic '{id}' rarity", errors);
+            ValidateRequiredText(relic.TriggerHook, $"Relic '{id}' trigger_hook", errors);
+            ValidateRequiredText(relic.EffectType, $"Relic '{id}' effect_type", errors);
+        }
+    }
+
+    private static void ValidateFloorEvents(IReadOnlyDictionary<string, FloorEventDefinition> floorEvents, ICollection<string> errors)
+    {
+        foreach (var (id, floorEvent) in floorEvents)
+        {
+            ValidateStableId(id, "Floor event", errors);
+            ValidateRequiredText(floorEvent.Type, $"Floor event '{id}' type", errors);
+            ValidateRequiredText(floorEvent.Description, $"Floor event '{id}' description", errors);
+        }
     }
 
     private static void ValidateHeader(string actualSchema, int actualVersion, string expectedSchema, string fileName, ICollection<string> errors)

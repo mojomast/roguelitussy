@@ -520,7 +520,7 @@
         },
         {
           "item_id": null,
-          "weight": 28,
+          "weight": 42,
           "count_min": 0,
           "count_max": 0
         }
@@ -576,7 +576,7 @@
       "entries": [
         {
           "item_id": "potion_health",
-          "weight": 28,
+          "weight": 42,
           "count_min": 1,
           "count_max": 2
         },
@@ -659,6 +659,12 @@
           "count_max": 1
         },
         {
+          "item_id": "relic_item_slot",
+          "weight": 15,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
           "item_id": null,
           "weight": 14,
           "count_min": 0,
@@ -734,6 +740,334 @@
         {
           "item_id": "ring_warding",
           "weight": 4,
+          "count_min": 1,
+          "count_max": 1
+        }
+      ]
+    },
+    {
+      "id": "boss_floor_loot",
+      "description": "Guaranteed high-value loot for boss floors.",
+      "rolls": 3,
+      "entries": [
+        {
+          "item_id": "sword_flame",
+          "weight": 8,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "armor_plate",
+          "weight": 8,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "battleaxe",
+          "weight": 8,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "ring_warding",
+          "weight": 6,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "amulet_regen",
+          "weight": 6,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "potion_might",
+          "weight": 10,
+          "count_min": 1,
+          "count_max": 2
+        }
+      ]
+    },
+    {
+      "id": "shrine_reward_table",
+      "description": "Rare rewards associated with shrine rooms.",
+      "rolls": 1,
+      "entries": [
+        {
+          "item_id": "potion_might",
+          "weight": 20,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "scroll_phase",
+          "weight": 15,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "ring_warding",
+          "weight": 10,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "boots_leather",
+          "weight": 12,
+          "count_min": 1,
+          "count_max": 1
+        }
+      ]
+    },
+    {
+      "id": "curse_room_chest_loot",
+      "description": "Extra-value treasure from cursed rooms.",
+      "rolls": 2,
+      "entries": [
+        {
+          "item_id": "sword_flame",
+          "weight": 6,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "armor_plate",
+          "weight": 6,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "scroll_phase",
+          "weight": 10,
+          "count_min": 1,
+          "count_max": 2
+        },
+        {
+          "item_id": "potion_might",
+          "weight": 12,
+          "count_min": 1,
+          "count_max": 2
+        },
+        {
+          "item_id": "amulet_regen",
+          "weight": 5,
+          "count_min": 1,
+          "count_max": 1
+        }
+      ]
+    },
+    {
+      "id": "venomspitter_loot",
+      "description": "Poison-themed drops from Venomspitters.",
+      "rolls": 1,
+      "entries": [
+        {
+          "item_id": "potion_health",
+          "weight": 20,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "dagger_venom",
+          "weight": 8,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": null,
+          "weight": 72,
+          "count_min": 0,
+          "count_max": 0
+        }
+      ]
+    },
+    {
+      "id": "armored_grunt_loot",
+      "description": "Armor and extra coin-bearing drops from Armored Grunts.",
+      "rolls": 1,
+      "entries": [
+        {
+          "item_id": "item_shield_basic",
+          "weight": 15,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "armor_chainmail",
+          "weight": 8,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "potion_health",
+          "weight": 22,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": null,
+          "weight": 55,
+          "count_min": 0,
+          "count_max": 0
+        }
+      ]
+    },
+    {
+      "id": "shadow_thief_loot",
+      "description": "Fast light gear carried by Shadow Thieves.",
+      "rolls": 1,
+      "entries": [
+        {
+          "item_id": "scroll_blink",
+          "weight": 15,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "boots_leather",
+          "weight": 12,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "item_smoke_bomb",
+          "weight": 12,
+          "count_min": 1,
+          "count_max": 2
+        },
+        {
+          "item_id": null,
+          "weight": 61,
+          "count_min": 0,
+          "count_max": 0
+        }
+      ]
+    },
+    {
+      "id": "healer_sprite_loot",
+      "description": "Support consumables from Healer Sprites.",
+      "rolls": 1,
+      "entries": [
+        {
+          "item_id": "potion_health",
+          "weight": 35,
+          "count_min": 1,
+          "count_max": 2
+        },
+        {
+          "item_id": "potion_mana",
+          "weight": 12,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": null,
+          "weight": 53,
+          "count_min": 0,
+          "count_max": 0
+        }
+      ]
+    },
+    {
+      "id": "explosive_golem_loot",
+      "description": "Heavy stone-guarded treasure.",
+      "rolls": 2,
+      "entries": [
+        {
+          "item_id": "armor_plate",
+          "weight": 8,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "battleaxe",
+          "weight": 10,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "scroll_fireball",
+          "weight": 12,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "relic_item_slot",
+          "weight": 5,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": null,
+          "weight": 65,
+          "count_min": 0,
+          "count_max": 0
+        }
+      ]
+    },
+    {
+      "id": "spectral_hound_loot",
+      "description": "Ghostly hound remnants.",
+      "rolls": 1,
+      "entries": [
+        {
+          "item_id": "scroll_phase",
+          "weight": 14,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "amulet_farsight",
+          "weight": 8,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": null,
+          "weight": 78,
+          "count_min": 0,
+          "count_max": 0
+        }
+      ]
+    },
+    {
+      "id": "safe_floor_merchant_stock",
+      "description": "Higher-quality stock for sanctuary floor merchants.",
+      "rolls": 4,
+      "entries": [
+        {
+          "item_id": "potion_health",
+          "weight": 25,
+          "count_min": 1,
+          "count_max": 3
+        },
+        {
+          "item_id": "potion_mana",
+          "weight": 12,
+          "count_min": 1,
+          "count_max": 2
+        },
+        {
+          "item_id": "scroll_frost_nova",
+          "weight": 10,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "item_arrows_bundle",
+          "weight": 20,
+          "count_min": 1,
+          "count_max": 3
+        },
+        {
+          "item_id": "item_shield_basic",
+          "weight": 15,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "ring_warding",
+          "weight": 8,
           "count_min": 1,
           "count_max": 1
         }

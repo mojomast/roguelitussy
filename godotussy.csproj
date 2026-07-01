@@ -29,6 +29,7 @@
 
   <ItemGroup Condition="'$(RenderingValidation)' == 'true'">
     <Compile Remove="Core\Persistence\**\*.cs" />
+    <Compile Include="Core\Persistence\MetaProgressionData.cs" />
   </ItemGroup>
 
   <PropertyGroup Condition="'$(RenderingValidation)' == 'true'">

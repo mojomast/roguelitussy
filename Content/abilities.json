@@ -240,6 +240,139 @@
       "sfx": "acid_sizzle"
     },
     {
+      "id": "shield_bash",
+      "name": "Shield Bash",
+      "description": "Smash an adjacent target with a shield, dealing modest damage and briefly stunning it.",
+      "targeting": {
+        "type": "single",
+        "range": 1,
+        "requires_los": true
+      },
+      "costs": {
+        "energy": 1000
+      },
+      "effects": [
+        {
+          "type": "damage",
+          "damage_type": "physical",
+          "base_value": 5,
+          "stat_scaling": {
+            "stat": "attack",
+            "factor": 0.5
+          }
+        },
+        {
+          "type": "apply_status",
+          "status_effect": "stunned",
+          "chance": 45,
+          "duration": 1
+        }
+      ],
+      "animation": "melee_slam",
+      "sfx": "heavy_impact"
+    },
+    {
+      "id": "ranged_shot",
+      "name": "Ranged Shot",
+      "description": "Fire a precise shot at a visible target from a safe distance.",
+      "targeting": {
+        "type": "single",
+        "range": 5,
+        "requires_los": true
+      },
+      "costs": {
+        "energy": 1000
+      },
+      "effects": [
+        {
+          "type": "damage",
+          "damage_type": "physical",
+          "base_value": 6,
+          "stat_scaling": {
+            "stat": "attack",
+            "factor": 0.8
+          }
+        }
+      ],
+      "animation": "projectile_arrow",
+      "sfx": "arrow_fire"
+    },
+    {
+      "id": "backstab",
+      "name": "Backstab",
+      "description": "Exploit an opening with a vicious close-range strike.",
+      "targeting": {
+        "type": "single",
+        "range": 1,
+        "requires_los": true
+      },
+      "costs": {
+        "energy": 900
+      },
+      "effects": [
+        {
+          "type": "damage",
+          "damage_type": "physical",
+          "base_value": 8,
+          "stat_scaling": {
+            "stat": "attack",
+            "factor": 1.0
+          }
+        }
+      ],
+      "animation": "melee_slam",
+      "sfx": "heavy_impact"
+    },
+    {
+      "id": "arcane_bolt",
+      "name": "Arcane Bolt",
+      "description": "Launch a focused bolt of force at a visible enemy.",
+      "targeting": {
+        "type": "single",
+        "range": 6,
+        "requires_los": true
+      },
+      "costs": {
+        "energy": 1000
+      },
+      "effects": [
+        {
+          "type": "damage",
+          "damage_type": "dark",
+          "base_value": 9,
+          "stat_scaling": {
+            "stat": "attack",
+            "factor": 0.7
+          }
+        }
+      ],
+      "animation": "drain_dark",
+      "sfx": "life_drain"
+    },
+    {
+      "id": "mana_shield",
+      "name": "Mana Shield",
+      "description": "Wrap yourself in a short-lived protective ward.",
+      "targeting": {
+        "type": "self",
+        "range": 0,
+        "requires_los": false
+      },
+      "costs": {
+        "energy": 800
+      },
+      "effects": [
+        {
+          "type": "apply_status",
+          "status_effect": "shielded",
+          "chance": 100,
+          "duration": 3
+        }
+      ],
+      "animation": "shout_ring",
+      "sfx": "war_cry"
+    },
+    {
       "id": "spike_trap",
       "name": "Spike Trap",
       "description": "Sharp iron spikes spring from the floor, impaling whoever steps on the tile.",
@@ -260,6 +393,240 @@
       ],
       "animation": "trap_spring",
       "sfx": "trap_click"
+    },
+    {
+      "id": "venom_spit",
+      "name": "Venom Spit",
+      "description": "Spit poison at a target within range.",
+      "targeting": {
+        "type": "single",
+        "range": 5,
+        "requires_los": true
+      },
+      "costs": {
+        "energy": 1000
+      },
+      "effects": [
+        {
+          "type": "damage",
+          "damage_type": "poison",
+          "base_value": 4,
+          "stat_scaling": {
+            "stat": "attack",
+            "factor": 0.5
+          }
+        },
+        {
+          "type": "apply_status",
+          "status_effect": "poisoned",
+          "chance": 75,
+          "duration": 5
+        }
+      ],
+      "animation": "projectile_poison",
+      "sfx": "venom_spit"
+    },
+    {
+      "id": "burning_touch",
+      "name": "Burning Touch",
+      "description": "A searing spectral strike that can ignite the target.",
+      "targeting": {
+        "type": "single",
+        "range": 1,
+        "requires_los": true
+      },
+      "costs": {
+        "energy": 1000
+      },
+      "effects": [
+        {
+          "type": "damage",
+          "damage_type": "fire",
+          "base_value": 7,
+          "stat_scaling": {
+            "stat": "attack",
+            "factor": 0.7
+          }
+        },
+        {
+          "type": "apply_status",
+          "status_effect": "burning",
+          "chance": 60,
+          "duration": 3
+        }
+      ],
+      "animation": "melee_fire",
+      "sfx": "burning_touch"
+    },
+    {
+      "id": "healing_pulse",
+      "name": "Healing Pulse",
+      "description": "Heal nearby allies with a soft burst of light.",
+      "targeting": {
+        "type": "aoe_circle",
+        "range": 0,
+        "radius": 2,
+        "requires_los": false,
+        "hits_allies": true,
+        "center": "self"
+      },
+      "costs": {
+        "energy": 1000
+      },
+      "effects": [
+        {
+          "type": "heal_self",
+          "value_source": "flat",
+          "factor": 6.0
+        }
+      ],
+      "animation": "healing_pulse",
+      "sfx": "healing_chime"
+    },
+    {
+      "id": "death_burst",
+      "name": "Death Burst",
+      "description": "Explode in a concussive burst around the caster.",
+      "targeting": {
+        "type": "aoe_circle",
+        "range": 0,
+        "radius": 2,
+        "requires_los": false,
+        "center": "self"
+      },
+      "costs": {
+        "energy": 1000
+      },
+      "effects": [
+        {
+          "type": "damage",
+          "damage_type": "physical",
+          "base_value": 12
+        }
+      ],
+      "animation": "explosion_rock",
+      "sfx": "golem_explode"
+    },
+    {
+      "id": "frost_nova",
+      "name": "Frost Nova",
+      "description": "A chilling pulse slows all nearby enemies.",
+      "targeting": {
+        "type": "aoe_circle",
+        "range": 0,
+        "radius": 6,
+        "requires_los": false,
+        "center": "self"
+      },
+      "costs": {
+        "energy": 1000,
+        "mp": 6
+      },
+      "effects": [
+        {
+          "type": "apply_status",
+          "status_effect": "frozen",
+          "chance": 100,
+          "duration": 2
+        }
+      ],
+      "animation": "frost_nova",
+      "sfx": "frost_nova"
+    },
+    {
+      "id": "poison_gas_trap",
+      "name": "Poison Gas Trap",
+      "description": "A cloud of toxin bursts from the floor.",
+      "targeting": {
+        "type": "aoe_circle",
+        "range": 0,
+        "radius": 1,
+        "requires_los": false,
+        "center": "self"
+      },
+      "costs": {
+        "energy": 100
+      },
+      "effects": [
+        {
+          "type": "apply_status",
+          "status_effect": "poisoned",
+          "chance": 100,
+          "duration": 8
+        }
+      ],
+      "animation": "poison_cloud",
+      "sfx": "gas_hiss"
+    },
+    {
+      "id": "alarm_trap",
+      "name": "Alarm Trap",
+      "description": "A piercing alarm rings through the floor.",
+      "targeting": {
+        "type": "aoe_circle",
+        "range": 0,
+        "radius": 6,
+        "requires_los": false,
+        "center": "self"
+      },
+      "costs": {
+        "energy": 100
+      },
+      "effects": [
+        {
+          "type": "apply_status",
+          "status_effect": "empowered",
+          "chance": 100,
+          "duration": 3,
+          "filter": "allies"
+        }
+      ],
+      "animation": "alarm_ring",
+      "sfx": "alarm_bell"
+    },
+    {
+      "id": "teleport_trap",
+      "name": "Teleport Trap",
+      "description": "Unstable magic tears open underfoot.",
+      "targeting": {
+        "type": "tile",
+        "range": 8,
+        "requires_los": false,
+        "requires_walkable": true
+      },
+      "costs": {
+        "energy": 100
+      },
+      "effects": [
+        {
+          "type": "teleport",
+          "destination": "target_tile"
+        }
+      ],
+      "animation": "teleport_flash",
+      "sfx": "blink_pop"
+    },
+    {
+      "id": "gold_drain_trap",
+      "name": "Gold Drain Trap",
+      "description": "A hexed sigil lashes out and drains coin.",
+      "targeting": {
+        "type": "single",
+        "range": 0,
+        "requires_los": false
+      },
+      "costs": {
+        "energy": 100
+      },
+      "effects": [
+        {
+          "type": "damage",
+          "damage_type": "dark",
+          "base_value": 1
+        }
+      ],
+      "animation": "curse_flash",
+      "sfx": "gold_drain"
     }
   ]
 }

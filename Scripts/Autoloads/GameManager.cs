@@ -18,6 +18,7 @@ public partial class GameManager : Node
     private RunStats _runStats = CreateDefaultRunStats();
     private FloorStats _floorStats = CreateDefaultFloorStats(0);
     private int _floorStartTurnNumber;
+    private bool _readyInitialized;
 
     private sealed record FloorEntrances(Position StairsUp, Position StairsDown);
 
@@ -305,6 +306,12 @@ public partial class GameManager : Node
 
     public override void _Ready()
     {
+        if (_readyInitialized)
+        {
+            return;
+        }
+
+        _readyInitialized = true;
         BindBus(ResolveEventBus());
         EnsureRuntimeServices();
     }
@@ -653,6 +660,8 @@ public partial class GameManager : Node
 
     public void LoadWorld(WorldState world)
     {
+        ArgumentNullException.ThrowIfNull(world);
+
         if (world.Player is null)
         {
             Bus?.EmitLogMessage($"Cannot load floor {world.Depth} because it does not contain an active player.", LogCategory.Warning);
@@ -1650,8 +1659,9 @@ public partial class GameManager : Node
                     return items;
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                Bus?.EmitLogMessage($"Loot table roll failed; using fallback floor loot: {ex.Message}", LogCategory.Warning);
             }
         }
 
@@ -2780,12 +2790,13 @@ public partial class GameManager : Node
             return;
         }
 
-        var existingTemplates = world.Entities
+        var existingNpcTemplateIds = world.Entities
             .Select(entity => entity.GetComponent<NpcComponent>()?.TemplateId)
             .Where(templateId => !string.IsNullOrWhiteSpace(templateId))
             .Cast<string>()
-            .ToHashSet(StringComparer.Ordinal);
-        var remainingSlots = Math.Max(0, 2 - existingTemplates.Count);
+            .ToList();
+        var existingTemplates = existingNpcTemplateIds.ToHashSet(StringComparer.Ordinal);
+        var remainingSlots = Math.Max(0, 2 - existingNpcTemplateIds.Count);
         if (remainingSlots == 0)
         {
             return;
@@ -2911,12 +2922,13 @@ public partial class GameManager : Node
 
     private static IEnumerable<Position> FindNpcSpawnCandidates(WorldState world, bool preferOpenArea)
     {
+        var stairs = FindStairs(world);
         for (var y = 0; y < world.Height; y++)
         {
             for (var x = 0; x < world.Width; x++)
             {
                 var position = new Position(x, y);
-                if (!IsEligibleNpcSpawnTile(world, position))
+                if (!IsEligibleNpcSpawnTile(world, position, stairs))
                 {
                     continue;
                 }
@@ -2939,7 +2951,7 @@ public partial class GameManager : Node
         }
     }
 
-    private static bool IsEligibleNpcSpawnTile(WorldState world, Position position)
+    private static bool IsEligibleNpcSpawnTile(WorldState world, Position position, IReadOnlyList<Position> stairs)
     {
         if (!world.IsWalkable(position)
             || world.GetEntityAt(position) is not null
@@ -2948,7 +2960,25 @@ public partial class GameManager : Node
             return false;
         }
 
-        return !IsNearStairs(world, position, 4);
+        return !IsNearStairs(position, stairs, 4);
+    }
+
+    private static List<Position> FindStairs(WorldState world)
+    {
+        var stairs = new List<Position>();
+        for (var y = 0; y < world.Height; y++)
+        {
+            for (var x = 0; x < world.Width; x++)
+            {
+                var position = new Position(x, y);
+                if (world.GetTile(position) is TileType.StairsUp or TileType.StairsDown)
+                {
+                    stairs.Add(position);
+                }
+            }
+        }
+
+        return stairs;
     }
 
     private static int CountWalkableNeighbors(WorldState world, Position position)
@@ -2980,18 +3010,13 @@ public partial class GameManager : Node
         return false;
     }
 
-    private static bool IsNearStairs(WorldState world, Position position, int maxDistance)
+    private static bool IsNearStairs(Position position, IReadOnlyList<Position> stairs, int maxDistance)
     {
-        for (var y = 0; y < world.Height; y++)
+        foreach (var stair in stairs)
         {
-            for (var x = 0; x < world.Width; x++)
+            if (position.DistanceTo(stair) <= maxDistance)
             {
-                var candidate = new Position(x, y);
-                if (world.GetTile(candidate) is TileType.StairsUp or TileType.StairsDown
-                    && position.DistanceTo(candidate) <= maxDistance)
-                {
-                    return true;
-                }
+                return true;
             }
         }
 

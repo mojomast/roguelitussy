@@ -52,6 +52,8 @@ Loading a run with pending perk choices reopens the level-up overlay when choice
 When the player dies, `GameManager` finalizes a runtime `RunStats` snapshot and emits `EventBus.GameOverWithStats`. `UIRoot` opens the `GameOverScreen`, which presents floor reached, turns survived, kills, gold, item finds, damage taken, seed, cause of death, best item, and a short contextual epitaph.
 Floor-specific runtime counters live in a separate `FloorStats` snapshot. `GameManager` resets them for each loaded floor and emits `EventBus.FloorSummaryReady` immediately before travel loads the destination floor, allowing the UI to show kills, loot, gold, damage, turns, opened chests, and triggered traps for the floor being left without mixing them into lifetime `RunStats`.
 
+Between-run meta progression is tracked by `MetaProgressionManager`, a Godot autoload that stores Echoes, purchased upgrade levels, and the last 20 run history entries in `user://meta_progress.json`. Echo awards are derived from floor reached, kills, gold collected, first-depth bonuses, and the authored `echo_bonus_pct` upgrade.
+
 The planned expansion path for progression is documented in `docs/PROGRESSION.md`.
 
 ## AI
@@ -90,6 +92,8 @@ Combat is still resolved inside `Core/Simulation/CombatResolver.cs`, but it is n
 
 The ability pipeline is shared by item casts and AI casts so the runtime rules stay in one place.
 
+Relics are content-authored passive hooks in `Content/relics.json`. The current simulation pass adds `RelicComponent` and `RelicProcessor` support for kill and poison-tick hooks, with EventBus relic-choice payloads available for UI integration.
+
 ## Generation
 
 Dungeon generation lives in `Core/Generation/`.
@@ -106,6 +110,8 @@ The current flow in `DungeonGenerator` is:
 8. Validate the generated level with `LevelValidator`, including trap reachability.
 
 Traps are walkable but hazardous stationary features. Authored trap definitions live in `Content/traps.json`; each room `trap_id` must reference a known trap. `LevelData` exposes `TrapSpawnDetails` so `GameManager.PopulateWorld` can instantiate trap entities.
+
+Floor-event planning lives in `Core/Generation/FloorEventResolver.cs`. It classifies every 5th floor as safe, every non-safe 3rd floor as a boss floor, and standard floors as candidates for shrine or curse rooms. Full room injection and presentation remain GameManager/UI integration work.
 
 ## Rendering And UI Flow
 

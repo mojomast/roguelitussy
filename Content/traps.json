@@ -8,11 +8,113 @@
       "description": "Sharp iron spikes hidden in the floor impale whoever steps on the tile.",
       "ability_id": "spike_trap",
       "damage_min": 5,
-      "damage_max": 10,
+      "damage_max": 8,
       "damage_type": "physical",
       "sprite_path": "res://Assets/Sprites/objects/trap_spikes.svg",
-      "sprite_atlas_coords": [0, 0],
-      "avoid_flags": ["phased", "flying"]
+      "sprite_atlas_coords": [
+        0,
+        0
+      ],
+      "avoid_flags": [
+        "phased",
+        "flying"
+      ],
+      "trigger_chance": 100
+    },
+    {
+      "id": "trap_spike",
+      "name": "Spike Trap",
+      "description": "Sharp iron spikes hidden in the floor impale whoever steps on the tile.",
+      "ability_id": "spike_trap",
+      "damage_min": 5,
+      "damage_max": 8,
+      "damage_type": "physical",
+      "sprite_path": "res://Assets/Sprites/objects/trap_spikes.svg",
+      "sprite_atlas_coords": [
+        0,
+        0
+      ],
+      "avoid_flags": [
+        "phased",
+        "flying"
+      ],
+      "trigger_chance": 100
+    },
+    {
+      "id": "trap_poison_gas",
+      "name": "Poison Gas Trap",
+      "description": "A pressure plate vents poison gas for 8 turns.",
+      "ability_id": "poison_gas_trap",
+      "damage_min": 0,
+      "damage_max": 0,
+      "damage_type": "poison",
+      "status_effect": "poisoned",
+      "status_duration": 8,
+      "status_magnitude": 1,
+      "sprite_path": "res://Assets/Sprites/objects/trap_spikes.svg",
+      "sprite_atlas_coords": [
+        1,
+        0
+      ],
+      "avoid_flags": [
+        "phased",
+        "flying"
+      ],
+      "trigger_chance": 100
+    },
+    {
+      "id": "trap_alarm",
+      "name": "Alarm Trap",
+      "description": "A hidden wire alerts enemies across the floor.",
+      "ability_id": "alarm_trap",
+      "damage_min": 0,
+      "damage_max": 0,
+      "damage_type": "physical",
+      "sprite_path": "res://Assets/Sprites/objects/trap_spikes.svg",
+      "sprite_atlas_coords": [
+        2,
+        0
+      ],
+      "avoid_flags": [
+        "phased"
+      ],
+      "trigger_chance": 100
+    },
+    {
+      "id": "trap_teleport",
+      "name": "Teleport Trap",
+      "description": "A shimmering rune randomly teleports the player.",
+      "ability_id": "teleport_trap",
+      "damage_min": 0,
+      "damage_max": 0,
+      "damage_type": "cold",
+      "sprite_path": "res://Assets/Sprites/objects/trap_spikes.svg",
+      "sprite_atlas_coords": [
+        3,
+        0
+      ],
+      "avoid_flags": [
+        "phased"
+      ],
+      "trigger_chance": 100
+    },
+    {
+      "id": "trap_gold_drain",
+      "name": "Gold Drain Trap",
+      "description": "A greedy curse should steal 20-50 gold once trap economy support lands.",
+      "ability_id": "gold_drain_trap",
+      "damage_min": 1,
+      "damage_max": 1,
+      "damage_type": "dark",
+      "sprite_path": "res://Assets/Sprites/objects/trap_spikes.svg",
+      "sprite_atlas_coords": [
+        4,
+        0
+      ],
+      "avoid_flags": [
+        "phased"
+      ],
+      "trigger_chance": 100
     }
   ]
 }

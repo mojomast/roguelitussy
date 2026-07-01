@@ -87,6 +87,8 @@ public sealed class AIParamsTests : ITestSuite
         File.WriteAllText(Path.Combine(sandbox.DirectoryPath, "room_prefabs.json"), EmptyRoomPrefabsJson());
         File.WriteAllText(Path.Combine(sandbox.DirectoryPath, "loot_tables.json"), EmptyLootTablesJson());
         File.WriteAllText(Path.Combine(sandbox.DirectoryPath, "traps.json"), EmptyTrapsJson());
+        File.WriteAllText(Path.Combine(sandbox.DirectoryPath, "relics.json"), "[]");
+        File.WriteAllText(Path.Combine(sandbox.DirectoryPath, "floor_events.json"), "[]");
 
         var content = ContentLoader.LoadFromDirectory(sandbox.DirectoryPath, throwOnValidationErrors: false);
         Expect.False(content.IsValid, "Unknown ai_params key should fail validation");

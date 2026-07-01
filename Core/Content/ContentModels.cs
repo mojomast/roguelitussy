@@ -127,6 +127,24 @@ public sealed class TrapsDocument
     public List<TrapDefinition> Traps { get; set; } = new();
 }
 
+public sealed class FloorEventDefinition
+{
+    [JsonPropertyName("event_id")]
+    public string EventId { get; set; } = string.Empty;
+
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = string.Empty;
+
+    [JsonPropertyName("shrine_type")]
+    public string ShrineType { get; set; } = string.Empty;
+
+    [JsonPropertyName("hp_cost")]
+    public int HpCost { get; set; }
+
+    [JsonPropertyName("description")]
+    public string Description { get; set; } = string.Empty;
+}
+
 public sealed class TrapDefinition
 {
     [JsonPropertyName("id")]

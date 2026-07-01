@@ -1,0 +1,10 @@
+[
+  { "id": "starting_gold", "display_name": "Fortune's Favor", "max_level": 3, "cost_per_level": [10, 25, 50], "description": "Start each run with +30/+60/+100 gold.", "effect": "starting_gold", "values": [30, 60, 100] },
+  { "id": "extra_inventory", "display_name": "Bottomless Pack", "max_level": 2, "cost_per_level": [20, 40], "description": "Gain +2/+4 inventory slots.", "effect": "inventory_bonus", "values": [2, 4] },
+  { "id": "unlock_ranger", "display_name": "Ranger's Path", "max_level": 1, "cost_per_level": [30], "description": "Unlock the Ranger archetype.", "effect": "unlock_archetype", "values": ["ranger"] },
+  { "id": "unlock_trickster", "display_name": "Trickster's Edge", "max_level": 1, "cost_per_level": [30], "description": "Unlock the Trickster archetype.", "effect": "unlock_archetype", "values": ["trickster"] },
+  { "id": "unlock_arcanist", "display_name": "Arcanist's Tome", "max_level": 1, "cost_per_level": [30], "description": "Unlock the Arcanist archetype.", "effect": "unlock_archetype", "values": ["arcanist"] },
+  { "id": "blessed_start", "display_name": "Blessed Beginning", "max_level": 3, "cost_per_level": [15, 35, 60], "description": "Start with 1/2/3 extra health potions.", "effect": "starting_items", "values": ["potion_health", "potion_health", "potion_health"] },
+  { "id": "echo_magnet", "display_name": "Echo Magnet", "max_level": 3, "cost_per_level": [20, 45, 80], "description": "Earn +10%/+25%/+50% more Echoes per run.", "effect": "echo_bonus_pct", "values": [10, 25, 50] },
+  { "id": "relic_seeker", "display_name": "Relic Seeker", "max_level": 1, "cost_per_level": [50], "description": "Guarantee one relic on floor 1.", "effect": "floor1_relic", "values": [1] }
+]

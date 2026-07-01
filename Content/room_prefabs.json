@@ -1106,6 +1106,111 @@
       "item_quality_bonus": 1,
       "enemy_count_bonus": 1,
       "lock_doors_on_enter": true
+    },
+    {
+      "id": "shrine_sanctum",
+      "name": "Shrine Sanctum",
+      "tags": [
+        "shrine",
+        "special"
+      ],
+      "width": 9,
+      "height": 7,
+      "min_depth": 1,
+      "max_depth": 99,
+      "layout": [
+        "#########",
+        "#.......#",
+        "#...I...#",
+        "+.......+",
+        "#.......#",
+        "#.......#",
+        "#########"
+      ],
+      "doors": [
+        {
+          "x": 0,
+          "y": 3,
+          "direction": "west"
+        },
+        {
+          "x": 8,
+          "y": 3,
+          "direction": "east"
+        }
+      ],
+      "spawn_points": [
+        {
+          "x": 4,
+          "y": 2,
+          "type": "shrine",
+          "trap_id": null
+        }
+      ],
+      "fixed_entities": [],
+      "item_quality_bonus": null,
+      "enemy_count_bonus": null,
+      "lock_doors_on_enter": false
+    },
+    {
+      "id": "curse_vault",
+      "name": "Curse Vault",
+      "tags": [
+        "curse",
+        "special",
+        "treasure"
+      ],
+      "width": 11,
+      "height": 9,
+      "min_depth": 2,
+      "max_depth": 99,
+      "layout": [
+        "###########",
+        "#.........#",
+        "#..C...C..#",
+        "#.........#",
+        "+....^....+",
+        "#.........#",
+        "#....C....#",
+        "#.........#",
+        "###########"
+      ],
+      "doors": [
+        {
+          "x": 0,
+          "y": 4,
+          "direction": "west"
+        },
+        {
+          "x": 10,
+          "y": 4,
+          "direction": "east"
+        }
+      ],
+      "spawn_points": [
+        {
+          "x": 3,
+          "y": 2,
+          "type": "curse_chest",
+          "trap_id": null
+        },
+        {
+          "x": 7,
+          "y": 2,
+          "type": "curse_chest",
+          "trap_id": null
+        },
+        {
+          "x": 5,
+          "y": 6,
+          "type": "curse_chest",
+          "trap_id": null
+        }
+      ],
+      "fixed_entities": [],
+      "item_quality_bonus": 2,
+      "enemy_count_bonus": null,
+      "lock_doors_on_enter": false
     }
   ]
 }

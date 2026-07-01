@@ -9,9 +9,10 @@ run/main_scene="res://Scenes/Main.tscn"
 config/features=PackedStringArray("4.5", "C#")
 
 [autoload]
-GameManager="*res://Scripts/Autoloads/GameManager.cs"
 EventBus="*res://Scripts/Autoloads/EventBus.cs"
 ContentDatabase="*res://Scripts/Autoloads/ContentDatabase.cs"
+MetaProgressionManager="*res://Scripts/Autoloads/MetaProgressionManager.cs"
+GameManager="*res://Scripts/Autoloads/GameManager.cs"
 
 [display]
 window/size/viewport_width=1920

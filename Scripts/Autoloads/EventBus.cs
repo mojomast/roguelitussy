@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Godot;
 using Roguelike.Core;
 
@@ -86,6 +87,9 @@ public partial class EventBus : Node
     public event Action<string>? TargetingModeExited;
     public event Action<Position, bool>? TargetingCursorMoved;
     public event Action<IReadOnlyList<Position>, bool>? TargetingPreviewChanged;
+    public event Action<IReadOnlyList<RelicTemplate>>? RelicChoiceReady;
+    public event Action? CurseRoomEntered;
+    public event Action<EntityId>? BossRoomEntered;
 
     public event Action<TrapTriggeredEventArgs>? TrapTriggered;
 
@@ -172,6 +176,12 @@ public partial class EventBus : Node
     public void EmitTargetingCursorMoved(Position position, bool isValid) => TargetingCursorMoved?.Invoke(position, isValid);
 
     public void EmitTargetingPreviewChanged(IReadOnlyList<Position> tiles, bool isValid) => TargetingPreviewChanged?.Invoke(tiles, isValid);
+
+    public void EmitRelicChoiceReady(IReadOnlyList<RelicTemplate> choices) => RelicChoiceReady?.Invoke(choices);
+
+    public void EmitCurseRoomEntered() => CurseRoomEntered?.Invoke();
+
+    public void EmitBossRoomEntered(EntityId bossId) => BossRoomEntered?.Invoke(bossId);
 
     public void EmitTrapTriggered(TrapTriggeredEventArgs args) => TrapTriggered?.Invoke(args);
 }

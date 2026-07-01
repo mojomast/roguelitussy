@@ -184,8 +184,21 @@ public static class StatusEffectProcessor
             switch (effect.Type)
             {
                 case StatusEffectType.Poisoned:
-                    damageTaken += 2 * effect.Magnitude;
-                    entity.Stats.HP -= 2 * effect.Magnitude;
+                    var poisonDamage = 2 * effect.Magnitude;
+                    if (effect.SourceEntityId is { } poisonSourceId && world.GetEntity(poisonSourceId) is { } poisonSource)
+                    {
+                        var context = new RelicHookContext
+                        {
+                            TargetId = entity.Id,
+                            DamageAmount = poisonDamage,
+                            ModifiedValue = poisonDamage,
+                        };
+                        RelicProcessor.ProcessHook("on_poison_tick", poisonSource, world, world.ContentDatabase, context);
+                        poisonDamage = Math.Max(0, context.ModifiedValue);
+                    }
+
+                    damageTaken += poisonDamage;
+                    entity.Stats.HP -= poisonDamage;
                     lethalSourceId = entity.Stats.HP <= 0 ? effect.SourceEntityId : lethalSourceId;
                     break;
                 case StatusEffectType.Burning:
@@ -272,6 +285,20 @@ public static class StatusEffectProcessor
                     {
                         case "damage":
                             var damage = tickEffect.Value * effect.Magnitude;
+                            if (effect.Type == StatusEffectType.Poisoned
+                                && effect.SourceEntityId is { } poisonSourceId
+                                && world.GetEntity(poisonSourceId) is { } poisonSource)
+                            {
+                                var context = new RelicHookContext
+                                {
+                                    TargetId = entity.Id,
+                                    DamageAmount = damage,
+                                    ModifiedValue = damage,
+                                };
+                                RelicProcessor.ProcessHook("on_poison_tick", poisonSource, world, db, context);
+                                damage = Math.Max(0, context.ModifiedValue);
+                            }
+
                             damageTaken += damage;
                             entity.Stats.HP -= damage;
                             lethalSourceId = entity.Stats.HP <= 0 ? effect.SourceEntityId : lethalSourceId;

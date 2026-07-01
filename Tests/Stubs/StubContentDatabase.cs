@@ -542,6 +542,9 @@ public sealed class StubContentDatabase : IContentDatabase
                 new[] { "flying", "phase_through_walls" },
                 100),
         };
+
+        RelicTemplates = new Dictionary<string, RelicTemplate>();
+        FloorEvents = new Dictionary<string, FloorEventDefinition>();
     }
 
 
@@ -564,6 +567,10 @@ public sealed class StubContentDatabase : IContentDatabase
     public IReadOnlyDictionary<string, StatusEffectDefinition> StatusEffects { get; } = null!;
 
     public IReadOnlyDictionary<string, TrapTemplate> TrapTemplates { get; } = null!;
+
+    public IReadOnlyDictionary<string, RelicTemplate> RelicTemplates { get; } = null!;
+
+    public IReadOnlyDictionary<string, FloorEventDefinition> FloorEvents { get; } = null!;
 
     public bool TryGetItemTemplate(string templateId, out ItemTemplate template)
     {
@@ -618,6 +625,20 @@ public sealed class StubContentDatabase : IContentDatabase
     {
         var found = TrapTemplates.TryGetValue(templateId, out var trap);
         template = trap!;
+        return found;
+    }
+
+    public bool TryGetRelicTemplate(string relicId, out RelicTemplate template)
+    {
+        var found = RelicTemplates.TryGetValue(relicId, out var relic);
+        template = relic!;
+        return found;
+    }
+
+    public bool TryGetFloorEvent(string eventId, out FloorEventDefinition definition)
+    {
+        var found = FloorEvents.TryGetValue(eventId, out var floorEvent);
+        definition = floorEvent!;
         return found;
     }
 

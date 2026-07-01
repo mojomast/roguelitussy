@@ -26,6 +26,12 @@ public static class DeathResolver
         var droppedItems = RollAndDropLoot(world, victim);
         var goldAwarded = AwardGoldToKiller(world, killer, victim);
 
+        RelicProcessor.ProcessHook("on_kill", killer, world, world.ContentDatabase, new RelicHookContext
+        {
+            TargetId = victim.Id,
+            EnemyTag = victim.GetComponent<EnemyComponent>()?.TemplateId,
+        });
+
         var progression = killer.GetComponent<ProgressionComponent>();
         if (progression is null)
         {

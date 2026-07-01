@@ -43,6 +43,16 @@ godot --headless --path . --quit
 - Completed: updated `docs/SYSTEMS.md` save version to 9 and documented atomic RNG rehydration plus replay regression coverage.
 - Completed: marked SAV-3 and SAV-4 done in `docs/IMPROVEMENT_SUGGESTIONS.md`.
 
+### Follow-up Status - Roguelite Track Foundation 2026-07-01
+
+- Completed: added meta-progression data, Echo upgrade content, and `MetaProgressionManager` autoload persistence to `user://meta_progress.json`.
+- Completed: added relic templates/content, relic components/processor, and initial kill/poison hook integration.
+- Completed: added archetype definitions, ranged attack action, kill-streak component, archetype abilities/perks, floor event resolver, shrine action/component, and expanded enemies/items/loot/perks/abilities/traps.
+- Completed: registered `relics.json` and `floor_events.json` in `ContentLoader`/`IContentDatabase`; updated content tests and tooling fixtures for the expanded required content set.
+- Completed: fixed the known bare `catch {}` in `CreateFloorItems`, improved NPC spawn cap logic, cached stair checks during NPC spawn scans, and added a GameManager `_Ready` guard.
+- Verification: `dotnet build`, stub project build, test project build, full harness (448 tests), and rendering-validation profile (401 tests) pass.
+- Partial: full Track 7 UI surfaces and the GameManager under-500-line refactor are not complete; `GameManager.cs` remains 3,195 lines.
+
 ### Follow-up Status - Wave 1 Persistence
 
 - Completed: SAV-1 — added `EnemyComponent { TemplateId }`, attached in `GameManager.CreateEnemyEntity`, and round-tripped through v9 save data with validation and migration.

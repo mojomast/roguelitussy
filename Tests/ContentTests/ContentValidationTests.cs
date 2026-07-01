@@ -27,16 +27,18 @@ public sealed class ContentValidationTests : ITestSuite
         var content = LoadContent();
 
         Expect.True(content.IsValid, FormatErrors(content));
-        Expect.Equal(23, content.ItemDefinitions.Count, "Expected the full item set to load");
-        Expect.Equal(13, content.EnemyDefinitions.Count, "Expected the full enemy set to load");
-        Expect.Equal(9, content.AbilityDefinitions.Count, "Expected the full ability set to load");
-        Expect.Equal(4, content.PerkDefinitions.Count, "Expected the initial perk set to load");
+        Expect.Equal(29, content.ItemDefinitions.Count, "Expected the full item set to load");
+        Expect.Equal(21, content.EnemyDefinitions.Count, "Expected the full enemy set to load");
+        Expect.Equal(23, content.AbilityDefinitions.Count, "Expected the full ability set to load");
+        Expect.Equal(20, content.PerkDefinitions.Count, "Expected the initial perk set to load");
         Expect.Equal(2, content.DialogueDefinitions.Count, "Expected the full dialog set to load");
         Expect.Equal(2, content.NpcDefinitions.Count, "Expected the full NPC set to load");
         Expect.Equal(10, content.StatusEffects.Count, "Expected the full status effect set to load");
         Expect.True(content.RoomPrefabs.Count >= 10, "Expected at least the baseline room prefab set to load");
-        Expect.Equal(17, content.LootTables.Count, "Expected the full loot table set to load");
-        Expect.Equal(1, content.TrapDefinitions.Count, "Expected the baseline trap set to load");
+        Expect.Equal(27, content.LootTables.Count, "Expected the full loot table set to load");
+        Expect.Equal(6, content.TrapDefinitions.Count, "Expected the baseline trap set to load");
+        Expect.Equal(20, content.RelicTemplates.Count, "Expected the full relic set to load");
+        Expect.Equal(6, content.FloorEvents.Count, "Expected the floor event catalogue to load");
     }
 
     private static void LoadsFromInMemoryJsonDocuments()

@@ -11,6 +11,7 @@ The current game already supports:
 - level-gated equipment requirements
 - save/load for run progression
 - reopening pending perk choices after loading a run
+- a first-pass Echo-based meta-progression store with upgrade levels and recent run history persisted to `user://meta_progress.json`
 
 That is a workable foundation, but it is still a narrow "kill things, get bigger numbers" model. The next pass should make progression shape playstyle, recovery, and decision-making across a run without collapsing the tension that makes a dungeon crawler work.
 
@@ -270,6 +271,8 @@ Examples:
 This makes your new NPC/dialog/shop work part of progression instead of a disconnected side system.
 
 ### Phase 6: Add Light Meta Unlocks
+
+Status: foundation implemented. `MetaProgressionManager` persists Echoes, purchased upgrade levels, and capped run history; `Content/meta_upgrades.json` authors starting-gold, inventory, archetype-unlock, starting-item, Echo-bonus, and relic-seeker nodes. Full character-creation gating and meta-shop UI remain follow-up integration work.
 
 Only after run progression feels good.
 

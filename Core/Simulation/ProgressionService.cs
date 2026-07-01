@@ -69,7 +69,9 @@ public static class ProgressionService
         }
 
         return content.PerkTemplates.Values
-            .Where(perk => perk.UnlockLevel <= progression.Level && !progression.SelectedPerkIds.Contains(perk.TemplateId, StringComparer.Ordinal))
+            .Where(perk => perk.UnlockLevel <= progression.Level
+                && !progression.SelectedPerkIds.Contains(perk.TemplateId, StringComparer.Ordinal)
+                && IsPerkAvailableToArchetype(entity, perk))
             .OrderBy(perk => perk.UnlockLevel)
             .ThenBy(perk => perk.DisplayName, StringComparer.Ordinal)
             .ToArray();
@@ -108,10 +110,23 @@ public static class ProgressionService
             return false;
         }
 
+        if (!IsPerkAvailableToArchetype(entity, perk))
+        {
+            message = $"Perk '{perk.DisplayName}' is not available to this archetype.";
+            return false;
+        }
+
         foreach (var effect in perk.Effects)
         {
             switch (effect.Type)
             {
+                case "perk_gate":
+                case "floor_undying":
+                case "ranged_pierce":
+                case "streak_threshold_minus1":
+                case "ability_damage_bonus_pct":
+                case "spell_echo_pct":
+                    break;
                 case "stat_bonus":
                     if (!TryApplyStatBonus(entity, effect.Stat, effect.Value))
                     {
@@ -160,6 +175,22 @@ public static class ProgressionService
         }
 
         return Math.Clamp(totalDiscount, 0, 90);
+    }
+
+    private static bool IsPerkAvailableToArchetype(IEntity entity, PerkTemplate perk)
+    {
+        var archetypeId = entity.GetComponent<ArchetypeComponent>()?.ArchetypeId;
+        foreach (var effect in perk.Effects)
+        {
+            if (!string.Equals(effect.Type, "perk_gate", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            return string.Equals(effect.Stat, ArchetypeDefinitions.Get(archetypeId).Id, StringComparison.Ordinal);
+        }
+
+        return !ArchetypeDefinitions.IsExclusivePerkForOtherArchetype(perk.TemplateId, archetypeId);
     }
 
     private static bool TryApplyStatBonus(IEntity entity, string? statName, int amount)

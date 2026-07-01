@@ -1,0 +1,22 @@
+[
+  { "relic_id": "vampire_fang", "display_name": "Vampire Fang", "description": "Heal 1 HP per kill.", "rarity": "common", "trigger_hook": "on_kill", "effect_type": "heal", "effect_value": 1 },
+  { "relic_id": "glass_cannon", "display_name": "Glass Cannon", "description": "Double attack, half defense.", "rarity": "rare", "trigger_hook": "on_floor_enter", "effect_type": "stat_mod", "effect_value": 0 },
+  { "relic_id": "toxic_core", "display_name": "Toxic Core", "description": "Poison ticks deal +3 bonus damage.", "rarity": "uncommon", "trigger_hook": "on_poison_tick", "effect_type": "damage_bonus", "effect_value": 3 },
+  { "relic_id": "gold_tooth", "display_name": "Gold Tooth", "description": "Earn +2 gold per kill.", "rarity": "common", "trigger_hook": "on_kill", "effect_type": "gold_bonus", "effect_value": 2 },
+  { "relic_id": "iron_skin", "display_name": "Iron Skin", "description": "Start each floor with a 5 HP shield.", "rarity": "uncommon", "trigger_hook": "on_floor_enter", "effect_type": "shield", "effect_value": 5 },
+  { "relic_id": "berserker_heart", "display_name": "Berserker Heart", "description": "+4 attack when below 25% HP.", "rarity": "rare", "trigger_hook": "on_low_hp", "effect_type": "stat_mod", "effect_value": 4 },
+  { "relic_id": "echo_shard", "display_name": "Echo Shard", "description": "Earn +5 bonus Echoes when floor is fully cleared.", "rarity": "uncommon", "trigger_hook": "on_floor_enter", "effect_type": "echo_bonus", "effect_value": 5 },
+  { "relic_id": "thorn_wrap", "display_name": "Thorn Wrap", "description": "Reflect 1 damage to attacker when hit.", "rarity": "common", "trigger_hook": "on_damaged", "effect_type": "damage_bonus", "effect_value": 1 },
+  { "relic_id": "lucky_coin", "display_name": "Lucky Coin", "description": "10% chance to negate damage taken.", "rarity": "uncommon", "trigger_hook": "on_damaged", "effect_type": "shield", "effect_value": 0 },
+  { "relic_id": "rest_stone", "display_name": "Rest Stone", "description": "Heal +1 extra HP per rest tick.", "rarity": "common", "trigger_hook": "on_rest", "effect_type": "heal", "effect_value": 1 },
+  { "relic_id": "warlord_crest", "display_name": "Warlord's Crest", "description": "+2 attack per floor cleared (max +10).", "rarity": "legendary", "trigger_hook": "on_floor_enter", "effect_type": "stat_mod", "effect_value": 2 },
+  { "relic_id": "bone_amulet", "display_name": "Bone Amulet", "description": "+5 max HP per 3 enemies killed.", "rarity": "uncommon", "trigger_hook": "on_kill", "effect_type": "stat_mod", "effect_value": 5 },
+  { "relic_id": "shadow_step", "display_name": "Shadow Step", "description": "+3 evasion for 2 turns after killing an enemy.", "rarity": "rare", "trigger_hook": "on_kill", "effect_type": "stat_mod", "effect_value": 3 },
+  { "relic_id": "merchant_badge", "display_name": "Merchant Badge", "description": "Shop items cost 15% less.", "rarity": "uncommon", "trigger_hook": "on_floor_enter", "effect_type": "stat_mod", "effect_value": 15 },
+  { "relic_id": "cursed_blade", "display_name": "Cursed Blade", "description": "+8 attack, but take 1 damage per turn.", "rarity": "rare", "trigger_hook": "on_floor_enter", "effect_type": "stat_mod", "effect_value": 8 },
+  { "relic_id": "cartographer_lens", "display_name": "Cartographer's Lens", "description": "Reveal full floor map on enter.", "rarity": "uncommon", "trigger_hook": "on_floor_enter", "effect_type": "stat_mod", "effect_value": 0 },
+  { "relic_id": "phoenix_ash", "display_name": "Phoenix Ash", "description": "Once per run: survive a lethal hit with 1 HP.", "rarity": "legendary", "trigger_hook": "on_low_hp", "effect_type": "shield", "effect_value": 1, "is_unique": true },
+  { "relic_id": "predator_mark", "display_name": "Predator's Mark", "description": "First hit on an enemy each floor deals double damage.", "rarity": "rare", "trigger_hook": "on_hit", "effect_type": "damage_bonus", "effect_value": 0 },
+  { "relic_id": "leech_stone", "display_name": "Leech Stone", "description": "Poisoned enemies take +2 bonus damage from all attacks.", "rarity": "uncommon", "trigger_hook": "on_hit", "effect_type": "damage_bonus", "effect_value": 2, "condition_tag": "poisoned" },
+  { "relic_id": "death_mask", "display_name": "Death Mask", "description": "+20% damage for 5 turns after taking damage.", "rarity": "rare", "trigger_hook": "on_damaged", "effect_type": "damage_bonus", "effect_value": 20 }
+]
