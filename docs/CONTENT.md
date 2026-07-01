@@ -10,6 +10,7 @@ The project uses flat JSON documents under `Content/` as the source of truth for
 - `status_effects.json`
 - `loot_tables.json`
 - `room_prefabs.json`
+- `traps.json`
 - `perks.json`
 - `dialogs.json`
 - `npcs.json`
@@ -24,6 +25,7 @@ The project uses flat JSON documents under `Content/` as the source of truth for
 - `status_effects.json` defines status effect metadata used by simulation and content references.
 - `loot_tables.json` defines weighted loot outcomes, including guaranteed multi-roll chest-specific tables and tuned recovery drops such as more available health potions.
 - `room_prefabs.json` defines prefab rooms and the tile legend used to interpret them.
+- `traps.json` defines trap templates referenced by room prefabs and spawned as trap entities at runtime.
 - `perks.json` defines progression perk metadata and effects.
 - `dialogs.json` defines NPC dialogue graphs, including optional rotating `start_nodes` for repeated greetings.
 - `npcs.json` defines NPC metadata, roles, service hooks, merchant stock, and dialogue references.
@@ -55,7 +57,7 @@ This matters because:
 
 1. Reads all required JSON documents from the selected content directory.
 2. Deserializes them with strict casing and no trailing commas.
-3. Builds deterministic lookups for items, enemies, abilities, status effects, room prefabs, loot tables, perks, dialogs, and NPCs.
+3. Builds deterministic lookups for items, enemies, abilities, status effects, room prefabs, traps, loot tables, perks, dialogs, and NPCs.
 4. Produces simulation-facing item and enemy templates.
 5. Produces simulation-facing ability templates and validation-ready progression/NPC content lookups.
 6. Collects validation errors for malformed or inconsistent content.

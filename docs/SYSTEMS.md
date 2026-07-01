@@ -179,6 +179,7 @@ Notable details:
 - Progression, identity, inventory/equipment, wallet, NPC, merchant, chest loot table, rolled chest contents, ability, cooldown, XP value, AI/template rehydration data, enemy template identity, scheduler actor order, status-effect source attribution, character creation options, and trap component state (`TrapComponent` on trap entities) round-trip through the normalized save shape where applicable.
 - `CombatRandomState` and `ItemRandomState` are persisted and rehydrated atomically through `WorldState.RehydrateRandomStates` so RNG continuation matches uninterrupted simulation with no transient intermediate state.
 - Deterministic replay regression tests prove that fixed action sequences produce identical traces after save/load at turn boundaries.
+- Enemy loot and gold drops use a deterministic seed derived from world seed, depth, position, turn number, and a stable byte hash of the victim `EntityId`; the seed does not depend on runtime `GetHashCode()` behavior.
 - Content metadata is warning-only: legacy or migrated saves with missing metadata still load, and hash/version mismatches emit a runtime log warning instead of failing validation.
 - Save validation checks dimensions, entity IDs, inventory/equipment integrity, persisted component payloads, status effects, payload sizes, and trap entity consistency (an entity with a `TrapComponent` must sit on a `Trap` tile and have a non-empty template id).
 

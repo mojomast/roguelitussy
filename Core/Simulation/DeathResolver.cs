@@ -182,7 +182,24 @@ public static class DeathResolver
             hash = (hash * 397) ^ position.X;
             hash = (hash * 397) ^ position.Y;
             hash = (hash * 397) ^ turnNumber;
-            hash = (hash * 397) ^ entityId.GetHashCode();
+            hash = (hash * 397) ^ StableEntityIdHash(entityId);
+            return hash;
+        }
+    }
+
+    private static int StableEntityIdHash(EntityId entityId)
+    {
+        Span<byte> bytes = stackalloc byte[16];
+        entityId.Value.TryWriteBytes(bytes);
+
+        unchecked
+        {
+            var hash = 17;
+            foreach (var value in bytes)
+            {
+                hash = (hash * 31) + value;
+            }
+
             return hash;
         }
     }

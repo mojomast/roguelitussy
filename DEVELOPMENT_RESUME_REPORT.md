@@ -546,3 +546,10 @@ Do not add more enemies, items, or progression content yet. The codebase is read
 - Completed: updated `docs/FEATURES.md` with implemented/partial/planned status for the latest UI/QOL features, including partial quick-use hotbar extraction and minimap legend toggle follow-ups.
 - Completed: Block B refactored `ChestUI` onto `MenuBase` shared modal architecture while preserving Take All/Close input behavior and event dispatch.
 - Verification: docs-only Block 2 required no code tests; Block 1 tests passed under Godot stubs per handoff.
+
+### Follow-up Status - 2026-07-01 Deterministic Death Loot Seed
+
+- Completed: `DeathResolver` no longer mixes death loot/gold seeds with `EntityId.GetHashCode()`; it now uses a stable byte hash of the victim GUID so the seed contract is deterministic across runtimes.
+- Completed: added a focused `DeathResolver` regression test for the stable entity-id seed mixer.
+- Documentation: `docs/SYSTEMS.md` now records the deterministic death loot/gold seed inputs.
+- Verification limitation: this environment does not have `dotnet` available, so build and harness verification could not be executed locally.

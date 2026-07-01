@@ -11,6 +11,7 @@ public sealed class DeathResolverTests : ITestSuite
     {
         registry.Add("Simulation.DeathResolver killing rat drops rat loot and gold", KillingRatDropsRatLootAndGold);
         registry.Add("Simulation.DeathResolver loot roll is deterministic for same seed", LootRollIsDeterministicForSameSeed);
+        registry.Add("Simulation.DeathResolver loot seed uses stable entity hash", LootSeedUsesStableEntityHash);
         registry.Add("Simulation.DeathResolver gold roll respects min max", GoldRollRespectsMinMax);
         registry.Add("Simulation.DeathResolver unattributed death drops loot but no gold", UnattributedDeathDropsLootButNoGold);
     }
@@ -80,6 +81,19 @@ public sealed class DeathResolverTests : ITestSuite
             Expect.Equal(first.DroppedItems[i].TemplateId, second.DroppedItems[i].TemplateId, $"Drop {i} template should match");
             Expect.Equal(first.DroppedItems[i].StackCount, second.DroppedItems[i].StackCount, $"Drop {i} stack count should match");
         }
+    }
+
+    private static void LootSeedUsesStableEntityHash()
+    {
+        var entityId = EntityId.From("00112233-4455-6677-8899-aabbccddeeff");
+        var position = new Position(5, 6);
+        var method = typeof(DeathResolver).GetMethod("MixSeed", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Expect.NotNull(method, "DeathResolver seed mixer should remain available for deterministic seed regression coverage");
+
+        var actual = (int)method!.Invoke(null, new object[] { 123, 2, position, 9, entityId })!;
+        var expected = ExpectedMixSeed(123, 2, position, 9, entityId);
+
+        Expect.Equal(expected, actual, "Death loot/gold seed should use a stable Guid byte hash instead of EntityId.GetHashCode");
     }
 
     private static void GoldRollRespectsMinMax()
@@ -162,6 +176,37 @@ public sealed class DeathResolverTests : ITestSuite
         }
 
         throw new InvalidOperationException($"Could not find a turn that makes '{enemyId}' drop loot.");
+    }
+
+    private static int ExpectedMixSeed(int seed, int depth, Position position, int turnNumber, EntityId entityId)
+    {
+        unchecked
+        {
+            var hash = seed;
+            hash = (hash * 397) ^ depth;
+            hash = (hash * 397) ^ position.X;
+            hash = (hash * 397) ^ position.Y;
+            hash = (hash * 397) ^ turnNumber;
+            hash = (hash * 397) ^ ExpectedStableEntityIdHash(entityId);
+            return hash;
+        }
+    }
+
+    private static int ExpectedStableEntityIdHash(EntityId entityId)
+    {
+        Span<byte> bytes = stackalloc byte[16];
+        entityId.Value.TryWriteBytes(bytes);
+
+        unchecked
+        {
+            var hash = 17;
+            foreach (var value in bytes)
+            {
+                hash = (hash * 31) + value;
+            }
+
+            return hash;
+        }
     }
 
     private static WorldState CreateWorld(int seed = 123)

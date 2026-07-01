@@ -146,11 +146,11 @@ Quick-reference entry points for agents working on this codebase.
 | Items | `Core/Simulation/Actions/UseItemAction.cs` | 6 | `heal`, `apply_status`, `cast_ability`, `cure` |
 | Abilities | `Core/Simulation/Actions/CastAbilityAction.cs` | 6 | Damage/status/teleport/heal_self |
 | Ability targets | `Core/Simulation/AbilityResolver.cs` | 9 | Only self/single/tile/aoe_circle implemented |
-| Statuses | `Core/Simulation/StatusEffectProcessor.cs` | 19 | Hardcoded behavior; JSON is descriptive |
+| Statuses | `Core/Simulation/StatusEffectProcessor.cs` | 19 | Data-driven status definitions with legacy fallbacks; `tick_timing`/expire hooks remain follow-up work |
 | Progression | `Core/Simulation/ProgressionService.cs` | 7 | XP/level-up helpers |
 | Content load | `Core/Content/ContentLoader.cs` | 122 | `LoadFromDirectory` entry point |
 | Save | `Core/Persistence/SaveManager.cs` | 9 | File I/O and slot management |
-| Serialize | `Core/Persistence/SaveSerializer.cs` | 9 | JSON round-trip, current version 8 |
+| Serialize | `Core/Persistence/SaveSerializer.cs` | 9 | JSON round-trip, current version 13 |
 
 ### Godot layer entry points
 
@@ -186,7 +186,7 @@ Content:
 
 ### Known wiring gaps
 
-- Targeted scrolls (`cast_ability:` with non-`self` targeting) have no UI path; `UIActionFactory.CreateUseItemAction` returns `null` for them. (Resolved in Wave 2; field targeting is now implemented.)
-- `StatusEffectProcessor` hardcodes status behavior; JSON `status_effects.json` is largely descriptive.
+- Quick-use hotbar intentionally refuses aimed scrolls; use the inventory targeting overlay for `cast_ability:` items that require a field target.
+- Status definitions are partially data-driven, but authored `tick_timing` and `on_expire_effects` are not yet fully enforced by normal turn processing.
 - `aoe_line` and `aoe_cone` ability targeting validate but are not resolved at runtime.
 - `GameManager` directly mutates `WorldState` for map reveal, teleport, and floor travel.

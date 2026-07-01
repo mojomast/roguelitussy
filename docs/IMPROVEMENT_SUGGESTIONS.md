@@ -2,7 +2,7 @@
 
 > Generated from a parallel review pass of 16 focused subagents across combat, items, abilities, status effects, AI, progression, identity, UI/UX, inventory, save/load determinism, tools, dungeon generation, onboarding, game feel, performance, and test/CI quality.
 >
-> Last updated: 2026-06-26
+> Last updated: 2026-07-01
 
 ## How Worker Subagents Should Use This Document
 
@@ -12,9 +12,9 @@
 4. Run the verification commands after each batch:
    ```bash
    dotnet build godotussy.csproj -p:UseGodotStubs=true
-   dotnet build Tests/godotussy.Tests.csproj
-   dotnet run --project Tests/godotussy.Tests.csproj
-   dotnet run --project Tests/godotussy.Tests.csproj -p:RenderingValidation=true
+   dotnet build Tests/godotussy.Tests.csproj -p:UseGodotStubs=true
+   dotnet run --project Tests/godotussy.Tests.csproj -p:UseGodotStubs=true
+   dotnet run --project Tests/godotussy.Tests.csproj -p:UseGodotStubs=true -p:RenderingValidation=true
    ```
 5. Mark completed suggestions in this file (change status to `done`) and update `improvments.md` / `DEVELOPMENT_RESUME_REPORT.md` accordingly.
 6. Do not start work that crosses ownership boundaries without coordinating. See `AGENTS.md` for ownership guidance.
