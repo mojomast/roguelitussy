@@ -202,7 +202,7 @@ public partial class MetaProgressionManager : Node
         if (path.StartsWith("user://", StringComparison.Ordinal))
         {
             return Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData),
                 "godotussy",
                 path[7..].Replace('/', Path.DirectorySeparatorChar));
         }
