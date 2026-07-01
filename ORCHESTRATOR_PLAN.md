@@ -345,7 +345,7 @@ Author the floor event catalogue:
 **Owns:** `Scripts/Autoloads/GameManager.cs` (split), new service files under `Scripts/Services/`, `Core/Simulation/` bug fixes
 
 ### Goal
-Break up the 100KB God Object, fix all identified bugs, and improve code quality without changing behavior.
+Start breaking up the 100KB God Object, fix identified bugs, and improve code quality without changing behavior. The first extraction pass should create safe service seams, but the full under-500-line target is a follow-up architecture backlog item and must not block Track 7 UI integration.
 
 ### Tasks
 
@@ -411,6 +411,13 @@ private static bool IsNearStairs(HashSet<Position> stairCache, Position position
 #### T5.8 — `GameManager._Ready` robustness
 - Wrap `EnsureRuntimeServices()` in a try/catch that logs to both GD and the EventBus
 - Add a `bool _initialized` guard to prevent double-init
+
+#### T5.9 — Backlog remaining `GameManager` under-500-line refactor
+- Do not require the full under-500-line target before Track 7 UI work.
+- Preserve the existing `GameManager` facade methods consumed by UI: new game, load/save, player action processing, floor travel, relic choice, character creation options, and runtime state accessors.
+- Create or update the architecture backlog item that tracks the remaining extractions after the first Track 5 service pass.
+- Recommended remaining extraction targets: `RuntimeServiceFactory`, `WorldSessionService`, `TurnOrchestrator`, `ProgressionEventBridge`, `EntityFactory`, `FloorTransitionService`, `SpawnService`, and `AutoplayService`.
+- Acceptance: roadmap/backlog clearly states that Track 7 can continue while the refactor is open.
 
 ---
 
@@ -598,12 +605,21 @@ The project is **done** when:
 1. All 7 tracks are complete and their tasks checked off
 2. The T7.8 integration checklist passes entirely
 3. No `catch {}` (bare) swallowing exists in the codebase
-4. `GameManager.cs` is under 500 lines (bulk moved to service classes)
+4. `GameManager.cs` has a documented extraction backlog and no new Track 7 UI responsibilities are added to it; the full under-500-line target is a post-Track-7 architecture acceptance goal.
 5. At least 20 relics exist in `relics.json`
 6. All 4 archetypes are playable and meaningfully different
 7. Meta shop persists across process restarts (read/write `user://meta_progress.json`)
 8. Floor events fire on correct cadence (safe every 5, boss every 3)
 9. The game compiles with `dotnet build` producing 0 errors
+
+---
+
+## Post-Track-7 Architecture Backlog
+
+- Complete the remaining `GameManager.cs` facade refactor until the file is under 500 lines.
+- Keep all deterministic gameplay mutation in `Core/`.
+- Keep `GameManager` as a thin Godot autoload facade over focused services.
+- Do not break public UI-facing methods while Track 7 polish is active.
 
 ---
 

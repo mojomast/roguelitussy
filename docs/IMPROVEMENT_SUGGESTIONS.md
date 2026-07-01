@@ -106,6 +106,7 @@
 | PERF-3 | Replace `EntityRenderer` child-name string lookups | P1 | Performance | open |
 | PERF-4 | Pool/reuse per-tile art nodes | P1 | Performance | open |
 | PERF-5 | Cache `WorldState.GetEntitiesInRadius` | P1 | Performance | open |
+| ARC-1 | Finish incremental `GameManager` facade refactor under 500 lines | P1 | Architecture | open |
 | TST-1 | Capture full exception details on test failure | P1 | Test / CI | done |
 | TST-2 | Add test filtering / selection to harness | P1 | Test / CI | done |
 | TST-3 | Reset shared static stub state between tests | P1 | Test / CI | done |
@@ -1397,7 +1398,49 @@
 
 ---
 
-## 16. Test / CI Quality
+## 16. Architecture
+
+### ARC-1 — Finish incremental `GameManager` facade refactor under 500 lines
+
+- **Priority:** P1
+- **Status:** open
+- **Target files:**
+  - `Scripts/Autoloads/GameManager.cs`
+  - `Scripts/Services/FloorTransitionService.cs`
+  - `Scripts/Services/SpawnService.cs`
+  - `Scripts/Services/AutoplayService.cs`
+  - `Scripts/Services/RuntimeServiceFactory.cs`
+  - `Scripts/Services/WorldSessionService.cs`
+  - `Scripts/Services/TurnOrchestrator.cs`
+  - `Scripts/Services/ProgressionEventBridge.cs`
+  - `Tests/IntegrationTests/`
+  - `Tests/UITests/`
+- **Why it improves the game:** `GameManager` is still a 3,195-line Godot autoload facade that owns too many unrelated responsibilities. Reducing it to a thin coordinator lowers merge conflicts, makes UI integration safer, and keeps future features from adding more hidden coupling.
+- **Implementation notes:**
+  - Do this after or alongside Track 7 UI work only when public facade methods can remain stable.
+  - Extract behavior behind existing `GameManager` methods rather than changing UI call sites first.
+  - Keep deterministic rules and gameplay mutations in `Core/`; Godot-side services should orchestrate and emit events only.
+  - Prefer narrow constructor-injected services under `Scripts/Services/`.
+  - Avoid mixing broad extraction with feature changes.
+- **Suggested phases:**
+  1. Characterize current behavior with integration/UI tests around new game, save/load, action processing, floor travel, chest interaction, targeting, relic choice, and game over.
+  2. Extract service/runtime setup into `RuntimeServiceFactory`.
+  3. Extract save/load/session binding into `WorldSessionService`.
+  4. Extract player-action processing and EventBus fanout into `TurnOrchestrator` plus `ProgressionEventBridge`.
+  5. Extract entity creation/spawning into `EntityFactory`/`SpawnService`.
+  6. Extract floor travel/cache/arrival logic into `FloorTransitionService`.
+  7. Extract run/rest/autoexplore into `AutoplayService`.
+  8. Trim `GameManager` to facade state, lifecycle, public UI API, and service delegation.
+- **Acceptance criteria / tests:**
+  - `GameManager.cs` is under 500 lines.
+  - Existing UI-facing public methods remain source-compatible or have coordinated migration notes.
+  - Full stub build, test project build, full harness, and rendering-validation profile pass.
+  - No `using Godot` is introduced into `Core/`.
+  - Track 7 UI surfaces are not blocked while this item remains open.
+
+---
+
+## 17. Test / CI Quality
 
 ### TST-1 — Capture full exception details on test failure
 

@@ -20,6 +20,8 @@
 
 > UI/QOL follow-up note (2026-06-27): the latest feature pass added game-over run stats, floor summary, pause run stats, categorized combat log coloring, examine cursor (`X`), quick-use hotbar (`1`-`5`), minimap legend, animated HUD bars, run movement (`R` then direction), rest-until-healed (`Z`), and autoexplore (`O`). Current docs for these live in `docs/FEATURES.md`, `docs/SYSTEMS.md`, and `docs/EVENTS.md`; this historical backlog should not be used as the source of truth for those UI controls.
 
+> Architecture follow-up note (2026-07-01): `GameManager.cs` remains a large facade and the full under-500-line refactor is still open. Track this in `docs/IMPROVEMENT_SUGGESTIONS.md` as an architecture backlog item rather than using this historical file as the source of truth. The refactor should not block Track 7 UI work; preserve the existing `GameManager` facade API while extracting services incrementally.
+
 ## Purpose
 
 This document is the current-state improvement spec for turning the existing project into a more complete, playable roguelike. It is intentionally written for parallel subagents. It replaces vague backlog work with concrete, codebase-specific workstreams, ordering, file targets, and acceptance criteria.

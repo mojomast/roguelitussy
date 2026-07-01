@@ -75,6 +75,8 @@ Key responsibilities:
 - Emit world snapshots and floor transitions
 - Attach runtime components such as `ProgressionComponent`, `IdentityComponent`, `XpValueComponent`, `AbilitiesComponent`, and `CooldownComponent`
 
+Planned direction: keep `GameManager` as the stable Godot autoload facade, but continue extracting implementation details into focused Godot-side services. UI code should continue calling facade-level methods while services move behind it. The long-term target is for `GameManager.cs` to stay under 500 lines by delegating session setup, save/load binding, turn orchestration, spawning, floor travel, progression event bridging, and autoplay behavior.
+
 ### EventBus
 
 `Scripts/Autoloads/EventBus.cs` is the shared notification surface between systems. It exposes gameplay, rendering, persistence, and UI lifecycle events such as:
@@ -190,3 +192,4 @@ Content:
 - Status definitions are partially data-driven, but authored `tick_timing` and `on_expire_effects` are not yet fully enforced by normal turn processing.
 - `aoe_line` and `aoe_cone` ability targeting validate but are not resolved at runtime.
 - `GameManager` directly mutates `WorldState` for map reveal, teleport, and floor travel.
+- `GameManager.cs` is still oversized; remaining extraction work is tracked as non-blocking architecture backlog and should not delay UI polish that only consumes the existing facade API.

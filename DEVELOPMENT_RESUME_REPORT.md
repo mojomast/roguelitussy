@@ -51,7 +51,7 @@ godot --headless --path . --quit
 - Completed: registered `relics.json` and `floor_events.json` in `ContentLoader`/`IContentDatabase`; updated content tests and tooling fixtures for the expanded required content set.
 - Completed: fixed the known bare `catch {}` in `CreateFloorItems`, improved NPC spawn cap logic, cached stair checks during NPC spawn scans, and added a GameManager `_Ready` guard.
 - Verification: `dotnet build`, stub project build, test project build, full harness (448 tests), and rendering-validation profile (401 tests) pass.
-- Partial: full Track 7 UI surfaces and the GameManager under-500-line refactor are not complete; `GameManager.cs` remains 3,195 lines.
+- Partial: full Track 7 UI surfaces remain open. `GameManager.cs` remains 3,195 lines; the under-500-line refactor should be tracked as a non-blocking architecture backlog item so Track 7 UI work can continue against the existing facade API.
 
 ### Follow-up Status - Wave 1 Persistence
 
