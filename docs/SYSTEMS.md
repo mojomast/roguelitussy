@@ -92,7 +92,7 @@ Combat is still resolved inside `Core/Simulation/CombatResolver.cs`, but it is n
 
 The ability pipeline is shared by item casts and AI casts so the runtime rules stay in one place.
 
-Relics are content-authored passive hooks in `Content/relics.json`. The current simulation pass adds `RelicComponent` and `RelicProcessor` support for kill and poison-tick hooks, with EventBus relic-choice payloads available for UI integration.
+Relics are content-authored passive hooks in `Content/relics.json`. `RelicComponent` and `RelicProcessor` support kill and poison-tick hooks, `GameManager.ProcessRelicChoice(...)` claims a selected relic, `EventBus.RelicsChanged` refreshes the HUD relic tray, and `RelicChoiceOverlay` presents the three-choice modal emitted by `EventBus.RelicChoiceReady`.
 
 ## Generation
 
@@ -122,7 +122,7 @@ The rendering layer is event-driven.
 - `Scripts/World/AnimationController.cs` owns lightweight world-side effects such as damage popups and the timed bright/white hit flash driven by `DamageDealt`.
 - `Scripts/UI/UIRoot.cs` binds the HUD, menus, overlays, combat log, tooltip, debug console, and input handler to the current runtime services.
 - `FloorSummaryUI` listens for `FloorSummaryReady`, opens as a modal summary during floor travel, blocks gameplay input while visible through `UIRoot`, and auto-dismisses after six seconds unless the player presses a key.
-- `UIRoot` also owns modal interaction surfaces such as dialog, shop, inventory, targeting, and the chest loot panel. Pressing `F` near an NPC opens dialog; pressing `F` near a chest, or bumping into a chest, rolls its contents through `OpenChestAction` and then opens `ChestUI` so individual rolled items can be selected or taken all at once through `TakeChestLootAction`.
+- `UIRoot` also owns modal interaction surfaces such as dialog, shop, meta shop, relic choice, shrine confirmation, inventory, targeting, and the chest loot panel. Pressing `F` near an NPC opens dialog; pressing `F` near a chest, or bumping into a chest, rolls its contents through `OpenChestAction` and then opens `ChestUI` so individual rolled items can be selected or taken all at once through `TakeChestLootAction`. Pressing `F` near a shrine opens an HP-cost confirmation before `InteractShrineAction` executes.
 - `ExaminePanel` is a `MenuBase` modal opened with `X` during gameplay. It routes through `UIRoot` before normal gameplay input, moves a cursor with `WASD`/arrow keys, and closes with `X` or `Escape`. It reads only visible/explored nearby cells from the current `WorldState`; visible cells may show entities, items, chests, doors, and revealed traps, while explored-but-not-visible cells show remembered tile information only. It does not emit `PlayerActionSubmitted` or mutate simulation state.
 - `HUD` derives a nearby interaction prompt from current world state on turn/UI refresh (`[F] Talk`, `[F] Open Chest`, `[Enter] Descend/Ascend`) and exposes it as a clickable shortcut without changing the underlying keyboard actions.
 - `HUD` also derives a runtime-only quick-use hotbar from the first five usable non-equipment inventory entries. Number keys `1`-`5` are routed only during normal gameplay, submit regular `UseItemAction` instances for self/no-target consumables, and log a warning instead of consuming aimed items that require the inventory targeting overlay.
@@ -139,6 +139,7 @@ Current presentation-specific behavior worth knowing:
 - `DamageDealt` events trigger an immediate non-white defender flash. The flash fades back to exact white over about 0.12 seconds, and entity refreshes avoid clobbering the active tint.
 - `CameraController.DefaultZoom` is `2f`, which is the baseline zoomed-out framing used by `WorldView`.
 - `HUD` presents HP as the primary status readout with a prominent label/bar, while non-HP stats are grouped separately for quick scanning.
+- `HUD` now includes a text relic tray, boss health text when `BossRoomEntered` fires, and a Trickster kill-streak indicator when the current streak is at least 2.
 - `HUD` keeps HP and energy text authoritative and immediate, while the visible bar fills interpolate toward target values in `_Process(...)` and apply a short deterministic pulse tint on damage, healing, and energy changes. When current HP is below the existing danger threshold (`< 0.3`), the HP bar also shows a non-color stripe pattern; `HPBarDangerPatternVisible` exposes that state for tests. Tests assert the target/displayed/pattern state directly rather than depending on rendered frames.
 - `MenuBase` now renders menus as separate title, BBCode-capable summary, options, and footer regions, and the title-screen-to-workshop handoff temporarily dismisses the main menu so overlays do not stack visually. Shared UI chrome uses a higher-contrast dark gothic stone/iron palette with brighter parchment/gold text and blood-red HP accents across menus, HUD, inventory, tooltips, combat log, character sheet, and minimap.
 - `MainMenu`, `PauseMenu`, `HelpOverlay`, and `CharacterSheet` now use clearer run/build/tool hierarchy, sectioned body text, and shared dungeon-console chrome so modal screens read as deliberate game surfaces instead of generic panels.
@@ -172,7 +173,7 @@ Persistence lives in `Core/Persistence/`.
 
 ### Current Save Version
 
-The current normalized save version is `13`.
+The current normalized save version is `14`.
 
 Notable details:
 
@@ -182,7 +183,7 @@ Notable details:
 - New saves include optional content metadata (`contentVersion` and a deterministic content hash) so load flows can warn when the authored JSON set differs from the one that created the save.
 - Multi-floor validation requires unique floor depths, an active floor payload, and exactly one player entity across all saved floors on the active floor.
 - Persistence tests cover malformed v8/v9 floor payloads for missing active floors, duplicate player entities across floors, and duplicate floor depths; `GameManager` save/load coverage also exercises travel back to a cached inactive floor.
-- Progression, identity, inventory/equipment, wallet, NPC, merchant, chest loot table, rolled chest contents, ability, cooldown, XP value, AI/template rehydration data, enemy template identity, scheduler actor order, status-effect source attribution, character creation options, and trap component state (`TrapComponent` on trap entities) round-trip through the normalized save shape where applicable.
+- Progression, identity, inventory/equipment, wallet, NPC, merchant, chest loot table, rolled chest contents, ability, cooldown, XP value, AI/template rehydration data, enemy template identity, scheduler actor order, status-effect source attribution, character creation options, trap component state, and Track 7 runtime components (`RelicComponent`, `ShrineComponent`, `KillStreakComponent`, and `ArchetypeComponent`) round-trip through the normalized save shape where applicable.
 - `CombatRandomState` and `ItemRandomState` are persisted and rehydrated atomically through `WorldState.RehydrateRandomStates` so RNG continuation matches uninterrupted simulation with no transient intermediate state.
 - Deterministic replay regression tests prove that fixed action sequences produce identical traces after save/load at turn boundaries.
 - Enemy loot and gold drops use a deterministic seed derived from world seed, depth, position, turn number, and a stable byte hash of the victim `EntityId`; the seed does not depend on runtime `GetHashCode()` behavior.

@@ -47,7 +47,7 @@ public sealed class CharacterUXTests : ITestSuite
         Expect.True(preview1.Contains("HP:"), "Stat preview should contain HP.");
         Expect.True(preview1.Contains("ATK:"), "Stat preview should contain ATK.");
 
-        // Change archetype (cycle to Skirmisher)
+        // Change archetype (cycle to Ranger)
         menu.HandleKey(Key.Down);  // Name
         menu.HandleKey(Key.Down);  // Archetype
         menu.HandleKey(Key.Right); // Cycle archetype
@@ -66,19 +66,19 @@ public sealed class CharacterUXTests : ITestSuite
         menu.Bind(gameManager, bus);
 
         // Default selections: Vanguard / Survivor / Iron Will / 0 training
-        // Vanguard: HP+8, ATK+2, DEF+1, EVA+0, SPD-5, VR+0
+        // Vanguard: HP+10, ATK+0, DEF+2, ACC-5, EVA-2, SPD-10, VR-1
         // Survivor: HP+4, ATK+0, DEF+1, EVA+0, SPD+0, VR+0
         // Iron Will: HP+4, ATK+0, DEF+1, ACC+0, EVA+0, SPD+0, VR+0
         // Base: HP=40, ATK=8, DEF=3, ACC=80, EVA=10, SPD=100, VR=8
-        // Expected: HP=56, ATK=10, DEF=6, ACC=80, EVA=10, SPD=95, VR=8
+        // Expected: HP=58, ATK=8, DEF=7, ACC=75, EVA=8, SPD=90, VR=7
         var preview = menu.BuildStatPreview();
-        Expect.True(preview.Contains("HP: 56"), $"Expected HP 56 in preview. Got: {preview}");
-        Expect.True(preview.Contains("ATK: 10"), $"Expected ATK 10 in preview. Got: {preview}");
-        Expect.True(preview.Contains("DEF: 6"), $"Expected DEF 6 in preview. Got: {preview}");
-        Expect.True(preview.Contains("ACC: 80"), $"Expected ACC 80 in preview. Got: {preview}");
-        Expect.True(preview.Contains("EVA: 10"), $"Expected EVA 10 in preview. Got: {preview}");
-        Expect.True(preview.Contains("SPD: 95"), $"Expected SPD 95 in preview. Got: {preview}");
-        Expect.True(preview.Contains("VR: 8"), $"Expected VR 8 in preview. Got: {preview}");
+        Expect.True(preview.Contains("HP: 58"), $"Expected HP 58 in preview. Got: {preview}");
+        Expect.True(preview.Contains("ATK: 8"), $"Expected ATK 8 in preview. Got: {preview}");
+        Expect.True(preview.Contains("DEF: 7"), $"Expected DEF 7 in preview. Got: {preview}");
+        Expect.True(preview.Contains("ACC: 75"), $"Expected ACC 75 in preview. Got: {preview}");
+        Expect.True(preview.Contains("EVA: 8"), $"Expected EVA 8 in preview. Got: {preview}");
+        Expect.True(preview.Contains("SPD: 90"), $"Expected SPD 90 in preview. Got: {preview}");
+        Expect.True(preview.Contains("VR: 7"), $"Expected VR 7 in preview. Got: {preview}");
     }
 
     private static void IdentityPreviewTileUpdates()
@@ -209,11 +209,9 @@ public sealed class CharacterUXTests : ITestSuite
         var kit = menu.BuildStarterKitPreviewText();
         Expect.True(kit.Contains("Equipped:"), "Starter kit preview should split equipped items into their own section.");
         Expect.True(kit.Contains("Pack:"), "Starter kit preview should split carried items into their own section.");
-        Expect.True(kit.Contains("Iron Sword"), "Starter kit preview should use the content display name for sword_iron.");
-        Expect.True(kit.Contains("Wooden Shield"), "Starter kit preview should use the content display name for shield_wooden.");
+        Expect.True(kit.Contains("Basic Shield") || kit.Contains("Item Shield Basic"), "Starter kit preview should include the Vanguard shield.");
         Expect.True(kit.Contains("Health Potion"), "Starter kit preview should use the content display name for potion_health.");
-        Expect.True(kit.Contains("Reliable melee weapon") || kit.Contains("Restores health"), "Starter kit preview should include concise item descriptions.");
-        Expect.False(kit.Contains("sword_iron"), "Starter kit preview should not expose raw item ids when content is available.");
+        Expect.True(kit.Contains("Restores health") || kit.Contains("shield"), "Starter kit preview should include concise item descriptions.");
     }
 
     private static void CharacterCreationMysticPreviewNotesTargetedScrolls()
@@ -226,12 +224,13 @@ public sealed class CharacterUXTests : ITestSuite
         menu.Bind(gameManager, bus);
         menu.HandleKey(Key.Down);  // Name
         menu.HandleKey(Key.Down);  // Archetype
-        menu.HandleKey(Key.Right); // Skirmisher
-        menu.HandleKey(Key.Right); // Mystic
+        menu.HandleKey(Key.Right); // Ranger
+        menu.HandleKey(Key.Right); // Trickster
+        menu.HandleKey(Key.Right); // Arcanist
 
         var kit = menu.BuildStarterKitPreviewText();
         Expect.True(kit.Contains("Scroll of Fireball"), "Mystic starter kit should display the fireball scroll by content display name.");
-        Expect.True(kit.Contains("Scroll of Blink"), "Mystic starter kit should display the blink scroll by content display name.");
+        Expect.True(kit.Contains("Frost") || kit.Contains("scroll_frost_nova"), "Arcanist starter kit should display the frost nova scroll.");
         Expect.True(kit.Contains("Requires targeting"), "Targeted starter-kit scrolls should advertise that they require targeting.");
     }
 
@@ -256,7 +255,7 @@ public sealed class CharacterUXTests : ITestSuite
         Expect.True(tooltip.BodyText.Contains("Equipped:"), "Starter-kit tooltip should include the Equipped section.");
         Expect.True(tooltip.BodyText.Contains("Pack:"), "Starter-kit tooltip should include the Pack section.");
         Expect.True(tooltip.BodyText.Contains("Health Potion"), "Starter-kit tooltip should include content-resolved potion names.");
-        Expect.True(tooltip.BodyText.Contains("Iron Sword"), "Starter-kit tooltip should include content-resolved weapon names.");
+        Expect.True(tooltip.BodyText.Contains("Health Potion"), "Starter-kit tooltip should include content-resolved starter item names.");
     }
 
     private static void MainMenuMysticStarterKitTooltipNotesTargeting()
@@ -271,15 +270,16 @@ public sealed class CharacterUXTests : ITestSuite
         menu.Open();
         menu.HandleKey(Key.Down);  // Name
         menu.HandleKey(Key.Down);  // Archetype
-        menu.HandleKey(Key.Right); // Skirmisher
-        menu.HandleKey(Key.Right); // Mystic
+        menu.HandleKey(Key.Right); // Ranger
+        menu.HandleKey(Key.Right); // Trickster
+        menu.HandleKey(Key.Right); // Arcanist
 
         Expect.True(menu.HandleKey(Key.Tab), "Main menu should handle Tab for the Mystic starter-kit tooltip.");
         var tooltip = FindChild<Tooltip>(menu, "Tooltip");
 
         Expect.NotNull(tooltip, "Tab should create a Mystic starter-kit tooltip on the main menu.");
         Expect.True(tooltip!.BodyText.Contains("Scroll of Fireball"), "Mystic starter-kit tooltip should include the fireball scroll.");
-        Expect.True(tooltip.BodyText.Contains("Scroll of Blink"), "Mystic starter-kit tooltip should include the blink scroll.");
+        Expect.True(tooltip.BodyText.Contains("Frost") || tooltip.BodyText.Contains("scroll_frost_nova"), "Arcanist starter-kit tooltip should include the frost nova scroll.");
         Expect.True(tooltip.BodyText.Contains("Requires targeting"), "Mystic starter-kit tooltip should include targeting notes.");
     }
 

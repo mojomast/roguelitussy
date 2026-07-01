@@ -508,57 +508,49 @@ Wire all track outputs together, implement missing UI, register autoloads, and v
 
 ### Tasks
 
-#### T7.1 — Register new autoloads in `project.godot`
-- Add `MetaProgressionManager` to autoloads section
-- Verify `EventBus` and `ContentDatabase` autoload order (EventBus must load first)
+#### T7.1 — Register new autoloads in `project.godot` — done
+- `MetaProgressionManager` is present in the autoloads section.
+- `EventBus` loads first, followed by `ContentDatabase`, `MetaProgressionManager`, and `GameManager`.
 
-#### T7.2 — Character creation screen — archetype picker
+#### T7.2 — Character creation screen — archetype picker — done
 - Update character creation UI to show 4 archetype cards (Vanguard, Ranger, Trickster, Arcanist)
 - Lock archetypes not yet unlocked (Ranger, Trickster, Arcanist require meta unlocks from Track 1)
 - Show archetype base stats preview, starting items, and signature mechanic description
 - Pass selected archetype to `GameManager.SetCharacterCreationOptions`
 
-#### T7.3 — Relic UI panel
+#### T7.3 — Relic UI panel — done
 - Add a relic tray to the HUD (bottom of screen, horizontal row of relic icons)
 - On `EventBus.RelicChoiceReady`: show a modal panel with 3 relic cards (icon, name, description, rarity color)
 - Player clicks one → call `GameManager.ProcessRelicChoice(relicId)`
 - Show relic tray updates in real time
 
-#### T7.4 — Meta-progression shop screen
+#### T7.4 — Meta-progression shop screen — done
 - Add a screen accessible from the main menu: `MetaShopScene.tscn`
 - Show current Echo balance
 - Show upgrade grid from `meta_upgrades.json` with current level, cost, and max level
 - Clicking an upgrade calls `MetaProgressionManager.TryUpgrade(upgradeId)`
 - Locked archetypes shown as grayed-out cards with unlock cost
 
-#### T7.5 — Run history / death screen
+#### T7.5 — Run history / death screen — done
 - Extend the game over screen to show full `RunStats`
 - Add a "Recent Runs" tab showing last 5 `RunHistoryEntry` records from `MetaProgressionManager`
 - Show Echoes earned this run with breakdown (floor × 2 + kills / 5 + gold / 50)
 
-#### T7.6 — Floor event UI
+#### T7.6 — Floor event UI — partial
 - On `EventBus.CurseRoomEntered`: show a centered popup banner for 3 seconds
 - On `EventBus.BossRoomEntered`: show a boss health bar in the HUD
 - On shrine interaction: show HP cost confirmation dialog before executing
 
-#### T7.7 — Kill streak HUD indicator
+#### T7.7 — Kill streak HUD indicator — done
 - Show streak counter (flame icon + number) in the HUD when Trickster archetype and streak >= 2
 - Animate with shake/glow on streak increment
 - Reset animation on streak break
 
 #### T7.8 — Final integration test checklist
 Before marking Track 7 complete, manually verify:
-- [ ] New game → Vanguard → floor 1 populates correctly, base stats match archetype definition
-- [ ] New game → Ranger → ranged attack action available, arrows consumed
-- [ ] New game → Trickster → kill streak increments, double-turn fires at streak 3
-- [ ] New game → Arcanist → starts with scrolls, arcane abilities available
-- [ ] Floor 3 → boss spawns → killed → relic choice modal appears → selecting relic shows in tray
-- [ ] Floor 5 → safe floor → no enemies → merchants available
-- [ ] Shrine room → spend HP → perk choice modal appears
-- [ ] Death → run history appended → Echoes awarded → meta shop shows new balance
-- [ ] Meta shop → buy `starting_gold` → new run → wallet has bonus gold
-- [ ] Meta shop → unlock Ranger → character creation → Ranger archetype selectable
-- [ ] Save → load → relic tray persists, archetype preserved
+- [x] Automated/stub verified: Vanguard/Ranger/Trickster/Arcanist UI preview and start-state plumbing.
+- [x] Automated/stub verified: relic choice processing, relic tray text, boss HUD text, shrine confirmation surface, kill streak HUD text, and Track 7 component persistence.
+- [ ] Manual Godot runtime verification remains required for exact room-entry cadence, boss-kill relic modal timing, safe-floor merchant population, and Trickster double-turn feel.
 
 ---
 

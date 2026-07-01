@@ -563,3 +563,11 @@ Do not add more enemies, items, or progression content yet. The codebase is read
 - Completed: added a focused `DeathResolver` regression test for the stable entity-id seed mixer.
 - Documentation: `docs/SYSTEMS.md` now records the deterministic death loot/gold seed inputs.
 - Verification limitation: this environment does not have `dotnet` available, so build and harness verification could not be executed locally.
+
+### Follow-up Status - Track 7 Roguelite UI Integration 2026-07-01
+
+- Completed: verified `project.godot` autoload order keeps `EventBus` first and includes `MetaProgressionManager` before `GameManager`.
+- Completed: character creation now exposes Vanguard, Ranger, Trickster, and Arcanist, gates non-Vanguard archetypes through meta upgrades, and starts players from `ArchetypeDefinitions` with archetype components, abilities, relic state, and Trickster streak state.
+- Completed: added relic choice modal, HUD relic tray, boss health text, kill-streak indicator, meta shop, shrine confirmation, curse popup, and death-screen run history/Echo breakdown.
+- Completed: save version 14 persists relic, shrine, kill streak, and archetype runtime components.
+- Verification: Track 7 focused UI and persistence tests pass under Godot stubs; full verification results are recorded in the final Track 7 handoff.

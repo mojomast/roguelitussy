@@ -49,6 +49,14 @@ public partial class UIRoot : CanvasLayer
 
     public FloorSummaryUI FloorSummaryUI { get; } = new();
 
+    public RelicChoiceOverlay RelicChoiceOverlay { get; } = new();
+
+    public MetaShopUI MetaShopUI { get; } = new();
+
+    public FloorEventPopupUI FloorEventPopupUI { get; } = new();
+
+    public ShrineConfirmationUI ShrineConfirmationUI { get; } = new();
+
     public Minimap Minimap { get; } = new();
 
     public QuickSlotHotbar QuickSlotHotbar { get; } = new();
@@ -105,11 +113,16 @@ public partial class UIRoot : CanvasLayer
         ShopUI.Bind(_gameManager, _eventBus, _content);
         ChestUI.Bind(_gameManager, _eventBus, _content);
         FloorSummaryUI.Bind(_eventBus);
+        RelicChoiceOverlay.Bind(_gameManager, _eventBus);
+        MetaShopUI.Bind(ResolveMetaProgressionManager());
+        FloorEventPopupUI.Bind(_eventBus);
+        ShrineConfirmationUI.Bind(_gameManager, _eventBus);
         Minimap.Bind(_gameManager, _eventBus);
         QuickSlotHotbar.Bind(_gameManager, _eventBus, _content);
         DevToolsWorkbench.Bind(_gameManager, _eventBus, _content);
-        MainMenu.Bind(_gameManager, _eventBus);
+        MainMenu.Bind(_gameManager, _eventBus, ResolveMetaProgressionManager());
         PauseMenu.Bind(_gameManager, _eventBus);
+        GameOverScreen.Bind(ResolveMetaProgressionManager());
         DebugConsole.Bind(_gameManager, _eventBus, _content);
         DebugOverlay.Bind(_gameManager, _eventBus);
         TargetingOverlay.Bind(_gameManager, _eventBus, _content);
@@ -123,6 +136,8 @@ public partial class UIRoot : CanvasLayer
         MainMenu.HelpRequested += ToggleHelp;
         MainMenu.DevToolsRequested -= OpenDevTools;
         MainMenu.DevToolsRequested += OpenDevTools;
+        MainMenu.MetaShopRequested -= OpenMetaShop;
+        MainMenu.MetaShopRequested += OpenMetaShop;
 
         PauseMenu.ResumeRequested -= OnResumeRequested;
         PauseMenu.ResumeRequested += OnResumeRequested;
@@ -226,6 +241,10 @@ public partial class UIRoot : CanvasLayer
         AddIfMissing(PauseMenu);
         AddIfMissing(GameOverScreen);
         AddIfMissing(FloorSummaryUI);
+        AddIfMissing(RelicChoiceOverlay);
+        AddIfMissing(MetaShopUI);
+        AddIfMissing(FloorEventPopupUI);
+        AddIfMissing(ShrineConfirmationUI);
         AddIfMissing(HelpOverlay);
         AddIfMissing(Tooltip);
         AddIfMissing(DebugConsole);
@@ -251,6 +270,12 @@ public partial class UIRoot : CanvasLayer
     {
         return GetNodeOrNull<ContentDatabase>("/root/ContentDatabase")
             ?? AutoloadResolver.Resolve<ContentDatabase>(this, "ContentDatabase");
+    }
+
+    private MetaProgressionManager? ResolveMetaProgressionManager()
+    {
+        return GetNodeOrNull<MetaProgressionManager>("/root/MetaProgressionManager")
+            ?? AutoloadResolver.Resolve<MetaProgressionManager>(this, "MetaProgressionManager");
     }
 
     private void AddIfMissing(Node node)
@@ -342,6 +367,28 @@ public partial class UIRoot : CanvasLayer
             return handled;
         }
 
+        if (RelicChoiceOverlay.Visible)
+        {
+            var handled = RelicChoiceOverlay.HandleKey(key);
+            if (handled)
+            {
+                RefreshInputGate();
+            }
+
+            return handled;
+        }
+
+        if (ShrineConfirmationUI.Visible)
+        {
+            var handled = ShrineConfirmationUI.HandleKey(key);
+            if (handled)
+            {
+                RefreshInputGate();
+            }
+
+            return handled;
+        }
+
         if (HelpOverlay.Visible)
         {
             var handled = HelpOverlay.HandleKey(key);
@@ -356,6 +403,17 @@ public partial class UIRoot : CanvasLayer
         if (MainMenu.Visible)
         {
             var handled = MainMenu.HandleKey(key);
+            if (handled)
+            {
+                RefreshInputGate();
+            }
+
+            return handled;
+        }
+
+        if (MetaShopUI.Visible)
+        {
+            var handled = MetaShopUI.HandleKey(key);
             if (handled)
             {
                 RefreshInputGate();
@@ -487,6 +545,9 @@ public partial class UIRoot : CanvasLayer
         PauseMenu.Close();
         GameOverScreen.Close();
         FloorSummaryUI.Close();
+        RelicChoiceOverlay.Close();
+        ShrineConfirmationUI.Close();
+        MetaShopUI.Close();
         HelpOverlay.Close();
         Inventory.Close();
         CharacterSheet.Close();
@@ -525,6 +586,8 @@ public partial class UIRoot : CanvasLayer
     private void OnFloorTransitionConfirmed()
     {
         FloorSummaryUI.Close();
+        RelicChoiceOverlay.Close();
+        ShrineConfirmationUI.Close();
         RefreshInputGate();
     }
 
@@ -540,6 +603,9 @@ public partial class UIRoot : CanvasLayer
         ChestUI.Close();
         GameOverScreen.Close();
         FloorSummaryUI.Close();
+        RelicChoiceOverlay.Close();
+        ShrineConfirmationUI.Close();
+        MetaShopUI.Close();
         HelpOverlay.Close();
         TargetingOverlay.Cancel();
         ExaminePanel.Close();
@@ -683,6 +749,16 @@ public partial class UIRoot : CanvasLayer
         RefreshInputGate();
     }
 
+    private void OpenMetaShop()
+    {
+        HelpOverlay.Close();
+        DevToolsWorkbench.Close();
+        PauseMenu.Close();
+        MetaShopUI.Bind(ResolveMetaProgressionManager());
+        MetaShopUI.Open();
+        RefreshInputGate();
+    }
+
     private void ToggleDevTools()
     {
         if (GameOverScreen.Visible)
@@ -784,6 +860,9 @@ public partial class UIRoot : CanvasLayer
         ChestUI.Close();
         GameOverScreen.Close();
         FloorSummaryUI.Close();
+        RelicChoiceOverlay.Close();
+        ShrineConfirmationUI.Close();
+        MetaShopUI.Close();
         HelpOverlay.Close();
         DevToolsWorkbench.Close();
         TargetingOverlay.Cancel();
@@ -843,6 +922,9 @@ public partial class UIRoot : CanvasLayer
         ShopUI.Close();
         ChestUI.Close();
         FloorSummaryUI.Close();
+        RelicChoiceOverlay.Close();
+        ShrineConfirmationUI.Close();
+        MetaShopUI.Close();
         HelpOverlay.Close();
         DevToolsWorkbench.Close();
         TargetingOverlay.Cancel();
@@ -879,6 +961,9 @@ public partial class UIRoot : CanvasLayer
             && !DialogUI.Visible
             && !ShopUI.Visible
             && !ChestUI.Visible
+            && !RelicChoiceOverlay.Visible
+            && !ShrineConfirmationUI.Visible
+            && !MetaShopUI.Visible
             && !ExaminePanel.Visible
             && !GameOverScreen.Visible
             && !FloorSummaryUI.Visible
@@ -899,6 +984,9 @@ public partial class UIRoot : CanvasLayer
             || DialogUI.Visible
             || ShopUI.Visible
             || ChestUI.Visible
+            || RelicChoiceOverlay.Visible
+            || ShrineConfirmationUI.Visible
+            || MetaShopUI.Visible
             || ExaminePanel.Visible
             || GameOverScreen.Visible
             || FloorSummaryUI.Visible
@@ -922,6 +1010,9 @@ public partial class UIRoot : CanvasLayer
             || DialogUI.Visible
             || ShopUI.Visible
             || ChestUI.Visible
+            || RelicChoiceOverlay.Visible
+            || ShrineConfirmationUI.Visible
+            || MetaShopUI.Visible
             || ExaminePanel.Visible
             || GameOverScreen.Visible
             || FloorSummaryUI.Visible
@@ -947,6 +1038,13 @@ public partial class UIRoot : CanvasLayer
         {
             _currentPromptAction = InteractionPromptAction.OpenChest;
             HUD.SetInteractionPrompt("[F] Open Chest");
+            return;
+        }
+
+        if (FindNearbyShrine() is not null)
+        {
+            _currentPromptAction = InteractionPromptAction.Talk;
+            HUD.SetInteractionPrompt("[F] Offer at Shrine");
             return;
         }
 
@@ -1034,6 +1132,16 @@ public partial class UIRoot : CanvasLayer
                 return;
             }
 
+            var shrine = FindNearbyShrine();
+            var shrineComponent = shrine?.GetComponent<ShrineComponent>();
+            var player = _gameManager?.World?.Player;
+            if (shrine is not null && shrineComponent is not null && player is not null)
+            {
+                _eventBus?.EmitShrineConfirmationRequested(new ShrineConfirmationRequest(player.Id, shrine.Id, shrineComponent.ShrineType, shrineComponent.HPCost));
+                RefreshInputGate();
+                return;
+            }
+
             _eventBus?.EmitLogMessage("Nothing nearby to interact with.", LogCategory.Warning);
             RefreshInputGate();
             return;
@@ -1110,6 +1218,32 @@ public partial class UIRoot : CanvasLayer
 
             var entity = world.GetEntityAt(position);
             if (entity?.GetComponent<ChestComponent>() is not null)
+            {
+                return entity;
+            }
+        }
+
+        return null;
+    }
+
+    private IEntity? FindNearbyShrine()
+    {
+        var world = _gameManager?.World;
+        var player = world?.Player;
+        if (world is null || player is null)
+        {
+            return null;
+        }
+
+        foreach (var position in EnumerateInteractionPositions(player.Position))
+        {
+            if (!world.InBounds(position))
+            {
+                continue;
+            }
+
+            var entity = world.GetEntityAt(position);
+            if (entity?.GetComponent<ShrineComponent>() is { IsUsed: false })
             {
                 return entity;
             }

@@ -110,6 +110,7 @@ The repository contains targeted suites for:
 - simulation
 - UI
 - character creation and equipment UX
+- Track 7 roguelite UI integration, including relic HUD text, boss/streak indicators, archetype preview updates, and component persistence for relic/shrine/streak/archetype state
 - architecture smoke coverage
 
 ## Writing New Tests

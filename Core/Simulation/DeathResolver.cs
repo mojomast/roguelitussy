@@ -40,6 +40,16 @@ public static class DeathResolver
         }
 
         progression.Kills++;
+        if (killer.GetComponent<KillStreakComponent>() is { } streak)
+        {
+            streak.CurrentStreak++;
+            streak.HighestStreak = Math.Max(streak.HighestStreak, streak.CurrentStreak);
+            if (streak.CurrentStreak is 3 or 5 or 10 && streak.BonusXpAwarded < streak.CurrentStreak)
+            {
+                ProgressionService.AwardExperience(killer, streak.CurrentStreak);
+                streak.BonusXpAwarded = streak.CurrentStreak;
+            }
+        }
 
         var xpValue = victim.GetComponent<XpValueComponent>();
         var award = xpValue is null

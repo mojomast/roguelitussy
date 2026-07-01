@@ -32,7 +32,7 @@ The project uses flat JSON documents under `Content/` as the source of truth for
 - `perks.json` defines progression perk metadata and effects.
 - `relics.json` defines passive relic templates and hook metadata used by the relic processor.
 - `floor_events.json` defines safe-floor, boss-floor, shrine, curse-room, and vault event metadata.
-- `meta_upgrades.json` defines Echo-purchased long-term upgrade nodes.
+- `meta_upgrades.json` defines Echo-purchased long-term upgrade nodes consumed by the meta shop and character-creation archetype gates.
 - `dialogs.json` defines NPC dialogue graphs, including optional rotating `start_nodes` for repeated greetings.
 - `npcs.json` defines NPC metadata, roles, service hooks, merchant stock, and dialogue references.
 

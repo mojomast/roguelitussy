@@ -63,7 +63,7 @@
 | PRG-5 | Auto-apply archetype growth on level-up | P1 | Progression | open |
 | CHR-1 | Restore `CharacterOptions` when loading a saved run | P0 | Character / Identity | done |
 | CHR-2 | Make race mechanically meaningful with minor bonuses | P1 | Character / Identity | open |
-| CHR-3 | Give each archetype a signature starting ability | P1 | Character / Identity | open |
+| CHR-3 | Give each archetype a signature starting ability | P1 | Character / Identity | done |
 | CHR-4 | Improve creation preview clarity | P1 | Character / Identity | done |
 | CHR-5 | Add a "Randomize Build" option | P2 | Character / Identity | open |
 | UI-1 | Add mouse interaction to the inventory grid | P1 | UI / UX | open |
@@ -689,6 +689,7 @@
 ### CHR-3 — Give each archetype a signature starting ability
 
 - **Priority:** P1
+- **Status:** done. Track 7 character creation now surfaces Vanguard, Ranger, Trickster, and Arcanist; `GameManager.CreatePlayer` attaches archetype starting abilities and archetype identity components from `ArchetypeDefinitions`.
 - **Target files:**
   - `Scripts/Autoloads/GameManager.cs` (`CreatePlayer`)
   - `Scripts/UI/MainMenu.cs` preview

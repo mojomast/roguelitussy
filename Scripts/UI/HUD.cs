@@ -42,6 +42,9 @@ public partial class HUD : Control
     private Label? _progressLabel;
     private Label? _statsLabel;
     private Label? _effectsLabel;
+    private Label? _relicLabel;
+    private Label? _bossLabel;
+    private Label? _killStreakLabel;
     private Label? _hotbarLabel;
     private HBoxContainer? _statusIconsContainer;
     private Label? _mapLabel;
@@ -91,6 +94,12 @@ public partial class HUD : Control
 
     public string StatusEffectsText { get; private set; } = string.Empty;
 
+    public string RelicTrayText { get; private set; } = string.Empty;
+
+    public string BossHealthText { get; private set; } = string.Empty;
+
+    public string KillStreakText { get; private set; } = string.Empty;
+
     public string HotbarText { get; private set; } = "Hotbar: empty";
 
     public string MinimapText { get; private set; } = "Map hidden";
@@ -136,6 +145,10 @@ public partial class HUD : Control
             _eventBus.InventoryChanged -= OnInventoryChanged;
             _eventBus.StatusEffectApplied -= OnStatusEffectChanged;
             _eventBus.StatusEffectRemoved -= OnStatusEffectChanged;
+            _eventBus.RelicsChanged -= OnRelicsChanged;
+            _eventBus.KillStreakChanged -= OnKillStreakChanged;
+            _eventBus.BossRoomEntered -= OnBossRoomEntered;
+            _eventBus.HPChanged -= OnBossHPChanged;
         }
 
         _gameManager = gameManager;
@@ -151,6 +164,10 @@ public partial class HUD : Control
             _eventBus.InventoryChanged += OnInventoryChanged;
             _eventBus.StatusEffectApplied += OnStatusEffectChanged;
             _eventBus.StatusEffectRemoved += OnStatusEffectChanged;
+            _eventBus.RelicsChanged += OnRelicsChanged;
+            _eventBus.KillStreakChanged += OnKillStreakChanged;
+            _eventBus.BossRoomEntered += OnBossRoomEntered;
+            _eventBus.HPChanged += OnBossHPChanged;
         }
 
         Refresh();
@@ -194,6 +211,21 @@ public partial class HUD : Control
         if (!string.IsNullOrWhiteSpace(StatusEffectsText))
         {
             builder.AppendLine(StatusEffectsText);
+        }
+
+        if (!string.IsNullOrWhiteSpace(RelicTrayText))
+        {
+            builder.AppendLine(RelicTrayText);
+        }
+
+        if (!string.IsNullOrWhiteSpace(BossHealthText))
+        {
+            builder.AppendLine(BossHealthText);
+        }
+
+        if (!string.IsNullOrWhiteSpace(KillStreakText))
+        {
+            builder.AppendLine(KillStreakText);
         }
 
         if (!string.IsNullOrWhiteSpace(HotbarText))
@@ -286,6 +318,46 @@ public partial class HUD : Control
         }
     }
 
+    private void OnRelicsChanged(EntityId entityId, IReadOnlyList<RelicTemplate> relics)
+    {
+        if (_gameManager?.World?.Player?.Id == entityId)
+        {
+            RelicTrayText = BuildRelicTrayText(relics);
+            UpdateLabels();
+        }
+    }
+
+    private void OnKillStreakChanged(EntityId entityId, int current, int highest)
+    {
+        if (_gameManager?.World?.Player?.Id == entityId)
+        {
+            KillStreakText = current >= 2 ? $"Kill Streak: {current} (best {highest})" : string.Empty;
+            UpdateLabels();
+        }
+    }
+
+    private void OnBossRoomEntered(EntityId bossId)
+    {
+        var boss = _gameManager?.World?.GetEntity(bossId);
+        BossHealthText = boss is null ? "Boss: engaged" : $"Boss: {boss.Name} {boss.Stats.HP}/{boss.Stats.MaxHP} HP";
+        UpdateLabels();
+    }
+
+    private void OnBossHPChanged(EntityId entityId, int currentHp, int maxHp)
+    {
+        if (string.IsNullOrWhiteSpace(BossHealthText))
+        {
+            return;
+        }
+
+        var boss = _gameManager?.World?.GetEntity(entityId);
+        if (boss?.GetComponent<EnemyComponent>() is not null && boss.Name.Contains("Boss", System.StringComparison.OrdinalIgnoreCase))
+        {
+            BossHealthText = $"Boss: {boss.Name} {currentHp}/{maxHp} HP";
+            UpdateLabels();
+        }
+    }
+
     private void Refresh()
     {
         EnsureVisualTree();
@@ -302,6 +374,9 @@ public partial class HUD : Control
             StatsText = string.Empty;
             GoldText = string.Empty;
             StatusEffectsText = string.Empty;
+            RelicTrayText = string.Empty;
+            BossHealthText = string.Empty;
+            KillStreakText = string.Empty;
             HotbarText = "Hotbar: empty";
             MinimapText = MinimapVisible ? "Minimap: 0 explored, 0 visible" : "Minimap hidden";
             HPColor = Colors.White;
@@ -324,6 +399,9 @@ public partial class HUD : Control
             StatsText = string.Empty;
             GoldText = string.Empty;
             StatusEffectsText = string.Empty;
+            RelicTrayText = string.Empty;
+            BossHealthText = string.Empty;
+            KillStreakText = string.Empty;
             HotbarText = "Hotbar: empty";
             MinimapText = MinimapVisible
                 ? $"Minimap: 0 explored, 0 visible"
@@ -369,6 +447,11 @@ public partial class HUD : Control
             ? string.Empty
             : "Effects: " + string.Join(", ", effects.Select(effect => $"{effect.Type}({effect.RemainingTurns})"));
         SyncStatusIcons(effects);
+        RelicTrayText = BuildRelicTrayText(_gameManager?.GetPlayerRelics() ?? System.Array.Empty<RelicTemplate>());
+        var streak = player.GetComponent<KillStreakComponent>();
+        KillStreakText = streak is { CurrentStreak: >= 2 }
+            ? $"Kill Streak: {streak.CurrentStreak} (best {streak.HighestStreak})"
+            : string.Empty;
 
         var visibleTiles = 0;
         var exploredTiles = 0;
@@ -588,6 +671,9 @@ public partial class HUD : Control
         _progressLabel = CreateLabel("ProgressLabel", new Vector2(12f, 68f), new Vector2(416f, 18f));
         _statsLabel = CreateLabel("StatsLabel", new Vector2(12f, 90f), new Vector2(416f, 18f));
         _effectsLabel = CreateLabel("EffectsLabel", new Vector2(12f, 112f), new Vector2(416f, 18f));
+        _relicLabel = CreateLabel("RelicLabel", new Vector2(12f, 132f), new Vector2(416f, 18f));
+        _bossLabel = CreateLabel("BossLabel", new Vector2(12f, 152f), new Vector2(416f, 18f));
+        _killStreakLabel = CreateLabel("KillStreakLabel", new Vector2(12f, 172f), new Vector2(416f, 18f));
         _hotbarLabel = CreateLabel("HotbarLabel", new Vector2(12f, 134f), new Vector2(416f, 18f));
         _mapLabel = CreateLabel("MapLabel", new Vector2(12f, 156f), new Vector2(416f, 18f));
         _interactionPromptLabel = new UiMouseLabel
@@ -625,6 +711,9 @@ public partial class HUD : Control
         _panel.AddChild(_progressLabel);
         _panel.AddChild(_statsLabel);
         _panel.AddChild(_effectsLabel);
+        _panel.AddChild(_relicLabel);
+        _panel.AddChild(_bossLabel);
+        _panel.AddChild(_killStreakLabel);
         _panel.AddChild(_hotbarLabel);
 
         _statusIconsContainer = new HBoxContainer
@@ -817,7 +906,7 @@ public partial class HUD : Control
         ApplyResponsiveLayout();
         UpdateHPVisuals();
 
-        if (_headerLabel is null || _progressLabel is null || _statsLabel is null || _effectsLabel is null || _hotbarLabel is null || _mapLabel is null)
+        if (_headerLabel is null || _progressLabel is null || _statsLabel is null || _effectsLabel is null || _relicLabel is null || _bossLabel is null || _killStreakLabel is null || _hotbarLabel is null || _mapLabel is null)
         {
             return;
         }
@@ -833,6 +922,15 @@ public partial class HUD : Control
         _effectsLabel.Text = StatusEffectsText;
         _effectsLabel.Visible = !string.IsNullOrWhiteSpace(StatusEffectsText);
         _effectsLabel.Modulate = UiStyle.WarningOrange();
+        _relicLabel.Text = RelicTrayText;
+        _relicLabel.Visible = !string.IsNullOrWhiteSpace(RelicTrayText);
+        _relicLabel.Modulate = UiStyle.BrightGold();
+        _bossLabel.Text = BossHealthText;
+        _bossLabel.Visible = !string.IsNullOrWhiteSpace(BossHealthText);
+        _bossLabel.Modulate = UiStyle.DangerRed();
+        _killStreakLabel.Text = KillStreakText;
+        _killStreakLabel.Visible = !string.IsNullOrWhiteSpace(KillStreakText);
+        _killStreakLabel.Modulate = UiStyle.WarningOrange();
         _hotbarLabel.Text = HotbarText;
         _hotbarLabel.Modulate = UiStyle.BrightGold();
         _mapLabel.Text = MinimapText;
@@ -968,7 +1066,7 @@ public partial class HUD : Control
         var width = System.Math.Min(440f, System.Math.Max(0f, viewportWidth - 24f));
         var contentWidth = System.Math.Max(0f, width - 24f);
         _panel.Position = new Vector2(8f, 8f);
-        _panel.Size = new Vector2(width, 190f);
+        _panel.Size = new Vector2(width, 236f);
         _panel.Modulate = UiStyle.GoldTrim();
         LayoutPanelChrome(_panel.Size);
 
@@ -981,14 +1079,17 @@ public partial class HUD : Control
         SetControlBounds(_statsLabel, 12f, 96f, contentWidth, 18f);
         LayoutStatPills(12f, 96f, contentWidth);
         SetControlBounds(_effectsLabel, 12f, 116f, contentWidth, 18f);
-        SetControlBounds(_hotbarLabel, 12f, 134f, contentWidth, 18f);
+        SetControlBounds(_relicLabel, 12f, 134f, contentWidth, 18f);
+        SetControlBounds(_bossLabel, 12f, 152f, contentWidth, 18f);
+        SetControlBounds(_killStreakLabel, 12f, 170f, contentWidth, 18f);
+        SetControlBounds(_hotbarLabel, 12f, 188f, contentWidth, 18f);
         if (_statusIconsContainer is not null)
         {
-            _statusIconsContainer.Position = new Vector2(12f, 152f);
+            _statusIconsContainer.Position = new Vector2(12f, 206f);
             _statusIconsContainer.Size = new Vector2(contentWidth, 22f);
         }
 
-        SetControlBounds(_mapLabel, 12f, 172f, contentWidth, 18f);
+        SetControlBounds(_mapLabel, 12f, 216f, contentWidth, 18f);
         LayoutBottomStatusPanel(viewportWidth, ResolveViewportHeight());
         LayoutInteractionPrompt();
     }
@@ -1211,6 +1312,13 @@ public partial class HUD : Control
         }
 
         return "Hotbar: " + string.Join("  ", parts);
+    }
+
+    private static string BuildRelicTrayText(IReadOnlyList<RelicTemplate> relics)
+    {
+        return relics.Count == 0
+            ? string.Empty
+            : "Relics: " + string.Join(" | ", relics.Select(relic => relic.DisplayName));
     }
 
     private static Label CreateLabel(string name, Vector2 position, Vector2 size)

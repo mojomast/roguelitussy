@@ -36,6 +36,8 @@ public sealed record FloorStats(
     int ChestsOpened,
     int TrapsTriggered);
 
+public sealed record ShrineConfirmationRequest(EntityId ActorId, EntityId ShrineId, string ShrineType, int HPCost);
+
 public enum LogCategory
 {
     System,
@@ -88,6 +90,9 @@ public partial class EventBus : Node
     public event Action<Position, bool>? TargetingCursorMoved;
     public event Action<IReadOnlyList<Position>, bool>? TargetingPreviewChanged;
     public event Action<IReadOnlyList<RelicTemplate>>? RelicChoiceReady;
+    public event Action<EntityId, IReadOnlyList<RelicTemplate>>? RelicsChanged;
+    public event Action<EntityId, int, int>? KillStreakChanged;
+    public event Action<ShrineConfirmationRequest>? ShrineConfirmationRequested;
     public event Action? CurseRoomEntered;
     public event Action<EntityId>? BossRoomEntered;
 
@@ -178,6 +183,12 @@ public partial class EventBus : Node
     public void EmitTargetingPreviewChanged(IReadOnlyList<Position> tiles, bool isValid) => TargetingPreviewChanged?.Invoke(tiles, isValid);
 
     public void EmitRelicChoiceReady(IReadOnlyList<RelicTemplate> choices) => RelicChoiceReady?.Invoke(choices);
+
+    public void EmitRelicsChanged(EntityId entityId, IReadOnlyList<RelicTemplate> relics) => RelicsChanged?.Invoke(entityId, relics);
+
+    public void EmitKillStreakChanged(EntityId entityId, int current, int highest) => KillStreakChanged?.Invoke(entityId, current, highest);
+
+    public void EmitShrineConfirmationRequested(ShrineConfirmationRequest request) => ShrineConfirmationRequested?.Invoke(request);
 
     public void EmitCurseRoomEntered() => CurseRoomEntered?.Invoke();
 

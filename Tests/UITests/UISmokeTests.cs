@@ -920,7 +920,7 @@ public sealed class UISmokeTests : ITestSuite
         var inventory = player.GetComponent<InventoryComponent>();
 
         Expect.Equal("Iris", player.Name, "Character creation should apply the selected preset name to the starting run.");
-        Expect.Equal("Skirmisher", gameManager.CharacterOptions.Archetype, "Character creation should persist the selected archetype.");
+        Expect.Equal("ranger", gameManager.CharacterOptions.Archetype, "Character creation should persist the selected archetype.");
         Expect.Equal("Scout", gameManager.CharacterOptions.Origin, "Character creation should persist the selected origin.");
         Expect.Equal("Quartermaster", gameManager.CharacterOptions.Trait, "Character creation should persist the selected trait.");
         var identity = player.GetComponent<IdentityComponent>();
@@ -928,11 +928,11 @@ public sealed class UISmokeTests : ITestSuite
         Expect.Equal("elf", identity!.RaceId, "Character creation should persist the selected race.");
         Expect.Equal("masculine", identity.GenderId, "Character creation should persist the selected gender.");
         Expect.Equal("scarred", identity.AppearanceId, "Character creation should persist the selected appearance.");
-        Expect.Equal("elf_masculine_scarred_skirmisher", identity.SpriteVariantId, "Character creation should compose the full sprite variant id.");
+        Expect.Equal("elf_masculine_scarred_ranger", identity.SpriteVariantId, "Character creation should compose the full sprite variant id.");
         Expect.True(player.Stats.Speed > 100, "Archetype and origin bonuses should affect player stats.");
         Expect.True(player.Stats.Accuracy > 80, "Allocated finesse points should affect player accuracy.");
         Expect.True(inventory?.Capacity > 20, "Trait bonuses should be able to expand inventory capacity.");
-        Expect.True(inventory?.GetEquipped(EquipSlot.MainHand) is not null, "A loadout archetype should start with equipment already equipped.");
+        Expect.True(inventory?.Items.Any(item => item.TemplateId == "item_arrows_bundle") == true, "Ranger should start with arrows in the pack.");
     }
 
     private static void HelpOverlayOpensFromMenuAndGameplay()
@@ -1270,7 +1270,7 @@ public sealed class UISmokeTests : ITestSuite
             menu.Bind(gameManager, bus);
             menu.Open();
 
-            for (var i = 0; i < 18; i++)
+            for (var i = 0; i < 19; i++)
             {
                 menu.HandleKey(Key.Down);
             }
@@ -1301,7 +1301,7 @@ public sealed class UISmokeTests : ITestSuite
             menu.Bind(gameManager, bus);
             menu.Open();
 
-            for (var i = 0; i < 18; i++)
+            for (var i = 0; i < 19; i++)
             {
                 menu.HandleKey(Key.Down);
             }

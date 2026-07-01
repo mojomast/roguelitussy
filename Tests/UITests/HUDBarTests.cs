@@ -18,6 +18,7 @@ public sealed class HUDBarTests : ITestSuite
         registry.Add("UI.HUD HP danger pattern clears above thirty percent", HpDangerPatternClearsAboveThirtyPercent);
         registry.Add("UI.HUD energy ghost trails spending", EnergyGhostTrailsSpending);
         registry.Add("UI.HUD bottom status shows HP and XP above hotbar", BottomStatusShowsHpAndXpAboveHotbar);
+        registry.Add("UI.HUD shows relic tray boss and kill streak indicators", ShowsRelicBossAndKillStreakIndicators);
     }
 
     private static void HpDamageKeepsDisplayedValueBeforeTicks()
@@ -150,6 +151,28 @@ public sealed class HUDBarTests : ITestSuite
             Expect.Equal(18d, hud.XPBarValue, "HUD should expose XP bar progress for tests and UI layout.");
             Expect.Equal(30d, hud.XPBarMaxValue, "HUD should expose XP bar max for tests and UI layout.");
         });
+    }
+
+    private static void ShowsRelicBossAndKillStreakIndicators()
+    {
+        var context = CreateContext(hp: 40, maxHp: 40, energy: 800);
+        context.Player.SetComponent(new RelicComponent());
+        context.Player.GetComponent<RelicComponent>()!.RelicIds.Add("vampire_fang");
+        context.Player.SetComponent(new KillStreakComponent { CurrentStreak = 2, HighestStreak = 3 });
+        var hud = CreateHud(context);
+
+        context.Bus.EmitRelicsChanged(context.Player.Id, context.GameManager.GetPlayerRelics());
+        context.Bus.EmitKillStreakChanged(context.Player.Id, 2, 3);
+
+        var boss = new StubEntity("Boss Guardian", new Position(1, 1), Faction.Enemy, stats: new Stats { HP = 30, MaxHP = 40, Attack = 8, Defense = 2, Accuracy = 80, Evasion = 5, Speed = 100 });
+        boss.SetComponent(new EnemyComponent { TemplateId = "boss_stone_guardian" });
+        context.GameManager.World!.AddEntity(boss);
+        context.Bus.EmitBossRoomEntered(boss.Id);
+
+        Expect.True(hud.RelicTrayText.Contains("Vampire Fang"), "HUD should show claimed relic names in the relic tray text.");
+        Expect.True(hud.KillStreakText.Contains("2"), "HUD should show Trickster kill streaks at two or more kills.");
+        Expect.True(hud.BossHealthText.Contains("Boss Guardian"), "HUD should show boss health after BossRoomEntered.");
+        Expect.True(hud.Snapshot().Contains("Relics:"), "HUD snapshot should include the relic tray when relics exist.");
     }
 
     private static HUD CreateHud(HudBarContext context)

@@ -22,6 +22,8 @@
 
 > Architecture follow-up note (2026-07-01): `GameManager.cs` remains a large facade and the full under-500-line refactor is still open. Track this in `docs/IMPROVEMENT_SUGGESTIONS.md` as an architecture backlog item rather than using this historical file as the source of truth. The refactor should not block Track 7 UI work; preserve the existing `GameManager` facade API while extracting services incrementally.
 
+> Track 7 follow-up note (2026-07-01): roguelite UI integration is implemented in code-driven UI surfaces: archetype-gated character creation, meta shop, relic choice/tray, death run history/Echo breakdown, shrine confirmation, floor-event popup hook, boss HUD text, and Trickster kill-streak HUD text. Remaining verification is manual Godot runtime playthrough coverage for exact special-room cadence and feel.
+
 ## Purpose
 
 This document is the current-state improvement spec for turning the existing project into a more complete, playable roguelike. It is intentionally written for parallel subagents. It replaces vague backlog work with concrete, codebase-specific workstreams, ordering, file targets, and acceptance criteria.

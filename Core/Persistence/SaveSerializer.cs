@@ -126,7 +126,55 @@ internal sealed class EntitySaveData
 
     public TrapSaveData? Trap { get; set; }
 
+    public RelicSaveData? Relic { get; set; }
+
+    public ShrineSaveData? Shrine { get; set; }
+
+    public KillStreakSaveData? KillStreak { get; set; }
+
+    public ArchetypeSaveData? Archetype { get; set; }
+
     public int SchedulerOrder { get; set; }
+}
+
+internal sealed class RelicSaveData
+{
+    public List<string> RelicIds { get; set; } = new();
+
+    public int ShieldCharges { get; set; }
+
+    public bool LowHpRelicFired { get; set; }
+}
+
+internal sealed class ShrineSaveData
+{
+    public string ShrineType { get; set; } = string.Empty;
+
+    public int HPCost { get; set; }
+
+    public bool IsUsed { get; set; }
+
+    public bool RewardChoicePending { get; set; }
+
+    public string PendingRewardType { get; set; } = string.Empty;
+
+    public string PendingActorId { get; set; } = string.Empty;
+}
+
+internal sealed class KillStreakSaveData
+{
+    public int CurrentStreak { get; set; }
+
+    public int HighestStreak { get; set; }
+
+    public int BonusXpAwarded { get; set; }
+}
+
+internal sealed class ArchetypeSaveData
+{
+    public string ArchetypeId { get; set; } = string.Empty;
+
+    public string SignatureMechanicId { get; set; } = string.Empty;
 }
 
 internal sealed class EnemySaveData
@@ -327,7 +375,7 @@ internal sealed class PositionSaveData
 
 public static class SaveSerializer
 {
-    public const int CurrentVersion = 13;
+    public const int CurrentVersion = 14;
 
     internal static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -600,6 +648,10 @@ public static class SaveSerializer
         var brain = entity.GetComponent<IBrain>();
         var enemy = entity.GetComponent<EnemyComponent>();
         var trap = entity.GetComponent<TrapComponent>();
+        var relic = entity.GetComponent<RelicComponent>();
+        var shrine = entity.GetComponent<ShrineComponent>();
+        var killStreak = entity.GetComponent<KillStreakComponent>();
+        var archetype = entity.GetComponent<ArchetypeComponent>();
 
         return new EntitySaveData
         {
@@ -705,6 +757,32 @@ public static class SaveSerializer
                 IsArmed = trap.IsArmed,
                 IsRevealed = trap.IsRevealed,
                 TriggerCount = trap.TriggerCount,
+            },
+            Relic = relic is null ? null : new RelicSaveData
+            {
+                RelicIds = relic.RelicIds.ToList(),
+                ShieldCharges = relic.ShieldCharges,
+                LowHpRelicFired = relic.LowHpRelicFired,
+            },
+            Shrine = shrine is null ? null : new ShrineSaveData
+            {
+                ShrineType = shrine.ShrineType,
+                HPCost = shrine.HPCost,
+                IsUsed = shrine.IsUsed,
+                RewardChoicePending = shrine.RewardChoicePending,
+                PendingRewardType = shrine.PendingRewardType,
+                PendingActorId = shrine.PendingActorId.IsValid ? shrine.PendingActorId.Value.ToString("N") : string.Empty,
+            },
+            KillStreak = killStreak is null ? null : new KillStreakSaveData
+            {
+                CurrentStreak = killStreak.CurrentStreak,
+                HighestStreak = killStreak.HighestStreak,
+                BonusXpAwarded = killStreak.BonusXpAwarded,
+            },
+            Archetype = archetype is null ? null : new ArchetypeSaveData
+            {
+                ArchetypeId = archetype.ArchetypeId,
+                SignatureMechanicId = archetype.SignatureMechanicId,
             },
             SchedulerOrder = world.SchedulerOrders.TryGetValue(entity.Id, out var schedulerOrder) ? schedulerOrder : 0,
         };
@@ -1045,6 +1123,53 @@ public static class SaveSerializer
                 IsArmed = data.Trap.IsArmed,
                 IsRevealed = data.Trap.IsRevealed,
                 TriggerCount = data.Trap.TriggerCount,
+            });
+        }
+
+        if (data.Relic is not null)
+        {
+            var relic = new RelicComponent
+            {
+                ShieldCharges = data.Relic.ShieldCharges,
+                LowHpRelicFired = data.Relic.LowHpRelicFired,
+            };
+            foreach (var relicId in data.Relic.RelicIds.Where(id => !string.IsNullOrWhiteSpace(id)))
+            {
+                relic.RelicIds.Add(relicId);
+            }
+
+            entity.SetComponent(relic);
+        }
+
+        if (data.Shrine is not null)
+        {
+            entity.SetComponent(new ShrineComponent
+            {
+                ShrineType = data.Shrine.ShrineType,
+                HPCost = data.Shrine.HPCost,
+                IsUsed = data.Shrine.IsUsed,
+                RewardChoicePending = data.Shrine.RewardChoicePending,
+                PendingRewardType = data.Shrine.PendingRewardType,
+                PendingActorId = string.IsNullOrWhiteSpace(data.Shrine.PendingActorId) ? EntityId.Invalid : EntityId.From(data.Shrine.PendingActorId),
+            });
+        }
+
+        if (data.KillStreak is not null)
+        {
+            entity.SetComponent(new KillStreakComponent
+            {
+                CurrentStreak = data.KillStreak.CurrentStreak,
+                HighestStreak = data.KillStreak.HighestStreak,
+                BonusXpAwarded = data.KillStreak.BonusXpAwarded,
+            });
+        }
+
+        if (data.Archetype is not null)
+        {
+            entity.SetComponent(new ArchetypeComponent
+            {
+                ArchetypeId = data.Archetype.ArchetypeId,
+                SignatureMechanicId = data.Archetype.SignatureMechanicId,
             });
         }
 

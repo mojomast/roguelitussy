@@ -13,6 +13,7 @@ public sealed class ComponentPersistenceTests : ITestSuite
         registry.Add("Persistence.Components preserves XP value", PreservesXpValue);
         registry.Add("Persistence.Components preserves enemy template identity", PreservesEnemyTemplateIdentity);
         registry.Add("Persistence.Components preserves trap component state", PreservesTrapComponentState);
+        registry.Add("Persistence.Components preserves Track 7 run state components", PreservesTrackSevenComponents);
         registry.Add("Persistence.Components preserves scheduler actor order", PreservesSchedulerActorOrder);
         registry.Add("Persistence.Components preserves abilities and cooldowns", PreservesAbilitiesAndCooldowns);
         registry.Add("Persistence.Components preserves AI state and brain", PreservesAIStateAndBrain);
@@ -116,6 +117,57 @@ public sealed class ComponentPersistenceTests : ITestSuite
         Expect.True(restoredComponent.IsArmed, "Trap armed state should survive round-trip.");
         Expect.False(restoredComponent.IsRevealed, "Trap revealed state should survive round-trip.");
         Expect.Equal(0, restoredComponent.TriggerCount, "Trap trigger count should survive round-trip.");
+    }
+
+    private static void PreservesTrackSevenComponents()
+    {
+        using var sandbox = SaveSandbox.Create();
+        var manager = new SaveManager(sandbox.DirectoryPath, sandbox.Clock);
+        var world = CreateWorld(4, 4);
+        world.Player.SetComponent(new RelicComponent
+        {
+            ShieldCharges = 3,
+            LowHpRelicFired = true,
+        });
+        world.Player.GetComponent<RelicComponent>()!.RelicIds.Add("vampire_fang");
+        world.Player.SetComponent(new KillStreakComponent { CurrentStreak = 4, HighestStreak = 5, BonusXpAwarded = 3 });
+        world.Player.SetComponent(new ArchetypeComponent { ArchetypeId = "trickster", SignatureMechanicId = "kill_streak_double_turn" });
+
+        var shrine = CreateEntity("Shrine", new Position(1, 1), Faction.Neutral, speed: 1, blocksMovement: false);
+        shrine.SetComponent(new ShrineComponent
+        {
+            ShrineType = "relic",
+            HPCost = 15,
+            IsUsed = true,
+            RewardChoicePending = true,
+            PendingRewardType = "relic",
+            PendingActorId = world.Player.Id,
+        });
+        world.AddEntity(shrine);
+
+        Expect.True(manager.SaveGame(world, SaveSlots.Slot1).GetAwaiter().GetResult(), "Save should persist Track 7 components.");
+        var restored = manager.LoadGame(SaveSlots.Slot1).GetAwaiter().GetResult();
+        Expect.NotNull(restored, "Saved world should load again.");
+
+        var relic = restored!.Player.GetComponent<RelicComponent>();
+        Expect.NotNull(relic, "Relic component should survive round-trip.");
+        Expect.True(relic!.RelicIds.Contains("vampire_fang"), "Relic ids should survive round-trip.");
+        Expect.Equal(3, relic.ShieldCharges, "Relic shield charges should survive round-trip.");
+        Expect.True(relic.LowHpRelicFired, "Relic one-shot guard should survive round-trip.");
+
+        var streak = restored.Player.GetComponent<KillStreakComponent>();
+        Expect.Equal(4, streak?.CurrentStreak ?? -1, "Kill streak should survive round-trip.");
+        Expect.Equal(5, streak?.HighestStreak ?? -1, "Highest streak should survive round-trip.");
+
+        var archetype = restored.Player.GetComponent<ArchetypeComponent>();
+        Expect.Equal("trickster", archetype?.ArchetypeId ?? string.Empty, "Archetype component should survive round-trip.");
+
+        var restoredShrine = restored.GetEntity(shrine.Id)!.GetComponent<ShrineComponent>();
+        Expect.NotNull(restoredShrine, "Shrine component should survive round-trip.");
+        Expect.Equal("relic", restoredShrine!.ShrineType, "Shrine type should survive round-trip.");
+        Expect.True(restoredShrine.IsUsed, "Shrine used state should survive round-trip.");
+        Expect.True(restoredShrine.RewardChoicePending, "Shrine pending reward state should survive round-trip.");
+        Expect.Equal(world.Player.Id, restoredShrine.PendingActorId, "Shrine pending actor should survive round-trip.");
     }
 
     private static void PreservesSchedulerActorOrder()

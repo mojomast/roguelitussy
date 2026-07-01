@@ -272,7 +272,7 @@ This makes your new NPC/dialog/shop work part of progression instead of a discon
 
 ### Phase 6: Add Light Meta Unlocks
 
-Status: foundation implemented. `MetaProgressionManager` persists Echoes, purchased upgrade levels, and capped run history; `Content/meta_upgrades.json` authors starting-gold, inventory, archetype-unlock, starting-item, Echo-bonus, and relic-seeker nodes. Full character-creation gating and meta-shop UI remain follow-up integration work.
+Status: integrated. `MetaProgressionManager` persists Echoes, purchased upgrade levels, and capped run history; `Content/meta_upgrades.json` authors starting-gold, inventory, archetype-unlock, starting-item, Echo-bonus, and relic-seeker nodes. Character creation shows Vanguard, Ranger, Trickster, and Arcanist, with non-Vanguard archetypes gated by the matching unlock upgrades. The main menu exposes the meta shop, and the death screen shows recent run history plus the Echo formula breakdown.
 
 Only after run progression feels good.
 

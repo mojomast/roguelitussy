@@ -340,6 +340,62 @@ public partial class GameManager : Node
         CharacterOptions = options ?? CharacterCreationOptions.Default;
     }
 
+    public bool ProcessRelicChoice(string relicId) => ProcessRelicChoice(relicId, out _);
+
+    public bool ProcessRelicChoice(string relicId, out string message)
+    {
+        message = string.Empty;
+        var player = World?.Player;
+        if (player is null)
+        {
+            message = "No active player is available.";
+            return false;
+        }
+
+        if (!RelicProcessor.AddRelic(player, Content, relicId))
+        {
+            message = $"Relic '{relicId}' could not be claimed.";
+            Bus?.EmitLogMessage(message, LogCategory.Warning);
+            return false;
+        }
+
+        var relics = GetPlayerRelics();
+        var claimedName = relics.FirstOrDefault(relic => string.Equals(relic.RelicId, relicId, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? relicId;
+        message = $"Claimed relic: {claimedName}.";
+        Bus?.EmitLogMessage(message, LogCategory.Loot);
+        Bus?.EmitRelicsChanged(player.Id, relics);
+        return true;
+    }
+
+    public IReadOnlyList<RelicTemplate> GetPlayerRelics()
+    {
+        var component = World?.Player?.GetComponent<RelicComponent>();
+        if (component is null)
+        {
+            return Array.Empty<RelicTemplate>();
+        }
+
+        return component.RelicIds
+            .Where(id => RelicProcessor.TryGetRelicTemplate(Content, id, out _))
+            .Select(id =>
+            {
+                RelicProcessor.TryGetRelicTemplate(Content, id, out var template);
+                return template;
+            })
+            .ToArray();
+    }
+
+    public IReadOnlyList<RelicTemplate> CreateRelicChoices(int count = 3)
+    {
+        IReadOnlyCollection<string> owned = World?.Player?.GetComponent<RelicComponent>()?.RelicIds ?? (IReadOnlyCollection<string>)Array.Empty<string>();
+        var ownedSet = new HashSet<string>(owned, StringComparer.OrdinalIgnoreCase);
+        return RelicProcessor.GetKnownRelics(Content)
+            .Where(relic => !ownedSet.Contains(relic.RelicId))
+            .OrderBy(relic => relic.RelicId, StringComparer.Ordinal)
+            .Take(Math.Max(1, count))
+            .ToArray();
+    }
+
     public void SetRuntimeContent(IContentDatabase content)
     {
         Content = content;
@@ -683,6 +739,7 @@ public partial class GameManager : Node
         RecalculatePlayerVisibility(world);
         Bus?.EmitLevelGenerated(world.Depth, world.Width, world.Height);
         Bus?.EmitFloorChanged(CurrentFloor);
+        EmitFloorEventHooks(world);
         EmitWorldSnapshot(world);
     }
 
@@ -912,6 +969,7 @@ public partial class GameManager : Node
         var equipmentBefore = SnapshotEquipment(actorBefore?.GetComponent<InventoryComponent>());
         var progressionBefore = SnapshotProgression(actorBefore);
         var walletBefore = SnapshotWallet(actorBefore);
+        var killStreakBefore = SnapshotKillStreak(World.Player);
         var playerHpBefore = World.Player.Stats.HP;
         var runStatsUpdatedForDeath = false;
 
@@ -968,6 +1026,11 @@ public partial class GameManager : Node
                         Bus?.EmitGameOver(CurrentFloor, World.TurnNumber);
                     }
                 }
+
+                if (damage.DefenderId == playerId && damage.FinalDamage > 0)
+                {
+                    ResetKillStreak(World.Player);
+                }
             }
 
             foreach (var effect in combatEvent.StatusEffectsApplied)
@@ -1001,6 +1064,7 @@ public partial class GameManager : Node
             EmitStateDelta(action, actorPositionBefore, entityPositionsBefore, inventoryBefore, equipmentBefore, outcome.DirtyPositions, playerId);
             EmitProgressionChanges(playerId, progressionBefore);
             EmitWalletChanges(playerId, walletBefore);
+            EmitKillStreakChanges(playerId, killStreakBefore);
         }
 
         if (!runStatsUpdatedForDeath && World.GetEntity(playerId) is not null)
@@ -1315,6 +1379,23 @@ public partial class GameManager : Node
             ?? AutoloadResolver.Resolve<ContentDatabase>(this, "ContentDatabase");
     }
 
+    private MetaProgressionManager? ResolveMetaProgressionManager()
+    {
+        return GetNodeOrNull<MetaProgressionManager>("/root/MetaProgressionManager")
+            ?? AutoloadResolver.Resolve<MetaProgressionManager>(this, "MetaProgressionManager");
+    }
+
+    private void EmitFloorEventHooks(WorldState world)
+    {
+        var boss = world.Entities.FirstOrDefault(entity =>
+            entity.GetComponent<EnemyComponent>() is { } enemy
+            && enemy.TemplateId.StartsWith("boss_", StringComparison.OrdinalIgnoreCase));
+        if (boss is not null || (world.Depth > 0 && world.Depth % 3 == 0 && world.Depth % 5 != 0))
+        {
+            Bus?.EmitBossRoomEntered(boss?.Id ?? EntityId.Invalid);
+        }
+    }
+
     private (WorldState World, FloorEntrances Entrances) CreateGeneratedWorld(int seed, int depth)
     {
         if (Generator is null || Content is null)
@@ -1510,17 +1591,8 @@ public partial class GameManager : Node
     private Entity CreatePlayer(Position spawn, Random rng)
     {
         var character = CharacterOptions;
-        var stats = new Stats
-        {
-            HP = 40,
-            MaxHP = 40,
-            Attack = 8,
-            Accuracy = 80,
-            Defense = 3,
-            Evasion = 10,
-            Speed = 100,
-            ViewRadius = 8,
-        };
+        var archetype = ArchetypeDefinitions.Get(character.Archetype);
+        var stats = archetype.CreateStats();
 
         stats.MaxHP += character.BonusMaxHp;
         stats.HP = stats.MaxHP;
@@ -1531,6 +1603,21 @@ public partial class GameManager : Node
         stats.Speed += character.BonusSpeed;
         stats.ViewRadius += character.BonusViewRadius;
 
+        var meta = ResolveMetaProgressionManager();
+        var inventoryBonus = meta?.GetIntBonus("inventory_bonus") ?? 0;
+        var startingGoldBonus = meta?.GetIntBonus("starting_gold") ?? 0;
+        var startingItems = new List<string>();
+        startingItems.AddRange(archetype.StartingItemIds);
+        startingItems.AddRange(character.StartingItemTemplateIds);
+        if (meta is not null)
+        {
+            startingItems.AddRange(meta.GetRepeatedStringBonuses("starting_items"));
+            if (meta.IsUnlocked("relic_seeker"))
+            {
+                startingItems.Add("relic_item_slot");
+            }
+        }
+
         var player = new Entity(
             character.Name,
             spawn,
@@ -1538,8 +1625,8 @@ public partial class GameManager : Node
             Faction.Player,
             id: EntityId.NewSeeded(rng));
 
-        var inventory = new InventoryComponent(Math.Max(8, 20 + character.InventoryCapacityBonus));
-        foreach (var templateId in character.StartingItemTemplateIds)
+        var inventory = new InventoryComponent(Math.Max(8, 20 + character.InventoryCapacityBonus + inventoryBonus));
+        foreach (var templateId in startingItems)
         {
             var item = new ItemInstance
             {
@@ -1560,8 +1647,30 @@ public partial class GameManager : Node
         }
 
         player.SetComponent(inventory);
-        player.SetComponent(new WalletComponent { Gold = StartingGold });
+        player.SetComponent(new WalletComponent { Gold = StartingGold + startingGoldBonus });
         player.SetComponent(new ProgressionComponent());
+        player.SetComponent(new RelicComponent());
+        player.SetComponent(new ArchetypeComponent
+        {
+            ArchetypeId = archetype.Id,
+            SignatureMechanicId = archetype.SignatureMechanicId,
+        });
+        if (archetype.Id == "trickster")
+        {
+            player.SetComponent(new KillStreakComponent());
+        }
+
+        if (archetype.StartingAbilityIds.Length > 0)
+        {
+            var abilities = new AbilitiesComponent();
+            foreach (var abilityId in archetype.StartingAbilityIds)
+            {
+                abilities.Slots.Add(new EnemyAbilitySlot { AbilityId = abilityId, Cooldown = 0, Priority = 100 });
+            }
+
+            player.SetComponent(abilities);
+            player.SetComponent(new CooldownComponent());
+        }
         player.SetComponent(new IdentityComponent
         {
             RaceId = character.RaceId,
@@ -1571,7 +1680,7 @@ public partial class GameManager : Node
                 character.RaceId,
                 character.GenderId,
                 character.AppearanceId,
-                character.Archetype),
+                archetype.Id),
         });
         EquipStartingLoadout(player, inventory, character);
         return player;
@@ -2654,6 +2763,36 @@ public partial class GameManager : Node
         }
 
         Bus.EmitCurrencyChanged(playerId, wallet.Gold);
+    }
+
+    private static (int Current, int Highest) SnapshotKillStreak(IEntity? entity)
+    {
+        var streak = entity?.GetComponent<KillStreakComponent>();
+        return streak is null ? (0, 0) : (streak.CurrentStreak, streak.HighestStreak);
+    }
+
+    private void EmitKillStreakChanges(EntityId playerId, (int Current, int Highest) before)
+    {
+        if (World is null || Bus is null)
+        {
+            return;
+        }
+
+        var streak = World.GetEntity(playerId)?.GetComponent<KillStreakComponent>();
+        if (streak is null || (streak.CurrentStreak == before.Current && streak.HighestStreak == before.Highest))
+        {
+            return;
+        }
+
+        Bus.EmitKillStreakChanged(playerId, streak.CurrentStreak, streak.HighestStreak);
+    }
+
+    private static void ResetKillStreak(IEntity? entity)
+    {
+        if (entity?.GetComponent<KillStreakComponent>() is { } streak && streak.CurrentStreak != 0)
+        {
+            streak.CurrentStreak = 0;
+        }
     }
 
     private static HashSet<EntityId> SnapshotInventory(InventoryComponent? inventory)

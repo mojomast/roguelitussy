@@ -29,6 +29,7 @@ public partial class MainMenu : MenuBase
         LoadSlot1,
         LoadSlot2,
         LoadSlot3,
+        MetaShop,
         DevTools,
         Help,
         Quit,
@@ -46,7 +47,9 @@ public partial class MainMenu : MenuBase
 
     private sealed record ArchetypeOption(
         string DisplayName,
+        string ArchetypeId,
         string Summary,
+        string SignatureMechanic,
         StatBonus Bonus,
         IReadOnlyList<string> StartingItems,
         IReadOnlyList<string> EquippedItems);
@@ -81,21 +84,35 @@ public partial class MainMenu : MenuBase
     {
         new(
             "Vanguard",
+            "vanguard",
             "A tough delver who starts armed and ready for the front line.",
-            new StatBonus(8, 2, 1, 0, 0, -5, 0, 0),
-            new[] { "sword_iron", "shield_wooden", "potion_health", "potion_health" },
-            new[] { "sword_iron", "shield_wooden" }),
+            "Shield Bash: control space and endure punishment.",
+            new StatBonus(10, 0, 2, -5, -2, -10, -1, 0),
+            new[] { "potion_health", "potion_health", "item_shield_basic" },
+            new[] { "item_shield_basic" }),
         new(
-            "Skirmisher",
-            "A fast striker who trades durability for initiative and accuracy.",
-            new StatBonus(0, 1, 0, 0, 4, 10, 0, 0),
-            new[] { "dagger_venom", "potion_haste", "potion_health" },
-            new[] { "dagger_venom" }),
+            "Ranger",
+            "ranger",
+            "A mobile marksman with accurate ranged pressure.",
+            "Ranged Shot: spend arrows to strike from safety.",
+            new StatBonus(-5, 2, -1, 15, 8, 10, 2, 0),
+            new[] { "potion_health", "item_arrows_bundle" },
+            System.Array.Empty<string>()),
         new(
-            "Mystic",
-            "A fragile explorer who leans on scrolls, vision, and mobility.",
-            new StatBonus(-4, 0, -1, 0, 0, 5, 1, 0),
-            new[] { "scroll_fireball", "scroll_blink", "potion_health" },
+            "Trickster",
+            "trickster",
+            "A slippery killer who snowballs chained takedowns.",
+            "Kill Streak: bonus pressure after repeated kills.",
+            new StatBonus(-10, 1, -2, 5, 12, 20, 1, 0),
+            new[] { "potion_health", "item_smoke_bomb" },
+            System.Array.Empty<string>()),
+        new(
+            "Arcanist",
+            "arcanist",
+            "A fragile caster who starts with scrolls and arcane abilities.",
+            "Arcane Charges: native spells backed by scroll burst.",
+            new StatBonus(-12, -2, -2, 10, 2, 0, 1, 0),
+            new[] { "scroll_fireball", "scroll_frost_nova", "potion_mana" },
             System.Array.Empty<string>()),
     };
 
@@ -161,6 +178,7 @@ public partial class MainMenu : MenuBase
 
     private EventBus? _eventBus;
     private GameManager? _gameManager;
+    private MetaProgressionManager? _metaProgression;
     private readonly List<MenuAction> _optionActions = new();
     private int _nameIndex;
     private int _archetypeIndex;
@@ -196,6 +214,8 @@ public partial class MainMenu : MenuBase
 
     public event System.Action? DevToolsRequested;
 
+    public event System.Action? MetaShopRequested;
+
     public MainMenu()
     {
         Name = "MainMenu";
@@ -206,6 +226,11 @@ public partial class MainMenu : MenuBase
 
     public void Bind(GameManager? gameManager, EventBus? eventBus)
     {
+        Bind(gameManager, eventBus, null);
+    }
+
+    public void Bind(GameManager? gameManager, EventBus? eventBus, MetaProgressionManager? metaProgression)
+    {
         if (_eventBus is not null)
         {
             _eventBus.LoadCompleted -= OnLoadCompleted;
@@ -214,6 +239,7 @@ public partial class MainMenu : MenuBase
 
         _gameManager = gameManager;
         _eventBus = eventBus;
+        _metaProgression = metaProgression;
         if (_eventBus is not null)
         {
             _eventBus.LoadCompleted += OnLoadCompleted;
@@ -243,10 +269,11 @@ public partial class MainMenu : MenuBase
             "\n",
             "EXPEDITION",
             $"Candidate: {NameOptions[_nameIndex]}  Seed: {PendingSeed}",
-            $"Build: {archetype.DisplayName} / {origin.DisplayName} / {trait.DisplayName}",
+            $"Build: {FormatArchetypeName(archetype)} / {origin.DisplayName} / {trait.DisplayName}",
             $"Identity: {RaceOptions[_raceIndex]} / {GenderOptions[_genderIndex]} / {AppearanceOptions[_appearanceIndex]}",
             $"Training: VIT {_vitalityPoints}  POW {_powerPoints}  GRD {_guardPoints}  FIN {_finessePoints}",
             $"Points Remaining: {RemainingPoints}",
+            $"Signature: {archetype.SignatureMechanic}",
             "Training effects: VIT +3 Max HP, POW +1 Attack, GRD +1 Defense, FIN +1 Accuracy and +1 Evasion.",
             "Use Left/Right or +/- to edit the highlighted field.");
     }
@@ -325,7 +352,7 @@ public partial class MainMenu : MenuBase
         return string.Join(
             "\n",
             $"Candidate  {NameOptions[_nameIndex]}",
-            $"Loadout    {archetype.DisplayName} / {origin.DisplayName} / {trait.DisplayName}",
+            $"Loadout    {FormatArchetypeName(archetype)} / {origin.DisplayName} / {trait.DisplayName}",
             $"Identity   {RaceOptions[_raceIndex]} / {GenderOptions[_genderIndex]} / {AppearanceOptions[_appearanceIndex]}",
             $"Training   VIT {_vitalityPoints}  POW {_powerPoints}  GRD {_guardPoints}  FIN {_finessePoints}",
             $"Reserve    {RemainingPoints} point(s) left  Seed {PendingSeed}",
@@ -363,7 +390,7 @@ public partial class MainMenu : MenuBase
         var archetype = Archetypes[_archetypeIndex];
         var origin = Origins[_originIndex];
         var trait = Traits[_traitIndex];
-        return $"Path: {archetype.DisplayName} / {origin.DisplayName}\nTrait: {trait.DisplayName}";
+        return $"Path: {FormatArchetypeName(archetype)} / {origin.DisplayName}\n{archetype.SignatureMechanic}";
     }
 
     private string FormatStarterItemLines(IEnumerable<string> itemIds)
@@ -525,7 +552,7 @@ public partial class MainMenu : MenuBase
     protected override float ResolveApproxLineHeight()
     {
         var viewportHeight = GetParent() is not null && GetTree() is not null ? GetViewportRect().Size.Y : 720f;
-        return viewportHeight >= 600f ? 14f : base.ResolveApproxLineHeight();
+        return viewportHeight >= 600f ? 12f : base.ResolveApproxLineHeight();
     }
 
     protected override void OnVisualStateRefreshed(Panel panel, RichTextLabel label, Vector2 viewportSize, Vector2 panelSize)
@@ -651,6 +678,12 @@ public partial class MainMenu : MenuBase
                     return;
                 }
 
+                if (!IsArchetypeUnlocked(Archetypes[_archetypeIndex]))
+                {
+                    UpdateStatus($"{Archetypes[_archetypeIndex].DisplayName} is locked. Open Meta Shop to unlock it.");
+                    return;
+                }
+
                 _gameManager?.SetCharacterCreationOptions(BuildCharacterCreationOptions());
                 UpdateStatus($"Deploying seed {PendingSeed}...");
                 _gameManager?.StartNewGame(PendingSeed);
@@ -705,6 +738,9 @@ public partial class MainMenu : MenuBase
                 break;
             case MenuAction.LoadSlot3:
                 _eventBus?.EmitLoadRequested(3);
+                break;
+            case MenuAction.MetaShop:
+                MetaShopRequested?.Invoke();
                 break;
             case MenuAction.Quit:
                 GetTree().Quit();
@@ -915,7 +951,7 @@ public partial class MainMenu : MenuBase
         AddOption("Start Expedition", MenuAction.Start);
         AddOption($"Name: {NameOptions[_nameIndex]}", MenuAction.Name);
         AddSection("BUILD");
-        AddOption($"Archetype: {Archetypes[_archetypeIndex].DisplayName}", MenuAction.Archetype);
+        AddOption($"Archetype: {FormatArchetypeName(Archetypes[_archetypeIndex])}", MenuAction.Archetype);
         AddOption($"Origin: {Origins[_originIndex].DisplayName}", MenuAction.Origin);
         AddOption($"Trait: {Traits[_traitIndex].DisplayName}", MenuAction.Trait);
         AddSection("IDENTITY");
@@ -932,6 +968,7 @@ public partial class MainMenu : MenuBase
         AddOption("Load Slot 1", MenuAction.LoadSlot1);
         AddOption("Load Slot 2", MenuAction.LoadSlot2);
         AddOption("Load Slot 3", MenuAction.LoadSlot3);
+        AddOption("Meta Shop", MenuAction.MetaShop);
         AddOption("Dev Tools", MenuAction.DevTools);
         AddOption("Help", MenuAction.Help);
         AddOption("Quit", MenuAction.Quit);
@@ -1015,7 +1052,7 @@ public partial class MainMenu : MenuBase
             RaceOptions[_raceIndex].ToLowerInvariant(),
             GenderOptions[_genderIndex].ToLowerInvariant(),
             AppearanceOptions[_appearanceIndex].ToLowerInvariant(),
-            archetypeId: Archetypes[_archetypeIndex].DisplayName);
+            archetypeId: Archetypes[_archetypeIndex].ArchetypeId);
     }
 
     private void EnsurePreviewVisuals(Panel panel)
@@ -1213,7 +1250,7 @@ public partial class MainMenu : MenuBase
 
         return new GameManager.CharacterCreationOptions(
             NameOptions[_nameIndex],
-            archetype.DisplayName,
+            archetype.ArchetypeId,
             origin.DisplayName,
             trait.DisplayName,
             archetype.Bonus.MaxHp + origin.Bonus.MaxHp + trait.Bonus.MaxHp + (_vitalityPoints * 3),
@@ -1232,6 +1269,29 @@ public partial class MainMenu : MenuBase
     }
 
     private int RemainingPoints => AllocationBudget - (_vitalityPoints + _powerPoints + _guardPoints + _finessePoints);
+
+    private bool IsArchetypeUnlocked(ArchetypeOption archetype)
+    {
+        if (archetype.ArchetypeId == "vanguard" || _metaProgression is null)
+        {
+            return true;
+        }
+
+        return _metaProgression.IsUnlocked($"unlock_{archetype.ArchetypeId}");
+    }
+
+    private string FormatArchetypeName(ArchetypeOption archetype)
+    {
+        if (IsArchetypeUnlocked(archetype))
+        {
+            return archetype.DisplayName;
+        }
+
+        var upgradeId = $"unlock_{archetype.ArchetypeId}";
+        var unlock = _metaProgression?.Upgrades.FirstOrDefault(upgrade => upgrade.Id == upgradeId);
+        var cost = unlock?.GetCostForLevel(_metaProgression?.GetUnlockLevel(upgradeId) ?? 0) ?? 0;
+        return cost > 0 ? $"{archetype.DisplayName} [LOCKED {cost} Echoes]" : $"{archetype.DisplayName} [LOCKED]";
+    }
 
     private static int WrapIndex(int index, int count)
     {
