@@ -2,7 +2,7 @@
 
 A deterministic roguelike foundation for Godot 4.5.2 Mono/.NET with a pure C# simulation core, Godot-facing presentation scripts, data-driven content, and a custom .NET test harness.
 
-The current build includes character identity and progression, archetype-gated starts, typed seed entry from the title flow, relic and meta-progression UI, ability casting, gear-driven combat, role-specific AI, equipment requirements, authoritative GameManager-owned visibility, refreshed CC0 0x72 dungeon art with contextual wall layering, committed SVG item/status icons, clearer menu and inventory presentation, text-fitting safeguards for modal UI, prominent HUD/action/combat-log feedback, reconciled world-space movement, overlay-aware gameplay chrome, expanded enemy sprite coverage, and broader mid- and late-floor content.
+The current build includes character identity and progression, archetype-gated starts, typed seed entry from the title flow, relic and meta-progression UI, content-authored synergies, ascension modifier data, deterministic daily seed tracking, narrative run epitaphs, boss phase transitions, faction reputation state, ability casting, gear-driven combat, role-specific AI, equipment requirements, authoritative GameManager-owned visibility, refreshed CC0 0x72 dungeon art with contextual wall layering, committed SVG item/status icons, clearer menu and inventory presentation, text-fitting safeguards for modal UI, prominent HUD/action/combat-log feedback, reconciled world-space movement, overlay-aware gameplay chrome, expanded enemy sprite coverage, and broader mid- and late-floor content.
 
 ## Quick Start
 
@@ -33,7 +33,7 @@ The current build includes character identity and progression, archetype-gated s
 - Layered 0x72 world rendering with contextual wall caps, trims, and sprite-backed entity presentation for the current enemy roster.
 - SVG-backed item/status icon source art and content-path validation for authored `res://` visuals.
 - An in-app developer workshop for creating room drafts and scaffolding item/enemy content directly from the runtime shell.
-- JSON-driven content for items, enemies, abilities, status effects, loot tables, room prefabs, perks, NPCs, dialogs, relics, floor events, and meta upgrades.
+- JSON-driven content for items, enemies, abilities, status effects, loot tables, room prefabs, perks, NPCs, dialogs, relics, floor events, synergies, ascension modifiers, daily modifiers, narrative templates, factions, and meta upgrades.
 - Save/load infrastructure with validation and migration support for progression and identity state.
 - A custom test runner covering simulation, AI, generation, content, persistence, rendering, UI, and integration flows.
 
@@ -55,6 +55,7 @@ The current build includes character identity and progression, archetype-gated s
   - `EventBus` - cross-system event hub.
   - `ContentDatabase` - bridge from Godot autoload space to the loaded content database.
   - `MetaProgressionManager` - persistent between-run Echo balance, upgrades, and recent run history.
+  - `DailyChallengeManager` - daily challenge attempt/completion/best-score persistence.
 
 ## Documentation Index
 

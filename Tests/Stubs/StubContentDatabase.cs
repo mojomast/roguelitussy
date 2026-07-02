@@ -70,7 +70,8 @@ public sealed class StubContentDatabase : IContentDatabase
                 null,
                 0,
                 1,
-                "common"),
+                "common",
+                Tags: new[] { "shield" }),
             ["dagger_venom"] = new(
                 "dagger_venom",
                 "Viper Fang",
@@ -360,6 +361,7 @@ public sealed class StubContentDatabase : IContentDatabase
                 "neutral",
                 "weathered",
                 "vanguard",
+                "merchants_guild",
                 new MerchantOfferTemplate[]
                 {
                     new("potion_health", 24, 4),
@@ -545,6 +547,42 @@ public sealed class StubContentDatabase : IContentDatabase
 
         RelicTemplates = new Dictionary<string, RelicTemplate>();
         FloorEvents = new Dictionary<string, FloorEventDefinition>();
+        Synergies = new Dictionary<string, SynergyDefinition>
+        {
+            ["stub_synergy"] = new()
+            {
+                SynergyId = "stub_synergy",
+                DisplayName = "Stub Synergy",
+                Description = "Test synergy.",
+                RequiredRelicIds = new[] { "vampire_fang" },
+                RequiredPerkIds = new[] { "perk_tough" },
+                BonusEffectType = "stat_mod",
+                BonusValue = 1,
+            },
+            ["shield_wall"] = new()
+            {
+                SynergyId = "shield_wall",
+                DisplayName = "Shield Wall",
+                Description = "Test shield synergy.",
+                RequiredItemTags = new[] { "shield" },
+                BonusEffectType = "stat_mod",
+                BonusValue = 2,
+            },
+        };
+        AscensionModifiers = new Dictionary<string, AscensionModifier>();
+        DailyModifiers = new Dictionary<string, DailyModifierDefinition>();
+        NarrativeTemplates = new Dictionary<string, NarrativeTemplate>();
+        Factions = new Dictionary<string, FactionDefinition>
+        {
+            ["merchants_guild"] = new()
+            {
+                FactionId = "merchants_guild",
+                DisplayName = "Merchants' Guild",
+                Description = "Test faction.",
+                HostileThreshold = -30,
+                FriendlyThreshold = 30,
+            },
+        };
     }
 
 
@@ -571,6 +609,16 @@ public sealed class StubContentDatabase : IContentDatabase
     public IReadOnlyDictionary<string, RelicTemplate> RelicTemplates { get; } = null!;
 
     public IReadOnlyDictionary<string, FloorEventDefinition> FloorEvents { get; } = null!;
+
+    public IReadOnlyDictionary<string, SynergyDefinition> Synergies { get; } = null!;
+
+    public IReadOnlyDictionary<string, AscensionModifier> AscensionModifiers { get; } = null!;
+
+    public IReadOnlyDictionary<string, DailyModifierDefinition> DailyModifiers { get; } = null!;
+
+    public IReadOnlyDictionary<string, NarrativeTemplate> NarrativeTemplates { get; } = null!;
+
+    public IReadOnlyDictionary<string, FactionDefinition> Factions { get; } = null!;
 
     public bool TryGetItemTemplate(string templateId, out ItemTemplate template)
     {
@@ -639,6 +687,41 @@ public sealed class StubContentDatabase : IContentDatabase
     {
         var found = FloorEvents.TryGetValue(eventId, out var floorEvent);
         definition = floorEvent!;
+        return found;
+    }
+
+    public bool TryGetSynergy(string synergyId, out SynergyDefinition definition)
+    {
+        var found = Synergies.TryGetValue(synergyId, out var synergy);
+        definition = synergy!;
+        return found;
+    }
+
+    public bool TryGetAscensionModifier(string modifierId, out AscensionModifier modifier)
+    {
+        var found = AscensionModifiers.TryGetValue(modifierId, out var ascensionModifier);
+        modifier = ascensionModifier!;
+        return found;
+    }
+
+    public bool TryGetDailyModifier(string modifierId, out DailyModifierDefinition modifier)
+    {
+        var found = DailyModifiers.TryGetValue(modifierId, out var dailyModifier);
+        modifier = dailyModifier!;
+        return found;
+    }
+
+    public bool TryGetNarrativeTemplate(string templateId, out NarrativeTemplate template)
+    {
+        var found = NarrativeTemplates.TryGetValue(templateId, out var narrativeTemplate);
+        template = narrativeTemplate!;
+        return found;
+    }
+
+    public bool TryGetFaction(string factionId, out FactionDefinition faction)
+    {
+        var found = Factions.TryGetValue(factionId, out var factionDefinition);
+        faction = factionDefinition!;
         return found;
     }
 

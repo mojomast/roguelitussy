@@ -1,0 +1,13 @@
+{
+  "$schema": "roguelike-daily-modifiers-v1",
+  "version": 1,
+  "daily_modifiers": [
+    { "modifier_id": "monday_merchants_week", "day_of_week": 1, "display_name": "Merchant's Week", "description": "All prices are 30% cheaper.", "effect_type": "shop_discount", "effect_value": 0.3 },
+    { "modifier_id": "tuesday_elite_surge", "day_of_week": 2, "display_name": "Elite Surge", "description": "Every floor has an elite enemy.", "effect_type": "elite_every_floor", "effect_value": 1 },
+    { "modifier_id": "wednesday_cursed_land", "day_of_week": 3, "display_name": "Cursed Land", "description": "All floors have curse room effects.", "effect_type": "curse_every_floor", "effect_value": 1 },
+    { "modifier_id": "thursday_speed_run", "day_of_week": 4, "display_name": "Speed Run", "description": "Score rewards faster clears.", "effect_type": "speed_score", "effect_value": 1000 },
+    { "modifier_id": "friday_relic_rush", "day_of_week": 5, "display_name": "Relic Rush", "description": "Start with one random relic.", "effect_type": "starting_relic", "effect_value": 1 },
+    { "modifier_id": "saturday_death_march", "day_of_week": 6, "display_name": "Death March", "description": "No safe floors; bosses have +50% HP.", "effect_type": "boss_hp_boost", "effect_value": 0.5 },
+    { "modifier_id": "sunday_bountiful", "day_of_week": 0, "display_name": "Bountiful", "description": "Double gold and loot drops.", "effect_type": "double_rewards", "effect_value": 2 }
+  ]
+}

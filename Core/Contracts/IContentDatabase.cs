@@ -28,6 +28,16 @@ public interface IContentDatabase
 
     IReadOnlyDictionary<string, FloorEventDefinition> FloorEvents { get; }
 
+    IReadOnlyDictionary<string, SynergyDefinition> Synergies { get; }
+
+    IReadOnlyDictionary<string, AscensionModifier> AscensionModifiers { get; }
+
+    IReadOnlyDictionary<string, DailyModifierDefinition> DailyModifiers { get; }
+
+    IReadOnlyDictionary<string, NarrativeTemplate> NarrativeTemplates { get; }
+
+    IReadOnlyDictionary<string, FactionDefinition> Factions { get; }
+
     bool TryGetItemTemplate(string templateId, out ItemTemplate template);
 
     bool TryGetEnemyTemplate(string templateId, out EnemyTemplate template);
@@ -47,6 +57,16 @@ public interface IContentDatabase
     bool TryGetRelicTemplate(string relicId, out RelicTemplate template);
 
     bool TryGetFloorEvent(string eventId, out FloorEventDefinition definition);
+
+    bool TryGetSynergy(string synergyId, out SynergyDefinition definition);
+
+    bool TryGetAscensionModifier(string modifierId, out AscensionModifier modifier);
+
+    bool TryGetDailyModifier(string modifierId, out DailyModifierDefinition modifier);
+
+    bool TryGetNarrativeTemplate(string templateId, out NarrativeTemplate template);
+
+    bool TryGetFaction(string factionId, out FactionDefinition faction);
 
     IReadOnlyList<ItemTemplate> GetAvailableItems(int depth);
 

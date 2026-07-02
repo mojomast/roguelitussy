@@ -112,6 +112,7 @@ The repository contains targeted suites for:
 - UI text fitting, compact inventory text bounds, title seed entry, start-game action routing, Echo Workshop close routing, HUD action feedback, and combat-log readability/filter behavior
 - character creation and equipment UX
 - Track 7 roguelite UI integration, including relic HUD text, boss/streak indicators, archetype preview updates, and component persistence for relic/shrine/streak/archetype state
+- Wave 1 roguelite systems, including synergy detection, daily seed determinism, ascension modifier lookup, narrative epitaph determinism, expanded content validation, and meta-progression ascension persistence
 - architecture smoke coverage
 
 ## Writing New Tests

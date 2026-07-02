@@ -435,6 +435,29 @@ public static class SaveValidator
         {
             errors.Add($"Entity '{entity.Name}' has a negative scheduler order {entity.SchedulerOrder}.");
         }
+
+        if (entity.BossPhase is not null)
+        {
+            if (entity.BossPhase.CurrentPhase < 1)
+            {
+                errors.Add($"Entity '{entity.Name}' has an invalid boss phase {entity.BossPhase.CurrentPhase}.");
+            }
+
+            if (entity.BossPhase.TriggeredPhases.Any(phase => phase <= 1))
+            {
+                errors.Add($"Entity '{entity.Name}' has invalid triggered boss phase data.");
+            }
+        }
+
+        if (entity.FactionReputation is not null && entity.FactionReputation.Reputation.Keys.Any(string.IsNullOrWhiteSpace))
+        {
+            errors.Add($"Entity '{entity.Name}' has faction reputation with a blank faction id.");
+        }
+
+        if (entity.Synergy is not null && entity.Synergy.AppliedPassiveSynergyIds.Any(string.IsNullOrWhiteSpace))
+        {
+            errors.Add($"Entity '{entity.Name}' has synergy state with a blank synergy id.");
+        }
     }
 
     private static void ValidateChest(EntitySaveData entity, List<string> errors)

@@ -607,6 +607,43 @@
       "sfx": "blink_pop"
     },
     {
+      "id": "ground_slam",
+      "name": "Ground Slam",
+      "description": "Smashes the ground, stunning nearby enemies.",
+      "targeting": { "type": "aoe_circle", "range": 0, "radius": 2, "requires_los": false, "hits_allies": false, "center": "self" },
+      "costs": { "energy": 1500 },
+      "effects": [
+        { "type": "damage", "damage_type": "physical", "base_value": 15 },
+        { "type": "apply_status", "status_effect": "stunned", "chance": 100, "duration": 1, "filter": "enemies" }
+      ],
+      "animation": "ground_slam",
+      "sfx": "stone_crack"
+    },
+    {
+      "id": "burning_aura",
+      "name": "Burning Aura",
+      "description": "Ignites adjacent foes with a sustained aura.",
+      "targeting": { "type": "aoe_circle", "range": 0, "radius": 1, "requires_los": false, "hits_allies": false, "center": "self" },
+      "costs": { "energy": 1000 },
+      "effects": [
+        { "type": "apply_status", "status_effect": "burning", "chance": 100, "duration": 8, "filter": "enemies" }
+      ],
+      "animation": "aura_fire",
+      "sfx": "flame_loop"
+    },
+    {
+      "id": "summon_hound",
+      "name": "Summon Hound",
+      "description": "Calls a spectral hound from the nearest shadow.",
+      "targeting": { "type": "self", "range": 0, "requires_los": false },
+      "costs": { "energy": 1000 },
+      "effects": [
+        { "type": "apply_status", "status_effect": "haste", "chance": 100, "duration": 2 }
+      ],
+      "animation": "summon_shadow",
+      "sfx": "hound_howl"
+    },
+    {
       "id": "gold_drain_trap",
       "name": "Gold Drain Trap",
       "description": "A hexed sigil lashes out and drains coin.",

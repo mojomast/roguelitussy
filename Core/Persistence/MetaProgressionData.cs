@@ -23,6 +23,10 @@ public sealed class MetaProgressionData
 
     public Dictionary<string, int> UnlockLevels { get; set; } = new(StringComparer.Ordinal);
 
+    public bool HasCompletedFirstClear { get; set; }
+
+    public int AscensionLevel { get; set; }
+
     public List<RunHistoryEntry> RunHistory { get; set; } = new();
 
     [JsonIgnore]
@@ -85,6 +89,7 @@ public sealed class MetaProgressionData
     {
         EchoesTotal = Math.Max(0, EchoesTotal);
         EchoesSpent = Math.Clamp(EchoesSpent, 0, EchoesTotal);
+        AscensionLevel = HasCompletedFirstClear ? Math.Clamp(AscensionLevel, 0, 10) : 0;
         UnlockLevels ??= new Dictionary<string, int>(StringComparer.Ordinal);
         RunHistory ??= new List<RunHistoryEntry>();
         TrimRunHistory();
@@ -108,4 +113,9 @@ public sealed record RunHistoryEntry(
     string CauseOfDeath,
     string BestItemName,
     int TotalTurns,
-    long Timestamp);
+    long Timestamp,
+    List<string>? RelicsHeld = null,
+    List<string>? SynergyIds = null,
+    List<string>? ActivePerkIds = null,
+    string[]? FloorsClearedThemes = null,
+    string Epitaph = "");

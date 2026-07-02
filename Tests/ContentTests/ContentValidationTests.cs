@@ -29,7 +29,7 @@ public sealed class ContentValidationTests : ITestSuite
         Expect.True(content.IsValid, FormatErrors(content));
         Expect.Equal(29, content.ItemDefinitions.Count, "Expected the full item set to load");
         Expect.Equal(21, content.EnemyDefinitions.Count, "Expected the full enemy set to load");
-        Expect.Equal(23, content.AbilityDefinitions.Count, "Expected the full ability set to load");
+        Expect.Equal(26, content.AbilityDefinitions.Count, "Expected the full ability set to load");
         Expect.Equal(20, content.PerkDefinitions.Count, "Expected the initial perk set to load");
         Expect.Equal(2, content.DialogueDefinitions.Count, "Expected the full dialog set to load");
         Expect.Equal(2, content.NpcDefinitions.Count, "Expected the full NPC set to load");
@@ -39,6 +39,11 @@ public sealed class ContentValidationTests : ITestSuite
         Expect.Equal(6, content.TrapDefinitions.Count, "Expected the baseline trap set to load");
         Expect.Equal(20, content.RelicTemplates.Count, "Expected the full relic set to load");
         Expect.Equal(6, content.FloorEvents.Count, "Expected the floor event catalogue to load");
+        Expect.Equal(15, content.Synergies.Count, "Expected the synergy catalogue to load");
+        Expect.Equal(10, content.AscensionModifiers.Count, "Expected the ascension modifier catalogue to load");
+        Expect.Equal(7, content.DailyModifiers.Count, "Expected the daily modifier catalogue to load");
+        Expect.Equal(40, content.NarrativeTemplates.Count, "Expected the narrative template catalogue to load");
+        Expect.Equal(3, content.Factions.Count, "Expected the faction catalogue to load");
     }
 
     private static void LoadsFromInMemoryJsonDocuments()
@@ -91,6 +96,14 @@ public sealed class ContentValidationTests : ITestSuite
 
         Expect.True(content.TryGetTrapTemplate("spike_trap", out var spikeTrap), "Spike trap should project into the trap surface");
         Expect.Equal("spike_trap", spikeTrap?.AbilityId ?? string.Empty, "Trap templates should preserve their referenced ability");
+        Expect.True(content.TryGetSynergy("leech_vampire", out var synergy), "Synergy content should project into the content surface");
+        Expect.Equal("Leech Vampire", synergy.DisplayName, "Synergy display names should project.");
+        Expect.True(content.TryGetAscensionModifier("a02_shop_prices", out var ascension), "Ascension modifiers should project into the content surface");
+        Expect.Equal(2, ascension.AscensionLevel, "Ascension levels should project.");
+        Expect.True(content.TryGetDailyModifier("friday_relic_rush", out var daily), "Daily modifiers should project into the content surface");
+        Expect.Equal(5, daily.DayOfWeek, "Daily modifier day indexes should project.");
+        Expect.True(content.TryGetFaction("merchants_guild", out var faction), "Factions should project into the content surface");
+        Expect.Equal("Merchants' Guild", faction.DisplayName, "Faction display names should project.");
     }
 
     private static void CrossReferencesRemainIntact()

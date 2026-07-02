@@ -53,6 +53,14 @@ godot --headless --path . --quit
 - Verification: `dotnet build`, stub project build, test project build, full harness (448 tests), and rendering-validation profile (401 tests) pass.
 - Partial: full Track 7 UI surfaces remain open. `GameManager.cs` remains 3,195 lines; the under-500-line refactor should be tracked as a non-blocking architecture backlog item so Track 7 UI work can continue against the existing facade API.
 
+### Follow-up Status - Wave 1 Roguelite Systems 2026-07-02
+
+- Completed: added content-backed synergy definitions, ascension modifiers, daily modifiers, narrative templates, and faction definitions to the `ContentLoader`/`IContentDatabase` pipeline with validation and content tests.
+- Completed: added `SynergyResolver`, deterministic daily seed/score helpers, `AscensionModifiers`, `RunNarrator`, boss phase runtime resolution, and faction reputation components/service.
+- Completed: save version advanced to `15` with optional persistence for boss phase, faction reputation, and applied synergy passive state plus v14 migration.
+- Completed: `DailyChallengeManager` autoload persists daily attempt/completion/best score state to `user://daily_challenge.json`.
+- Verification: stub build, test project build, content/persistence/simulation/UI slices, and full harness pass with 470 registered tests.
+
 ### Follow-up Status - Wave 1 Persistence
 
 - Completed: SAV-1 — added `EnemyComponent { TemplateId }`, attached in `GameManager.CreateEnemyEntity`, and round-tripped through v9 save data with validation and migration.

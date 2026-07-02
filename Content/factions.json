@@ -1,0 +1,9 @@
+{
+  "$schema": "roguelike-factions-v1",
+  "version": 1,
+  "factions": [
+    { "faction_id": "merchants_guild", "display_name": "Merchants' Guild", "description": "Traders who control the dungeon's supply lines.", "hostile_threshold": -30, "friendly_threshold": 30, "neutral_range": [-29, 29] },
+    { "faction_id": "thieves_compact", "display_name": "Thieves' Compact", "description": "Shadow brokers who reward bold action.", "hostile_threshold": -25, "friendly_threshold": 25, "neutral_range": [-24, 24] },
+    { "faction_id": "warriors_order", "display_name": "Warriors' Order", "description": "Monster hunters who respect strength.", "hostile_threshold": -20, "friendly_threshold": 20, "neutral_range": [-19, 19] }
+  ]
+}

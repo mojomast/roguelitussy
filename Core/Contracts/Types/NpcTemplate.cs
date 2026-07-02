@@ -19,6 +19,7 @@ public sealed record NpcTemplate(
     string GenderId,
     string AppearanceId,
     string ArchetypeId,
+    string FactionId = "merchants_guild",
     IReadOnlyList<MerchantOfferTemplate>? MerchantOffers = null)
 {
     public bool IsMerchant => MerchantOffers is { Count: > 0 };

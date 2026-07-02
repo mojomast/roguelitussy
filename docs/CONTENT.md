@@ -14,6 +14,11 @@ The project uses flat JSON documents under `Content/` as the source of truth for
 - `perks.json`
 - `relics.json`
 - `floor_events.json`
+- `synergies.json`
+- `ascension_modifiers.json`
+- `daily_modifiers.json`
+- `narrative_templates.json`
+- `factions.json`
 - `meta_upgrades.json`
 - `dialogs.json`
 - `npcs.json`
@@ -32,6 +37,11 @@ The project uses flat JSON documents under `Content/` as the source of truth for
 - `perks.json` defines progression perk metadata and effects.
 - `relics.json` defines passive relic templates and hook metadata used by the relic processor.
 - `floor_events.json` defines safe-floor, boss-floor, shrine, curse-room, and vault event metadata.
+- `synergies.json` defines build-combination hints and passive effects from relics, perks, archetypes, and item tags.
+- `ascension_modifiers.json` defines the 0-10 challenge ladder modifiers available after the first full clear.
+- `daily_modifiers.json` defines the weekday-specific daily challenge modifiers layered over the deterministic daily seed.
+- `narrative_templates.json` defines deterministic epitaph sentence templates for run history and death screens.
+- `factions.json` defines social reputation thresholds and faction display metadata.
 - `meta_upgrades.json` defines Echo-purchased long-term upgrade nodes consumed by the meta shop and character-creation archetype gates.
 - `dialogs.json` defines NPC dialogue graphs, including optional rotating `start_nodes` for repeated greetings.
 - `npcs.json` defines NPC metadata, roles, service hooks, merchant stock, and dialogue references.
@@ -63,7 +73,7 @@ This matters because:
 
 1. Reads all required JSON documents from the selected content directory.
 2. Deserializes them with strict casing and no trailing commas.
-3. Builds deterministic lookups for items, enemies, abilities, status effects, room prefabs, traps, loot tables, perks, relics, floor events, dialogs, and NPCs.
+3. Builds deterministic lookups for items, enemies, abilities, status effects, room prefabs, traps, loot tables, perks, relics, floor events, synergies, ascension modifiers, daily modifiers, narrative templates, factions, dialogs, and NPCs.
 4. Produces simulation-facing item and enemy templates.
 5. Produces simulation-facing ability templates and validation-ready progression/NPC content lookups.
 6. Collects validation errors for malformed or inconsistent content.
@@ -83,6 +93,8 @@ When adding an item, provide at least:
 - stack or slot information where appropriate
 
 Weapon items can now drive live combat behavior through fields such as damage range, crit chance, accuracy, speed modifier, and `on_hit` status effects. Equippable items may also include runtime-enforced `requirements`.
+
+Item `tags` are projected into runtime templates and are used by synergy detection. Keep tags lowercase snake_case concepts such as `heavy`, `shield`, `arcane`, `light`, or `ranged`.
 
 Item `stats` must map to runtime-supported equipment or item-use behavior. Supported authored keys are `damage_min`, `damage_max`, `accuracy`, `speed_modifier`, `crit_chance`, `defense`, `evasion`, `fov_bonus`, `attack`, `hp`, and `max_hp`. Passive item effects are not currently supported by runtime simulation and should not be authored until their action is implemented.
 
@@ -120,6 +132,8 @@ Recognized `ai_params` keys are:
 - `phase_through_walls` (boolean): grants permanent phasing, allowing movement and pathfinding through walls.
 
 Enemy speed values should stay on the engine's current 100-based scale.
+
+Boss enemies may declare `boss_phase_data`. Each phase entry includes `phase`, `threshold` as an HP fraction, optional `ability_id`, `stat_boost`, `status_effect`, and `message`. Referenced abilities must exist in `abilities.json`; triggered phase state persists in save version 15.
 
 ### Abilities And Status Effects
 

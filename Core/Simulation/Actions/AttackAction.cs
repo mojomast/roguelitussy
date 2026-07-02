@@ -78,6 +78,10 @@ public sealed class AttackAction : IAction
         }
 
         target.Stats.HP -= damage.FinalDamage;
+        if (target.Stats.HP > 0)
+        {
+            BossPhaseResolver.TryApplyTransitions(world, target, outcome, ActorId);
+        }
 
         // Process on-hit effects before kill check
         if (!damage.IsKill && target.Stats.HP > 0 && weapon is not null)

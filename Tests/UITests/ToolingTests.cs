@@ -388,6 +388,11 @@ public sealed class ToolingTests : ITestSuite
         "traps.json",
         "relics.json",
         "floor_events.json",
+        "synergies.json",
+        "ascension_modifiers.json",
+        "daily_modifiers.json",
+        "narrative_templates.json",
+        "factions.json",
     };
 
     private static T ReadDocument<T>(string path)

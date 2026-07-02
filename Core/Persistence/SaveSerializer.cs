@@ -134,7 +134,30 @@ internal sealed class EntitySaveData
 
     public ArchetypeSaveData? Archetype { get; set; }
 
+    public BossPhaseSaveData? BossPhase { get; set; }
+
+    public FactionSaveData? FactionReputation { get; set; }
+
+    public SynergySaveData? Synergy { get; set; }
+
     public int SchedulerOrder { get; set; }
+}
+
+internal sealed class BossPhaseSaveData
+{
+    public int CurrentPhase { get; set; } = 1;
+
+    public List<int> TriggeredPhases { get; set; } = new();
+}
+
+internal sealed class FactionSaveData
+{
+    public Dictionary<string, int> Reputation { get; set; } = new(StringComparer.Ordinal);
+}
+
+internal sealed class SynergySaveData
+{
+    public List<string> AppliedPassiveSynergyIds { get; set; } = new();
 }
 
 internal sealed class RelicSaveData
@@ -375,7 +398,7 @@ internal sealed class PositionSaveData
 
 public static class SaveSerializer
 {
-    public const int CurrentVersion = 14;
+    public const int CurrentVersion = 15;
 
     internal static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -1171,6 +1194,45 @@ public static class SaveSerializer
                 ArchetypeId = data.Archetype.ArchetypeId,
                 SignatureMechanicId = data.Archetype.SignatureMechanicId,
             });
+        }
+
+        if (data.BossPhase is not null)
+        {
+            var bossPhase = new BossPhaseComponent
+            {
+                CurrentPhase = Math.Max(1, data.BossPhase.CurrentPhase),
+            };
+            foreach (var phase in data.BossPhase.TriggeredPhases.Where(phase => phase > 1).Distinct())
+            {
+                bossPhase.TriggeredPhases.Add(phase);
+            }
+
+            entity.SetComponent(bossPhase);
+        }
+
+        if (data.FactionReputation is not null)
+        {
+            var faction = new FactionComponent();
+            foreach (var (factionId, value) in data.FactionReputation.Reputation)
+            {
+                if (!string.IsNullOrWhiteSpace(factionId))
+                {
+                    faction.Reputation[factionId] = value;
+                }
+            }
+
+            entity.SetComponent(faction);
+        }
+
+        if (data.Synergy is not null)
+        {
+            var synergy = new SynergyComponent();
+            foreach (var synergyId in data.Synergy.AppliedPassiveSynergyIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal))
+            {
+                synergy.AppliedPassiveSynergyIds.Add(synergyId);
+            }
+
+            entity.SetComponent(synergy);
         }
 
         return entity;

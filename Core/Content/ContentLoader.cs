@@ -27,6 +27,11 @@ public sealed class ContentLoader : IContentDatabase
         "traps.json",
         "relics.json",
         "floor_events.json",
+        "synergies.json",
+        "ascension_modifiers.json",
+        "daily_modifiers.json",
+        "narrative_templates.json",
+        "factions.json",
     };
 
     private static readonly Regex StableIdPattern = new("^[a-z0-9_]+$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
@@ -81,6 +86,16 @@ public sealed class ContentLoader : IContentDatabase
 
     public IReadOnlyDictionary<string, FloorEventDefinition> FloorEvents { get; }
 
+    public IReadOnlyDictionary<string, SynergyDefinition> Synergies { get; }
+
+    public IReadOnlyDictionary<string, AscensionModifier> AscensionModifiers { get; }
+
+    public IReadOnlyDictionary<string, DailyModifierDefinition> DailyModifiers { get; }
+
+    public IReadOnlyDictionary<string, NarrativeTemplate> NarrativeTemplates { get; }
+
+    public IReadOnlyDictionary<string, FactionDefinition> Factions { get; }
+
     public IReadOnlyDictionary<string, string> TileLegend { get; }
 
     public IReadOnlyList<string> ValidationErrors { get; }
@@ -101,6 +116,11 @@ public sealed class ContentLoader : IContentDatabase
         SortedDictionary<string, TrapDefinition> trapDefinitions,
         SortedDictionary<string, RelicTemplate> relicTemplates,
         SortedDictionary<string, FloorEventDefinition> floorEvents,
+        SortedDictionary<string, SynergyDefinition> synergies,
+        SortedDictionary<string, AscensionModifier> ascensionModifiers,
+        SortedDictionary<string, DailyModifierDefinition> dailyModifiers,
+        SortedDictionary<string, NarrativeTemplate> narrativeTemplates,
+        SortedDictionary<string, FactionDefinition> factions,
         SortedDictionary<string, string> tileLegend,
         SortedDictionary<string, ItemTemplate> itemTemplates,
         SortedDictionary<string, EnemyTemplate> enemyTemplates,
@@ -127,6 +147,11 @@ public sealed class ContentLoader : IContentDatabase
         TrapDefinitions = new ReadOnlyDictionary<string, TrapDefinition>(trapDefinitions);
         RelicTemplates = new ReadOnlyDictionary<string, RelicTemplate>(relicTemplates);
         FloorEvents = new ReadOnlyDictionary<string, FloorEventDefinition>(floorEvents);
+        Synergies = new ReadOnlyDictionary<string, SynergyDefinition>(synergies);
+        AscensionModifiers = new ReadOnlyDictionary<string, AscensionModifier>(ascensionModifiers);
+        DailyModifiers = new ReadOnlyDictionary<string, DailyModifierDefinition>(dailyModifiers);
+        NarrativeTemplates = new ReadOnlyDictionary<string, NarrativeTemplate>(narrativeTemplates);
+        Factions = new ReadOnlyDictionary<string, FactionDefinition>(factions);
         TileLegend = new ReadOnlyDictionary<string, string>(tileLegend);
         ItemTemplates = new ReadOnlyDictionary<string, ItemTemplate>(itemTemplates);
         EnemyTemplates = new ReadOnlyDictionary<string, EnemyTemplate>(enemyTemplates);
@@ -194,6 +219,11 @@ public sealed class ContentLoader : IContentDatabase
         var traps = ReadDocument<TrapsDocument>("traps.json", readJson("traps.json"));
         var relics = ReadDocument<List<RelicTemplate>>("relics.json", readJson("relics.json"));
         var floorEvents = ReadDocument<List<FloorEventDefinition>>("floor_events.json", readJson("floor_events.json"));
+        var synergies = ReadDocument<SynergiesDocument>("synergies.json", readJson("synergies.json"));
+        var ascensionModifiers = ReadDocument<AscensionModifiersDocument>("ascension_modifiers.json", readJson("ascension_modifiers.json"));
+        var dailyModifiers = ReadDocument<DailyModifiersDocument>("daily_modifiers.json", readJson("daily_modifiers.json"));
+        var narrativeTemplates = ReadDocument<NarrativeTemplatesDocument>("narrative_templates.json", readJson("narrative_templates.json"));
+        var factions = ReadDocument<FactionsDocument>("factions.json", readJson("factions.json"));
 
         var itemDefinitions = BuildLookup(items.Items, item => item.Id, "item");
         var enemyDefinitions = BuildLookup(enemies.Enemies, enemy => enemy.Id, "enemy");
@@ -207,6 +237,11 @@ public sealed class ContentLoader : IContentDatabase
         var trapDefinitions = BuildLookup(traps.Traps, trap => trap.Id, "trap");
         var relicTemplates = BuildLookup(relics, relic => relic.RelicId, "relic");
         var floorEventDefinitions = BuildLookup(floorEvents, evt => evt.EventId, "floor event");
+        var synergyDefinitions = BuildLookup(synergies.Synergies, synergy => synergy.SynergyId, "synergy");
+        var ascensionDefinitions = BuildLookup(ascensionModifiers.AscensionModifiers, modifier => modifier.ModifierId, "ascension modifier");
+        var dailyDefinitions = BuildLookup(dailyModifiers.DailyModifiers, modifier => modifier.ModifierId, "daily modifier");
+        var narrativeDefinitions = BuildLookup(narrativeTemplates.NarrativeTemplates, template => template.TemplateId, "narrative template");
+        var factionDefinitions = BuildLookup(factions.Factions, faction => faction.FactionId, "faction");
         var tileLegend = new SortedDictionary<string, string>(rooms.TileLegend, StringComparer.Ordinal);
 
         var itemTemplates = new SortedDictionary<string, ItemTemplate>(StringComparer.Ordinal);
@@ -262,6 +297,11 @@ public sealed class ContentLoader : IContentDatabase
             rooms,
             lootTables,
             traps,
+            synergies,
+            ascensionModifiers,
+            dailyModifiers,
+            narrativeTemplates,
+            factions,
             itemDefinitions,
             enemyDefinitions,
             abilityDefinitions,
@@ -274,6 +314,11 @@ public sealed class ContentLoader : IContentDatabase
             trapDefinitions,
             relicTemplates,
             floorEventDefinitions,
+            synergyDefinitions,
+            ascensionDefinitions,
+            dailyDefinitions,
+            narrativeDefinitions,
+            factionDefinitions,
             tileLegend);
 
         validationErrors.AddRange(DifficultyScaler.ValidateBalance(itemDefinitions, enemyDefinitions, lootDefinitions));
@@ -291,6 +336,11 @@ public sealed class ContentLoader : IContentDatabase
             trapDefinitions,
             relicTemplates,
             floorEventDefinitions,
+            synergyDefinitions,
+            ascensionDefinitions,
+            dailyDefinitions,
+            narrativeDefinitions,
+            factionDefinitions,
             tileLegend,
             itemTemplates,
             enemyTemplates,
@@ -436,6 +486,41 @@ public sealed class ContentLoader : IContentDatabase
         return found;
     }
 
+    public bool TryGetSynergy(string synergyId, out SynergyDefinition definition)
+    {
+        var found = Synergies.TryGetValue(synergyId, out var synergy);
+        definition = synergy!;
+        return found;
+    }
+
+    public bool TryGetAscensionModifier(string modifierId, out AscensionModifier modifier)
+    {
+        var found = AscensionModifiers.TryGetValue(modifierId, out var ascensionModifier);
+        modifier = ascensionModifier!;
+        return found;
+    }
+
+    public bool TryGetDailyModifier(string modifierId, out DailyModifierDefinition modifier)
+    {
+        var found = DailyModifiers.TryGetValue(modifierId, out var dailyModifier);
+        modifier = dailyModifier!;
+        return found;
+    }
+
+    public bool TryGetNarrativeTemplate(string templateId, out NarrativeTemplate template)
+    {
+        var found = NarrativeTemplates.TryGetValue(templateId, out var narrativeTemplate);
+        template = narrativeTemplate!;
+        return found;
+    }
+
+    public bool TryGetFaction(string factionId, out FactionDefinition faction)
+    {
+        var found = Factions.TryGetValue(factionId, out var factionDefinition);
+        faction = factionDefinition!;
+        return found;
+    }
+
     public IReadOnlyList<ItemTemplate> GetAvailableItems(int depth)
     {
         return ItemDefinitions.Values
@@ -578,7 +663,10 @@ public sealed class ContentLoader : IContentDatabase
             requirements,
             item.Value,
             item.Weight,
-            requiresTargetSelection);
+            requiresTargetSelection,
+            item.Tags.Count > 0
+                ? item.Tags.Distinct(StringComparer.Ordinal).OrderBy(tag => tag, StringComparer.Ordinal).ToArray()
+                : null);
     }
 
     private static DialogueTemplate BuildDialogueTemplate(DialogueDefinition dialogue)
@@ -620,6 +708,7 @@ public sealed class ContentLoader : IContentDatabase
             string.IsNullOrWhiteSpace(npc.GenderId) ? "neutral" : npc.GenderId,
             string.IsNullOrWhiteSpace(npc.AppearanceId) ? "default" : npc.AppearanceId,
             string.IsNullOrWhiteSpace(npc.ArchetypeId) ? "adventurer" : npc.ArchetypeId,
+            string.IsNullOrWhiteSpace(npc.FactionId) ? "merchants_guild" : npc.FactionId,
             merchantOffers);
     }
 
@@ -682,6 +771,18 @@ public sealed class ContentLoader : IContentDatabase
         };
 
         var aiParameters = BuildAIParameters(enemy.AiParams);
+        var bossPhases = enemy.BossPhaseData.Count > 0
+            ? enemy.BossPhaseData
+                .OrderBy(phase => phase.Phase)
+                .Select(phase => new BossPhaseTemplate(
+                    phase.Phase,
+                    phase.Threshold,
+                    phase.AbilityId,
+                    phase.StatBoost,
+                    phase.StatusEffect,
+                    phase.Message))
+                .ToArray()
+            : null;
 
         return new EnemyTemplate(
             enemy.Id,
@@ -697,7 +798,11 @@ public sealed class ContentLoader : IContentDatabase
             enemy.GoldMin,
             enemy.GoldMax,
             enemy.Stats.XpValue,
-            aiParameters);
+            aiParameters,
+            enemy.Tags.Count > 0
+                ? enemy.Tags.Distinct(StringComparer.Ordinal).OrderBy(tag => tag, StringComparer.Ordinal).ToArray()
+                : null,
+            bossPhases);
     }
 
     private static AIParameters BuildAIParameters(Dictionary<string, JsonElement> aiParams)
@@ -1029,6 +1134,11 @@ public sealed class ContentLoader : IContentDatabase
         RoomPrefabsDocument rooms,
         LootTablesDocument lootTables,
         TrapsDocument traps,
+        SynergiesDocument synergies,
+        AscensionModifiersDocument ascensionModifiers,
+        DailyModifiersDocument dailyModifiers,
+        NarrativeTemplatesDocument narrativeTemplates,
+        FactionsDocument factions,
         IReadOnlyDictionary<string, ItemDefinition> itemDefinitions,
         IReadOnlyDictionary<string, EnemyDefinition> enemyDefinitions,
         IReadOnlyDictionary<string, AbilityDefinition> abilityDefinitions,
@@ -1041,6 +1151,11 @@ public sealed class ContentLoader : IContentDatabase
         IReadOnlyDictionary<string, TrapDefinition> trapDefinitions,
         IReadOnlyDictionary<string, RelicTemplate> relicTemplates,
         IReadOnlyDictionary<string, FloorEventDefinition> floorEvents,
+        IReadOnlyDictionary<string, SynergyDefinition> synergyDefinitions,
+        IReadOnlyDictionary<string, AscensionModifier> ascensionDefinitions,
+        IReadOnlyDictionary<string, DailyModifierDefinition> dailyDefinitions,
+        IReadOnlyDictionary<string, NarrativeTemplate> narrativeDefinitions,
+        IReadOnlyDictionary<string, FactionDefinition> factionDefinitions,
         IReadOnlyDictionary<string, string> tileLegend)
     {
         var errors = new List<string>();
@@ -1055,21 +1170,137 @@ public sealed class ContentLoader : IContentDatabase
         ValidateHeader(rooms.Schema, rooms.Version, "roguelike-room-prefabs-v1", "room_prefabs.json", errors);
         ValidateHeader(lootTables.Schema, lootTables.Version, "roguelike-loot-tables-v1", "loot_tables.json", errors);
         ValidateHeader(traps.Schema, traps.Version, "roguelike-traps-v1", "traps.json", errors);
+        ValidateHeader(synergies.Schema, synergies.Version, "roguelike-synergies-v1", "synergies.json", errors);
+        ValidateHeader(ascensionModifiers.Schema, ascensionModifiers.Version, "roguelike-ascension-modifiers-v1", "ascension_modifiers.json", errors);
+        ValidateHeader(dailyModifiers.Schema, dailyModifiers.Version, "roguelike-daily-modifiers-v1", "daily_modifiers.json", errors);
+        ValidateHeader(narrativeTemplates.Schema, narrativeTemplates.Version, "roguelike-narrative-templates-v1", "narrative_templates.json", errors);
+        ValidateHeader(factions.Schema, factions.Version, "roguelike-factions-v1", "factions.json", errors);
 
         ValidateItems(itemDefinitions, abilityDefinitions, statusDefinitions, errors);
         ValidateEnemies(enemyDefinitions, abilityDefinitions, lootDefinitions, errors);
         ValidateAbilities(abilityDefinitions, statusDefinitions, errors);
         ValidatePerks(perkDefinitions, errors);
         ValidateDialogs(dialogueDefinitions, errors);
-        ValidateNpcs(npcDefinitions, dialogueDefinitions, itemDefinitions, errors);
+        ValidateNpcs(npcDefinitions, dialogueDefinitions, itemDefinitions, factionDefinitions, errors);
         ValidateStatusEffects(statusDefinitions, errors);
         ValidateRooms(roomDefinitions, enemyDefinitions, itemDefinitions, npcDefinitions, lootDefinitions, trapDefinitions, tileLegend, errors);
         ValidateLootTables(lootDefinitions, itemDefinitions, errors);
         ValidateTraps(trapDefinitions, abilityDefinitions, errors);
         ValidateRelics(relicTemplates, errors);
         ValidateFloorEvents(floorEvents, errors);
+        ValidateSynergies(synergyDefinitions, relicTemplates, perkDefinitions, itemDefinitions, errors);
+        ValidateAscensionModifiers(ascensionDefinitions, errors);
+        ValidateDailyModifiers(dailyDefinitions, errors);
+        ValidateNarrativeTemplates(narrativeDefinitions, errors);
+        ValidateFactions(factionDefinitions, errors);
 
         return errors;
+    }
+
+    private static void ValidateSynergies(
+        IReadOnlyDictionary<string, SynergyDefinition> synergies,
+        IReadOnlyDictionary<string, RelicTemplate> relics,
+        IReadOnlyDictionary<string, PerkDefinition> perks,
+        IReadOnlyDictionary<string, ItemDefinition> items,
+        ICollection<string> errors)
+    {
+        var authoredTags = items.Values.SelectMany(item => item.Tags).ToHashSet(StringComparer.Ordinal);
+        foreach (var (id, synergy) in synergies)
+        {
+            ValidateStableId(id, "Synergy", errors);
+            ValidateRequiredText(synergy.DisplayName, $"Synergy '{id}' display_name", errors);
+            ValidateRequiredText(synergy.Description, $"Synergy '{id}' description", errors);
+            ValidateRequiredText(synergy.BonusEffectType, $"Synergy '{id}' bonus_effect_type", errors);
+            if (!IsAllowedValue(synergy.BonusEffectType, "damage_bonus", "heal", "stat_mod", "echo_bonus"))
+            {
+                errors.Add($"Synergy '{id}' has unsupported bonus_effect_type '{synergy.BonusEffectType}'.");
+            }
+
+            foreach (var relicId in synergy.RequiredRelicIds)
+            {
+                if (!relics.ContainsKey(relicId))
+                {
+                    errors.Add($"Synergy '{id}' references unknown relic '{relicId}'.");
+                }
+            }
+
+            foreach (var perkId in synergy.RequiredPerkIds)
+            {
+                if (!perks.ContainsKey(perkId))
+                {
+                    errors.Add($"Synergy '{id}' references unknown perk '{perkId}'.");
+                }
+            }
+
+            foreach (var tag in synergy.RequiredItemTags)
+            {
+                if (!authoredTags.Contains(tag))
+                {
+                    errors.Add($"Synergy '{id}' references unknown item tag '{tag}'.");
+                }
+            }
+        }
+    }
+
+    private static void ValidateAscensionModifiers(IReadOnlyDictionary<string, AscensionModifier> modifiers, ICollection<string> errors)
+    {
+        foreach (var (id, modifier) in modifiers)
+        {
+            ValidateStableId(id, "Ascension modifier", errors);
+            ValidateRequiredText(modifier.DisplayName, $"Ascension modifier '{id}' display_name", errors);
+            ValidateRequiredText(modifier.Description, $"Ascension modifier '{id}' description", errors);
+            if (modifier.AscensionLevel < 1 || modifier.AscensionLevel > 10)
+            {
+                errors.Add($"Ascension modifier '{id}' ascension_level must be between 1 and 10.");
+            }
+
+            if (!IsAllowedValue(modifier.EffectType, "enemy_stat_boost", "shop_price_increase", "shrine_hp_cost", "elite_every_floor", "remove_item_category", "starting_hp_penalty", "status_resistance", "loot_rarity_downshift", "curse_every_floor", "final_boss_guards"))
+            {
+                errors.Add($"Ascension modifier '{id}' has unsupported effect_type '{modifier.EffectType}'.");
+            }
+        }
+    }
+
+    private static void ValidateDailyModifiers(IReadOnlyDictionary<string, DailyModifierDefinition> modifiers, ICollection<string> errors)
+    {
+        var days = new HashSet<int>();
+        foreach (var (id, modifier) in modifiers)
+        {
+            ValidateStableId(id, "Daily modifier", errors);
+            ValidateRequiredText(modifier.DisplayName, $"Daily modifier '{id}' display_name", errors);
+            ValidateRequiredText(modifier.Description, $"Daily modifier '{id}' description", errors);
+            if (modifier.DayOfWeek < 0 || modifier.DayOfWeek > 6 || !days.Add(modifier.DayOfWeek))
+            {
+                errors.Add($"Daily modifier '{id}' must use a unique day_of_week between 0 and 6.");
+            }
+        }
+    }
+
+    private static void ValidateNarrativeTemplates(IReadOnlyDictionary<string, NarrativeTemplate> templates, ICollection<string> errors)
+    {
+        foreach (var (id, template) in templates)
+        {
+            ValidateStableId(id, "Narrative template", errors);
+            ValidateRequiredText(template.Condition, $"Narrative template '{id}' condition", errors);
+            if (template.SentenceTemplates.Length == 0)
+            {
+                errors.Add($"Narrative template '{id}' must define at least one sentence template.");
+            }
+        }
+    }
+
+    private static void ValidateFactions(IReadOnlyDictionary<string, FactionDefinition> factions, ICollection<string> errors)
+    {
+        foreach (var (id, faction) in factions)
+        {
+            ValidateStableId(id, "Faction", errors);
+            ValidateRequiredText(faction.DisplayName, $"Faction '{id}' display_name", errors);
+            ValidateRequiredText(faction.Description, $"Faction '{id}' description", errors);
+            if (faction.HostileThreshold >= faction.FriendlyThreshold)
+            {
+                errors.Add($"Faction '{id}' hostile_threshold must be lower than friendly_threshold.");
+            }
+        }
     }
 
     private static void ValidateRelics(IReadOnlyDictionary<string, RelicTemplate> relics, ICollection<string> errors)
@@ -1486,6 +1717,24 @@ public sealed class ContentLoader : IContentDatabase
                 }
             }
 
+            foreach (var phase in enemy.BossPhaseData)
+            {
+                if (phase.Phase <= 1)
+                {
+                    errors.Add($"Enemy '{id}' boss phase must be greater than 1.");
+                }
+
+                if (phase.Threshold <= 0.0 || phase.Threshold >= 1.0)
+                {
+                    errors.Add($"Enemy '{id}' boss phase {phase.Phase} threshold must be between 0 and 1.");
+                }
+
+                if (!string.IsNullOrWhiteSpace(phase.AbilityId) && !abilities.ContainsKey(phase.AbilityId))
+                {
+                    errors.Add($"Enemy '{id}' boss phase {phase.Phase} references unknown ability '{phase.AbilityId}'.");
+                }
+            }
+
             if (!string.IsNullOrWhiteSpace(enemy.LootTableId) && !lootTables.ContainsKey(enemy.LootTableId))
             {
                 errors.Add($"Enemy '{id}' references unknown loot table '{enemy.LootTableId}'.");
@@ -1678,6 +1927,7 @@ public sealed class ContentLoader : IContentDatabase
         IReadOnlyDictionary<string, NpcDefinition> npcs,
         IReadOnlyDictionary<string, DialogueDefinition> dialogs,
         IReadOnlyDictionary<string, ItemDefinition> items,
+        IReadOnlyDictionary<string, FactionDefinition> factions,
         ICollection<string> errors)
     {
         foreach (var (id, npc) in npcs)
@@ -1696,6 +1946,11 @@ public sealed class ContentLoader : IContentDatabase
             if (!dialogs.ContainsKey(npc.DialogueId))
             {
                 errors.Add($"Npc '{id}' references unknown dialog '{npc.DialogueId}'.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(npc.FactionId) && !factions.ContainsKey(npc.FactionId))
+            {
+                errors.Add($"Npc '{id}' references unknown faction '{npc.FactionId}'.");
             }
 
             foreach (var stock in npc.Stock)

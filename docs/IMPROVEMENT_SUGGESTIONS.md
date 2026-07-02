@@ -4,6 +4,8 @@
 >
 > Last updated: 2026-07-01
 
+> Update 2026-07-02: Wave 1 roguelite foundations are partially implemented outside the original improvement table: content-backed synergies, ascension modifiers, daily modifiers, narrative templates, factions, boss phase state, deterministic daily seed helpers, run epitaph generation, faction reputation state, and save version 15 persistence. Wave 2 presentation/feel/content-expansion tasks remain open unless their existing table row says otherwise.
+
 ## How Worker Subagents Should Use This Document
 
 1. Pick a suggestion by ID. Each suggestion is scoped to a focused, implementable change.

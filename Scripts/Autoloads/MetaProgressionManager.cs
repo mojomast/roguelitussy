@@ -117,6 +117,29 @@ public partial class MetaProgressionManager : Node
 
     public IReadOnlyList<RunHistoryEntry> GetRunHistory() => _data.RunHistory.ToArray();
 
+    public bool HasCompletedFirstClear => _data.HasCompletedFirstClear;
+
+    public int AscensionLevel => _data.AscensionLevel;
+
+    public void CompleteRun()
+    {
+        _data.HasCompletedFirstClear = true;
+        Save();
+    }
+
+    public void SetAscensionLevel(int level)
+    {
+        var nextLevel = _data.HasCompletedFirstClear ? Math.Clamp(level, 0, 10) : 0;
+        if (_data.AscensionLevel == nextLevel)
+        {
+            return;
+        }
+
+        _data.AscensionLevel = nextLevel;
+        Save();
+        GetNodeOrNull<EventBus>("/root/EventBus")?.EmitAscensionLevelChanged(nextLevel);
+    }
+
     public int GetIntBonus(string effect)
     {
         return MetaProgressionService.ResolveIntEffectValue(_data.UnlockLevels, _upgrades, effect);
@@ -151,7 +174,13 @@ public partial class MetaProgressionManager : Node
             echoBonus);
 
         AddEchoes(echoes);
-        RecordRun(ToHistoryEntry(stats));
+        var entry = ToHistoryEntry(stats);
+        if (GetNodeOrNull<ContentDatabase>("/root/ContentDatabase")?.Database is { } content)
+        {
+            entry = entry with { Epitaph = RunNarrator.GenerateEpitaph(entry, content, stats.Seed) };
+        }
+
+        RecordRun(entry);
     }
 
     private void OnGameOver(int finalDepth, int turnsSurvived)

@@ -25,4 +25,5 @@ public sealed record ItemTemplate(
     IReadOnlyDictionary<string, int>? Requirements = null,
     int Value = 0,
     double Weight = 0.0,
-    bool RequiresTargetSelection = false);
+    bool RequiresTargetSelection = false,
+    IReadOnlyList<string>? Tags = null);

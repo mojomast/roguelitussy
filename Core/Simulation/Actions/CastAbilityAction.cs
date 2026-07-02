@@ -112,6 +112,10 @@ public sealed class CastAbilityAction : IAction
                         target.Stats.HP -= finalDamage;
                         totalDamageDealt += finalDamage;
                         outcome.DirtyPositions.Add(target.Position);
+                        if (target.Stats.HP > 0)
+                        {
+                            BossPhaseResolver.TryApplyTransitions(world, target, outcome, ActorId);
+                        }
 
                         var result = new DamageResult(ActorId, target.Id, rawDamage, finalDamage, effect.DamageType, false, false, isKill);
                         damageResults.Add(result);

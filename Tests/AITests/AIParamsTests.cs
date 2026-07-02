@@ -89,6 +89,11 @@ public sealed class AIParamsTests : ITestSuite
         File.WriteAllText(Path.Combine(sandbox.DirectoryPath, "traps.json"), EmptyTrapsJson());
         File.WriteAllText(Path.Combine(sandbox.DirectoryPath, "relics.json"), "[]");
         File.WriteAllText(Path.Combine(sandbox.DirectoryPath, "floor_events.json"), "[]");
+        File.WriteAllText(Path.Combine(sandbox.DirectoryPath, "synergies.json"), "{ \"$schema\": \"roguelike-synergies-v1\", \"version\": 1, \"synergies\": [] }");
+        File.WriteAllText(Path.Combine(sandbox.DirectoryPath, "ascension_modifiers.json"), "{ \"$schema\": \"roguelike-ascension-modifiers-v1\", \"version\": 1, \"ascension_modifiers\": [] }");
+        File.WriteAllText(Path.Combine(sandbox.DirectoryPath, "daily_modifiers.json"), "{ \"$schema\": \"roguelike-daily-modifiers-v1\", \"version\": 1, \"daily_modifiers\": [] }");
+        File.WriteAllText(Path.Combine(sandbox.DirectoryPath, "narrative_templates.json"), "{ \"$schema\": \"roguelike-narrative-templates-v1\", \"version\": 1, \"narrative_templates\": [] }");
+        File.WriteAllText(Path.Combine(sandbox.DirectoryPath, "factions.json"), "{ \"$schema\": \"roguelike-factions-v1\", \"version\": 1, \"factions\": [] }");
 
         var content = ContentLoader.LoadFromDirectory(sandbox.DirectoryPath, throwOnValidationErrors: false);
         Expect.False(content.IsValid, "Unknown ai_params key should fail validation");

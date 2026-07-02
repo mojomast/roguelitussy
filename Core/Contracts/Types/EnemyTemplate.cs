@@ -14,4 +14,14 @@ public sealed record EnemyTemplate(
     int GoldMin,
     int GoldMax,
     int XpValue,
-    AIParameters AIParameters);
+    AIParameters AIParameters,
+    IReadOnlyList<string>? Tags = null,
+    IReadOnlyList<BossPhaseTemplate>? BossPhases = null);
+
+public sealed record BossPhaseTemplate(
+    int Phase,
+    double Threshold,
+    string AbilityId,
+    int StatBoost,
+    string StatusEffect,
+    string Message);

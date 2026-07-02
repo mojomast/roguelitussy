@@ -28,6 +28,8 @@
 
 > UI modal/overlap follow-up note (2026-07-02): Echo Workshop now routes above the title menu and exits through `Escape` or an explicit Back row. Inventory header, grid, detail, and footer text now fit compact panels to prevent text overlap.
 
+> Wave 1 roguelite systems note (2026-07-02): content-backed synergies, ascension modifiers, daily modifiers, narrative templates, faction definitions, boss phase data, deterministic daily seed helpers, run epitaph generation, faction reputation state, and save version 15 persistence are implemented and covered by focused tests. Remaining follow-up is richer Wave 2 presentation/feel wiring for every new EventBus surface.
+
 ## Purpose
 
 This document is the current-state improvement spec for turning the existing project into a more complete, playable roguelike. It is intentionally written for parallel subagents. It replaces vague backlog work with concrete, codebase-specific workstreams, ordering, file targets, and acceptance criteria.

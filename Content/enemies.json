@@ -534,6 +534,10 @@
         { "ability_id": "heavy_slam", "cooldown": 2, "priority": 1 },
         { "ability_id": "war_cry", "cooldown": 5, "priority": 2 }
       ],
+      "boss_phase_data": [
+        { "phase": 2, "threshold": 0.5, "ability_id": "shield_bash", "stat_boost": 5, "status_effect": "shielded", "message": "{name} enrages! The ancient stone bulwark awakens." },
+        { "phase": 3, "threshold": 0.25, "ability_id": "ground_slam", "stat_boost": 3, "status_effect": "", "message": "{name} cracks the floor and enters its final stance!" }
+      ],
       "loot_table_id": "boss_floor_loot",
       "gold_min": 25,
       "gold_max": 45,
@@ -555,6 +559,10 @@
       "abilities": [
         { "ability_id": "burning_touch", "cooldown": 2, "priority": 1 },
         { "ability_id": "phase_shift", "cooldown": 4, "priority": 2 }
+      ],
+      "boss_phase_data": [
+        { "phase": 2, "threshold": 0.5, "ability_id": "burning_aura", "stat_boost": 2, "status_effect": "phased", "message": "{name} splits into smoke and flame!" },
+        { "phase": 3, "threshold": 0.25, "ability_id": "summon_hound", "stat_boost": 2, "status_effect": "hasted", "message": "{name} calls hungry shapes from the dark!" }
       ],
       "loot_table_id": "boss_floor_loot",
       "gold_min": 35,

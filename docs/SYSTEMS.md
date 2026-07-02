@@ -54,6 +54,12 @@ Floor-specific runtime counters live in a separate `FloorStats` snapshot. `GameM
 
 Between-run meta progression is tracked by `MetaProgressionManager`, a Godot autoload that stores Echoes, purchased upgrade levels, and the last 20 run history entries in `user://meta_progress.json`. Echo awards are derived from floor reached, kills, gold collected, first-depth bonuses, and the authored `echo_bonus_pct` upgrade.
 
+Ascension readiness is stored alongside meta progression: `HasCompletedFirstClear` gates selectable ascension levels, and `AscensionLevel` is clamped to 0-10. Ascension modifier content lives in `Content/ascension_modifiers.json`; the pure `AscensionModifiers` helper returns all modifiers at or below the selected level.
+
+Daily challenge state is tracked by the `DailyChallengeManager` autoload in `user://daily_challenge.json`. Daily seeds are deterministic from UTC date through `DailySeedGenerator`, and daily scoring uses floor reached, enemies killed, turns taken, and gold remaining.
+
+Run history entries can store richer narrative fields and a generated epitaph. `RunNarrator` chooses matching templates from `Content/narrative_templates.json` deterministically from the run seed.
+
 The planned expansion path for progression is documented in `docs/PROGRESSION.md`.
 
 ## AI
@@ -93,6 +99,12 @@ Combat is still resolved inside `Core/Simulation/CombatResolver.cs`, but it is n
 The ability pipeline is shared by item casts and AI casts so the runtime rules stay in one place.
 
 Relics are content-authored passive hooks in `Content/relics.json`. `RelicComponent` and `RelicProcessor` support kill and poison-tick hooks, `GameManager.ProcessRelicChoice(...)` claims a selected relic, `EventBus.RelicsChanged` refreshes the HUD relic tray, and `RelicChoiceOverlay` presents the three-choice modal emitted by `EventBus.RelicChoiceReady`.
+
+Synergies are content-authored build identities in `Content/synergies.json`. `SynergyResolver` derives active and one-piece-away synergies from the player's relics, selected perks, archetype, and item tags, and applies idempotent passive stat bonuses through `SynergyComponent`.
+
+Boss phase data can be authored on enemy templates through `boss_phase_data`. `BossPhaseResolver` runs after melee and ability damage, adds phase abilities/status/stat boosts when HP thresholds are crossed, and records triggered phases on `BossPhaseComponent` so each transition fires once.
+
+Faction reputation is stored on the player through `FactionComponent` and adjusted by `ReputationService`. Enemy kills award Warriors' Order reputation, while boss kills also affect Thieves' Compact and Merchants' Guild reputation.
 
 ## Generation
 
@@ -174,7 +186,7 @@ Persistence lives in `Core/Persistence/`.
 
 ### Current Save Version
 
-The current normalized save version is `14`.
+The current normalized save version is `15`.
 
 Notable details:
 
@@ -184,7 +196,7 @@ Notable details:
 - New saves include optional content metadata (`contentVersion` and a deterministic content hash) so load flows can warn when the authored JSON set differs from the one that created the save.
 - Multi-floor validation requires unique floor depths, an active floor payload, and exactly one player entity across all saved floors on the active floor.
 - Persistence tests cover malformed v8/v9 floor payloads for missing active floors, duplicate player entities across floors, and duplicate floor depths; `GameManager` save/load coverage also exercises travel back to a cached inactive floor.
-- Progression, identity, inventory/equipment, wallet, NPC, merchant, chest loot table, rolled chest contents, ability, cooldown, XP value, AI/template rehydration data, enemy template identity, scheduler actor order, status-effect source attribution, character creation options, trap component state, and Track 7 runtime components (`RelicComponent`, `ShrineComponent`, `KillStreakComponent`, and `ArchetypeComponent`) round-trip through the normalized save shape where applicable.
+- Progression, identity, inventory/equipment, wallet, NPC, merchant, chest loot table, rolled chest contents, ability, cooldown, XP value, AI/template rehydration data, enemy template identity, scheduler actor order, status-effect source attribution, character creation options, trap component state, Track 7 runtime components (`RelicComponent`, `ShrineComponent`, `KillStreakComponent`, and `ArchetypeComponent`), and Wave 1 runtime components (`BossPhaseComponent`, `FactionComponent`, and `SynergyComponent`) round-trip through the normalized save shape where applicable.
 - `CombatRandomState` and `ItemRandomState` are persisted and rehydrated atomically through `WorldState.RehydrateRandomStates` so RNG continuation matches uninterrupted simulation with no transient intermediate state.
 - Deterministic replay regression tests prove that fixed action sequences produce identical traces after save/load at turn boundaries.
 - Enemy loot and gold drops use a deterministic seed derived from world seed, depth, position, turn number, and a stable byte hash of the victim `EntityId`; the seed does not depend on runtime `GetHashCode()` behavior.
@@ -222,10 +234,10 @@ By default, `SaveManager` writes to:
 
 The runtime-facing templates now cover:
 
-- items, including weapon combat fields, on-hit effects, equipment requirements, and consumable `on_use` behavior
-- enemies, including XP values
+- items, including weapon combat fields, tags, on-hit effects, equipment requirements, and consumable `on_use` behavior
+- enemies, including XP values and optional boss phase data
 - abilities, including targeting and effect definitions
-- perks, NPCs, and dialogs used by progression/service content and room fixtures
+- perks, NPCs, dialogs, synergies, ascension modifiers, daily modifiers, narrative templates, and factions used by progression/service content and room fixtures
 
 Consumable item use supports authored healing, status application, and ability-cast delegation. `cast_ability` use effects must be paired with valid ability content and targeting data from the caller/UI so the same targeting validation path is used as direct ability casts.
 

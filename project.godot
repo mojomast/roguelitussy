@@ -12,6 +12,7 @@ config/features=PackedStringArray("4.5", "C#")
 EventBus="*res://Scripts/Autoloads/EventBus.cs"
 ContentDatabase="*res://Scripts/Autoloads/ContentDatabase.cs"
 MetaProgressionManager="*res://Scripts/Autoloads/MetaProgressionManager.cs"
+DailyChallengeManager="*res://Scripts/Autoloads/DailyChallengeManager.cs"
 GameManager="*res://Scripts/Autoloads/GameManager.cs"
 
 [display]

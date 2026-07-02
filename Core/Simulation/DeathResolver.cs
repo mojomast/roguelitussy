@@ -32,6 +32,11 @@ public static class DeathResolver
             EnemyTag = victim.GetComponent<EnemyComponent>()?.TemplateId,
         });
 
+        if (victim.GetComponent<EnemyComponent>() is { } enemyComponent)
+        {
+            ReputationService.OnEnemyKilled(killer, enemyComponent.TemplateId, world.ContentDatabase);
+        }
+
         var progression = killer.GetComponent<ProgressionComponent>();
         if (progression is null)
         {

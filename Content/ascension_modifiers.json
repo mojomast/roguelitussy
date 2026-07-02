@@ -1,0 +1,16 @@
+{
+  "$schema": "roguelike-ascension-modifiers-v1",
+  "version": 1,
+  "ascension_modifiers": [
+    { "modifier_id": "a01_enemy_hp", "display_name": "Thicker Hides", "description": "Enemies have +10% HP.", "ascension_level": 1, "effect_type": "enemy_stat_boost", "effect_value": 0.1 },
+    { "modifier_id": "a02_shop_prices", "display_name": "Dungeon Tariffs", "description": "Shop prices increase by 20%.", "ascension_level": 2, "effect_type": "shop_price_increase", "effect_value": 0.2 },
+    { "modifier_id": "a03_shrine_cost", "display_name": "Blood Tithe", "description": "Shrines cost +5 HP.", "ascension_level": 3, "effect_type": "shrine_hp_cost", "effect_value": 5 },
+    { "modifier_id": "a04_elites", "display_name": "Elite Patrols", "description": "An elite enemy appears on every floor.", "ascension_level": 4, "effect_type": "elite_every_floor", "effect_value": 1 },
+    { "modifier_id": "a05_no_potions", "display_name": "Dry Shelves", "description": "Potions are removed from shop stock.", "ascension_level": 5, "effect_type": "remove_item_category", "effect_value": 1 },
+    { "modifier_id": "a06_resistance", "display_name": "Hardened Blood", "description": "Enemies gain one random status resistance.", "ascension_level": 6, "effect_type": "status_resistance", "effect_value": 1 },
+    { "modifier_id": "a07_starting_hp", "display_name": "Thin Blood", "description": "Starting HP is reduced by 10.", "ascension_level": 7, "effect_type": "starting_hp_penalty", "effect_value": 10 },
+    { "modifier_id": "a08_poor_loot", "display_name": "Picked Clean", "description": "Loot rarity shifts down one tier.", "ascension_level": 8, "effect_type": "loot_rarity_downshift", "effect_value": 1 },
+    { "modifier_id": "a09_curses", "display_name": "Cursed Descent", "description": "Curse rooms appear on every floor.", "ascension_level": 9, "effect_type": "curse_every_floor", "effect_value": 1 },
+    { "modifier_id": "a10_guards", "display_name": "Titan's Guard", "description": "The final boss has two elite guards.", "ascension_level": 10, "effect_type": "final_boss_guards", "effect_value": 2 }
+  ]
+}

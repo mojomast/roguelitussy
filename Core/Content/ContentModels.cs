@@ -127,6 +127,66 @@ public sealed class TrapsDocument
     public List<TrapDefinition> Traps { get; set; } = new();
 }
 
+public sealed class SynergiesDocument
+{
+    [JsonPropertyName("$schema")]
+    public string Schema { get; set; } = string.Empty;
+
+    [JsonPropertyName("version")]
+    public int Version { get; set; }
+
+    [JsonPropertyName("synergies")]
+    public List<SynergyDefinition> Synergies { get; set; } = new();
+}
+
+public sealed class AscensionModifiersDocument
+{
+    [JsonPropertyName("$schema")]
+    public string Schema { get; set; } = string.Empty;
+
+    [JsonPropertyName("version")]
+    public int Version { get; set; }
+
+    [JsonPropertyName("ascension_modifiers")]
+    public List<AscensionModifier> AscensionModifiers { get; set; } = new();
+}
+
+public sealed class DailyModifiersDocument
+{
+    [JsonPropertyName("$schema")]
+    public string Schema { get; set; } = string.Empty;
+
+    [JsonPropertyName("version")]
+    public int Version { get; set; }
+
+    [JsonPropertyName("daily_modifiers")]
+    public List<DailyModifierDefinition> DailyModifiers { get; set; } = new();
+}
+
+public sealed class NarrativeTemplatesDocument
+{
+    [JsonPropertyName("$schema")]
+    public string Schema { get; set; } = string.Empty;
+
+    [JsonPropertyName("version")]
+    public int Version { get; set; }
+
+    [JsonPropertyName("narrative_templates")]
+    public List<NarrativeTemplate> NarrativeTemplates { get; set; } = new();
+}
+
+public sealed class FactionsDocument
+{
+    [JsonPropertyName("$schema")]
+    public string Schema { get; set; } = string.Empty;
+
+    [JsonPropertyName("version")]
+    public int Version { get; set; }
+
+    [JsonPropertyName("factions")]
+    public List<FactionDefinition> Factions { get; set; } = new();
+}
+
 public sealed class FloorEventDefinition
 {
     [JsonPropertyName("event_id")]
@@ -236,6 +296,9 @@ public sealed class ItemDefinition
 
     [JsonPropertyName("sprite_atlas_coords")]
     public List<int> SpriteAtlasCoords { get; set; } = new();
+
+    [JsonPropertyName("tags")]
+    public List<string> Tags { get; set; } = new();
 }
 
 public sealed class ItemEffectDefinition
@@ -318,6 +381,9 @@ public sealed class EnemyDefinition
     [JsonPropertyName("tags")]
     public List<string> Tags { get; set; } = new();
 
+    [JsonPropertyName("boss_phase_data")]
+    public List<BossPhaseDefinition> BossPhaseData { get; set; } = new();
+
     [JsonPropertyName("sprite_path")]
     public string SpritePath { get; set; } = string.Empty;
 
@@ -362,6 +428,27 @@ public sealed class EnemyAbilityReference
 
     [JsonPropertyName("priority")]
     public int Priority { get; set; }
+}
+
+public sealed class BossPhaseDefinition
+{
+    [JsonPropertyName("phase")]
+    public int Phase { get; set; }
+
+    [JsonPropertyName("threshold")]
+    public double Threshold { get; set; }
+
+    [JsonPropertyName("ability_id")]
+    public string AbilityId { get; set; } = string.Empty;
+
+    [JsonPropertyName("stat_boost")]
+    public int StatBoost { get; set; }
+
+    [JsonPropertyName("status_effect")]
+    public string StatusEffect { get; set; } = string.Empty;
+
+    [JsonPropertyName("message")]
+    public string Message { get; set; } = string.Empty;
 }
 
 public sealed class DialogueDefinition
@@ -437,6 +524,9 @@ public sealed class NpcDefinition
 
     [JsonPropertyName("archetype_id")]
     public string ArchetypeId { get; set; } = string.Empty;
+
+    [JsonPropertyName("faction_id")]
+    public string FactionId { get; set; } = string.Empty;
 
     [JsonPropertyName("stock")]
     public List<MerchantStockDefinition> Stock { get; set; } = new();

@@ -103,6 +103,12 @@ public partial class EventBus : Node
     public event Action? CurseRoomEntered;
     public event Action<EntityId>? BossRoomEntered;
     public event Action<ActionFeedbackEventArgs>? ActionFeedback;
+    public event Action<SynergyDefinition>? SynergyActivated;
+    public event Action<int>? AscensionLevelChanged;
+    public event Action<EntityId, int>? BossPhaseTransition;
+    public event Action<string, int, int>? ReputationChanged;
+    public event Action<EntityId, EntityId, int>? CriticalHitDealt;
+    public event Action<int>? FloorCleared;
 
     public event Action<TrapTriggeredEventArgs>? TrapTriggered;
 
@@ -203,6 +209,18 @@ public partial class EventBus : Node
     public void EmitBossRoomEntered(EntityId bossId) => BossRoomEntered?.Invoke(bossId);
 
     public void EmitActionFeedback(ActionFeedbackEventArgs args) => ActionFeedback?.Invoke(args);
+
+    public void EmitSynergyActivated(SynergyDefinition synergy) => SynergyActivated?.Invoke(synergy);
+
+    public void EmitAscensionLevelChanged(int level) => AscensionLevelChanged?.Invoke(level);
+
+    public void EmitBossPhaseTransition(EntityId bossId, int newPhase) => BossPhaseTransition?.Invoke(bossId, newPhase);
+
+    public void EmitReputationChanged(string factionId, int newValue, int delta) => ReputationChanged?.Invoke(factionId, newValue, delta);
+
+    public void EmitCriticalHitDealt(EntityId attackerId, EntityId defenderId, int damage) => CriticalHitDealt?.Invoke(attackerId, defenderId, damage);
+
+    public void EmitFloorCleared(int depth) => FloorCleared?.Invoke(depth);
 
     public void EmitTrapTriggered(TrapTriggeredEventArgs args) => TrapTriggered?.Invoke(args);
 }
