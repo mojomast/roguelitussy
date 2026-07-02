@@ -52,6 +52,12 @@ public partial class MetaShopUI : MenuBase
 
     protected override void ActivateSelected()
     {
+        if (SelectedIndex == ResolveBackOptionIndex())
+        {
+            Close();
+            return;
+        }
+
         if (_metaProgression is null || SelectedIndex < 0 || SelectedIndex >= _metaProgression.Upgrades.Count)
         {
             return;
@@ -66,7 +72,7 @@ public partial class MetaShopUI : MenuBase
     {
         if (_metaProgression is null)
         {
-            ConfigureOptions("Meta progression unavailable");
+            ConfigureOptions("Back to Title");
             return;
         }
 
@@ -75,6 +81,8 @@ public partial class MetaShopUI : MenuBase
             var level = _metaProgression.GetUnlockLevel(upgrade.Id);
             var cost = level >= upgrade.MaxLevel ? "MAX" : $"{upgrade.GetCostForLevel(level)} Echoes";
             return $"{upgrade.DisplayName} ({level}/{upgrade.MaxLevel}) {cost}";
-        }).ToArray());
+        }).Concat(new[] { "Back to Title" }).ToArray());
     }
+
+    private int ResolveBackOptionIndex() => _metaProgression?.Upgrades.Count ?? 0;
 }

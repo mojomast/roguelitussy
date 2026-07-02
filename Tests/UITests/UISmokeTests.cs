@@ -42,6 +42,7 @@ public sealed class UISmokeTests : ITestSuite
         registry.Add("UI.Inventory and tooltip surface item rarity", InventorySurfacesItemRarity);
         registry.Add("UI.Inventory uses category glyphs and full stack details", InventoryUsesCategoryGlyphsAndStackDetails);
         registry.Add("UI.Inventory footer hints wrap without overlap", InventoryFooterHintsWrapWithoutOverlap);
+        registry.Add("UI.Inventory text fits compact panels", InventoryTextFitsCompactPanels);
         registry.Add("UI.Help overlay opens from menu and gameplay", HelpOverlayOpensFromMenuAndGameplay);
         registry.Add("UI.Pause menu groups run actions without changing routing", PauseMenuGroupsRunActions);
         registry.Add("UI.Character sheet uses sectioned visual chrome", CharacterSheetUsesSectionedVisualChrome);
@@ -71,6 +72,7 @@ public sealed class UISmokeTests : ITestSuite
         registry.Add("UI.UIRoot accepts numpad enter on the title screen", UIRootAcceptsNumpadEnter);
         registry.Add("UI.UIRoot ignores repeated key echo events", UIRootIgnoresEchoedKeys);
         registry.Add("UI.UIRoot load reopens pending perk choices", UIRootLoadReopensPendingPerkChoices);
+        registry.Add("UI.UIRoot routes Echo shop above title menu", UIRootRoutesEchoShopAboveTitleMenu);
         registry.Add("UI.Escape closes standardized overlays", EscapeClosesStandardizedOverlays);
         registry.Add("UI.Level-up Escape closes without selecting perk", LevelUpEscapeClosesWithoutSelectingPerk);
         registry.Add("UI.UIRoot routes keyboard between title, overlays, and gameplay", UIRootRoutesKeyboard);
@@ -886,6 +888,39 @@ public sealed class UISmokeTests : ITestSuite
         });
     }
 
+    private static void InventoryTextFitsCompactPanels()
+    {
+        WithViewportSize(new Vector2(640f, 360f), _ =>
+        {
+            var context = CreateContext(new ItemInstance { TemplateId = "scroll_fireball", IsIdentified = true });
+            var root = new Control();
+            var inventory = new InventoryUI();
+            root.AddChild(inventory);
+            inventory.Bind(context.GameManager, context.Bus, context.Content, new Tooltip());
+            inventory.Open();
+
+            var panel = FindChild<Panel>(inventory, "Panel");
+            Expect.NotNull(panel, "Inventory should have a root panel.");
+
+            var headerStats = FindChild<Label>(panel!, "HeaderStats");
+            var sortLabel = FindChild<Label>(panel!, "SortLabel");
+            Expect.NotNull(headerStats, "Inventory should render header stats.");
+            Expect.NotNull(sortLabel, "Inventory should render sort label.");
+            Expect.True(ApproxTextWidth(headerStats!.Text) <= headerStats.Size.X + 0.1f, "Inventory header stats should fit their allocated width.");
+            Expect.True(ApproxTextWidth(sortLabel!.Text) <= sortLabel.Size.X + 0.1f, "Inventory sort label should fit its allocated width.");
+
+            foreach (var line in inventory.DescriptionText.Split('\n'))
+            {
+                Expect.True(line.Length <= 46, "Inventory description lines should be clipped before they can overlap adjacent UI.");
+            }
+
+            foreach (var plainLine in StripBbcode(inventory.GridMarkup).Split('\n'))
+            {
+                Expect.True(plainLine.Length <= 76, "Inventory grid header/footer lines should remain compact on small panels.");
+            }
+        });
+    }
+
     private static void MainMenuCharacterCreationAffectsStartingRun()
     {
         var gameManager = new GameManager();
@@ -1543,6 +1578,23 @@ public sealed class UISmokeTests : ITestSuite
         Expect.True(root.LevelUpOverlay.Visible, "A successful load should reopen saved pending perk choices.");
     }
 
+    private static void UIRootRoutesEchoShopAboveTitleMenu()
+    {
+        var context = CreateContext();
+        var root = new UIRoot();
+        root.BindServices(context.GameManager, context.Bus, context.Content);
+        root.MetaShopUI.Bind(null);
+
+        root.MetaShopUI.Open();
+        Expect.True(root.MainMenu.Visible, "The title screen remains visible behind the Echo shop.");
+        Expect.True(root.MetaShopUI.Visible, "Echo shop should be open for routing test.");
+
+        root._UnhandledInput(new InputEventKey { Pressed = true, PhysicalKeycode = Key.Escape });
+
+        Expect.False(root.MetaShopUI.Visible, "Escape should close the Echo shop before reaching the title menu.");
+        Expect.True(root.MainMenu.Visible, "Closing the Echo shop should return to the title menu instead of closing it.");
+    }
+
     private static void EscapeClosesStandardizedOverlays()
     {
         var context = CreateContext();
@@ -1591,6 +1643,15 @@ public sealed class UISmokeTests : ITestSuite
         shop.Open(merchant.Id);
         Expect.True(shop.HandleKey(Key.Escape), "Escape should be handled by shop.");
         Expect.False(shop.Visible, "Escape should close shop.");
+
+        var metaShop = new MetaShopUI();
+        metaShop.Bind(null);
+        metaShop.Open();
+        Expect.True(metaShop.HandleKey(Key.Escape), "Escape should be handled by Echo shop.");
+        Expect.False(metaShop.Visible, "Escape should close Echo shop.");
+        metaShop.Open();
+        Expect.True(metaShop.HandleKey(Key.Enter), "Echo shop should expose a selectable back option.");
+        Expect.False(metaShop.Visible, "Selecting Back should close Echo shop.");
 
         var chest = new Entity("Ancient Chest", new Position(2, 2), new Stats { HP = 1, MaxHP = 1, Speed = 100 }, Faction.Neutral);
         chest.SetComponent(new ChestComponent { LootTableId = "starter_chest" });
@@ -2064,6 +2125,35 @@ public sealed class UISmokeTests : ITestSuite
         }
 
         return null;
+    }
+
+    private static float ApproxTextWidth(string text) => text.Length * 7f;
+
+    private static string StripBbcode(string text)
+    {
+        var result = new System.Text.StringBuilder(text.Length);
+        var inTag = false;
+        foreach (var ch in text)
+        {
+            if (ch == '[')
+            {
+                inTag = true;
+                continue;
+            }
+
+            if (ch == ']')
+            {
+                inTag = false;
+                continue;
+            }
+
+            if (!inTag)
+            {
+                result.Append(ch);
+            }
+        }
+
+        return result.ToString();
     }
 
     private sealed class DetailedSpawnGenerator : IGenerator

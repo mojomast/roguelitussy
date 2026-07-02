@@ -400,9 +400,9 @@ public partial class UIRoot : CanvasLayer
             return handled;
         }
 
-        if (MainMenu.Visible)
+        if (MetaShopUI.Visible)
         {
-            var handled = MainMenu.HandleKey(key);
+            var handled = MetaShopUI.HandleKey(key);
             if (handled)
             {
                 RefreshInputGate();
@@ -411,9 +411,9 @@ public partial class UIRoot : CanvasLayer
             return handled;
         }
 
-        if (MetaShopUI.Visible)
+        if (MainMenu.Visible)
         {
-            var handled = MetaShopUI.HandleKey(key);
+            var handled = MainMenu.HandleKey(key);
             if (handled)
             {
                 RefreshInputGate();

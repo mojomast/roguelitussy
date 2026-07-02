@@ -577,4 +577,5 @@ Do not add more enemies, items, or progression content yet. The codebase is read
 - Completed: title/menu flow now presents a clear `Start Game` action and supports typed seed entry for deterministic runs.
 - Completed: menu and long-text UI safeguards fit or clamp labels, summaries, tooltips, and option lists so text does not overlap adjacent controls.
 - Completed: prominent action feedback, HUD status readability, and combat-log clarity were improved so recent actions, blocked actions, combat outcomes, and active log filtering are easier to scan.
+- Completed: Echo Workshop now exits cleanly through `Escape` or a Back row even while the title menu remains visible underneath, and inventory header/detail/footer text is fitted on compact panels.
 - Documentation: `README.md`, `docs/SYSTEMS.md`, `docs/TESTING.md`, `docs/IMPROVEMENT_SUGGESTIONS.md`, and `improvments.md` now reflect the user-facing UI changes.

@@ -26,6 +26,8 @@
 
 > UI clarity follow-up note (2026-07-02): title flow now has an explicit `Start Game` action plus typed seed entry for deterministic starts. Menu/text surfaces use fitting and clamping safeguards to avoid overlap, and the HUD/combat log emphasize recent actions, blocked actions, combat outcomes, and active filtering for clearer moment-to-moment feedback.
 
+> UI modal/overlap follow-up note (2026-07-02): Echo Workshop now routes above the title menu and exits through `Escape` or an explicit Back row. Inventory header, grid, detail, and footer text now fit compact panels to prevent text overlap.
+
 ## Purpose
 
 This document is the current-state improvement spec for turning the existing project into a more complete, playable roguelike. It is intentionally written for parallel subagents. It replaces vague backlog work with concrete, codebase-specific workstreams, ordering, file targets, and acceptance criteria.

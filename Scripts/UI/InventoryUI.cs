@@ -50,6 +50,8 @@ public partial class InventoryUI : Control
     private const float FooterHeight = 42f;
     private const float SlotSize = 52f;
     private const float SlotGap = 8f;
+    private const int MaxGridLineChars = 50;
+    private const int MaxDescriptionLineChars = 46;
 
     private sealed class SlotVisual
     {
@@ -493,8 +495,9 @@ public partial class InventoryUI : Control
             lines.Add(ResolvePrimaryActionHint(template, item));
             lines.Add(item.StackCount > 1 ? "D: drop one from stack" : "D: drop item");
 
-            DescriptionText = string.Join("\n", lines);
-            DescriptionMarkup = BuildDescriptionMarkup(template, item, lines);
+            var fittedLines = FitLines(lines, MaxDescriptionLineChars);
+            DescriptionText = string.Join("\n", fittedLines);
+            DescriptionMarkup = BuildDescriptionMarkup(template, item, fittedLines);
             var tooltipComparison = (template.Slot != EquipSlot.None && !IsEquipped(item))
                 ? string.Join("\n", BuildEquipmentComparisonLines(template)) : null;
             ShowActiveTooltip(template, item, tooltipComparison);
@@ -502,7 +505,7 @@ public partial class InventoryUI : Control
             return;
         }
 
-        DescriptionText = item.TemplateId;
+        DescriptionText = FitLine(item.TemplateId, MaxDescriptionLineChars);
         DescriptionMarkup = ItemRarityPresentation.EscapeBBCode(DescriptionText);
         HideActiveTooltip();
         RefreshVisualState();
@@ -1013,10 +1016,10 @@ public partial class InventoryUI : Control
         var sortWidth = System.Math.Min(140f, System.Math.Max(80f, _headerBar.Size.X * 0.25f));
         var statsRight = _headerBar.Position.X + _headerBar.Size.X - sortWidth - 12f;
         _headerStatsLabel.Size = new Vector2(System.Math.Max(40f, statsRight - _headerStatsLabel.Position.X), HeaderHeight);
-        _headerStatsLabel.Text = $"{_items.Count}/{inventoryCapacity} stacks  ▪  {ResolveTotalCarriedItems()} items  ▪  Wt: {ResolveTotalWeight():0.0}  ▪  Val: {ResolveTotalValue()}  ▪  Gold: {ResolveGold()}";
+        _headerStatsLabel.Text = FitLabelText($"{_items.Count}/{inventoryCapacity} stacks  ▪  {ResolveTotalCarriedItems()} items  ▪  Wt: {ResolveTotalWeight():0.0}  ▪  Val: {ResolveTotalValue()}  ▪  Gold: {ResolveGold()}", _headerStatsLabel.Size.X);
         _sortLabel.Position = new Vector2(_headerBar.Position.X + _headerBar.Size.X - sortWidth - 8f, _headerBar.Position.Y + 6f);
         _sortLabel.Size = new Vector2(sortWidth, HeaderHeight);
-        _sortLabel.Text = $"[Tab] Sort: {CurrentSort}";
+        _sortLabel.Text = FitLabelText($"[Tab] Sort: {CurrentSort}", _sortLabel.Size.X);
     }
 
     private void LayoutFooter(Vector2 panelSize)
@@ -1040,6 +1043,7 @@ public partial class InventoryUI : Control
             var row = compact ? i / columns : 0;
             label.Position = new Vector2(_footerBar.Position.X + 10f + (column * labelWidth), _footerBar.Position.Y + 3f + (row * rowHeight));
             label.Size = new Vector2(System.Math.Max(0f, labelWidth - 6f), rowHeight);
+            label.Text = FitLabelText(label.Text, label.Size.X);
             if (i < _footerDividers.Count)
             {
                 var divider = _footerDividers[i];
@@ -1124,12 +1128,12 @@ public partial class InventoryUI : Control
     {
         var builder = new StringBuilder();
         var inventory = _gameManager?.World?.Player?.GetComponent<InventoryComponent>();
-        builder.AppendLine($"[color={UiStyle.LegendaryHex}]Inventory[/color]  {ItemRarityPresentation.EscapeBBCode($"{_items.Count}/{inventory?.Capacity ?? 0} stacks  {ResolveTotalCarriedItems()} items")}");
-        builder.AppendLine($"[color={UiStyle.CommonHex}]{ItemRarityPresentation.EscapeBBCode($"Gold: {ResolveGold()}  Weight: {ResolveTotalWeight():0.0}  Value: {ResolveTotalValue()}")}[/color]");
-        builder.AppendLine($"[color={UiStyle.CommonHex}]{ItemRarityPresentation.EscapeBBCode($"Sort: {CurrentSort}  Auto-equip upgrades: {ResolveAutoEquipLabel()}")}[/color]");
+        builder.AppendLine($"[color={UiStyle.LegendaryHex}]Inventory[/color]  {ItemRarityPresentation.EscapeBBCode(FitLine($"{_items.Count}/{inventory?.Capacity ?? 0} stacks  {ResolveTotalCarriedItems()} items", MaxGridLineChars - 12))}");
+        builder.AppendLine($"[color={UiStyle.CommonHex}]{ItemRarityPresentation.EscapeBBCode(FitLine($"Gold: {ResolveGold()}  Weight: {ResolveTotalWeight():0.0}  Value: {ResolveTotalValue()}", MaxGridLineChars))}[/color]");
+        builder.AppendLine($"[color={UiStyle.CommonHex}]{ItemRarityPresentation.EscapeBBCode(FitLine($"Sort: {CurrentSort}  Auto-equip upgrades: {ResolveAutoEquipLabel()}", MaxGridLineChars))}[/color]");
         if (CurrentSort == SortMode.Category)
         {
-            builder.AppendLine(ItemRarityPresentation.EscapeBBCode($"Groups: {ResolveCategorySummary()}"));
+            builder.AppendLine(ItemRarityPresentation.EscapeBBCode(FitLine($"Groups: {ResolveCategorySummary()}", MaxGridLineChars)));
         }
 
         builder.AppendLine();
@@ -1149,8 +1153,34 @@ public partial class InventoryUI : Control
             builder.AppendLine();
         }
 
-        builder.Append(ItemRarityPresentation.EscapeBBCode(ResolveFooterText()));
+        builder.Append(ItemRarityPresentation.EscapeBBCode(FitLine(ResolveFooterText(), MaxGridLineChars)));
         return builder.ToString().TrimEnd();
+    }
+
+    private static IReadOnlyList<string> FitLines(IEnumerable<string> lines, int maxChars)
+    {
+        return lines.Select(line => FitLine(line, maxChars)).ToArray();
+    }
+
+    private static string FitLine(string text, int maxChars)
+    {
+        if (string.IsNullOrEmpty(text) || text.Length <= maxChars)
+        {
+            return text;
+        }
+
+        return text[..System.Math.Max(1, maxChars - 3)] + "...";
+    }
+
+    private static string FitLabelText(string text, float width)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return string.Empty;
+        }
+
+        var maxChars = System.Math.Max(4, (int)System.Math.Floor(width / 7f));
+        return FitLine(text, maxChars);
     }
 
     private string ResolveAutoEquipLabel() => _gameManager?.AutoEquipUpgradesEnabled == true ? "On" : "Off";
