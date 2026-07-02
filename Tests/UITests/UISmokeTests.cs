@@ -20,6 +20,7 @@ public sealed class UISmokeTests : ITestSuite
         registry.Add("UI.GameManager floor travel restores mutated arrival stairs", GameManagerFloorTravelRepairsMutatedArrivalTile);
         registry.Add("UI.GameManager floor travel leaves returned stairs usable", GameManagerFloorTravelLeavesReturnedStairsUsable);
         registry.Add("UI.HUD updates from bus and exposes keyboard toggles", HudUpdatesFromBus);
+        registry.Add("UI.GameManager emits action feedback for blocked and successful player actions", GameManagerEmitsActionFeedback);
         registry.Add("UI.HUD animates HP and energy bar state", HudAnimatesHpAndEnergyBars);
         registry.Add("UI.HUD shows derived quick-use hotbar", HudShowsDerivedQuickUseHotbar);
         registry.Add("UI.Quick-use number key submits potion action", QuickUseNumberKeySubmitsPotionAction);
@@ -56,6 +57,7 @@ public sealed class UISmokeTests : ITestSuite
         registry.Add("UI.Workbench windows content for small viewports", WorkbenchWindowsContentForSmallViewports);
         registry.Add("UI.MainMenu scrolls option list within the viewport", MainMenuScrollsOptionListWithinViewport);
         registry.Add("UI.MainMenu fits all choices at normal viewport", MainMenuFitsAllChoicesAtNormalViewport);
+        registry.Add("UI.MainMenu visual option rows fit their card", MainMenuVisualOptionRowsFitTheirCard);
         registry.Add("UI.Dialog and shop overlays route interaction flow", DialogAndShopOverlaysRouteInteractionFlow);
         registry.Add("UI.Shop applies perk-based merchant discounts", ShopAppliesPerkDiscounts);
         registry.Add("UI.Dialog overlay traverses authored advisor dialog nodes", DialogOverlayTraversesAdvisorDialogNodes);
@@ -241,6 +243,19 @@ public sealed class UISmokeTests : ITestSuite
         var before = hud.MinimapText;
         hud.ToggleMinimap();
         Expect.False(before == hud.MinimapText, "Toggling the minimap should change the HUD summary");
+    }
+
+    private static void GameManagerEmitsActionFeedback()
+    {
+        var context = CreateRunContext(5, 5, new Position(1, 1), viewRadius: 4);
+        var feedback = new List<ActionFeedbackEventArgs>();
+        context.Bus.ActionFeedback += feedback.Add;
+
+        context.GameManager.ProcessPlayerAction(new MoveAction(context.Player.Id, new Position(-1, 0)));
+        context.GameManager.ProcessPlayerAction(new WaitAction(context.Player.Id));
+
+        Expect.True(feedback.Any(item => item.WasBlocked && item.Message.Contains("Blocked", System.StringComparison.Ordinal)), "Blocked validation failures should emit clear action feedback.");
+        Expect.True(feedback.Any(item => !item.WasBlocked && item.Result == ActionResult.Success && item.Message.Contains("Waiting", System.StringComparison.Ordinal)), "Successful player actions should emit action feedback from outcome log data.");
     }
 
     private static void HudStatusIconsAppearWhenPlayerHasEffects()
@@ -1191,6 +1206,9 @@ public sealed class UISmokeTests : ITestSuite
 
         Expect.True(tooltip.BodyText.Contains("...", System.StringComparison.Ordinal), "Long tooltip bodies should be capped with an ellipsis.");
         Expect.False(tooltip.BodyText.Contains("Line 20", System.StringComparison.Ordinal), "Long tooltip bodies should not render off-panel tail lines.");
+
+        tooltip.ShowShortcutTooltip("Long Help", new string('x', 90), new Vector2(0f, 0f));
+        Expect.True(tooltip.BodyMarkup.Split('\n').All(line => line.Length <= 52), "Tooltip rendered body lines should be capped to the panel width.");
     }
 
     private static void TooltipKeepsEquipmentComparisonLinesVisible()
@@ -1276,7 +1294,7 @@ public sealed class UISmokeTests : ITestSuite
             }
 
             Expect.True(menu.MenuText.Contains("> Quit"), "The selected bottom main-menu option should remain visible after scrolling.");
-            Expect.False(menu.MenuText.Contains("Start Expedition\n") || menu.MenuText.Contains("> Start Expedition"), "The rendered menu text should window the option list instead of keeping off-screen top entries visible.");
+            Expect.False(menu.MenuText.Contains("Start Game\n") || menu.MenuText.Contains("> Start Game"), "The rendered menu text should window the option list instead of keeping off-screen top entries visible.");
             var panel = FindChild<Panel>(menu, "Panel");
             var header = panel is null ? null : FindChild<ColorRect>(panel, "HeaderBand");
             var options = panel is null ? null : FindChild<ColorRect>(panel, "OptionsCard");
@@ -1306,11 +1324,42 @@ public sealed class UISmokeTests : ITestSuite
                 menu.HandleKey(Key.Down);
             }
 
-            Expect.True(menu.MenuText.Contains("Start Expedition", System.StringComparison.Ordinal), "Normal-sized main menu should keep the first choice visible instead of scrolling on selection changes.");
+            Expect.True(menu.MenuText.Contains("Start Game", System.StringComparison.Ordinal), "Normal-sized main menu should keep the first choice visible instead of scrolling on selection changes.");
             Expect.True(menu.MenuText.Contains("> Quit", System.StringComparison.Ordinal), "Normal-sized main menu should keep the bottom choice visible at the same time.");
             var panel = FindChild<Panel>(menu, "Panel");
             Expect.NotNull(panel, "Main menu should still create a panel at normal viewport size.");
             Expect.True(panel!.Size.Y > 600f, "Normal-sized main menu should use available height to fit all choices.");
+        });
+    }
+
+    private static void MainMenuVisualOptionRowsFitTheirCard()
+    {
+        WithViewportSize(new Vector2(640f, 360f), _ =>
+        {
+            var gameManager = new GameManager();
+            var bus = new EventBus();
+            gameManager.AttachServices(new WorldState(), new TurnScheduler(), new StubGenerator(), new FOVCalculator(), new StubContentDatabase(), new StubSaveManager(), bus);
+
+            var root = new Control();
+            var menu = new MainMenu();
+            root.AddChild(menu);
+            menu.Bind(gameManager, bus);
+            menu.Open();
+
+            var panel = FindChild<Panel>(menu, "Panel");
+            var options = panel is null ? null : FindChild<ColorRect>(panel, "OptionsCard");
+            Expect.NotNull(options, "Main menu should create an options card.");
+
+            var rows = options!.Children.OfType<Panel>().Where(row => row.Name.StartsWith("OptionRow_", System.StringComparison.Ordinal)).ToArray();
+            Expect.True(rows.Length > 0, "Main menu should render visual option rows.");
+            foreach (var row in rows)
+            {
+                Expect.True(row.Position.X >= 0f && row.Position.X + row.Size.X <= options.Size.X + 0.1f, $"{row.Name} should fit horizontally inside the options card.");
+                Expect.True(row.Position.Y >= 0f && row.Position.Y + row.Size.Y <= options.Size.Y + 0.1f, $"{row.Name} should fit vertically inside the options card.");
+                var label = FindChild<Label>(row, "RowLabel");
+                Expect.NotNull(label, $"{row.Name} should include a text label.");
+                Expect.True(label!.Position.X + label.Size.X <= row.Size.X + 0.1f, $"{row.Name} label should fit inside its row.");
+            }
         });
     }
 

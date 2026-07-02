@@ -38,6 +38,13 @@ public sealed record FloorStats(
 
 public sealed record ShrineConfirmationRequest(EntityId ActorId, EntityId ShrineId, string ShrineType, int HPCost);
 
+public sealed record ActionFeedbackEventArgs(
+    string Message,
+    LogCategory Category,
+    ActionResult Result,
+    ActionType ActionType,
+    bool WasBlocked);
+
 public enum LogCategory
 {
     System,
@@ -95,6 +102,7 @@ public partial class EventBus : Node
     public event Action<ShrineConfirmationRequest>? ShrineConfirmationRequested;
     public event Action? CurseRoomEntered;
     public event Action<EntityId>? BossRoomEntered;
+    public event Action<ActionFeedbackEventArgs>? ActionFeedback;
 
     public event Action<TrapTriggeredEventArgs>? TrapTriggered;
 
@@ -193,6 +201,8 @@ public partial class EventBus : Node
     public void EmitCurseRoomEntered() => CurseRoomEntered?.Invoke();
 
     public void EmitBossRoomEntered(EntityId bossId) => BossRoomEntered?.Invoke(bossId);
+
+    public void EmitActionFeedback(ActionFeedbackEventArgs args) => ActionFeedback?.Invoke(args);
 
     public void EmitTrapTriggered(TrapTriggeredEventArgs args) => TrapTriggered?.Invoke(args);
 }

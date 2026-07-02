@@ -17,9 +17,11 @@ public sealed class CombatLogTests : ITestSuite
         registry.Add("UI.EventBus empty log messages are safe", EmptyLogMessagesAreSafe);
         registry.Add("UI.CombatLog default filter indicator is All", DefaultFilterIndicatorIsAll);
         registry.Add("UI.CombatLog filter cycles through states and wraps", FilterCyclesThroughStatesAndWraps);
+        registry.Add("UI.CombatLog long display messages are truncated", LongDisplayMessagesAreTruncated);
         registry.Add("UI.CombatLog combat filter includes warning combat grouping and excludes nonmatching categories", CombatFilterExcludesNonmatchingCategories);
         registry.Add("UI.CombatLog filtering preserves stored entries", FilteringPreservesStoredEntries);
         registry.Add("UI.CombatLog filter key routes through gameplay input", FilterKeyRoutesThroughInput);
+        registry.Add("UI.CombatLog listens for progression feedback", ListensForProgressionFeedback);
     }
 
     private static void EnemyActionUsesDangerRed()
@@ -103,6 +105,14 @@ public sealed class CombatLogTests : ITestSuite
             "Fourth cycle should wrap back to All filter.");
     }
 
+    private static void LongDisplayMessagesAreTruncated()
+    {
+        var fitted = CombatLog.FormatDisplayMessageForTest(new string('x', 140));
+
+        Expect.True(fitted.Length <= 96, "Combat log display lines should be capped before they can overrun the console panel.");
+        Expect.True(fitted.EndsWith("...", System.StringComparison.Ordinal), "Truncated combat log lines should clearly show an ellipsis.");
+    }
+
     private static void CombatFilterExcludesNonmatchingCategories()
     {
         var bus = new EventBus();
@@ -164,6 +174,23 @@ public sealed class CombatLogTests : ITestSuite
 
         Expect.True(root.CombatLog.RenderedText.Contains("[Filter: Combat]", System.StringComparison.Ordinal),
             "Gameplay filter key should cycle the combat log filter.");
+    }
+
+    private static void ListensForProgressionFeedback()
+    {
+        var context = CreateContext();
+        var log = new CombatLog();
+        log.Bind(context.GameManager, context.Bus);
+
+        context.Bus.EmitExperienceGained(context.World.Player.Id, 5, 15);
+        context.Bus.EmitLeveledUp(context.World.Player.Id, 2);
+        context.Bus.EmitCurrencyChanged(context.World.Player.Id, 140);
+        context.Bus.EmitKillStreakChanged(context.World.Player.Id, 2, 3);
+
+        Expect.True(log.RenderedText.Contains("Gained 5 XP", System.StringComparison.Ordinal), "Combat log should show player XP gains from progression events.");
+        Expect.True(log.RenderedText.Contains("Level up!", System.StringComparison.Ordinal), "Combat log should show level-up events.");
+        Expect.True(log.RenderedText.Contains("Gold: 140", System.StringComparison.Ordinal), "Combat log should show player currency updates.");
+        Expect.True(log.RenderedText.Contains("Kill streak: 2", System.StringComparison.Ordinal), "Combat log should show visible kill streak progression.");
     }
 
     private static UIContext CreateContext()

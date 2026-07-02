@@ -17,6 +17,8 @@ public sealed class CharacterUXTests : ITestSuite
         registry.Add("UX.Identity preview tile updates with character choices", IdentityPreviewTileUpdates);
         registry.Add("UX.Graphical identity preview updates with character choices", GraphicalIdentityPreviewUpdates);
         registry.Add("UX.Main menu body stays compact when graphical preview is present", MainMenuBodyStaysCompact);
+        registry.Add("UX.Main menu exposes clear Start Game action", MainMenuExposesClearStartGameAction);
+        registry.Add("UX.Main menu accepts typed seed entry", MainMenuAcceptsTypedSeedEntry);
         registry.Add("UX.Character creation training copy shows exact effects", CharacterCreationTrainingCopyShowsExactEffects);
         registry.Add("UX.Character creation starter kit uses content descriptions", CharacterCreationStarterKitUsesContentDescriptions);
         registry.Add("UX.Character creation mystic preview notes targeted scrolls", CharacterCreationMysticPreviewNotesTargetedScrolls);
@@ -176,6 +178,44 @@ public sealed class CharacterUXTests : ITestSuite
         Expect.False(menu.MenuText.Contains("--- Identity Preview ---"), "Main menu body should not duplicate the graphical identity preview block.");
         Expect.True(menu.MenuText.Contains("Build:"), "Main menu body should keep the compact build summary.");
         Expect.True(menu.MenuText.Contains("Identity:"), "Main menu body should keep the compact identity summary.");
+    }
+
+    private static void MainMenuExposesClearStartGameAction()
+    {
+        var gameManager = new GameManager();
+        var bus = new EventBus();
+        gameManager.AttachServices(new WorldState(), new TurnScheduler(), new StubGenerator(), new FOVCalculator(), new StubContentDatabase(), new StubSaveManager(), bus);
+
+        var menu = new MainMenu();
+        menu.Bind(gameManager, bus);
+
+        Expect.True(menu.Options.Contains("Start Game"), "Main menu should expose a clear Start Game action.");
+        Expect.False(menu.Options.Contains("Start Expedition"), "Main menu should not use the old Start Expedition label.");
+    }
+
+    private static void MainMenuAcceptsTypedSeedEntry()
+    {
+        var gameManager = new GameManager();
+        var bus = new EventBus();
+        gameManager.AttachServices(new WorldState(), new TurnScheduler(), new StubGenerator(), new FOVCalculator(), new StubContentDatabase(), new StubSaveManager(), bus);
+
+        var menu = new MainMenu();
+        menu.Bind(gameManager, bus);
+        menu.SetSeed(42);
+        MoveToSeed(menu);
+
+        Expect.False(menu.HandleKey(Key.Right), "Seed selection should not increment when pressing Right.");
+        Expect.Equal(42, menu.PendingSeed, "Seed should stay unchanged until typed edit is committed.");
+
+        Expect.True(menu.HandleKey(Key.Enter), "Activating the seed row should start typed seed entry.");
+        Expect.True(menu.MenuText.Contains("Seed: _"), "Seed edit mode should show an empty editable seed buffer.");
+        Expect.True(menu.HandleKey(Key.Two), "Seed edit should accept digit 2.");
+        Expect.True(menu.HandleKey(Key.Five), "Seed edit should accept digit 5.");
+        Expect.True(menu.HandleKey(Key.One), "Seed edit should accept digit 1.");
+        Expect.True(menu.HandleKey(Key.Enter), "Enter should commit typed seed entry.");
+
+        Expect.Equal(251, menu.PendingSeed, "Typed seed entry should replace the pending seed with the committed digits.");
+        Expect.True(menu.Options.Contains("Seed: 251"), "Committed typed seed should be reflected in menu options.");
     }
 
     private static void CharacterCreationTrainingCopyShowsExactEffects()
@@ -440,6 +480,14 @@ public sealed class CharacterUXTests : ITestSuite
         overlay.OpenGameplayHelp();
         Expect.True(overlay.CurrentBodyText.Contains("Level Up"), "Gameplay help should mention Level Up.");
         Expect.True(overlay.CurrentBodyText.Contains("Equipment comparison"), "Gameplay help should mention equipment comparison.");
+    }
+
+    private static void MoveToSeed(MainMenu menu)
+    {
+        for (var i = 0; i < 12; i++)
+        {
+            menu.HandleKey(Key.Down);
+        }
     }
 
     private static UIContext CreateContext(params ItemInstance[] items)

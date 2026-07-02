@@ -67,7 +67,7 @@
 | CHR-4 | Improve creation preview clarity | P1 | Character / Identity | done |
 | CHR-5 | Add a "Randomize Build" option | P2 | Character / Identity | open |
 | UI-1 | Add mouse interaction to the inventory grid | P1 | UI / UX | open |
-| UI-2 | Add message categories and filtering to combat log | P1 | UI / UX | open |
+| UI-2 | Add message categories and filtering to combat log | P1 | UI / UX | done |
 | UI-3 | Make status effects visible on HUD and entity sprites | P1 | UI / UX | done |
 | UI-4 | Standardize overlay close keys and inline hotkey hints | P1 | UI / UX | done |
 | UI-5 | Add colorblind-safe rarity and HP indicators | P1 | UI / UX | done |
@@ -757,7 +757,7 @@
 ### UI-2 — Add message categories and filtering to combat log
 
 - **Priority:** P1
-- **Status:** partial. Message categories, category colors, critical emphasis, and age fading are implemented via `LogCategory`, `EventBus.LogMessage`, and `CombatLog` tests. Category filtering remains open.
+- **Status:** done. Message categories, category colors, critical emphasis, age fading, visible filter state, and filter cycling are implemented via `LogCategory`, `EventBus.LogMessage`, and `CombatLog` tests.
 - **Target files:**
   - `Scripts/UI/CombatLog.cs`
   - `Scripts/Autoloads/EventBus.cs`
@@ -1572,7 +1572,7 @@ Build on Wave 1–2 to make combat/AI more interesting.
 1. UI-4 — Standardize overlay close keys
 2. UI-5 — Colorblind-safe rarity/HP
 3. UI-3 — Status effect visuals
-4. UI-2 — Combat log categories (**partial:** categories/coloring done; filtering remains)
+4. UI-2 — Combat log categories and filtering (**done**)
 5. UI-1 — Mouse inventory interaction
 6. INV-4 — Render ground items
 7. INV-1 — Inventory filters

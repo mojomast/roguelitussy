@@ -9,6 +9,7 @@ public partial class Tooltip : Control
 {
     private const float PanelPadding = 10f;
     private const float MinimumWidth = 220f;
+    private const int MaxBodyLineChars = 52;
     private Panel? _panel;
     private ColorRect? _background;
     private ColorRect? _borderTop;
@@ -44,9 +45,10 @@ public partial class Tooltip : Control
     public void ShowItemTooltip(ItemTemplate template, ItemInstance instance, Vector2 screenPos,
         string? comparisonText = null, bool equipped = false, string equippedSlot = "None")
     {
-        TitleText = ItemRarityPresentation.ResolveDecoratedName(template.DisplayName, template.Rarity);
+        var titleName = FitLine(template.DisplayName, MaxBodyLineChars - 8);
+        TitleText = ItemRarityPresentation.ResolveDecoratedName(titleName, template.Rarity);
         var rarityLabel = ItemRarityPresentation.ResolveDisplayLabel(template.Rarity);
-        TitleMarkup = $"[b][color={UiStyle.ToHex(UiStyle.BrightGold())}]{ItemRarityPresentation.ResolveDecoratedNameMarkup(template.DisplayName, template.Rarity)}[/color][/b] "
+        TitleMarkup = $"[b][color={UiStyle.ToHex(UiStyle.BrightGold())}]{ItemRarityPresentation.ResolveDecoratedNameMarkup(titleName, template.Rarity)}[/color][/b] "
             + $"[i][color={ItemRarityPresentation.ResolveHexColor(template.Rarity)}]{ItemRarityPresentation.EscapeBBCode(rarityLabel)}[/color][/i]";
 
         var lines = new List<string>
@@ -84,7 +86,7 @@ public partial class Tooltip : Control
 
         lines.Add(equipped ? "[E] Unequip  [D] Drop" : "[E] Equip/Use  [D] Drop");
 
-        var visibleLines = ClampLines(lines, 16);
+        var visibleLines = ClampLines(FitLines(lines), 16);
         BodyText = string.Join("\n", visibleLines);
         BodyMarkup = BuildItemBodyMarkup(template, visibleLines);
         ScreenPosition = ClampToScreen(screenPos);
@@ -108,9 +110,9 @@ public partial class Tooltip : Control
             }
         }
 
-        TitleText = enemy.Name;
+        TitleText = FitLine(enemy.Name, MaxBodyLineChars);
         BodyText = builder.ToString().TrimEnd();
-        BodyText = string.Join("\n", ClampLines(BodyText.Split('\n'), 9));
+        BodyText = string.Join("\n", ClampLines(FitLines(BodyText.Split('\n')), 14));
         TitleMarkup = ItemRarityPresentation.EscapeBBCode(TitleText);
         BodyMarkup = ItemRarityPresentation.EscapeBBCode(BodyText);
         ScreenPosition = ClampToScreen(screenPos);
@@ -120,11 +122,11 @@ public partial class Tooltip : Control
 
     public void ShowShortcutTooltip(string title, string body, Vector2 screenPos)
     {
-        TitleText = title;
+        TitleText = FitLine(title, MaxBodyLineChars);
         BodyText = body;
-        BodyText = string.Join("\n", ClampLines(BodyText.Split('\n'), 9));
-        TitleMarkup = ItemRarityPresentation.EscapeBBCode(title);
-        BodyMarkup = ItemRarityPresentation.EscapeBBCode(BodyText);
+        BodyText = string.Join("\n", ClampLines(BodyText.Split('\n'), 14));
+        TitleMarkup = ItemRarityPresentation.EscapeBBCode(TitleText);
+        BodyMarkup = ItemRarityPresentation.EscapeBBCode(string.Join("\n", FitLines(BodyText.Split('\n'))));
         ScreenPosition = ClampToScreen(screenPos);
         Visible = true;
         RefreshVisualState();
@@ -311,6 +313,27 @@ public partial class Tooltip : Control
 
         visible.Add("...");
         return visible;
+    }
+
+    private static IReadOnlyList<string> FitLines(IEnumerable<string> lines)
+    {
+        var fitted = new List<string>();
+        foreach (var line in lines)
+        {
+            fitted.Add(FitLine(line, MaxBodyLineChars));
+        }
+
+        return fitted;
+    }
+
+    private static string FitLine(string line, int maxChars)
+    {
+        if (string.IsNullOrEmpty(line) || line.Length <= maxChars)
+        {
+            return line;
+        }
+
+        return line[..System.Math.Max(1, maxChars - 3)] + "...";
     }
 
     private Vector2 ClampToScreen(Vector2 position)

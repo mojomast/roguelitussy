@@ -421,7 +421,7 @@ public abstract partial class MenuBase : Control
 
         _footerLabel.Position = new Vector2(PanelPadding, footerTop);
         _footerLabel.Size = new Vector2(contentWidth, FooterHeight);
-        _footerLabel.Text = _visibleFooterText;
+        _footerLabel.Text = FitLabelText(_visibleFooterText, _footerLabel.Size.X);
         _panel.Visible = Visible;
         _backdrop.Visible = Visible;
         _headerBand.Visible = Visible;
@@ -456,6 +456,11 @@ public abstract partial class MenuBase : Control
         {
             var section = IsSectionHeader(index);
             var rowHeight = section ? 18f : 22f;
+            if (y + rowHeight > position.Y + size.Y + 0.1f)
+            {
+                break;
+            }
+
             var rowIndex = index;
             var row = section
                 ? new Panel()
@@ -477,7 +482,7 @@ public abstract partial class MenuBase : Control
             textLabel.Name = "RowLabel";
             textLabel.Position = new Vector2(section ? 0f : 8f, 2f);
             textLabel.Size = new Vector2(Math.Max(0f, size.X - 8f), rowHeight);
-            textLabel.Text = section ? _options[index] : (index == SelectedIndex ? $"▶ {_options[index]}" : $"  {_options[index]}");
+            textLabel.Text = FitLabelText(section ? _options[index] : (index == SelectedIndex ? $"▶ {_options[index]}" : $"  {_options[index]}"), textLabel.Size.X);
             textLabel.Modulate = section ? UiStyle.FaintText() : index == SelectedIndex ? UiStyle.BrightGold() : UiStyle.Parchment();
             row.AddChild(background);
             row.AddChild(accent);
@@ -558,6 +563,17 @@ public abstract partial class MenuBase : Control
         return string.IsNullOrWhiteSpace(text)
             ? 0
             : text.Split('\n').Length;
+    }
+
+    protected static string FitLabelText(string text, float width)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return string.Empty;
+        }
+
+        var maxChars = Math.Max(4, (int)Math.Floor(width / 7f));
+        return text.Length <= maxChars ? text : text[..Math.Max(1, maxChars - 3)] + "...";
     }
 
     private int ResolveFirstVisibleOption(int visibleOptionCount)

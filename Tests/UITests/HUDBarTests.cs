@@ -18,7 +18,9 @@ public sealed class HUDBarTests : ITestSuite
         registry.Add("UI.HUD HP danger pattern clears above thirty percent", HpDangerPatternClearsAboveThirtyPercent);
         registry.Add("UI.HUD energy ghost trails spending", EnergyGhostTrailsSpending);
         registry.Add("UI.HUD bottom status shows HP and XP above hotbar", BottomStatusShowsHpAndXpAboveHotbar);
+        registry.Add("UI.HUD dynamic text rows fit their allocated bounds", DynamicTextRowsFitAllocatedBounds);
         registry.Add("UI.HUD shows relic tray boss and kill streak indicators", ShowsRelicBossAndKillStreakIndicators);
+        registry.Add("UI.HUD shows latest action feedback prominently", ShowsLatestActionFeedbackProminently);
     }
 
     private static void HpDamageKeepsDisplayedValueBeforeTicks()
@@ -175,6 +177,57 @@ public sealed class HUDBarTests : ITestSuite
         Expect.True(hud.Snapshot().Contains("Relics:"), "HUD snapshot should include the relic tray when relics exist.");
     }
 
+    private static void ShowsLatestActionFeedbackProminently()
+    {
+        var context = CreateContext(hp: 40, maxHp: 40, energy: 800);
+        var hud = CreateHud(context);
+
+        context.Bus.EmitActionFeedback(new ActionFeedbackEventArgs(
+            "You hit Skeleton for 4 damage.",
+            LogCategory.PlayerAction,
+            ActionResult.Success,
+            ActionType.MeleeAttack,
+            false));
+
+        var feedbackLabel = FindChild<Label>(hud, "ActionFeedbackLabel");
+        Expect.Equal("You hit Skeleton for 4 damage.", hud.ActionFeedbackText, "HUD should expose the latest action feedback for smoke tests and UI state.");
+        Expect.NotNull(feedbackLabel, "HUD should create a prominent action feedback label.");
+        Expect.True(feedbackLabel!.Visible, "HUD action feedback label should become visible after feedback arrives.");
+        Expect.True(hud.Snapshot().Contains("You hit Skeleton", System.StringComparison.Ordinal), "HUD snapshot should include latest action feedback.");
+    }
+
+    private static void DynamicTextRowsFitAllocatedBounds()
+    {
+        WithViewportSize(new Vector2(640f, 360f), _ =>
+        {
+            var context = CreateContext(hp: 1234, maxHp: 9999, energy: 800);
+            context.Player.SetComponent(new ProgressionComponent { Level = 12, Experience = 12345, ExperienceToNextLevel = 98765, UnspentStatPoints = 9, UnspentPerkChoices = 3 });
+            context.Player.SetComponent(new KillStreakComponent { CurrentStreak = 22, HighestStreak = 99 });
+            var hud = CreateHud(context);
+            hud.SetInteractionPrompt("Press F to inspect the extremely wordy ancient contraption before it collapses.");
+
+            var panel = (Panel)hud.Children[0];
+            var mapLabel = FindChild<Label>(panel, "MapLabel");
+            var statusIcons = FindChild<HBoxContainer>(panel, "StatusIconsContainer");
+            var hotbarLabel = FindChild<Label>(panel, "HotbarLabel");
+            var bottomPanel = FindChild<Panel>(hud, "BottomStatusPanel");
+            var bottomHp = bottomPanel is null ? null : FindChild<Label>(bottomPanel, "BottomHPLabel");
+            var bottomXp = bottomPanel is null ? null : FindChild<Label>(bottomPanel, "BottomXPLabel");
+            var bottomHpBar = bottomPanel is null ? null : FindChild<ColorRect>(bottomPanel, "BottomHPBarBackground");
+
+            Expect.NotNull(mapLabel, "HUD should expose a map label for layout checks.");
+            Expect.NotNull(statusIcons, "HUD should expose a status icon row for layout checks.");
+            Expect.NotNull(hotbarLabel, "HUD should expose a hotbar label for layout checks.");
+            Expect.False(Overlaps(statusIcons!, mapLabel!), "Status icon row and map label should not overlap vertically.");
+            Expect.False(Overlaps(hotbarLabel!, statusIcons!), "Hotbar label and status icon row should not overlap vertically.");
+            Expect.NotNull(bottomHp, "Bottom HP label should exist.");
+            Expect.NotNull(bottomXp, "Bottom XP label should exist.");
+            Expect.NotNull(bottomHpBar, "Bottom HP bar should exist.");
+            Expect.True(bottomHp!.Position.X + bottomHp.Size.X <= bottomHpBar!.Position.X + 0.1f, "Bottom HP text should end before the HP bar begins.");
+            Expect.True(bottomXp!.Text.Length <= 18, "Bottom XP text should use a compact label that fits beside the bar.");
+        });
+    }
+
     private static HUD CreateHud(HudBarContext context)
     {
         var hud = new HUD();
@@ -227,6 +280,14 @@ public sealed class HUDBarTests : ITestSuite
         }
 
         return null;
+    }
+
+    private static bool Overlaps(Control left, Control right)
+    {
+        return left.Position.X < right.Position.X + right.Size.X
+            && left.Position.X + left.Size.X > right.Position.X
+            && left.Position.Y < right.Position.Y + right.Size.Y
+            && left.Position.Y + left.Size.Y > right.Position.Y;
     }
 
     private static void WithViewportSize(Vector2 viewportSize, System.Action<Vector2> action)

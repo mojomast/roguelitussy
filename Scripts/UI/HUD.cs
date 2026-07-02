@@ -48,6 +48,7 @@ public partial class HUD : Control
     private Label? _hotbarLabel;
     private HBoxContainer? _statusIconsContainer;
     private Label? _mapLabel;
+    private Label? _actionFeedbackLabel;
     private UiMouseLabel? _interactionPromptLabel;
     private readonly List<ColorRect> _statPillBackgrounds = new();
     private readonly List<Label> _statPillLabels = new();
@@ -106,6 +107,8 @@ public partial class HUD : Control
 
     public string InteractionPromptText { get; private set; } = string.Empty;
 
+    public string ActionFeedbackText { get; private set; } = string.Empty;
+
     public Color HPColor { get; private set; } = Colors.White;
 
     public float HPPulseIntensity { get; private set; }
@@ -149,6 +152,7 @@ public partial class HUD : Control
             _eventBus.KillStreakChanged -= OnKillStreakChanged;
             _eventBus.BossRoomEntered -= OnBossRoomEntered;
             _eventBus.HPChanged -= OnBossHPChanged;
+            _eventBus.ActionFeedback -= OnActionFeedback;
         }
 
         _gameManager = gameManager;
@@ -168,6 +172,7 @@ public partial class HUD : Control
             _eventBus.KillStreakChanged += OnKillStreakChanged;
             _eventBus.BossRoomEntered += OnBossRoomEntered;
             _eventBus.HPChanged += OnBossHPChanged;
+            _eventBus.ActionFeedback += OnActionFeedback;
         }
 
         Refresh();
@@ -238,6 +243,12 @@ public partial class HUD : Control
         {
             builder.AppendLine();
             builder.Append(InteractionPromptText);
+        }
+
+        if (!string.IsNullOrWhiteSpace(ActionFeedbackText))
+        {
+            builder.AppendLine();
+            builder.Append(ActionFeedbackText);
         }
 
         return builder.ToString().TrimEnd();
@@ -356,6 +367,12 @@ public partial class HUD : Control
             BossHealthText = $"Boss: {boss.Name} {currentHp}/{maxHp} HP";
             UpdateLabels();
         }
+    }
+
+    private void OnActionFeedback(ActionFeedbackEventArgs feedback)
+    {
+        ActionFeedbackText = string.IsNullOrWhiteSpace(feedback.Message) ? string.Empty : feedback.Message.Trim();
+        UpdateActionFeedbackVisual(feedback.Category);
     }
 
     private void Refresh()
@@ -725,6 +742,9 @@ public partial class HUD : Control
         _panel.AddChild(_statusIconsContainer);
 
         _panel.AddChild(_mapLabel);
+        _actionFeedbackLabel = CreateLabel("ActionFeedbackLabel", Vector2.Zero, Vector2.Zero);
+        _actionFeedbackLabel.Modulate = UiStyle.BrightGold();
+        AddChild(_actionFeedbackLabel);
         AddChild(_interactionPromptLabel);
         EnsureBottomStatusVisuals();
         ApplyResponsiveLayout();
@@ -911,29 +931,29 @@ public partial class HUD : Control
             return;
         }
 
-        _headerLabel.Text = $"{FloorText}  ▪  {TurnText}  ▪  {LevelText}  ▪  {GoldText}".Trim();
+        _headerLabel.Text = FitLabelText($"{FloorText}  ▪  {TurnText}  ▪  {LevelText}  ▪  {GoldText}".Trim(), _headerLabel.Size.X);
         _headerLabel.Modulate = UiStyle.Parchment();
-        _progressLabel.Text = string.Join("  ", new[] { LevelText, GoldText }.Where(text => !string.IsNullOrWhiteSpace(text)));
+        _progressLabel.Text = FitLabelText(string.Join("  ", new[] { LevelText, GoldText }.Where(text => !string.IsNullOrWhiteSpace(text))), _progressLabel.Size.X);
         _progressLabel.Modulate = LevelText.Contains("LV UP!", System.StringComparison.Ordinal) ? UiStyle.BrightGold() : UiStyle.MutedText();
-        _statsLabel.Text = StatsText;
+        _statsLabel.Text = FitLabelText(StatsText, _statsLabel.Size.X);
         _statsLabel.Modulate = UiStyle.Parchment();
         _statsLabel.Visible = false;
         UpdateStatPills();
-        _effectsLabel.Text = StatusEffectsText;
+        _effectsLabel.Text = FitLabelText(StatusEffectsText, _effectsLabel.Size.X);
         _effectsLabel.Visible = !string.IsNullOrWhiteSpace(StatusEffectsText);
         _effectsLabel.Modulate = UiStyle.WarningOrange();
-        _relicLabel.Text = RelicTrayText;
+        _relicLabel.Text = FitLabelText(RelicTrayText, _relicLabel.Size.X);
         _relicLabel.Visible = !string.IsNullOrWhiteSpace(RelicTrayText);
         _relicLabel.Modulate = UiStyle.BrightGold();
-        _bossLabel.Text = BossHealthText;
+        _bossLabel.Text = FitLabelText(BossHealthText, _bossLabel.Size.X);
         _bossLabel.Visible = !string.IsNullOrWhiteSpace(BossHealthText);
         _bossLabel.Modulate = UiStyle.DangerRed();
-        _killStreakLabel.Text = KillStreakText;
+        _killStreakLabel.Text = FitLabelText(KillStreakText, _killStreakLabel.Size.X);
         _killStreakLabel.Visible = !string.IsNullOrWhiteSpace(KillStreakText);
         _killStreakLabel.Modulate = UiStyle.WarningOrange();
-        _hotbarLabel.Text = HotbarText;
+        _hotbarLabel.Text = FitLabelText(HotbarText, _hotbarLabel.Size.X);
         _hotbarLabel.Modulate = UiStyle.BrightGold();
-        _mapLabel.Text = MinimapText;
+        _mapLabel.Text = FitLabelText(MinimapText, _mapLabel.Size.X);
         _mapLabel.Modulate = UiStyle.FaintText();
         UpdateBottomStatusVisuals();
         UpdateInteractionPromptVisual();
@@ -1050,7 +1070,7 @@ public partial class HUD : Control
                 continue;
             }
 
-            label.Text = $"{parts[i * 2]} {parts[(i * 2) + 1]}";
+            label.Text = FitLabelText($"{parts[i * 2]} {parts[(i * 2) + 1]}", label.Size.X);
             label.Modulate = UiStyle.Parchment();
         }
     }
@@ -1066,7 +1086,7 @@ public partial class HUD : Control
         var width = System.Math.Min(440f, System.Math.Max(0f, viewportWidth - 24f));
         var contentWidth = System.Math.Max(0f, width - 24f);
         _panel.Position = new Vector2(8f, 8f);
-        _panel.Size = new Vector2(width, 236f);
+        _panel.Size = new Vector2(width, 254f);
         _panel.Modulate = UiStyle.GoldTrim();
         LayoutPanelChrome(_panel.Size);
 
@@ -1085,12 +1105,13 @@ public partial class HUD : Control
         SetControlBounds(_hotbarLabel, 12f, 188f, contentWidth, 18f);
         if (_statusIconsContainer is not null)
         {
-            _statusIconsContainer.Position = new Vector2(12f, 206f);
+            _statusIconsContainer.Position = new Vector2(12f, 208f);
             _statusIconsContainer.Size = new Vector2(contentWidth, 22f);
         }
 
-        SetControlBounds(_mapLabel, 12f, 216f, contentWidth, 18f);
+        SetControlBounds(_mapLabel, 12f, 232f, contentWidth, 18f);
         LayoutBottomStatusPanel(viewportWidth, ResolveViewportHeight());
+        LayoutActionFeedback();
         LayoutInteractionPrompt();
     }
 
@@ -1118,13 +1139,13 @@ public partial class HUD : Control
     {
         if (_bottomHPLabel is not null)
         {
-            _bottomHPLabel.Text = HPText;
+            _bottomHPLabel.Text = FitLabelText(HPText, _bottomHPLabel.Size.X);
             _bottomHPLabel.Modulate = HPColor;
         }
 
         if (_bottomXPLabel is not null)
         {
-            _bottomXPLabel.Text = string.IsNullOrWhiteSpace(LevelText) ? "XP: --/--" : LevelText;
+            _bottomXPLabel.Text = FitLabelText(BuildBottomXPText(LevelText), _bottomXPLabel.Size.X);
             _bottomXPLabel.Modulate = LevelText.Contains("LV UP!", System.StringComparison.Ordinal) ? UiStyle.BrightGold() : UiStyle.Parchment();
         }
     }
@@ -1136,7 +1157,7 @@ public partial class HUD : Control
             return;
         }
 
-        var labelWidth = 104f;
+        var labelWidth = System.Math.Min(132f, System.Math.Max(104f, _bottomStatusPanel.Size.X * 0.24f));
         var barX = labelWidth + 10f;
         var barWidth = System.Math.Max(80f, _bottomStatusPanel.Size.X - barX - 12f);
         SetControlBounds(_bottomHPLabel, 10f, 5f, labelWidth, 16f);
@@ -1188,6 +1209,39 @@ public partial class HUD : Control
         _interactionPromptLabel.Visible = !string.IsNullOrWhiteSpace(InteractionPromptText);
         _interactionPromptLabel.Text = InteractionPromptText;
         _interactionPromptLabel.Modulate = UiStyle.BrightGold();
+    }
+
+    private void LayoutActionFeedback()
+    {
+        if (_actionFeedbackLabel is null)
+        {
+            return;
+        }
+
+        var viewportWidth = ResolveViewportWidth();
+        var viewportHeight = ResolveViewportHeight();
+        var width = System.Math.Min(620f, System.Math.Max(240f, viewportWidth - 32f));
+        _actionFeedbackLabel.Position = new Vector2(System.Math.Max(8f, (viewportWidth - width) * 0.5f), System.Math.Max(96f, viewportHeight - 204f));
+        _actionFeedbackLabel.Size = new Vector2(width, 28f);
+    }
+
+    private void UpdateActionFeedbackVisual(LogCategory category)
+    {
+        if (_actionFeedbackLabel is null)
+        {
+            return;
+        }
+
+        LayoutActionFeedback();
+        _actionFeedbackLabel.Visible = !string.IsNullOrWhiteSpace(ActionFeedbackText);
+        _actionFeedbackLabel.Text = FitLabelText(ActionFeedbackText, _actionFeedbackLabel.Size.X);
+        _actionFeedbackLabel.Modulate = category switch
+        {
+            LogCategory.Warning => UiStyle.WarningAmber(),
+            LogCategory.Critical => UiStyle.BrightGold(),
+            LogCategory.EnemyAction => UiStyle.DangerRed(),
+            _ => UiStyle.BrightGold(),
+        };
     }
 
     private void LayoutPanelChrome(Vector2 size)
@@ -1312,6 +1366,34 @@ public partial class HUD : Control
         }
 
         return "Hotbar: " + string.Join("  ", parts);
+    }
+
+    private static string BuildBottomXPText(string levelText)
+    {
+        if (string.IsNullOrWhiteSpace(levelText))
+        {
+            return "XP: --/--";
+        }
+
+        var xpIndex = levelText.IndexOf("XP:", System.StringComparison.Ordinal);
+        if (xpIndex < 0)
+        {
+            return levelText;
+        }
+
+        var compact = levelText[xpIndex..].Replace("  LV UP!", " +", System.StringComparison.Ordinal);
+        return compact.Length > 18 ? compact[..15] + "..." : compact;
+    }
+
+    private static string FitLabelText(string text, float width)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return string.Empty;
+        }
+
+        var maxChars = System.Math.Max(4, (int)System.Math.Floor(width / 7f));
+        return text.Length <= maxChars ? text : text[..System.Math.Max(1, maxChars - 3)] + "...";
     }
 
     private static string BuildRelicTrayText(IReadOnlyList<RelicTemplate> relics)

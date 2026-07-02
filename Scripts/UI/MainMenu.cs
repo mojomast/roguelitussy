@@ -204,6 +204,8 @@ public partial class MainMenu : MenuBase
     private Label? _previewVariantId;
     private Tooltip? _starterKitTooltip;
     private bool _starterKitTooltipVisible;
+    private bool _isEditingSeed;
+    private string _seedEditBuffer = "1337";
     private string _statusMessage = "Ready for deployment.";
 
     public int PendingSeed { get; private set; } = 1337;
@@ -257,6 +259,8 @@ public partial class MainMenu : MenuBase
     public void SetSeed(int seed)
     {
         PendingSeed = seed <= 0 ? 1 : seed;
+        _seedEditBuffer = PendingSeed.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        _isEditingSeed = false;
         RebuildOptions();
     }
 
@@ -580,7 +584,7 @@ public partial class MainMenu : MenuBase
 
         if (FooterLabel is not null)
         {
-            FooterLabel.Text = BuildFooterText();
+            FooterLabel.Text = FitLabelText(BuildFooterText(), FooterLabel.Size.X);
             FooterLabel.Position = new Vector2(PreviewPadding, panelSize.Y - 34f);
             FooterLabel.Size = new Vector2(System.Math.Max(0f, panelSize.X - (PreviewPadding * 2f)), 22f);
             FooterLabel.Modulate = UiStyle.MutedText();
@@ -608,7 +612,7 @@ public partial class MainMenu : MenuBase
             System.Math.Max(0f, BodyCard.Size.X - 36f),
             System.Math.Max(0f, BodyCard.Size.Y - 32f));
         label.Clear();
-        label.AppendText(BuildHeroSummary());
+        label.AppendText(ClampTextLines(WrapPreviewText(BuildHeroSummary(), label.Size.X), 8));
         label.Modulate = UiStyle.Parchment();
 
         OptionsCard.Color = UiStyle.CathedralBlack(0.99f);
@@ -642,6 +646,16 @@ public partial class MainMenu : MenuBase
     internal const int BaseEvasion = 10;
     internal const int BaseSpeed = 100;
     internal const int BaseViewRadius = 8;
+
+    public override bool HandleKey(Key key)
+    {
+        if (_isEditingSeed && Visible)
+        {
+            return HandleSeedEditKey(key);
+        }
+
+        return base.HandleKey(key);
+    }
 
     protected override bool HandleCustomKey(Key key)
     {
@@ -721,8 +735,7 @@ public partial class MainMenu : MenuBase
                 AdjustAllocation(ResolveSelectedAction(), 1);
                 break;
             case MenuAction.Seed:
-                PendingSeed++;
-                RebuildOptions();
+                BeginSeedEdit();
                 break;
             case MenuAction.DevTools:
                 DevToolsRequested?.Invoke();
@@ -835,9 +848,7 @@ public partial class MainMenu : MenuBase
             case MenuAction.Finesse:
                 return AdjustAllocation(ResolveSelectedAction(), delta);
             case MenuAction.Seed:
-                PendingSeed = System.Math.Max(1, PendingSeed + delta);
-                RebuildOptions();
-                return true;
+                return false;
             default:
                 return false;
         }
@@ -948,7 +959,7 @@ public partial class MainMenu : MenuBase
         _optionActions.Clear();
         ConfigureOptions();
         AddSection("EXPEDITION");
-        AddOption("Start Expedition", MenuAction.Start);
+        AddOption("Start Game", MenuAction.Start);
         AddOption($"Name: {NameOptions[_nameIndex]}", MenuAction.Name);
         AddSection("BUILD");
         AddOption($"Archetype: {FormatArchetypeName(Archetypes[_archetypeIndex])}", MenuAction.Archetype);
@@ -964,7 +975,7 @@ public partial class MainMenu : MenuBase
         AddOption($"Guard (+1 Defense): {_guardPoints}", MenuAction.Guard);
         AddOption($"Finesse (+1 Accuracy/Evasion): {_finessePoints}", MenuAction.Finesse);
         AddSection("SYSTEM");
-        AddOption($"Seed: {PendingSeed}", MenuAction.Seed);
+        AddOption(FormatSeedOption(), MenuAction.Seed);
         AddOption("Load Slot 1", MenuAction.LoadSlot1);
         AddOption("Load Slot 2", MenuAction.LoadSlot2);
         AddOption("Load Slot 3", MenuAction.LoadSlot3);
@@ -980,6 +991,101 @@ public partial class MainMenu : MenuBase
         }
 
         RefreshStarterKitTooltip();
+    }
+
+    private string FormatSeedOption()
+    {
+        return _isEditingSeed ? $"Seed: {_seedEditBuffer}_ (Enter to save, Esc to cancel)" : $"Seed: {PendingSeed}";
+    }
+
+    private void BeginSeedEdit()
+    {
+        _seedEditBuffer = string.Empty;
+        _isEditingSeed = true;
+        UpdateStatus("Type a seed, then press Enter to save or Esc to cancel.");
+    }
+
+    private bool HandleSeedEditKey(Key key)
+    {
+        if (key is Key.Enter or Key.KpEnter)
+        {
+            CommitSeedEdit();
+            return true;
+        }
+
+        if (key is Key.Escape)
+        {
+            _isEditingSeed = false;
+            _seedEditBuffer = PendingSeed.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            UpdateStatus("Seed edit canceled.");
+            RebuildOptions();
+            return true;
+        }
+
+        var keyName = key.ToString();
+        if (keyName is "Backspace")
+        {
+            if (_seedEditBuffer.Length > 0)
+            {
+                _seedEditBuffer = _seedEditBuffer[..^1];
+                RebuildOptions();
+            }
+
+            return true;
+        }
+
+        if (keyName is "Delete")
+        {
+            _seedEditBuffer = string.Empty;
+            RebuildOptions();
+            return true;
+        }
+
+        var digit = TryGetSeedDigit(keyName);
+        if (digit is null)
+        {
+            return true;
+        }
+
+        if (_seedEditBuffer.Length < 10)
+        {
+            _seedEditBuffer += digit.Value;
+            RebuildOptions();
+        }
+
+        return true;
+    }
+
+    private void CommitSeedEdit()
+    {
+        if (!int.TryParse(_seedEditBuffer, out var seed) || seed <= 0)
+        {
+            seed = 1;
+        }
+
+        PendingSeed = seed;
+        _seedEditBuffer = PendingSeed.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        _isEditingSeed = false;
+        UpdateStatus($"Seed set to {PendingSeed}.");
+        RebuildOptions();
+    }
+
+    private static char? TryGetSeedDigit(string keyName)
+    {
+        return keyName switch
+        {
+            "Zero" or "Key0" or "Kp0" or "Num0" => '0',
+            "One" or "Key1" or "Kp1" or "Num1" => '1',
+            "Two" or "Key2" or "Kp2" or "Num2" => '2',
+            "Three" or "Key3" or "Kp3" or "Num3" => '3',
+            "Four" or "Key4" or "Kp4" or "Num4" => '4',
+            "Five" or "Key5" or "Kp5" or "Num5" => '5',
+            "Six" or "Key6" or "Kp6" or "Num6" => '6',
+            "Seven" or "Key7" or "Kp7" or "Num7" => '7',
+            "Eight" or "Key8" or "Kp8" or "Num8" => '8',
+            "Nine" or "Key9" or "Kp9" or "Num9" => '9',
+            _ => null,
+        };
     }
 
     private void ToggleStarterKitTooltip()
@@ -1203,39 +1309,62 @@ public partial class MainMenu : MenuBase
 
         if (_previewKitLabel is not null)
         {
-            _previewKitLabel.Text = WrapPreviewText(BuildStarterKitPreviewText(), _previewKitLabel.Size.X);
+            _previewKitLabel.Text = ClampTextLines(WrapPreviewText(BuildStarterKitPreviewText(), _previewKitLabel.Size.X), ResolveLineCapacity(_previewKitLabel.Size.Y));
             _previewKitLabel.Modulate = UiStyle.Parchment();
         }
 
         if (_previewStatsLabel is not null)
         {
-            _previewStatsLabel.Text = BuildPreviewStatsText();
+            _previewStatsLabel.Text = ClampTextLines(BuildPreviewStatsText(), ResolveLineCapacity(_previewStatsLabel.Size.Y));
             _previewStatsLabel.Modulate = UiStyle.Parchment();
         }
 
         if (_previewDetail is not null)
         {
-            _previewDetail.Text = BuildPreviewPathText();
+            _previewDetail.Text = ClampTextLines(WrapPreviewText(BuildPreviewPathText(), _previewDetail.Size.X), ResolveLineCapacity(_previewDetail.Size.Y));
             _previewDetail.Modulate = UiStyle.MutedText();
         }
 
         if (_previewTitle is not null)
         {
-            _previewTitle.Text = profile.Title.ToUpperInvariant();
+            _previewTitle.Text = FitLabelText(profile.Title.ToUpperInvariant(), _previewTitle.Size.X);
             _previewTitle.Modulate = UiStyle.BrightGold();
         }
 
         if (_previewSubtitle is not null)
         {
-            _previewSubtitle.Text = $"{profile.Subtitle}  {profile.AppearanceMark}";
+            _previewSubtitle.Text = FitLabelText($"{profile.Subtitle}  {profile.AppearanceMark}", _previewSubtitle.Size.X);
             _previewSubtitle.Modulate = profile.AccentTint;
         }
 
         if (_previewVariantId is not null)
         {
-            _previewVariantId.Text = $"Variant ID\n{profile.VariantId}";
+            _previewVariantId.Text = ClampTextLines($"Variant ID\n{profile.VariantId}", ResolveLineCapacity(_previewVariantId.Size.Y));
             _previewVariantId.Modulate = UiStyle.MutedText();
         }
+    }
+
+    private static int ResolveLineCapacity(float height)
+    {
+        return System.Math.Max(1, (int)System.Math.Floor(height / 16f));
+    }
+
+    private static string ClampTextLines(string text, int maxLines)
+    {
+        if (string.IsNullOrWhiteSpace(text) || maxLines <= 0)
+        {
+            return string.Empty;
+        }
+
+        var lines = text.Split('\n');
+        if (lines.Length <= maxLines)
+        {
+            return text;
+        }
+
+        var visible = lines.Take(System.Math.Max(1, maxLines)).ToArray();
+        visible[^1] = "...";
+        return string.Join("\n", visible);
     }
 
     private GameManager.CharacterCreationOptions BuildCharacterCreationOptions()

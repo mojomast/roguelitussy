@@ -109,6 +109,7 @@ The repository contains targeted suites for:
 - rendering
 - simulation
 - UI
+- UI text fitting, title seed entry, start-game action routing, HUD action feedback, and combat-log readability/filter behavior
 - character creation and equipment UX
 - Track 7 roguelite UI integration, including relic HUD text, boss/streak indicators, archetype preview updates, and component persistence for relic/shrine/streak/archetype state
 - architecture smoke coverage

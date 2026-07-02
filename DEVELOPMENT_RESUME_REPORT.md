@@ -571,3 +571,10 @@ Do not add more enemies, items, or progression content yet. The codebase is read
 - Completed: added relic choice modal, HUD relic tray, boss health text, kill-streak indicator, meta shop, shrine confirmation, curse popup, and death-screen run history/Echo breakdown.
 - Completed: save version 14 persists relic, shrine, kill streak, and archetype runtime components.
 - Verification: Track 7 focused UI and persistence tests pass under Godot stubs; full verification results are recorded in the final Track 7 handoff.
+
+### Follow-up Status - UI Clarity Pass 2026-07-02
+
+- Completed: title/menu flow now presents a clear `Start Game` action and supports typed seed entry for deterministic runs.
+- Completed: menu and long-text UI safeguards fit or clamp labels, summaries, tooltips, and option lists so text does not overlap adjacent controls.
+- Completed: prominent action feedback, HUD status readability, and combat-log clarity were improved so recent actions, blocked actions, combat outcomes, and active log filtering are easier to scan.
+- Documentation: `README.md`, `docs/SYSTEMS.md`, `docs/TESTING.md`, `docs/IMPROVEMENT_SUGGESTIONS.md`, and `improvments.md` now reflect the user-facing UI changes.

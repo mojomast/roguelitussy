@@ -2,7 +2,7 @@
 
 A deterministic roguelike foundation for Godot 4.5.2 Mono/.NET with a pure C# simulation core, Godot-facing presentation scripts, data-driven content, and a custom .NET test harness.
 
-The current build includes character identity and progression, archetype-gated starts, relic and meta-progression UI, ability casting, gear-driven combat, role-specific AI, equipment requirements, authoritative GameManager-owned visibility, refreshed CC0 0x72 dungeon art with contextual wall layering, committed SVG item/status icons, clearer menu and inventory presentation, reconciled world-space movement, overlay-aware gameplay chrome, expanded enemy sprite coverage, and broader mid- and late-floor content.
+The current build includes character identity and progression, archetype-gated starts, typed seed entry from the title flow, relic and meta-progression UI, ability casting, gear-driven combat, role-specific AI, equipment requirements, authoritative GameManager-owned visibility, refreshed CC0 0x72 dungeon art with contextual wall layering, committed SVG item/status icons, clearer menu and inventory presentation, text-fitting safeguards for modal UI, prominent HUD/action/combat-log feedback, reconciled world-space movement, overlay-aware gameplay chrome, expanded enemy sprite coverage, and broader mid- and late-floor content.
 
 ## Quick Start
 

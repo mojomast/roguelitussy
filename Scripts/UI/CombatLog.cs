@@ -10,6 +10,7 @@ public partial class CombatLog : Control
 {
     private const int MaxMessages = 100;
     private const int VisibleMessageCount = 8;
+    private const int MaxDisplayMessageChars = 96;
     private const float PanelWidth = 500f;
     private const float PanelHeight = 220f;
     private const float OuterMargin = 20f;
@@ -96,6 +97,10 @@ public partial class CombatLog : Control
             _eventBus.SaveCompleted -= OnSaveCompleted;
             _eventBus.LoadCompleted -= OnLoadCompleted;
             _eventBus.FloorChanged -= OnFloorChanged;
+            _eventBus.ExperienceGained -= OnExperienceGained;
+            _eventBus.LeveledUp -= OnLeveledUp;
+            _eventBus.CurrencyChanged -= OnCurrencyChanged;
+            _eventBus.KillStreakChanged -= OnKillStreakChanged;
         }
 
         _gameManager = gameManager;
@@ -113,6 +118,10 @@ public partial class CombatLog : Control
         _eventBus.SaveCompleted += OnSaveCompleted;
         _eventBus.LoadCompleted += OnLoadCompleted;
         _eventBus.FloorChanged += OnFloorChanged;
+        _eventBus.ExperienceGained += OnExperienceGained;
+        _eventBus.LeveledUp += OnLeveledUp;
+        _eventBus.CurrencyChanged += OnCurrencyChanged;
+        _eventBus.KillStreakChanged += OnKillStreakChanged;
         RefreshVisualState();
     }
 
@@ -179,9 +188,46 @@ public partial class CombatLog : Control
         AddMessage($"Reached floor {floor}.", LogCategory.System);
     }
 
+    private void OnExperienceGained(EntityId entityId, int amount, int total)
+    {
+        if (entityId == _gameManager?.World?.Player?.Id)
+        {
+            AddMessage($"Gained {amount} XP ({total} total).", LogCategory.PlayerAction);
+        }
+    }
+
+    private void OnLeveledUp(EntityId entityId, int newLevel)
+    {
+        if (entityId == _gameManager?.World?.Player?.Id)
+        {
+            AddMessage($"Level up! Reached level {newLevel}.", LogCategory.Critical);
+        }
+    }
+
+    private void OnCurrencyChanged(EntityId entityId, int gold)
+    {
+        if (entityId == _gameManager?.World?.Player?.Id)
+        {
+            AddMessage($"Gold: {gold}.", LogCategory.Loot);
+        }
+    }
+
+    private void OnKillStreakChanged(EntityId entityId, int current, int highest)
+    {
+        if (entityId == _gameManager?.World?.Player?.Id && current >= 2)
+        {
+            AddMessage($"Kill streak: {current} (best {highest}).", LogCategory.PlayerAction);
+        }
+    }
+
     private void AddMessage(string message, LogCategory category)
     {
-        AddMarkupMessage(FormatEntryForTest(message, category, 0), category);
+        AddMarkupMessage(FormatEntryForTest(FitDisplayMessage(message), category, 0), category);
+    }
+
+    public static string FormatDisplayMessageForTest(string? message)
+    {
+        return FitDisplayMessage(message);
     }
 
     public static string FormatEntryForTest(string? message, LogCategory category, int age)
@@ -206,6 +252,12 @@ public partial class CombatLog : Control
     };
 
     private static float ResolveAgeAlpha(int age) => age > 6 ? 0.30f : age > 3 ? 0.60f : 1f;
+
+    private static string FitDisplayMessage(string? message)
+    {
+        var text = message ?? string.Empty;
+        return text.Length <= MaxDisplayMessageChars ? text : text[..(MaxDisplayMessageChars - 3)] + "...";
+    }
 
     private static string ToHexWithAlpha(Color color, float alpha)
     {

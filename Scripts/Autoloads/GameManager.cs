@@ -952,12 +952,24 @@ public partial class GameManager : Node
     {
         if (World is null || Scheduler is null)
         {
+            Bus?.EmitActionFeedback(new ActionFeedbackEventArgs(
+                "No active run is available.",
+                LogCategory.Warning,
+                ActionResult.Invalid,
+                action.Type,
+                true));
             return ActionOutcome.Fail(ActionResult.Invalid);
         }
 
         var validation = action.Validate(World);
         if (validation != ActionResult.Success)
         {
+            Bus?.EmitActionFeedback(new ActionFeedbackEventArgs(
+                BuildBlockedActionFeedback(action, validation),
+                LogCategory.Warning,
+                validation,
+                action.Type,
+                true));
             return ActionOutcome.Fail(validation);
         }
 
@@ -1075,6 +1087,17 @@ public partial class GameManager : Node
         foreach (var message in outcome.LogMessages)
         {
             Bus?.EmitLogMessage(message, ResolveOutcomeLogCategory(message, playerId));
+        }
+
+        if (outcome.Result == ActionResult.Success && action.ActorId == playerId)
+        {
+            var feedbackMessage = BuildSuccessfulActionFeedback(action, outcome, playerId);
+            Bus?.EmitActionFeedback(new ActionFeedbackEventArgs(
+                feedbackMessage,
+                ResolveOutcomeLogCategory(feedbackMessage, playerId),
+                outcome.Result,
+                action.Type,
+                false));
         }
 
         Bus?.EmitTurnCompleted();
@@ -2700,6 +2723,120 @@ public partial class GameManager : Node
 
         return LogCategory.PlayerAction;
     }
+
+    private string BuildBlockedActionFeedback(IAction action, ActionResult result)
+    {
+        var actorName = World?.GetEntity(action.ActorId)?.Name ?? "Player";
+        return action.Type switch
+        {
+            ActionType.Move => "Blocked: you cannot move there.",
+            ActionType.MeleeAttack => "Blocked: nothing valid to attack there.",
+            ActionType.RangedAttack => "Blocked: no clear shot.",
+            ActionType.PickupItem => "Blocked: there is nothing to pick up here.",
+            ActionType.OpenDoor => "Blocked: there is no door to open there.",
+            ActionType.CloseDoor => "Blocked: there is no open door to close there.",
+            ActionType.OpenChest => "Blocked: there is no chest to open there.",
+            ActionType.Descend => "Blocked: stand on downward stairs to descend.",
+            ActionType.Ascend => "Blocked: stand on upward stairs to ascend.",
+            ActionType.UseItem => "Blocked: that item cannot be used now.",
+            ActionType.CastAbility => "Blocked: that ability cannot be cast now.",
+            _ => $"Blocked: {actorName}'s {FriendlyActionName(action.Type)} failed ({result}).",
+        };
+    }
+
+    private string BuildSuccessfulActionFeedback(IAction action, ActionOutcome outcome, EntityId playerId)
+    {
+        var primary = BuildPrimaryCombatFeedback(outcome, playerId)
+            ?? outcome.LogMessages.FirstOrDefault(message => !string.IsNullOrWhiteSpace(message))
+            ?? $"You {FriendlyActionVerb(action.Type)}.";
+        var response = BuildEnemyResponseFeedback(outcome, playerId);
+        return string.IsNullOrWhiteSpace(response) ? primary : $"{primary} Then {response}";
+    }
+
+    private string? BuildPrimaryCombatFeedback(ActionOutcome outcome, EntityId playerId)
+    {
+        foreach (var damage in outcome.CombatEvents.SelectMany(combatEvent => combatEvent.DamageResults))
+        {
+            if (damage.AttackerId != playerId)
+            {
+                continue;
+            }
+
+            var defenderName = ResolveFeedbackName(damage.DefenderId, playerId);
+            if (damage.IsMiss)
+            {
+                return $"You miss {defenderName}.";
+            }
+
+            var verb = damage.IsKill ? "kill" : "hit";
+            var crit = damage.IsCritical ? " critically" : string.Empty;
+            return $"You{crit} {verb} {defenderName} for {damage.FinalDamage} damage.";
+        }
+
+        return null;
+    }
+
+    private string? BuildEnemyResponseFeedback(ActionOutcome outcome, EntityId playerId)
+    {
+        var damage = outcome.CombatEvents
+            .SelectMany(combatEvent => combatEvent.DamageResults)
+            .LastOrDefault(result => result.DefenderId == playerId && result.AttackerId != playerId);
+        if (damage is null)
+        {
+            return null;
+        }
+
+        var attackerName = ResolveFeedbackName(damage.AttackerId, playerId);
+        return damage.IsMiss
+            ? $"{attackerName} missed you."
+            : $"{attackerName} hit you for {damage.FinalDamage} damage.";
+    }
+
+    private string ResolveFeedbackName(EntityId entityId, EntityId playerId)
+    {
+        if (entityId == playerId)
+        {
+            return "you";
+        }
+
+        return World?.GetEntity(entityId)?.Name ?? entityId.ToString();
+    }
+
+    private static string FriendlyActionName(ActionType type) => type switch
+    {
+        ActionType.MeleeAttack => "attack",
+        ActionType.RangedAttack => "shot",
+        ActionType.UseItem => "item use",
+        ActionType.ToggleEquip => "equipment change",
+        ActionType.PickupItem => "pickup",
+        ActionType.DropItem => "drop",
+        ActionType.OpenDoor => "open door",
+        ActionType.CloseDoor => "close door",
+        ActionType.OpenChest => "open chest",
+        ActionType.CastAbility => "ability",
+        ActionType.TakeChestLoot => "loot pickup",
+        _ => type.ToString().ToLowerInvariant(),
+    };
+
+    private static string FriendlyActionVerb(ActionType type) => type switch
+    {
+        ActionType.Wait => "wait",
+        ActionType.Move => "move",
+        ActionType.MeleeAttack => "attack",
+        ActionType.RangedAttack => "fire",
+        ActionType.UseItem => "use an item",
+        ActionType.ToggleEquip => "change equipment",
+        ActionType.PickupItem => "pick up an item",
+        ActionType.DropItem => "drop an item",
+        ActionType.OpenDoor => "open a door",
+        ActionType.CloseDoor => "close a door",
+        ActionType.OpenChest => "open a chest",
+        ActionType.Descend => "descend",
+        ActionType.Ascend => "ascend",
+        ActionType.CastAbility => "cast an ability",
+        ActionType.TakeChestLoot => "take chest loot",
+        _ => "act",
+    };
 
     private static (int Experience, int Level, int UnspentStatPoints, int UnspentPerkChoices) SnapshotProgression(IEntity? entity)
     {
