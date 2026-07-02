@@ -69,6 +69,11 @@ public sealed class CombatResolver
             hitChance -= 5;
         }
 
+        if (StatusEffectProcessor.HasEffect(attacker, StatusEffectType.Blinded))
+        {
+            hitChance -= 25;
+        }
+
         if (StatusEffectProcessor.HasEffect(defender, StatusEffectType.Frozen))
         {
             hitChance += 20;
@@ -92,6 +97,11 @@ public sealed class CombatResolver
         }
 
         var critChance = weapon is not null ? weapon.CritChance : DefaultCritChance;
+        if (attacker.Stats.Accuracy - defender.Stats.Evasion > 40)
+        {
+            critChance = Math.Max(critChance, 15);
+        }
+
         var isCritical = _rng.Next(100) < critChance;
         var rawDamage = weapon is not null && weapon.DamageMax > 0
             ? CalculateWeaponDamage(attacker, weapon, isCritical)
@@ -120,7 +130,7 @@ public sealed class CombatResolver
         }
 
         var rawDamage = Math.Max(1, baseDamage + attackBonus);
-        return isCritical ? rawDamage * 2 : rawDamage;
+        return isCritical ? ApplyCriticalMultiplier(rawDamage) : rawDamage;
     }
 
     public int CalculateRawDamage(IEntity attacker, bool isCritical)
@@ -138,8 +148,10 @@ public sealed class CombatResolver
 
         var variance = _rng.Next(-2, 3);
         var rawDamage = Math.Max(1, attack + variance);
-        return isCritical ? rawDamage * 2 : rawDamage;
+        return isCritical ? ApplyCriticalMultiplier(rawDamage) : rawDamage;
     }
+
+    private static int ApplyCriticalMultiplier(int rawDamage) => Math.Max(1, (int)Math.Ceiling(rawDamage * 1.5));
 
     public int ApplyArmor(int rawDamage, IEntity defender, DamageType damageType)
     {

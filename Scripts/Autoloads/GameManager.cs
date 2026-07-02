@@ -19,6 +19,7 @@ public partial class GameManager : Node
     private FloorStats _floorStats = CreateDefaultFloorStats(0);
     private int _floorStartTurnNumber;
     private bool _readyInitialized;
+    private readonly HashSet<int> _clearedFloors = new();
 
     private sealed record FloorEntrances(Position StairsUp, Position StairsDown);
 
@@ -362,6 +363,7 @@ public partial class GameManager : Node
         var relics = GetPlayerRelics();
         var claimedName = relics.FirstOrDefault(relic => string.Equals(relic.RelicId, relicId, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? relicId;
         message = $"Claimed relic: {claimedName}.";
+        ApplyAndEmitSynergyChanges(player);
         Bus?.EmitLogMessage(message, LogCategory.Loot);
         Bus?.EmitRelicsChanged(player.Id, relics);
         return true;
@@ -685,6 +687,7 @@ public partial class GameManager : Node
         CurrentFloor = 0;
         _runStats = CreateFreshRunStats(seed);
         ResetFloorStats(CurrentFloor);
+        _clearedFloors.Clear();
         _cachedFloors.Clear();
         _floorEntrances.Clear();
 
@@ -814,6 +817,7 @@ public partial class GameManager : Node
         }
 
         Bus?.EmitLogMessage(message, LogCategory.PlayerAction);
+        ApplyAndEmitSynergyChanges(player);
         Bus?.EmitHPChanged(player.Id, player.Stats.HP, player.Stats.MaxHP);
         Bus?.EmitProgressionChanged(player.Id);
         return true;
@@ -881,6 +885,8 @@ public partial class GameManager : Node
 
         wallet.Gold -= price;
         offer.Quantity--;
+        var reputationBefore = SnapshotReputation(player);
+        ReputationService.OnShopPurchase(player, price, Content);
         if (template.MaxStack > 1)
         {
             inventory.AddWithStacking(purchasedItem, template.MaxStack);
@@ -892,6 +898,7 @@ public partial class GameManager : Node
 
         Bus?.EmitInventoryChanged(player.Id);
         Bus?.EmitCurrencyChanged(player.Id, wallet.Gold);
+        EmitReputationChanges(reputationBefore, player);
         message = $"Bought {template.DisplayName} from {merchant.Name} for {price} gold.";
         Bus?.EmitLogMessage(message, LogCategory.Loot);
         return true;
@@ -982,6 +989,8 @@ public partial class GameManager : Node
         var progressionBefore = SnapshotProgression(actorBefore);
         var walletBefore = SnapshotWallet(actorBefore);
         var killStreakBefore = SnapshotKillStreak(World.Player);
+        var reputationBefore = SnapshotReputation(World.Player);
+        var synergyBefore = SnapshotAppliedSynergies(World.Player);
         var playerHpBefore = World.Player.Stats.HP;
         var runStatsUpdatedForDeath = false;
 
@@ -1016,6 +1025,11 @@ public partial class GameManager : Node
             foreach (var damage in combatEvent.DamageResults)
             {
                 Bus?.EmitDamageDealt(damage);
+                if (damage.IsCritical && damage.FinalDamage > 0)
+                {
+                    Bus?.EmitCriticalHitDealt(damage.AttackerId, damage.DefenderId, damage.FinalDamage);
+                }
+
                 var defender = World.GetEntity(damage.DefenderId);
                 if (defender is not null)
                 {
@@ -1059,6 +1073,11 @@ public partial class GameManager : Node
             Bus?.EmitStatusEffectRemoved(entityId, effectType);
         }
 
+        foreach (var (bossId, phase) in outcome.BossPhaseTransitions)
+        {
+            Bus?.EmitBossPhaseTransition(bossId, phase);
+        }
+
         var changedFloor = false;
         if (outcome.Result == ActionResult.Success && action.ActorId == playerId)
         {
@@ -1077,6 +1096,9 @@ public partial class GameManager : Node
             EmitProgressionChanges(playerId, progressionBefore);
             EmitWalletChanges(playerId, walletBefore);
             EmitKillStreakChanges(playerId, killStreakBefore);
+            EmitReputationChanges(reputationBefore, World.GetEntity(playerId));
+            ApplyAndEmitSynergyChanges(World.GetEntity(playerId), synergyBefore);
+            TryResolveFloorClear(playerId);
         }
 
         if (!runStatsUpdatedForDeath && World.GetEntity(playerId) is not null)
@@ -1169,6 +1191,10 @@ public partial class GameManager : Node
         if (turns >= MaxRestTurns)
         {
             Bus?.EmitLogMessage("Rest stopped at the safety limit.", LogCategory.Warning);
+        }
+        else if (World.Player is { IsAlive: true } playerAfterRest && TryFindVisibleOrAdjacentHostile(World, playerAfterRest, out var hostileName))
+        {
+            Bus?.EmitLogMessage($"Rest interrupted - enemy spotted! {hostileName}", LogCategory.Warning);
         }
 
         return turns;
@@ -2146,6 +2172,8 @@ public partial class GameManager : Node
             aggregateOutcome.CombatEvents.AddRange(enemyOutcome.CombatEvents);
             aggregateOutcome.LogMessages.AddRange(enemyOutcome.LogMessages);
             aggregateOutcome.DirtyPositions.AddRange(enemyOutcome.DirtyPositions);
+            aggregateOutcome.ExpiredStatusEffects.AddRange(enemyOutcome.ExpiredStatusEffects);
+            aggregateOutcome.BossPhaseTransitions.AddRange(enemyOutcome.BossPhaseTransitions);
         }
     }
 
@@ -2372,6 +2400,12 @@ public partial class GameManager : Node
 
     private static bool HasVisibleOrAdjacentHostile(WorldState world, IEntity player)
     {
+        return TryFindVisibleOrAdjacentHostile(world, player, out _);
+    }
+
+    private static bool TryFindVisibleOrAdjacentHostile(WorldState world, IEntity player, out string hostileName)
+    {
+        hostileName = string.Empty;
         foreach (var entity in world.Entities)
         {
             if (entity.Id == player.Id || !entity.IsAlive || entity.Faction == player.Faction || entity.Faction == Faction.Neutral)
@@ -2381,6 +2415,7 @@ public partial class GameManager : Node
 
             if (player.Position.ChebyshevTo(entity.Position) <= 1 || world.IsVisible(entity.Position))
             {
+                hostileName = string.IsNullOrWhiteSpace(entity.Name) ? "Unknown" : entity.Name;
                 return true;
             }
         }
@@ -2924,6 +2959,111 @@ public partial class GameManager : Node
         Bus.EmitKillStreakChanged(playerId, streak.CurrentStreak, streak.HighestStreak);
     }
 
+    private static Dictionary<string, int> SnapshotReputation(IEntity? entity)
+    {
+        var faction = entity?.GetComponent<FactionComponent>();
+        return faction is null
+            ? new Dictionary<string, int>(StringComparer.Ordinal)
+            : new Dictionary<string, int>(faction.Reputation, StringComparer.Ordinal);
+    }
+
+    private void EmitReputationChanges(Dictionary<string, int> before, IEntity? player)
+    {
+        if (Bus is null || player is null)
+        {
+            return;
+        }
+
+        var after = player.GetComponent<FactionComponent>()?.Reputation;
+        if (after is null)
+        {
+            return;
+        }
+
+        foreach (var pair in after.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+            before.TryGetValue(pair.Key, out var oldValue);
+            if (oldValue != pair.Value)
+            {
+                Bus.EmitReputationChanged(pair.Key, pair.Value, pair.Value - oldValue);
+            }
+        }
+    }
+
+    private static HashSet<string> SnapshotAppliedSynergies(IEntity? entity)
+    {
+        var synergy = entity?.GetComponent<SynergyComponent>();
+        return synergy is null
+            ? new HashSet<string>(StringComparer.Ordinal)
+            : new HashSet<string>(synergy.AppliedPassiveSynergyIds, StringComparer.Ordinal);
+    }
+
+    private void ApplyAndEmitSynergyChanges(IEntity? player) => ApplyAndEmitSynergyChanges(player, SnapshotAppliedSynergies(player));
+
+    private void ApplyAndEmitSynergyChanges(IEntity? player, HashSet<string> before)
+    {
+        if (player is null || Content is null || World is null)
+        {
+            return;
+        }
+
+        SynergyResolver.ApplyPassiveSynergies(player, Content, World);
+        var after = player.GetComponent<SynergyComponent>()?.AppliedPassiveSynergyIds ?? new List<string>();
+        foreach (var synergyId in after.Where(id => !before.Contains(id)).OrderBy(id => id, StringComparer.Ordinal))
+        {
+            if (Content.Synergies.TryGetValue(synergyId, out var synergy))
+            {
+                Bus?.EmitSynergyActivated(synergy);
+                Bus?.EmitLogMessage($"{synergy.DisplayName} synergy activated!", LogCategory.Critical);
+            }
+        }
+
+        var potential = SynergyResolver.GetPotentialSynergies(player, Content).FirstOrDefault();
+        if (potential is not null)
+        {
+            Bus?.EmitLogMessage($"Synergy hint: one piece away from {potential.DisplayName}.", LogCategory.System);
+        }
+    }
+
+    private void TryResolveFloorClear(EntityId playerId)
+    {
+        if (World is null || Bus is null || _clearedFloors.Contains(CurrentFloor) || World.GetEntity(playerId) is not { } player)
+        {
+            return;
+        }
+
+        if (HasLivingHostileEnemy(World, player))
+        {
+            return;
+        }
+
+        _clearedFloors.Add(CurrentFloor);
+        var bonusGold = 10 + (CurrentFloor * 5);
+        if (player.GetComponent<WalletComponent>() is { } wallet)
+        {
+            wallet.Gold += bonusGold;
+            _floorStats = _floorStats with { GoldCollected = _floorStats.GoldCollected + bonusGold };
+            _runStats = _runStats with { GoldCollected = _runStats.GoldCollected + bonusGold };
+            Bus.EmitCurrencyChanged(player.Id, wallet.Gold);
+        }
+
+        Bus.EmitFloorCleared(CurrentFloor);
+        Bus.EmitLogMessage($"Floor Cleared! +{bonusGold} gold.", LogCategory.Critical);
+    }
+
+    private static bool HasLivingHostileEnemy(WorldState world, IEntity player)
+    {
+        foreach (var entity in world.Entities)
+        {
+            if (entity.Id != player.Id && entity.IsAlive && entity.Faction != player.Faction && entity.Faction != Faction.Neutral)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static void ResetKillStreak(IEntity? entity)
     {
         if (entity?.GetComponent<KillStreakComponent>() is { } streak && streak.CurrentStreak != 0)
@@ -3428,7 +3568,20 @@ public partial class GameManager : Node
     {
         var discountPercent = ProgressionService.ResolveShopDiscountPercent(player, Content);
         var discounted = basePrice * Math.Max(0, 100 - discountPercent) / 100;
-        return Math.Max(1, discounted);
+        var ascensionLevel = ResolveMetaProgressionManager()?.AscensionLevel ?? 0;
+        var multiplier = 1f;
+        if (Content is not null && ascensionLevel > 0)
+        {
+            foreach (var modifier in AscensionModifiers.GetActiveModifiers(ascensionLevel, Content))
+            {
+                if (string.Equals(modifier.EffectType, "shop_price_increase", StringComparison.Ordinal))
+                {
+                    multiplier += Math.Max(0f, modifier.EffectValue);
+                }
+            }
+        }
+
+        return Math.Max(1, (int)Math.Ceiling(discounted * multiplier));
     }
 
     private static void ApplyStatModifiers(Stats stats, IReadOnlyDictionary<string, int> modifiers, int direction)

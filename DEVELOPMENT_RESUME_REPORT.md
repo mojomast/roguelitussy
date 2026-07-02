@@ -61,6 +61,16 @@ godot --headless --path . --quit
 - Completed: `DailyChallengeManager` autoload persists daily attempt/completion/best score state to `user://daily_challenge.json`.
 - Verification: stub build, test project build, content/persistence/simulation/UI slices, and full harness pass with 470 registered tests.
 
+### Follow-up Status - Wave 2 Roguelite Integration 2026-07-02
+
+- Completed: added Wave 2 content expansion with six enemies, six newly-authored requested items plus existing requested scroll/smoke-bomb coverage, five relics, `blinded`, `chain_lightning`, extra loot tables, and SVG item/status assets.
+- Completed: wired existing EventBus surfaces for critical hits, boss phase transitions, synergy activation, reputation changes, and floor clears into GameManager/HUD/CombatLog.
+- Completed: daily challenge title entry starts today's deterministic seed; Echo Workshop exposes ascension controls; game-over bodies show narrative epitaph text and copy-run support through Godot clipboard API.
+- Completed: save serialization now writes Wave 1 `BossPhaseComponent`, `FactionComponent`, and `SynergyComponent` payloads that previously only loaded.
+- Completed: runtime support added for `blinded`, deterministic three-target `chain_lightning`, `soul_collector` every-fifth-kill max-HP gain, ascension shop-price increases, floor-clear gold, and explicit rest-interrupted-by-enemy logging.
+- Verification: stub build, test project build, full harness (470 tests), and rendering-validation profile (422 tests) pass locally.
+- Manual gap: full Godot 4.5.2 runtime playthrough checks for exact banner/toast timing, daily persistence on real user paths, and boss/reputation feel still need editor/runtime verification.
+
 ### Follow-up Status - Wave 1 Persistence
 
 - Completed: SAV-1 — added `EnemyComponent { TemplateId }`, attached in `GameManager.CreateEnemyEntity`, and round-tripped through v9 save data with validation and migration.

@@ -120,7 +120,7 @@ public partial class UIRoot : CanvasLayer
         Minimap.Bind(_gameManager, _eventBus);
         QuickSlotHotbar.Bind(_gameManager, _eventBus, _content);
         DevToolsWorkbench.Bind(_gameManager, _eventBus, _content);
-        MainMenu.Bind(_gameManager, _eventBus, ResolveMetaProgressionManager());
+        MainMenu.Bind(_gameManager, _eventBus, ResolveMetaProgressionManager(), ResolveDailyChallengeManager());
         PauseMenu.Bind(_gameManager, _eventBus);
         GameOverScreen.Bind(ResolveMetaProgressionManager());
         DebugConsole.Bind(_gameManager, _eventBus, _content);
@@ -276,6 +276,12 @@ public partial class UIRoot : CanvasLayer
     {
         return GetNodeOrNull<MetaProgressionManager>("/root/MetaProgressionManager")
             ?? AutoloadResolver.Resolve<MetaProgressionManager>(this, "MetaProgressionManager");
+    }
+
+    private DailyChallengeManager? ResolveDailyChallengeManager()
+    {
+        return GetNodeOrNull<DailyChallengeManager>("/root/DailyChallengeManager")
+            ?? AutoloadResolver.Resolve<DailyChallengeManager>(this, "DailyChallengeManager");
     }
 
     private void AddIfMissing(Node node)

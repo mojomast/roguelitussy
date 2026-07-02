@@ -56,7 +56,7 @@ Between-run meta progression is tracked by `MetaProgressionManager`, a Godot aut
 
 Ascension readiness is stored alongside meta progression: `HasCompletedFirstClear` gates selectable ascension levels, and `AscensionLevel` is clamped to 0-10. Ascension modifier content lives in `Content/ascension_modifiers.json`; the pure `AscensionModifiers` helper returns all modifiers at or below the selected level.
 
-Daily challenge state is tracked by the `DailyChallengeManager` autoload in `user://daily_challenge.json`. Daily seeds are deterministic from UTC date through `DailySeedGenerator`, and daily scoring uses floor reached, enemies killed, turns taken, and gold remaining.
+Daily challenge state is tracked by the `DailyChallengeManager` autoload in `user://daily_challenge.json`. Daily seeds are deterministic from UTC date through `DailySeedGenerator`, the title screen can start today's deterministic seed directly, and daily scoring uses floor reached, enemies killed, turns taken, and gold remaining.
 
 Run history entries can store richer narrative fields and a generated epitaph. `RunNarrator` chooses matching templates from `Content/narrative_templates.json` deterministically from the run seed.
 
@@ -104,7 +104,11 @@ Synergies are content-authored build identities in `Content/synergies.json`. `Sy
 
 Boss phase data can be authored on enemy templates through `boss_phase_data`. `BossPhaseResolver` runs after melee and ability damage, adds phase abilities/status/stat boosts when HP thresholds are crossed, and records triggered phases on `BossPhaseComponent` so each transition fires once.
 
-Faction reputation is stored on the player through `FactionComponent` and adjusted by `ReputationService`. Enemy kills award Warriors' Order reputation, while boss kills also affect Thieves' Compact and Merchants' Guild reputation.
+Faction reputation is stored on the player through `FactionComponent` and adjusted by `ReputationService`. Enemy kills award Warriors' Order reputation, boss kills also affect Thieves' Compact and Merchants' Guild reputation, shop purchases increase Merchants' Guild reputation, and GameManager emits reputation deltas for HUD/combat-log feedback.
+
+Critical hits now use a clearer 1.5x damage multiplier. If the attacker's accuracy exceeds defender evasion by more than 40, baseline crit chance is at least 15%; equipped weapon crit chance can still exceed that. Critical hits emit both `DamageDealt` and `CriticalHitDealt` presentation events.
+
+When the last living hostile enemy on a floor dies, GameManager emits `FloorCleared(depth)`, awards `10 + depth * 5` gold once for that floor, and logs a floor-clear callout.
 
 ## Generation
 
@@ -138,10 +142,10 @@ The rendering layer is event-driven.
 - The title flow now exposes an explicit `Start Game` action and a typed seed entry field. Typed seeds feed the normal deterministic new-run path, while leaving the field empty keeps the default generated-seed behavior.
 - `ExaminePanel` is a `MenuBase` modal opened with `X` during gameplay. It routes through `UIRoot` before normal gameplay input, moves a cursor with `WASD`/arrow keys, and closes with `X` or `Escape`. It reads only visible/explored nearby cells from the current `WorldState`; visible cells may show entities, items, chests, doors, and revealed traps, while explored-but-not-visible cells show remembered tile information only. It does not emit `PlayerActionSubmitted` or mutate simulation state.
 - `HUD` derives a nearby interaction prompt from current world state on turn/UI refresh (`[F] Talk`, `[F] Open Chest`, `[Enter] Descend/Ascend`) and exposes it as a clickable shortcut without changing the underlying keyboard actions.
-- `HUD` also derives a runtime-only quick-use hotbar from the first five usable non-equipment inventory entries. Number keys `1`-`5` are routed only during normal gameplay, submit regular `UseItemAction` instances for self/no-target consumables, and log a warning instead of consuming aimed items that require the inventory targeting overlay.
+- `HUD` also derives a runtime-only quick-use hotbar from the first five usable non-equipment inventory entries. Number keys `1`-`5` are routed only during normal gameplay, submit regular `UseItemAction` instances for self/no-target consumables, and log a warning instead of consuming aimed items that require the inventory targeting overlay. HUD text also surfaces active/potential synergies, faction reputation labels, boss phase callouts, and floor-clear action feedback.
 - Run movement uses a prefix key because the current input path routes only key codes, not modifier state. Press `R`, then a cardinal direction to repeatedly process normal `MoveAction` turns through `GameManager.ProcessPlayerAction`; `Escape` cancels the prefix. The run stops before blockers, doors, occupants, nearby points of interest, low HP, damage taken, game over, visible/adjacent hostiles, or a fixed safety cap.
 - Autoexplore uses `O` to repeatedly recompute deterministic BFS from the current player position, preferring visible points of interest and then the nearest reachable unexplored frontier. Every step is submitted as a normal `MoveAction` through `GameManager.ProcessPlayerAction`; it stops for visible/adjacent hostiles, damage taken, low HP, reached points of interest, no reachable target, game over, invalid movement, or a fixed safety cap.
-- Rest-until-healed uses `Z` to repeatedly process normal `WaitAction` turns through `GameManager.ProcessPlayerAction`. It preserves single waits on `Space` and `.`, stops immediately at full HP or visible/adjacent hostiles, also stops for low HP, poison/burning/corrosion, damage taken, game over, invalid waits, or a fixed safety cap, and does not add UI-side passive healing.
+- Rest-until-healed uses `Z` to repeatedly process normal `WaitAction` turns through `GameManager.ProcessPlayerAction`. It preserves single waits on `Space` and `.`, stops immediately at full HP or visible/adjacent hostiles, also stops for low HP, poison/burning/corrosion, damage taken, game over, invalid waits, or a fixed safety cap, and does not add UI-side passive healing. Enemy interruptions now log the spotted enemy name explicitly.
 
 Current presentation-specific behavior worth knowing:
 
@@ -196,7 +200,7 @@ Notable details:
 - New saves include optional content metadata (`contentVersion` and a deterministic content hash) so load flows can warn when the authored JSON set differs from the one that created the save.
 - Multi-floor validation requires unique floor depths, an active floor payload, and exactly one player entity across all saved floors on the active floor.
 - Persistence tests cover malformed v8/v9 floor payloads for missing active floors, duplicate player entities across floors, and duplicate floor depths; `GameManager` save/load coverage also exercises travel back to a cached inactive floor.
-- Progression, identity, inventory/equipment, wallet, NPC, merchant, chest loot table, rolled chest contents, ability, cooldown, XP value, AI/template rehydration data, enemy template identity, scheduler actor order, status-effect source attribution, character creation options, trap component state, Track 7 runtime components (`RelicComponent`, `ShrineComponent`, `KillStreakComponent`, and `ArchetypeComponent`), and Wave 1 runtime components (`BossPhaseComponent`, `FactionComponent`, and `SynergyComponent`) round-trip through the normalized save shape where applicable.
+- Progression, identity, inventory/equipment, wallet, NPC, merchant, chest loot table, rolled chest contents, ability, cooldown, XP value, AI/template rehydration data, enemy template identity, scheduler actor order, status-effect source attribution, character creation options, trap component state, Track 7 runtime components (`RelicComponent`, `ShrineComponent`, `KillStreakComponent`, and `ArchetypeComponent`), and Wave 1 runtime components (`BossPhaseComponent`, `FactionComponent`, and `SynergyComponent`) round-trip through the normalized save shape where applicable. Wave 2 fixed the serializer write path for boss phase, faction reputation, and applied synergy passive payloads.
 - `CombatRandomState` and `ItemRandomState` are persisted and rehydrated atomically through `WorldState.RehydrateRandomStates` so RNG continuation matches uninterrupted simulation with no transient intermediate state.
 - Deterministic replay regression tests prove that fixed action sequences produce identical traces after save/load at turn boundaries.
 - Enemy loot and gold drops use a deterministic seed derived from world seed, depth, position, turn number, and a stable byte hash of the victim `EntityId`; the seed does not depend on runtime `GetHashCode()` behavior.

@@ -74,6 +74,7 @@ public enum StatusEffectType : byte
     Corroded,
     Phased,
     Flying,
+    Blinded,
 }
 
 public enum EquipSlot : byte

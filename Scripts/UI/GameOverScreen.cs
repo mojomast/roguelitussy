@@ -66,8 +66,10 @@ public partial class GameOverScreen : MenuBase
 
         var echoBreakdown = BuildEchoBreakdown(muted, gold, parchment);
         var history = BuildRunHistory(muted, parchment, gold);
+        var epitaph = ResolveEpitaph();
 
         return $"[color={danger}][b]✝ {ItemRarityPresentation.EscapeBBCode(_stats.CharacterName).ToUpperInvariant()} HAS FALLEN[/b][/color]   [color={muted}][lb]SEED:{_stats.Seed}[rb][/color]\n" +
+            $"[color={gold}][i]{ItemRarityPresentation.EscapeBBCode(epitaph)}[/i][/color]\n" +
             $"────────────────────────────────────────\n" +
             $"[color={muted}]Delver:[/color] [color={parchment}]{ItemRarityPresentation.EscapeBBCode(_stats.CharacterName)}[/color]\n" +
             $"[color={muted}]Slain by:[/color] [color={parchment}]{ItemRarityPresentation.EscapeBBCode(_stats.CauseOfDeath)}[/color]    [color={muted}]Floor {_stats.FloorReached} · Turn {_stats.TotalTurns:N0}[/color]" +
@@ -108,7 +110,7 @@ public partial class GameOverScreen : MenuBase
 
     protected override string BuildFooterText()
     {
-        return "[ENTER] New Run              [ESC] Main Menu";
+        return "[ENTER] New Run              [ESC] Main Menu              [C] Copy Run";
     }
 
     protected override bool HandleCustomKey(Key key)
@@ -116,6 +118,12 @@ public partial class GameOverScreen : MenuBase
         if (key is Key.KpEnter)
         {
             ActivateSelected();
+            return true;
+        }
+
+        if (key is Key.C)
+        {
+            DisplayServer.ClipboardSet($"{_stats.CharacterName} fell on floor {_stats.FloorReached} after {_stats.TotalTurns} turns. {ResolveEpitaph()}");
             return true;
         }
 
@@ -166,5 +174,18 @@ public partial class GameOverScreen : MenuBase
         }
 
         return "The dungeon swallows another delver.";
+    }
+
+    private string ResolveEpitaph()
+    {
+        var entry = _metaProgression?.GetRunHistory().FirstOrDefault(history =>
+            history.FloorReached == _stats.FloorReached
+            && history.EnemiesKilled == _stats.EnemiesKilled);
+        if (!string.IsNullOrWhiteSpace(entry?.Epitaph))
+        {
+            return entry.Epitaph;
+        }
+
+        return ResolveFlavorLine(_stats);
     }
 }

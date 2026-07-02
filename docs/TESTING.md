@@ -113,6 +113,7 @@ The repository contains targeted suites for:
 - character creation and equipment UX
 - Track 7 roguelite UI integration, including relic HUD text, boss/streak indicators, archetype preview updates, and component persistence for relic/shrine/streak/archetype state
 - Wave 1 roguelite systems, including synergy detection, daily seed determinism, ascension modifier lookup, narrative epitaph determinism, expanded content validation, and meta-progression ascension persistence
+- Wave 2 roguelite integration, including requested content IDs/reachability, critical/floor-clear/reputation/synergy event presentation through existing UI surfaces, daily title entry, ascension shop-price wiring, and save serialization for boss phase/faction/synergy payloads
 - architecture smoke coverage
 
 ## Writing New Tests

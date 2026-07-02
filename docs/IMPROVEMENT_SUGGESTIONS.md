@@ -6,6 +6,8 @@
 
 > Update 2026-07-02: Wave 1 roguelite foundations are partially implemented outside the original improvement table: content-backed synergies, ascension modifiers, daily modifiers, narrative templates, factions, boss phase state, deterministic daily seed helpers, run epitaph generation, faction reputation state, and save version 15 persistence. Wave 2 presentation/feel/content-expansion tasks remain open unless their existing table row says otherwise.
 
+> Update 2026-07-02 Wave 2: the roguelite presentation/content pass is implemented at the text/UI-event level. Daily challenge title entry, ascension controls/shop-price modifier, synergy and reputation HUD/log feedback, boss phase event emission, floor-clear rewards, critical-hit log callouts, rest-interruption clarity, `blinded`, `chain_lightning`, `soul_collector`, new enemies/items/relics, and save serialization for boss/faction/synergy payloads are live. Remaining polish is real Godot 4.5.2 playthrough validation of timing/feel and richer non-text VFX.
+
 ## How Worker Subagents Should Use This Document
 
 1. Pick a suggestion by ID. Each suggestion is scoped to a focused, implementable change.

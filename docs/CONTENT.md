@@ -141,11 +141,13 @@ When linking abilities or status effects from other content, make sure the refer
 
 Supported ability targeting types currently in runtime use are `self`, `single`, `tile`, and `aoe_circle`. Supported effect types currently executed by the runtime are `damage`, `apply_status`, `teleport`, and `heal_self`. Targeting is validated by `CastAbilityAction`; keep content targeting definitions precise so direct casts and item-delegated casts behave the same way. For harmful area damage or harmful statuses, `hits_allies: false` defaults unfiltered effects to enemies only, while explicit effect filters and `hits_allies: true` preserve broader targeting.
 
-Status-effect runtime behavior currently includes authored corroded stacking up to three stacks and burning/frozen mutual removal on apply. Status effects applied by melee on-hit effects or abilities retain source attribution for delayed poison/burning kill credit and save/load round-trips.
+Status-effect runtime behavior currently includes authored corroded stacking up to three stacks, burning/frozen mutual removal on apply, and `blinded` as an accuracy-reducing combat status. Status effects applied by melee on-hit effects or abilities retain source attribution for delayed poison/burning kill credit and save/load round-trips.
+
+`chain_lightning` is an authored lightning ability with a deterministic runtime special case: it starts from the authored AoE candidate set and resolves up to three nearest hostile targets to the selected tile.
 
 ### Loot Tables, Chests, And Merchants
 
-Chest-specific loot tables should not contain no-drop entries. `chest_loot` and `deep_chest_loot` currently roll multiple rewards per chest, and runtime chests persist rolled contents so players can take selected items and leave the rest behind. Chest contents are save-facing item instances once rolled, so changing chest behavior requires persistence coverage.
+Chest-specific loot tables should not contain no-drop entries. `chest_loot` and `deep_chest_loot` currently roll multiple rewards per chest, and runtime chests persist rolled contents so players can take selected items and leave the rest behind. Chest contents are save-facing item instances once rolled, so changing chest behavior requires persistence coverage. The Wave 2 expansion adds six new enemies, five relics, `blinded`, chain-lightning scroll support, and new reachable item drops while preserving the early health-potion sustain share.
 
 Merchant stock is authored on NPC definitions in `npcs.json`. Stock entries must reference existing item IDs and use positive price/quantity values. Prefer a spread of recovery items, scrolls, armor, and weapons so vendors provide build correction rather than only one starter weapon and potion.
 

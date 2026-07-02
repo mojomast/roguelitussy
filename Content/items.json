@@ -743,17 +743,16 @@
     {
       "id": "item_smoke_bomb",
       "name": "Smoke Bomb",
-      "description": "A clay bomb that should create sight-blocking smoke once trap/fog runtime support lands.",
+      "description": "A clay bomb that bursts into choking smoke and blinds a small area.",
       "type": "consumable",
       "slot": "none",
       "stats": {},
       "effects": [
         {
           "type": "on_use",
-          "action": "apply_status",
-          "status_effect": "phased",
-          "duration": 3,
-          "target": "self"
+          "action": "cast_ability",
+          "ability_id": "blinding_cloud",
+          "target": "aimed"
         }
       ],
       "rarity": "uncommon",
@@ -762,7 +761,7 @@
       "requirements": {},
       "stackable": true,
       "max_stack": 5,
-      "sprite_path": "res://Assets/Sprites/items/dungeon_key.svg",
+      "sprite_path": "res://Assets/Sprites/items/item_smoke_bomb.svg",
       "sprite_atlas_coords": [
         8,
         2
@@ -885,6 +884,207 @@
       "tags": [
         "relic",
         "special"
+      ]
+    },
+    {
+      "id": "item_web_trap",
+      "name": "Web Trap",
+      "description": "A sticky snare bundle that launches binding strands at a target.",
+      "type": "consumable",
+      "slot": "none",
+      "stats": {},
+      "effects": [
+        {
+          "type": "on_use",
+          "action": "cast_ability",
+          "ability_id": "web_snare",
+          "target": "aimed"
+        }
+      ],
+      "rarity": "common",
+      "value": 45,
+      "weight": 0.6,
+      "requirements": {},
+      "stackable": true,
+      "max_stack": 5,
+      "sprite_path": "res://Assets/Sprites/items/item_web_trap.svg",
+      "sprite_atlas_coords": [
+        13,
+        2
+      ],
+      "tags": [
+        "consumable",
+        "trap",
+        "utility"
+      ]
+    },
+    {
+      "id": "scroll_chain_lightning",
+      "name": "Scroll of Chain Lightning",
+      "description": "A storm-scripted scroll that calls forked lightning over a small area.",
+      "type": "consumable",
+      "slot": "none",
+      "stats": {},
+      "effects": [
+        {
+          "type": "on_use",
+          "action": "cast_ability",
+          "ability_id": "chain_lightning",
+          "target": "aimed"
+        }
+      ],
+      "rarity": "rare",
+      "value": 175,
+      "weight": 0.1,
+      "requirements": {},
+      "stackable": true,
+      "max_stack": 3,
+      "sprite_path": "res://Assets/Sprites/items/scroll_chain_lightning.svg",
+      "sprite_atlas_coords": [
+        14,
+        2
+      ],
+      "tags": [
+        "consumable",
+        "arcane",
+        "lightning"
+      ]
+    },
+    {
+      "id": "item_throwing_knife",
+      "name": "Throwing Knife",
+      "description": "A balanced blade for quick close-quarters work.",
+      "type": "weapon",
+      "slot": "main_hand",
+      "stats": {
+        "damage_min": 2,
+        "damage_max": 6,
+        "accuracy": 90,
+        "speed_modifier": 15,
+        "crit_chance": 10
+      },
+      "effects": [],
+      "rarity": "common",
+      "value": 35,
+      "weight": 0.8,
+      "requirements": {
+        "level": 1,
+        "dexterity": 3
+      },
+      "sprite_path": "res://Assets/Sprites/items/item_throwing_knife.svg",
+      "sprite_atlas_coords": [
+        15,
+        0
+      ],
+      "tags": [
+        "weapon",
+        "melee",
+        "light",
+        "ranged"
+      ]
+    },
+    {
+      "id": "item_iron_rations",
+      "name": "Iron Rations",
+      "description": "Hard biscuit and salted meat. Restores a small amount of health.",
+      "type": "consumable",
+      "slot": "none",
+      "stats": {},
+      "effects": [
+        {
+          "type": "on_use",
+          "action": "heal",
+          "value": 10,
+          "target": "self"
+        }
+      ],
+      "rarity": "common",
+      "value": 18,
+      "weight": 0.7,
+      "requirements": {},
+      "stackable": true,
+      "max_stack": 8,
+      "sprite_path": "res://Assets/Sprites/items/item_iron_rations.svg",
+      "sprite_atlas_coords": [
+        16,
+        2
+      ],
+      "tags": [
+        "consumable",
+        "food",
+        "healing"
+      ]
+    },
+    {
+      "id": "item_rune_stone",
+      "name": "Rune Stone",
+      "description": "A palm-sized warding stone that briefly hardens the bearer against harm.",
+      "type": "consumable",
+      "slot": "none",
+      "stats": {},
+      "effects": [
+        {
+          "type": "on_use",
+          "action": "apply_status",
+          "status_effect": "shielded",
+          "duration": 4,
+          "target": "self"
+        }
+      ],
+      "rarity": "uncommon",
+      "value": 95,
+      "weight": 0.4,
+      "requirements": {},
+      "stackable": true,
+      "max_stack": 5,
+      "sprite_path": "res://Assets/Sprites/items/item_rune_stone.svg",
+      "sprite_atlas_coords": [
+        17,
+        2
+      ],
+      "tags": [
+        "consumable",
+        "arcane",
+        "ward"
+      ]
+    },
+    {
+      "id": "item_berserker_axe",
+      "name": "Berserker Axe",
+      "description": "A notched axe that rewards reckless, overwhelming strikes.",
+      "type": "weapon",
+      "slot": "main_hand",
+      "stats": {
+        "damage_min": 7,
+        "damage_max": 16,
+        "accuracy": 62,
+        "speed_modifier": -25,
+        "crit_chance": 8
+      },
+      "effects": [
+        {
+          "type": "on_hit",
+          "status_effect": "weakened",
+          "chance": 20,
+          "duration": 2
+        }
+      ],
+      "rarity": "rare",
+      "value": 360,
+      "weight": 5.5,
+      "requirements": {
+        "level": 5,
+        "strength": 7
+      },
+      "sprite_path": "res://Assets/Sprites/items/item_berserker_axe.svg",
+      "sprite_atlas_coords": [
+        16,
+        0
+      ],
+      "tags": [
+        "weapon",
+        "melee",
+        "heavy"
       ]
     }
   ]

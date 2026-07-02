@@ -183,9 +183,27 @@
       "entries": [
         {
           "item_id": "potion_health",
-          "weight": 35,
+          "weight": 70,
           "count_min": 1,
           "count_max": 2
+        },
+        {
+          "item_id": "item_iron_rations",
+          "weight": 20,
+          "count_min": 1,
+          "count_max": 2
+        },
+        {
+          "item_id": "item_throwing_knife",
+          "weight": 8,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "item_web_trap",
+          "weight": 8,
+          "count_min": 1,
+          "count_max": 1
         },
         {
           "item_id": "potion_haste",
@@ -202,6 +220,12 @@
         {
           "item_id": "scroll_blink",
           "weight": 12,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "item_rune_stone",
+          "weight": 7,
           "count_min": 1,
           "count_max": 1
         },
@@ -452,6 +476,18 @@
           "count_max": 1
         },
         {
+          "item_id": "scroll_chain_lightning",
+          "weight": 5,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "item_rune_stone",
+          "weight": 5,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
           "item_id": "scroll_blink",
           "weight": 12,
           "count_min": 1,
@@ -497,6 +533,12 @@
         {
           "item_id": "battleaxe",
           "weight": 12,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "item_berserker_axe",
+          "weight": 3,
           "count_min": 1,
           "count_max": 1
         },
@@ -605,6 +647,12 @@
           "count_max": 1
         },
         {
+          "item_id": "scroll_chain_lightning",
+          "weight": 6,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
           "item_id": "scroll_blink",
           "weight": 6,
           "count_min": 1,
@@ -613,6 +661,12 @@
         {
           "item_id": "battleaxe",
           "weight": 5,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "item_berserker_axe",
+          "weight": 4,
           "count_min": 1,
           "count_max": 1
         },
@@ -710,6 +764,18 @@
         {
           "item_id": "battleaxe",
           "weight": 6,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "item_berserker_axe",
+          "weight": 6,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "scroll_chain_lightning",
+          "weight": 5,
           "count_min": 1,
           "count_max": 1
         },
@@ -814,6 +880,12 @@
         {
           "item_id": "boots_leather",
           "weight": 12,
+          "count_min": 1,
+          "count_max": 1
+        },
+        {
+          "item_id": "item_rune_stone",
+          "weight": 8,
           "count_min": 1,
           "count_max": 1
         }
@@ -1060,6 +1132,18 @@
           "count_max": 3
         },
         {
+          "item_id": "item_iron_rations",
+          "weight": 20,
+          "count_min": 1,
+          "count_max": 3
+        },
+        {
+          "item_id": "item_smoke_bomb",
+          "weight": 12,
+          "count_min": 1,
+          "count_max": 2
+        },
+        {
           "item_id": "item_shield_basic",
           "weight": 15,
           "count_min": 1,
@@ -1071,6 +1155,70 @@
           "count_min": 1,
           "count_max": 1
         }
+      ]
+    },
+    {
+      "id": "cultist_healer_loot",
+      "description": "Medicinal and ritual supplies carried by Cultist Healers.",
+      "rolls": 1,
+      "entries": [
+        { "item_id": "potion_health", "weight": 30, "count_min": 1, "count_max": 2 },
+        { "item_id": "item_iron_rations", "weight": 20, "count_min": 1, "count_max": 2 },
+        { "item_id": "item_rune_stone", "weight": 8, "count_min": 1, "count_max": 1 },
+        { "item_id": null, "weight": 42, "count_min": 0, "count_max": 0 }
+      ]
+    },
+    {
+      "id": "shadow_assassin_loot",
+      "description": "Light blades and misdirection tools from Shadow Assassins.",
+      "rolls": 1,
+      "entries": [
+        { "item_id": "item_throwing_knife", "weight": 18, "count_min": 1, "count_max": 2 },
+        { "item_id": "item_smoke_bomb", "weight": 16, "count_min": 1, "count_max": 2 },
+        { "item_id": "scroll_blink", "weight": 10, "count_min": 1, "count_max": 1 },
+        { "item_id": null, "weight": 56, "count_min": 0, "count_max": 0 }
+      ]
+    },
+    {
+      "id": "stone_sentinel_loot",
+      "description": "Warded stone and heavy salvage from Stone Sentinels.",
+      "rolls": 1,
+      "entries": [
+        { "item_id": "item_rune_stone", "weight": 16, "count_min": 1, "count_max": 1 },
+        { "item_id": "armor_plate", "weight": 6, "count_min": 1, "count_max": 1 },
+        { "item_id": null, "weight": 78, "count_min": 0, "count_max": 0 }
+      ]
+    },
+    {
+      "id": "web_spinner_loot",
+      "description": "Sticky utility drops from Web Spinners.",
+      "rolls": 1,
+      "entries": [
+        { "item_id": "item_web_trap", "weight": 22, "count_min": 1, "count_max": 2 },
+        { "item_id": "potion_health", "weight": 12, "count_min": 1, "count_max": 1 },
+        { "item_id": null, "weight": 66, "count_min": 0, "count_max": 0 }
+      ]
+    },
+    {
+      "id": "magma_wisp_loot",
+      "description": "Scorched arcane drops from Magma Wisps.",
+      "rolls": 1,
+      "entries": [
+        { "item_id": "scroll_fireball", "weight": 14, "count_min": 1, "count_max": 1 },
+        { "item_id": "scroll_chain_lightning", "weight": 7, "count_min": 1, "count_max": 1 },
+        { "item_id": "potion_might", "weight": 10, "count_min": 1, "count_max": 1 },
+        { "item_id": null, "weight": 69, "count_min": 0, "count_max": 0 }
+      ]
+    },
+    {
+      "id": "echo_shade_loot",
+      "description": "Echoing shadow remnants and rare scrolls.",
+      "rolls": 1,
+      "entries": [
+        { "item_id": "scroll_chain_lightning", "weight": 10, "count_min": 1, "count_max": 1 },
+        { "item_id": "scroll_phase", "weight": 12, "count_min": 1, "count_max": 1 },
+        { "item_id": "item_rune_stone", "weight": 8, "count_min": 1, "count_max": 1 },
+        { "item_id": null, "weight": 70, "count_min": 0, "count_max": 0 }
       ]
     }
   ]

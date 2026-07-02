@@ -29,6 +29,7 @@ public partial class MainMenu : MenuBase
         LoadSlot1,
         LoadSlot2,
         LoadSlot3,
+        DailyChallenge,
         MetaShop,
         DevTools,
         Help,
@@ -179,6 +180,7 @@ public partial class MainMenu : MenuBase
     private EventBus? _eventBus;
     private GameManager? _gameManager;
     private MetaProgressionManager? _metaProgression;
+    private DailyChallengeManager? _dailyChallenge;
     private readonly List<MenuAction> _optionActions = new();
     private int _nameIndex;
     private int _archetypeIndex;
@@ -233,6 +235,11 @@ public partial class MainMenu : MenuBase
 
     public void Bind(GameManager? gameManager, EventBus? eventBus, MetaProgressionManager? metaProgression)
     {
+        Bind(gameManager, eventBus, metaProgression, null);
+    }
+
+    public void Bind(GameManager? gameManager, EventBus? eventBus, MetaProgressionManager? metaProgression, DailyChallengeManager? dailyChallenge)
+    {
         if (_eventBus is not null)
         {
             _eventBus.LoadCompleted -= OnLoadCompleted;
@@ -242,6 +249,7 @@ public partial class MainMenu : MenuBase
         _gameManager = gameManager;
         _eventBus = eventBus;
         _metaProgression = metaProgression;
+        _dailyChallenge = dailyChallenge;
         if (_eventBus is not null)
         {
             _eventBus.LoadCompleted += OnLoadCompleted;
@@ -360,6 +368,7 @@ public partial class MainMenu : MenuBase
             $"Identity   {RaceOptions[_raceIndex]} / {GenderOptions[_genderIndex]} / {AppearanceOptions[_appearanceIndex]}",
             $"Training   VIT {_vitalityPoints}  POW {_powerPoints}  GRD {_guardPoints}  FIN {_finessePoints}",
             $"Reserve    {RemainingPoints} point(s) left  Seed {PendingSeed}",
+            BuildDailySummaryLine(),
             $"Status     {_statusMessage}");
     }
 
@@ -752,6 +761,9 @@ public partial class MainMenu : MenuBase
             case MenuAction.LoadSlot3:
                 _eventBus?.EmitLoadRequested(3);
                 break;
+            case MenuAction.DailyChallenge:
+                StartDailyChallenge();
+                break;
             case MenuAction.MetaShop:
                 MetaShopRequested?.Invoke();
                 break;
@@ -979,9 +991,9 @@ public partial class MainMenu : MenuBase
         AddOption("Load Slot 1", MenuAction.LoadSlot1);
         AddOption("Load Slot 2", MenuAction.LoadSlot2);
         AddOption("Load Slot 3", MenuAction.LoadSlot3);
+        AddOption(FormatDailyChallengeOption(), MenuAction.DailyChallenge);
         AddOption("Meta Shop", MenuAction.MetaShop);
         AddOption("Dev Tools", MenuAction.DevTools);
-        AddOption("Help", MenuAction.Help);
         AddOption("Quit", MenuAction.Quit);
 
         var restoredIndex = _optionActions.IndexOf(selectedAction);
@@ -996,6 +1008,54 @@ public partial class MainMenu : MenuBase
     private string FormatSeedOption()
     {
         return _isEditingSeed ? $"Seed: {_seedEditBuffer}_ (Enter to save, Esc to cancel)" : $"Seed: {PendingSeed}";
+    }
+
+    private string FormatDailyChallengeOption()
+    {
+        var date = DailySeedGenerator.GetTodaysDateString();
+        var seed = DailySeedGenerator.GetTodaysSeed();
+        var completed = _dailyChallenge?.TodayCompleted == true ? " COMPLETE" : string.Empty;
+        return $"Daily Challenge: {date} #{seed:X8}{completed}";
+    }
+
+    private string BuildDailySummaryLine()
+    {
+        var seed = DailySeedGenerator.GetTodaysSeed();
+        var best = _dailyChallenge?.TodayBestScore ?? 0;
+        var status = _dailyChallenge?.TodayCompleted == true ? "complete" : "open";
+        return $"Daily     {DailySeedGenerator.GetTodaysDateString()}  Seed #{seed:X8}  Best {best} ({status})";
+    }
+
+    private void StartDailyChallenge()
+    {
+        if (_gameManager is null)
+        {
+            UpdateStatus("Daily unavailable: GameManager autoload missing.");
+            return;
+        }
+
+        if (_dailyChallenge?.TodayCompleted == true)
+        {
+            UpdateStatus("Today's daily challenge is already completed.");
+            return;
+        }
+
+        if (!IsArchetypeUnlocked(Archetypes[_archetypeIndex]))
+        {
+            UpdateStatus($"{Archetypes[_archetypeIndex].DisplayName} is locked. Open Meta Shop to unlock it.");
+            return;
+        }
+
+        PendingSeed = DailySeedGenerator.GetTodaysSeed();
+        _seedEditBuffer = PendingSeed.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        _gameManager.SetCharacterCreationOptions(BuildCharacterCreationOptions());
+        UpdateStatus($"Starting daily seed #{PendingSeed:X8}...");
+        _gameManager.StartNewGame(PendingSeed);
+        if (_gameManager.CurrentState == GameManager.GameState.Playing)
+        {
+            Close();
+            GameStarted?.Invoke();
+        }
     }
 
     private void BeginSeedEdit()

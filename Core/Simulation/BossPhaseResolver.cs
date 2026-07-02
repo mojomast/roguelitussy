@@ -45,6 +45,7 @@ public static class BossPhaseResolver
             outcome.LogMessages.Add(string.IsNullOrWhiteSpace(phase.Message)
                 ? $"{boss.Name} enters phase {phase.Phase}!"
                 : phase.Message.Replace("{name}", boss.Name, StringComparison.Ordinal));
+            outcome.BossPhaseTransitions.Add((boss.Id, phase.Phase));
             transitioned = true;
         }
 

@@ -445,6 +445,10 @@ public static class StatusEffectProcessor
             case "fly":
                 type = StatusEffectType.Flying;
                 return true;
+            case "blind":
+            case "blinded":
+                type = StatusEffectType.Blinded;
+                return true;
             default:
                 type = StatusEffectType.None;
                 return false;
@@ -537,6 +541,7 @@ public static class StatusEffectProcessor
         StatusEffectType.Corroded => "corroded",
         StatusEffectType.Phased => "phased",
         StatusEffectType.Flying => "flying",
+        StatusEffectType.Blinded => "blinded",
         _ => null,
     };
 

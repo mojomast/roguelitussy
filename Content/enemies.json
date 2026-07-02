@@ -690,6 +690,137 @@
       "tags": ["beast", "undead", "fast", "incorporeal"],
       "sprite_path": "res://Assets/Sprites/0x72/Ice_Zombie_Idle_1.png",
       "sprite_atlas_coords": [20, 0]
+    },
+    {
+      "id": "cultist_healer",
+      "name": "Cultist Healer",
+      "description": "A robed zealot who keeps wounded allies standing with stolen rites.",
+      "stats": { "hp": 18, "attack": 4, "defense": 1, "accuracy": 72, "evasion": 12, "speed": 95, "fov_range": 9, "xp_value": 24 },
+      "ai_type": "support",
+      "ai_params": { "flee_hp_pct": 40, "aggro_range": 9, "support_range": 5, "group_aggro_range": 7, "wander_when_idle": true },
+      "faction": "Enemy",
+      "min_depth": 2,
+      "max_depth": 7,
+      "spawn_weight": 5,
+      "abilities": [
+        { "ability_id": "healing_pulse", "cooldown": 3, "priority": 1 },
+        { "ability_id": "war_cry", "cooldown": 5, "priority": 2 }
+      ],
+      "loot_table_id": "cultist_healer_loot",
+      "gold_min": 4,
+      "gold_max": 10,
+      "tags": ["humanoid", "cultist", "support", "healer", "mid_game"],
+      "sprite_path": "res://Assets/Sprites/0x72/Orc_Shaman_Idle_1.png",
+      "sprite_atlas_coords": [21, 0]
+    },
+    {
+      "id": "shadow_assassin",
+      "name": "Shadow Assassin",
+      "description": "A knife in the dark, gone before the blood reaches the floor.",
+      "stats": { "hp": 24, "attack": 9, "defense": 2, "accuracy": 92, "evasion": 38, "speed": 145, "fov_range": 11, "xp_value": 40 },
+      "ai_type": "ambush",
+      "ai_params": { "flee_hp_pct": 25, "aggro_range": 11, "phase_through_walls": true, "wander_when_idle": false },
+      "faction": "Enemy",
+      "min_depth": 4,
+      "max_depth": 99,
+      "spawn_weight": 4,
+      "abilities": [
+        { "ability_id": "backstab", "cooldown": 3, "priority": 1 },
+        { "ability_id": "phase_shift", "cooldown": 5, "priority": 2 }
+      ],
+      "loot_table_id": "shadow_assassin_loot",
+      "gold_min": 8,
+      "gold_max": 18,
+      "tags": ["humanoid", "shadow", "assassin", "ambush", "late_game"],
+      "sprite_path": "res://Assets/Sprites/0x72/Masked_Orc_Idle_1.png",
+      "sprite_atlas_coords": [22, 0]
+    },
+    {
+      "id": "stone_sentinel",
+      "name": "Stone Sentinel",
+      "description": "A patient construct that wakes only to crush trespassers.",
+      "stats": { "hp": 46, "attack": 8, "defense": 8, "accuracy": 72, "evasion": 0, "speed": 65, "fov_range": 8, "xp_value": 44 },
+      "ai_type": "patrol",
+      "ai_params": { "flee_hp_pct": 0, "aggro_range": 8, "patrol_radius": 4, "wander_when_idle": false },
+      "faction": "Enemy",
+      "min_depth": 3,
+      "max_depth": 9,
+      "spawn_weight": 5,
+      "abilities": [
+        { "ability_id": "heavy_slam", "cooldown": 3, "priority": 1 },
+        { "ability_id": "shield_bash", "cooldown": 4, "priority": 2 }
+      ],
+      "loot_table_id": "stone_sentinel_loot",
+      "gold_min": 5,
+      "gold_max": 12,
+      "tags": ["construct", "stone", "tank", "mid_game"],
+      "sprite_path": "res://Assets/Sprites/0x72/Big_Zombie_Idle_1.png",
+      "sprite_atlas_coords": [23, 0]
+    },
+    {
+      "id": "web_spinner",
+      "name": "Web Spinner",
+      "description": "A pale cavern spider that spits weighted snares before closing in.",
+      "stats": { "hp": 16, "attack": 4, "defense": 1, "accuracy": 78, "evasion": 28, "speed": 125, "fov_range": 7, "xp_value": 20 },
+      "ai_type": "ranged_kite",
+      "ai_params": { "preferred_range": 4, "flee_hp_pct": 20, "min_range": 2, "aggro_range": 7, "wander_when_idle": true },
+      "faction": "Enemy",
+      "min_depth": 1,
+      "max_depth": 5,
+      "spawn_weight": 7,
+      "abilities": [
+        { "ability_id": "web_snare", "cooldown": 2, "priority": 1 }
+      ],
+      "loot_table_id": "web_spinner_loot",
+      "gold_min": 1,
+      "gold_max": 5,
+      "tags": ["beast", "spider", "ranged", "early_game"],
+      "sprite_path": "res://Assets/Sprites/0x72/Wogol_Idle_1.png",
+      "sprite_atlas_coords": [24, 0]
+    },
+    {
+      "id": "magma_wisp",
+      "name": "Magma Wisp",
+      "description": "A drifting ember-soul that bursts hot enough to pit stone.",
+      "stats": { "hp": 20, "attack": 7, "defense": 1, "accuracy": 82, "evasion": 25, "speed": 120, "fov_range": 9, "xp_value": 34 },
+      "ai_type": "ranged_kite",
+      "ai_params": { "preferred_range": 5, "flee_hp_pct": 15, "min_range": 3, "aggro_range": 9, "wander_when_idle": true },
+      "faction": "Enemy",
+      "min_depth": 4,
+      "max_depth": 10,
+      "spawn_weight": 4,
+      "abilities": [
+        { "ability_id": "fireball", "cooldown": 4, "priority": 1 },
+        { "ability_id": "burning_touch", "cooldown": 3, "priority": 2 }
+      ],
+      "loot_table_id": "magma_wisp_loot",
+      "gold_min": 4,
+      "gold_max": 11,
+      "tags": ["elemental", "fire", "ranged", "late_game"],
+      "sprite_path": "res://Assets/Sprites/0x72/Chort_Idle_1.png",
+      "sprite_atlas_coords": [25, 0]
+    },
+    {
+      "id": "echo_shade",
+      "name": "Echo Shade",
+      "description": "A half-remembered killer that repeats the last scream it heard.",
+      "stats": { "hp": 28, "attack": 8, "defense": 2, "accuracy": 86, "evasion": 34, "speed": 125, "fov_range": 12, "xp_value": 46 },
+      "ai_type": "ambush",
+      "ai_params": { "flee_hp_pct": 20, "aggro_range": 12, "phase_through_walls": true, "wander_when_idle": true },
+      "faction": "Enemy",
+      "min_depth": 5,
+      "max_depth": 99,
+      "spawn_weight": 3,
+      "abilities": [
+        { "ability_id": "arcane_bolt", "cooldown": 3, "priority": 1 },
+        { "ability_id": "phase_shift", "cooldown": 5, "priority": 2 }
+      ],
+      "loot_table_id": "echo_shade_loot",
+      "gold_min": 7,
+      "gold_max": 16,
+      "tags": ["undead", "shadow", "incorporeal", "late_game"],
+      "sprite_path": "res://Assets/Sprites/0x72/Ice_Zombie_Idle_1.png",
+      "sprite_atlas_coords": [26, 0]
     }
   ]
 }

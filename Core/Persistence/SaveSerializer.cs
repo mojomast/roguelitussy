@@ -675,6 +675,9 @@ public static class SaveSerializer
         var shrine = entity.GetComponent<ShrineComponent>();
         var killStreak = entity.GetComponent<KillStreakComponent>();
         var archetype = entity.GetComponent<ArchetypeComponent>();
+        var bossPhase = entity.GetComponent<BossPhaseComponent>();
+        var faction = entity.GetComponent<FactionComponent>();
+        var synergy = entity.GetComponent<SynergyComponent>();
 
         return new EntitySaveData
         {
@@ -806,6 +809,19 @@ public static class SaveSerializer
             {
                 ArchetypeId = archetype.ArchetypeId,
                 SignatureMechanicId = archetype.SignatureMechanicId,
+            },
+            BossPhase = bossPhase is null ? null : new BossPhaseSaveData
+            {
+                CurrentPhase = bossPhase.CurrentPhase,
+                TriggeredPhases = bossPhase.TriggeredPhases.OrderBy(phase => phase).ToList(),
+            },
+            FactionReputation = faction is null ? null : new FactionSaveData
+            {
+                Reputation = new Dictionary<string, int>(faction.Reputation, StringComparer.Ordinal),
+            },
+            Synergy = synergy is null ? null : new SynergySaveData
+            {
+                AppliedPassiveSynergyIds = synergy.AppliedPassiveSynergyIds.Distinct(StringComparer.Ordinal).OrderBy(id => id, StringComparer.Ordinal).ToList(),
             },
             SchedulerOrder = world.SchedulerOrders.TryGetValue(entity.Id, out var schedulerOrder) ? schedulerOrder : 0,
         };

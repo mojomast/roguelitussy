@@ -44,6 +44,16 @@ public static class AbilityResolver
                 break;
         }
 
+        if (string.Equals(ability.AbilityId, "chain_lightning", StringComparison.Ordinal))
+        {
+            return targets
+                .Where(target => target.Id != caster.Id && target.Faction != caster.Faction && target.Faction != Faction.Neutral)
+                .OrderBy(target => target.Position.ChebyshevTo(targetPos))
+                .ThenBy(target => target.Id.Value.ToString("N"), StringComparer.Ordinal)
+                .Take(3)
+                .ToList();
+        }
+
         return targets;
     }
 

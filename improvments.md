@@ -30,6 +30,8 @@
 
 > Wave 1 roguelite systems note (2026-07-02): content-backed synergies, ascension modifiers, daily modifiers, narrative templates, faction definitions, boss phase data, deterministic daily seed helpers, run epitaph generation, faction reputation state, and save version 15 persistence are implemented and covered by focused tests. Remaining follow-up is richer Wave 2 presentation/feel wiring for every new EventBus surface.
 
+> Wave 2 roguelite integration note (2026-07-02): requested Wave 2 content expansion and text/UI-event integration are implemented. HUD/combat log now surface synergies, reputation, boss phases, floor clears, momentum/crit callouts, and daily/ascension entry points; runtime support exists for `blinded`, `chain_lightning`, and `soul_collector`; save serialization now writes boss phase, faction reputation, and applied synergy state. Manual Godot runtime playthrough remains needed for exact banner/toast feel.
+
 ## Purpose
 
 This document is the current-state improvement spec for turning the existing project into a more complete, playable roguelike. It is intentionally written for parallel subagents. It replaces vague backlog work with concrete, codebase-specific workstreams, ordering, file targets, and acceptance criteria.

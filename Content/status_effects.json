@@ -236,6 +236,34 @@
       "on_apply_effects": [],
       "on_expire_effects": [],
       "color_tint": "#AAAAFF44"
+    },
+    {
+      "id": "blinded",
+      "name": "Blinded",
+      "description": "Vision and accuracy are impaired by smoke, ash, or shadow.",
+      "icon_path": "res://Assets/Sprites/ui/status_blinded.svg",
+      "duration_type": "turns",
+      "default_duration": 3,
+      "stackable": false,
+      "refreshable": true,
+      "tick_timing": "none",
+      "tick_effects": [],
+      "stat_modifiers": [
+        {
+          "stat": "accuracy",
+          "operation": "add",
+          "value": -25
+        },
+        {
+          "stat": "fov_range",
+          "operation": "add",
+          "value": -3
+        }
+      ],
+      "flags": [],
+      "on_apply_effects": [],
+      "on_expire_effects": [],
+      "color_tint": "#222244AA"
     }
   ]
 }

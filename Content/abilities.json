@@ -664,6 +664,92 @@
       ],
       "animation": "curse_flash",
       "sfx": "gold_drain"
+    },
+    {
+      "id": "web_snare",
+      "name": "Web Snare",
+      "description": "Spit binding webbing that slows and briefly pins a target.",
+      "targeting": {
+        "type": "single",
+        "range": 5,
+        "requires_los": true
+      },
+      "costs": {
+        "energy": 1000
+      },
+      "effects": [
+        {
+          "type": "damage",
+          "damage_type": "physical",
+          "base_value": 3,
+          "stat_scaling": {
+            "stat": "attack",
+            "factor": 0.3
+          }
+        },
+        {
+          "type": "apply_status",
+          "status_effect": "weakened",
+          "chance": 75,
+          "duration": 2
+        }
+      ],
+      "animation": "web_shot",
+      "sfx": "web_snap"
+    },
+    {
+      "id": "blinding_cloud",
+      "name": "Blinding Cloud",
+      "description": "Burst a smoke-and-ash cloud that blinds creatures caught in it.",
+      "targeting": {
+        "type": "aoe_circle",
+        "range": 5,
+        "radius": 2,
+        "requires_los": true,
+        "hits_allies": true
+      },
+      "costs": {
+        "energy": 1000
+      },
+      "effects": [
+        {
+          "type": "apply_status",
+          "status_effect": "blinded",
+          "chance": 100,
+          "duration": 3
+        }
+      ],
+      "animation": "smoke_burst",
+      "sfx": "smoke_puff"
+    },
+    {
+      "id": "chain_lightning",
+      "name": "Chain Lightning",
+      "description": "Release forked lightning across a small cluster of visible targets.",
+      "targeting": {
+        "type": "aoe_circle",
+        "range": 6,
+        "radius": 2,
+        "requires_los": true,
+        "hits_allies": true
+      },
+      "costs": {
+        "energy": 1200,
+        "mp": 10
+      },
+      "effects": [
+        {
+          "type": "damage",
+          "damage_type": "lightning",
+          "base_value": 11,
+          "stat_scaling": {
+            "stat": "attack",
+            "factor": 0.6
+          }
+        }
+      ],
+      "animation": "lightning_chain",
+      "sfx": "lightning_crack"
     }
   ]
 }

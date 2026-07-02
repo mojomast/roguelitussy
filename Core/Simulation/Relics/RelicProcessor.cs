@@ -91,6 +91,17 @@ public static class RelicProcessor
                 ApplyShield(relic, component, player, ctx);
                 break;
             case "echo_bonus":
+                if (relic.RelicId == "soul_collector")
+                {
+                    var progression = player.GetComponent<ProgressionComponent>();
+                    if (progression is not null && progression.Kills > 0 && progression.Kills % 5 == 0)
+                    {
+                        var amount = Math.Max(0, relic.EffectValue);
+                        player.Stats.MaxHP += amount;
+                        player.Stats.HP += amount;
+                    }
+                }
+
                 break;
         }
     }

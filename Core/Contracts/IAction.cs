@@ -27,6 +27,8 @@ public sealed class ActionOutcome
 
     public List<(EntityId EntityId, StatusEffectType EffectType)> ExpiredStatusEffects { get; init; } = new();
 
+    public List<(EntityId BossId, int Phase)> BossPhaseTransitions { get; init; } = new();
+
     public static ActionOutcome Fail(ActionResult reason) => new() { Result = reason };
 
     public static ActionOutcome Ok() => new() { Result = ActionResult.Success };

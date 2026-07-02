@@ -70,6 +70,16 @@ public enum MouseButton
     Middle = 3,
 }
 
+public static class DisplayServer
+{
+    public static string Clipboard { get; private set; } = string.Empty;
+
+    public static void ClipboardSet(string text)
+    {
+        Clipboard = text ?? string.Empty;
+    }
+}
+
 [AttributeUsage(AttributeTargets.Delegate)]
 public sealed class SignalAttribute : Attribute
 {

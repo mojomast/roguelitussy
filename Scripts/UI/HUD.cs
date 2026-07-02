@@ -97,6 +97,10 @@ public partial class HUD : Control
 
     public string RelicTrayText { get; private set; } = string.Empty;
 
+    public string SynergyText { get; private set; } = string.Empty;
+
+    public string ReputationText { get; private set; } = string.Empty;
+
     public string BossHealthText { get; private set; } = string.Empty;
 
     public string KillStreakText { get; private set; } = string.Empty;
@@ -151,6 +155,10 @@ public partial class HUD : Control
             _eventBus.RelicsChanged -= OnRelicsChanged;
             _eventBus.KillStreakChanged -= OnKillStreakChanged;
             _eventBus.BossRoomEntered -= OnBossRoomEntered;
+            _eventBus.BossPhaseTransition -= OnBossPhaseTransition;
+            _eventBus.FloorCleared -= OnFloorCleared;
+            _eventBus.SynergyActivated -= OnSynergyActivated;
+            _eventBus.ReputationChanged -= OnReputationChanged;
             _eventBus.HPChanged -= OnBossHPChanged;
             _eventBus.ActionFeedback -= OnActionFeedback;
         }
@@ -171,6 +179,10 @@ public partial class HUD : Control
             _eventBus.RelicsChanged += OnRelicsChanged;
             _eventBus.KillStreakChanged += OnKillStreakChanged;
             _eventBus.BossRoomEntered += OnBossRoomEntered;
+            _eventBus.BossPhaseTransition += OnBossPhaseTransition;
+            _eventBus.FloorCleared += OnFloorCleared;
+            _eventBus.SynergyActivated += OnSynergyActivated;
+            _eventBus.ReputationChanged += OnReputationChanged;
             _eventBus.HPChanged += OnBossHPChanged;
             _eventBus.ActionFeedback += OnActionFeedback;
         }
@@ -221,6 +233,16 @@ public partial class HUD : Control
         if (!string.IsNullOrWhiteSpace(RelicTrayText))
         {
             builder.AppendLine(RelicTrayText);
+        }
+
+        if (!string.IsNullOrWhiteSpace(SynergyText))
+        {
+            builder.AppendLine(SynergyText);
+        }
+
+        if (!string.IsNullOrWhiteSpace(ReputationText))
+        {
+            builder.AppendLine(ReputationText);
         }
 
         if (!string.IsNullOrWhiteSpace(BossHealthText))
@@ -354,6 +376,35 @@ public partial class HUD : Control
         UpdateLabels();
     }
 
+    private void OnBossPhaseTransition(EntityId bossId, int phase)
+    {
+        var boss = _gameManager?.World?.GetEntity(bossId);
+        BossHealthText = boss is null
+            ? $"Boss: PHASE {phase}"
+            : $"Boss: {boss.Name} {boss.Stats.HP}/{boss.Stats.MaxHP} HP  PHASE {phase}";
+        ActionFeedbackText = $"PHASE {phase}";
+        UpdateLabels();
+    }
+
+    private void OnFloorCleared(int depth)
+    {
+        ActionFeedbackText = $"Floor Cleared! +{10 + (depth * 5)} gold";
+        UpdateLabels();
+    }
+
+    private void OnSynergyActivated(SynergyDefinition synergy)
+    {
+        ActionFeedbackText = $"{synergy.DisplayName} ACTIVATED!";
+        Refresh();
+    }
+
+    private void OnReputationChanged(string factionId, int newValue, int delta)
+    {
+        var arrow = delta >= 0 ? "↑" : "↓";
+        ActionFeedbackText = $"{arrow} {PrettifyFactionId(factionId)} ({delta:+#;-#;0})";
+        Refresh();
+    }
+
     private void OnBossHPChanged(EntityId entityId, int currentHp, int maxHp)
     {
         if (string.IsNullOrWhiteSpace(BossHealthText))
@@ -392,6 +443,8 @@ public partial class HUD : Control
             GoldText = string.Empty;
             StatusEffectsText = string.Empty;
             RelicTrayText = string.Empty;
+            SynergyText = string.Empty;
+            ReputationText = string.Empty;
             BossHealthText = string.Empty;
             KillStreakText = string.Empty;
             HotbarText = "Hotbar: empty";
@@ -417,6 +470,8 @@ public partial class HUD : Control
             GoldText = string.Empty;
             StatusEffectsText = string.Empty;
             RelicTrayText = string.Empty;
+            SynergyText = string.Empty;
+            ReputationText = string.Empty;
             BossHealthText = string.Empty;
             KillStreakText = string.Empty;
             HotbarText = "Hotbar: empty";
@@ -465,6 +520,8 @@ public partial class HUD : Control
             : "Effects: " + string.Join(", ", effects.Select(effect => $"{effect.Type}({effect.RemainingTurns})"));
         SyncStatusIcons(effects);
         RelicTrayText = BuildRelicTrayText(_gameManager?.GetPlayerRelics() ?? System.Array.Empty<RelicTemplate>());
+        SynergyText = BuildSynergyText(player);
+        ReputationText = BuildReputationText(player);
         var streak = player.GetComponent<KillStreakComponent>();
         KillStreakText = streak is { CurrentStreak: >= 2 }
             ? $"Kill Streak: {streak.CurrentStreak} (best {streak.HighestStreak})"
@@ -918,6 +975,7 @@ public partial class HUD : Control
         StatusEffectType.Corroded => "corroded",
         StatusEffectType.Phased => "phased",
         StatusEffectType.Flying => "flying",
+        StatusEffectType.Blinded => "blinded",
         _ => null,
     };
 
@@ -942,8 +1000,9 @@ public partial class HUD : Control
         _effectsLabel.Text = FitLabelText(StatusEffectsText, _effectsLabel.Size.X);
         _effectsLabel.Visible = !string.IsNullOrWhiteSpace(StatusEffectsText);
         _effectsLabel.Modulate = UiStyle.WarningOrange();
-        _relicLabel.Text = FitLabelText(RelicTrayText, _relicLabel.Size.X);
-        _relicLabel.Visible = !string.IsNullOrWhiteSpace(RelicTrayText);
+        var buildText = string.Join("  ", new[] { RelicTrayText, SynergyText, ReputationText }.Where(text => !string.IsNullOrWhiteSpace(text)));
+        _relicLabel.Text = FitLabelText(buildText, _relicLabel.Size.X);
+        _relicLabel.Visible = !string.IsNullOrWhiteSpace(buildText);
         _relicLabel.Modulate = UiStyle.BrightGold();
         _bossLabel.Text = FitLabelText(BossHealthText, _bossLabel.Size.X);
         _bossLabel.Visible = !string.IsNullOrWhiteSpace(BossHealthText);
@@ -1401,6 +1460,44 @@ public partial class HUD : Control
         return relics.Count == 0
             ? string.Empty
             : "Relics: " + string.Join(" | ", relics.Select(relic => relic.DisplayName));
+    }
+
+    private string BuildSynergyText(IEntity player)
+    {
+        var content = _gameManager?.Content;
+        if (content is null)
+        {
+            return string.Empty;
+        }
+
+        var active = SynergyResolver.GetActiveSynergies(player, content);
+        if (active.Count > 0)
+        {
+            return "Synergies: " + string.Join(" | ", active.Select(synergy => synergy.DisplayName));
+        }
+
+        var potential = SynergyResolver.GetPotentialSynergies(player, content).FirstOrDefault();
+        return potential is null ? string.Empty : $"Synergy Hint: {potential.DisplayName} needs one piece";
+    }
+
+    private static string BuildReputationText(IEntity player)
+    {
+        var reputation = player.GetComponent<FactionComponent>();
+        if (reputation is null || reputation.Reputation.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        return "Rep: " + string.Join(
+            " | ",
+            reputation.Reputation
+                .OrderBy(pair => pair.Key, System.StringComparer.Ordinal)
+                .Select(pair => $"{PrettifyFactionId(pair.Key)} {pair.Value} {ReputationService.GetReputationLabel(pair.Value)}"));
+    }
+
+    private static string PrettifyFactionId(string factionId)
+    {
+        return string.Join(" ", factionId.Split('_').Select(part => part.Length == 0 ? part : char.ToUpperInvariant(part[0]) + part[1..]));
     }
 
     private static Label CreateLabel(string name, Vector2 position, Vector2 size)

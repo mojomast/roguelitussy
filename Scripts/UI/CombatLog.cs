@@ -101,6 +101,10 @@ public partial class CombatLog : Control
             _eventBus.LeveledUp -= OnLeveledUp;
             _eventBus.CurrencyChanged -= OnCurrencyChanged;
             _eventBus.KillStreakChanged -= OnKillStreakChanged;
+            _eventBus.CriticalHitDealt -= OnCriticalHitDealt;
+            _eventBus.SynergyActivated -= OnSynergyActivated;
+            _eventBus.ReputationChanged -= OnReputationChanged;
+            _eventBus.FloorCleared -= OnFloorCleared;
         }
 
         _gameManager = gameManager;
@@ -122,6 +126,10 @@ public partial class CombatLog : Control
         _eventBus.LeveledUp += OnLeveledUp;
         _eventBus.CurrencyChanged += OnCurrencyChanged;
         _eventBus.KillStreakChanged += OnKillStreakChanged;
+        _eventBus.CriticalHitDealt += OnCriticalHitDealt;
+        _eventBus.SynergyActivated += OnSynergyActivated;
+        _eventBus.ReputationChanged += OnReputationChanged;
+        _eventBus.FloorCleared += OnFloorCleared;
         RefreshVisualState();
     }
 
@@ -138,8 +146,10 @@ public partial class CombatLog : Control
         var defender = ResolveName(damage.DefenderId);
         var message = damage.IsMiss
             ? $"{attacker} misses {defender}."
-            : $"{attacker} hits {defender} for {damage.FinalDamage} damage.";
-        AddMessage(message, damage.AttackerId == _gameManager?.World?.Player?.Id ? LogCategory.PlayerAction : LogCategory.EnemyAction);
+            : damage.IsCritical
+                ? $"CRITICAL HIT! {attacker} hits {defender} for {damage.FinalDamage} damage."
+                : $"{attacker} hits {defender} for {damage.FinalDamage} damage.";
+        AddMessage(message, damage.IsCritical ? LogCategory.Critical : damage.AttackerId == _gameManager?.World?.Player?.Id ? LogCategory.PlayerAction : LogCategory.EnemyAction);
     }
 
     private void OnEntityDied(EntityId entityId)
@@ -217,7 +227,32 @@ public partial class CombatLog : Control
         if (entityId == _gameManager?.World?.Player?.Id && current >= 2)
         {
             AddMessage($"Kill streak: {current} (best {highest}).", LogCategory.PlayerAction);
+            if (current is 3 or 5 or 7)
+            {
+                AddMessage($"Momentum surges at streak {current}!", LogCategory.Critical);
+            }
         }
+    }
+
+    private void OnCriticalHitDealt(EntityId attackerId, EntityId defenderId, int damage)
+    {
+        AddMessage($"CRITICAL HIT! {ResolveName(attackerId)} -> {ResolveName(defenderId)} ({damage}).", LogCategory.Critical);
+    }
+
+    private void OnSynergyActivated(SynergyDefinition synergy)
+    {
+        AddMessage($"{synergy.DisplayName} ACTIVATED!", LogCategory.Critical);
+    }
+
+    private void OnReputationChanged(string factionId, int newValue, int delta)
+    {
+        var arrow = delta >= 0 ? "↑" : "↓";
+        AddMessage($"{arrow} {PrettifyFactionId(factionId)} ({delta:+#;-#;0}) now {newValue}.", delta < 0 ? LogCategory.Warning : LogCategory.System);
+    }
+
+    private void OnFloorCleared(int depth)
+    {
+        AddMessage($"Floor Cleared! +{10 + (depth * 5)} gold.", LogCategory.Critical);
     }
 
     private void AddMessage(string message, LogCategory category)
@@ -416,5 +451,10 @@ public partial class CombatLog : Control
         return content is not null && content.TryGetItemTemplate(templateId, out var template)
             ? template.DisplayName
             : templateId;
+    }
+
+    private static string PrettifyFactionId(string factionId)
+    {
+        return string.Join(" ", factionId.Split('_').Select(part => part.Length == 0 ? part : char.ToUpperInvariant(part[0]) + part[1..]));
     }
 }

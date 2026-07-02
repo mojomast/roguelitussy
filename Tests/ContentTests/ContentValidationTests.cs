@@ -27,23 +27,26 @@ public sealed class ContentValidationTests : ITestSuite
         var content = LoadContent();
 
         Expect.True(content.IsValid, FormatErrors(content));
-        Expect.Equal(29, content.ItemDefinitions.Count, "Expected the full item set to load");
-        Expect.Equal(21, content.EnemyDefinitions.Count, "Expected the full enemy set to load");
-        Expect.Equal(26, content.AbilityDefinitions.Count, "Expected the full ability set to load");
+        Expect.Equal(35, content.ItemDefinitions.Count, "Expected the full item set to load");
+        Expect.Equal(27, content.EnemyDefinitions.Count, "Expected the full enemy set to load");
+        Expect.Equal(29, content.AbilityDefinitions.Count, "Expected the full ability set to load");
         Expect.Equal(20, content.PerkDefinitions.Count, "Expected the initial perk set to load");
         Expect.Equal(2, content.DialogueDefinitions.Count, "Expected the full dialog set to load");
         Expect.Equal(2, content.NpcDefinitions.Count, "Expected the full NPC set to load");
-        Expect.Equal(10, content.StatusEffects.Count, "Expected the full status effect set to load");
+        Expect.Equal(11, content.StatusEffects.Count, "Expected the full status effect set to load");
         Expect.True(content.RoomPrefabs.Count >= 10, "Expected at least the baseline room prefab set to load");
-        Expect.Equal(27, content.LootTables.Count, "Expected the full loot table set to load");
+        Expect.Equal(33, content.LootTables.Count, "Expected the full loot table set to load");
         Expect.Equal(6, content.TrapDefinitions.Count, "Expected the baseline trap set to load");
-        Expect.Equal(20, content.RelicTemplates.Count, "Expected the full relic set to load");
+        Expect.Equal(25, content.RelicTemplates.Count, "Expected the full relic set to load");
         Expect.Equal(6, content.FloorEvents.Count, "Expected the floor event catalogue to load");
         Expect.Equal(15, content.Synergies.Count, "Expected the synergy catalogue to load");
         Expect.Equal(10, content.AscensionModifiers.Count, "Expected the ascension modifier catalogue to load");
         Expect.Equal(7, content.DailyModifiers.Count, "Expected the daily modifier catalogue to load");
         Expect.Equal(40, content.NarrativeTemplates.Count, "Expected the narrative template catalogue to load");
         Expect.Equal(3, content.Factions.Count, "Expected the faction catalogue to load");
+
+        RequestedContentExpansionIdsLoad(content);
+        RequestedItemDropsAreReachable(content);
     }
 
     private static void LoadsFromInMemoryJsonDocuments()
@@ -245,6 +248,81 @@ public sealed class ContentValidationTests : ITestSuite
             Expect.True(enemy.GoldMin >= 0, $"Enemy '{enemy.Id}' gold_min must be non-negative");
             Expect.True(enemy.GoldMax >= 0, $"Enemy '{enemy.Id}' gold_max must be non-negative");
             Expect.True(enemy.GoldMin <= enemy.GoldMax, $"Enemy '{enemy.Id}' gold_min must not exceed gold_max");
+        }
+    }
+
+    private static void RequestedContentExpansionIdsLoad(ContentLoader content)
+    {
+        var requestedEnemies = new[]
+        {
+            "cultist_healer",
+            "shadow_assassin",
+            "stone_sentinel",
+            "web_spinner",
+            "magma_wisp",
+            "echo_shade"
+        };
+
+        var requestedItems = new[]
+        {
+            "item_web_trap",
+            "scroll_blink",
+            "scroll_chain_lightning",
+            "item_throwing_knife",
+            "item_iron_rations",
+            "item_smoke_bomb",
+            "item_rune_stone",
+            "item_berserker_axe"
+        };
+
+        var requestedRelics = new[]
+        {
+            "mirror_shard",
+            "time_anchor",
+            "soul_collector",
+            "void_amulet",
+            "alchemist_stone"
+        };
+
+        foreach (var enemyId in requestedEnemies)
+        {
+            Expect.True(content.EnemyDefinitions.ContainsKey(enemyId), $"Requested enemy '{enemyId}' should load.");
+        }
+
+        foreach (var itemId in requestedItems)
+        {
+            Expect.True(content.ItemDefinitions.ContainsKey(itemId), $"Requested item '{itemId}' should load.");
+        }
+
+        foreach (var relicId in requestedRelics)
+        {
+            Expect.True(content.RelicTemplates.ContainsKey(relicId), $"Requested relic '{relicId}' should load.");
+        }
+
+        Expect.True(content.StatusEffects.ContainsKey("blinded"), "Requested blinded status effect should load.");
+    }
+
+    private static void RequestedItemDropsAreReachable(ContentLoader content)
+    {
+        var lootItemIds = content.LootTables.Values
+            .SelectMany(table => table.Entries)
+            .Where(entry => !string.IsNullOrWhiteSpace(entry.ItemId))
+            .Select(entry => entry.ItemId!)
+            .ToHashSet(System.StringComparer.Ordinal);
+
+        foreach (var itemId in new[]
+        {
+            "item_web_trap",
+            "scroll_blink",
+            "scroll_chain_lightning",
+            "item_throwing_knife",
+            "item_iron_rations",
+            "item_smoke_bomb",
+            "item_rune_stone",
+            "item_berserker_axe"
+        })
+        {
+            Expect.True(lootItemIds.Contains(itemId), $"Requested item '{itemId}' should be reachable from loot tables.");
         }
     }
 
