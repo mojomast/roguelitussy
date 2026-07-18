@@ -312,12 +312,16 @@ public sealed class DungeonGeneratorTests : ITestSuite
             throw new InvalidOperationException("CollectTrapSpawnDetails method not found.");
         }
 
-        var result = (List<TrapSpawnData>)method.Invoke(null, new object[] { new[] { room }, occupied })!;
+        var result = (List<TrapSpawnData>)method.Invoke(null, new object?[] { new[] { room }, occupied, "prison", 42 })!;
 
         Expect.Equal(2, result.Count, "Should collect both trap tiles and trap spawn points.");
-        Expect.True(result.Any(spawn => spawn.Position == new Position(12, 11) && spawn.TrapId is null), "Trap tile position should be collected.");
+        var tileTrap = result.Single(spawn => spawn.Position == new Position(12, 11));
+        Expect.True(tileTrap.TrapId is "spike_trap" or "trap_alarm", "Trap tiles should receive a theme-appropriate trap id.");
         Expect.True(result.Any(spawn => spawn.Position == new Position(11, 12) && spawn.TrapId == "spike_trap"), "Trap spawn point with trap_id should be collected.");
         Expect.Equal(2, occupied.Count, "Trap positions should be added to the occupied set.");
+
+        var repeat = (List<TrapSpawnData>)method.Invoke(null, new object?[] { new[] { room }, new HashSet<Position>(), "prison", 42 })!;
+        Expect.Equal(tileTrap.TrapId!, repeat.Single(spawn => spawn.Position == new Position(12, 11)).TrapId!, "Trap id assignment should be deterministic for a given seed.");
     }
 
     private static void LevelValidatorConfirmsTrapReachability()
@@ -389,7 +393,7 @@ public sealed class DungeonGeneratorTests : ITestSuite
             throw new InvalidOperationException("Could not resolve generator collection methods.");
         }
 
-        var traps = (List<TrapSpawnData>)trapMethod.Invoke(null, new object[] { new[] { room }, occupied })!;
+        var traps = (List<TrapSpawnData>)trapMethod.Invoke(null, new object?[] { new[] { room }, occupied, "crypt", 7 })!;
         var enemies = (List<EnemySpawnData>)enemyMethod.Invoke(null, new object[] { new[] { room }, occupied, Array.Empty<EnemySpawnData>(), new[] { "enemy", "enemy_boss" } })!;
         var items = (List<ItemSpawnData>)itemMethod.Invoke(null, new object[] { new[] { room }, occupied, Array.Empty<ItemSpawnData>(), new[] { "item" } })!;
 

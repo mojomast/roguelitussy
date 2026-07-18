@@ -24,7 +24,12 @@ public sealed record RunStats(
     int Seed,
     string CauseOfDeath,
     string BestItemName,
-    int BestItemValue);
+    int BestItemValue,
+    string Archetype = "unknown",
+    IReadOnlyList<string>? RelicIds = null,
+    IReadOnlyList<string>? SynergyIds = null,
+    IReadOnlyList<string>? PerkIds = null,
+    IReadOnlyList<string>? FloorsClearedThemes = null);
 
 public sealed record FloorStats(
     int FloorNumber,
@@ -60,7 +65,6 @@ public partial class EventBus : Node
 {
     public event Action<int>? TurnStarted;
     public event Action? TurnCompleted;
-    public event Action<EntityId>? EntityTurnStarted;
     public event Action<IAction>? PlayerActionSubmitted;
     public event Action<DamageResult>? DamageDealt;
     public event Action<EntityId>? EntityDied;
@@ -76,12 +80,12 @@ public partial class EventBus : Node
     public event Action<string, LogCategory>? LogMessage;
     public event Action<EntityId>? InventoryChanged;
     public event Action<EntityId, int, int>? HPChanged;
+    public event Action<EntityId, int>? Healed;
     public event Action<int>? SaveRequested;
     public event Action<int>? LoadRequested;
     public event Action<bool>? SaveCompleted;
     public event Action<bool>? LoadCompleted;
     public event Action? FovRecalculated;
-    public event Action<int, int, int>? LevelGenerated;
     public event Action<int, int>? LevelTransition;
     public event Action<EntityId, EquipSlot, ItemInstance?>? EquipmentChanged;
     public event Action<int, int>? GameOver;
@@ -104,7 +108,6 @@ public partial class EventBus : Node
     public event Action<EntityId>? BossRoomEntered;
     public event Action<ActionFeedbackEventArgs>? ActionFeedback;
     public event Action<SynergyDefinition>? SynergyActivated;
-    public event Action<int>? AscensionLevelChanged;
     public event Action<EntityId, int>? BossPhaseTransition;
     public event Action<string, int, int>? ReputationChanged;
     public event Action<EntityId, EntityId, int>? CriticalHitDealt;
@@ -115,8 +118,6 @@ public partial class EventBus : Node
     public void EmitTurnStarted(int turnNumber) => TurnStarted?.Invoke(turnNumber);
 
     public void EmitTurnCompleted() => TurnCompleted?.Invoke();
-
-    public void EmitEntityTurnStarted(EntityId entityId) => EntityTurnStarted?.Invoke(entityId);
 
     public void EmitPlayerActionSubmitted(IAction action) => PlayerActionSubmitted?.Invoke(action);
 
@@ -155,6 +156,8 @@ public partial class EventBus : Node
     public void EmitHPChanged(EntityId entityId, int currentHp, int maxHp) =>
         HPChanged?.Invoke(entityId, currentHp, maxHp);
 
+    public void EmitHealed(EntityId entityId, int amount) => Healed?.Invoke(entityId, amount);
+
     public void EmitSaveRequested(int slot) => SaveRequested?.Invoke(slot);
 
     public void EmitLoadRequested(int slot) => LoadRequested?.Invoke(slot);
@@ -164,8 +167,6 @@ public partial class EventBus : Node
     public void EmitLoadCompleted(bool success) => LoadCompleted?.Invoke(success);
 
     public void EmitFovRecalculated() => FovRecalculated?.Invoke();
-
-    public void EmitLevelGenerated(int depth, int width, int height) => LevelGenerated?.Invoke(depth, width, height);
 
     public void EmitLevelTransition(int fromDepth, int toDepth) => LevelTransition?.Invoke(fromDepth, toDepth);
 
@@ -211,8 +212,6 @@ public partial class EventBus : Node
     public void EmitActionFeedback(ActionFeedbackEventArgs args) => ActionFeedback?.Invoke(args);
 
     public void EmitSynergyActivated(SynergyDefinition synergy) => SynergyActivated?.Invoke(synergy);
-
-    public void EmitAscensionLevelChanged(int level) => AscensionLevelChanged?.Invoke(level);
 
     public void EmitBossPhaseTransition(EntityId bossId, int newPhase) => BossPhaseTransition?.Invoke(bossId, newPhase);
 

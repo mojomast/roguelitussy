@@ -140,7 +140,12 @@ internal sealed class EntitySaveData
 
     public SynergySaveData? Synergy { get; set; }
 
-    public int SchedulerOrder { get; set; }
+    /// <summary>
+    /// Turn scheduler tie-break order for this entity. Null means the entity was not
+    /// tracked by the scheduler when the save was written; 0 is a valid order (the
+    /// first-registered actor) and must be preserved.
+    /// </summary>
+    public int? SchedulerOrder { get; set; }
 }
 
 internal sealed class BossPhaseSaveData
@@ -167,6 +172,20 @@ internal sealed class RelicSaveData
     public int ShieldCharges { get; set; }
 
     public bool LowHpRelicFired { get; set; }
+
+    public List<string> FirstHitEntityIds { get; set; } = new();
+
+    public List<string> AppliedOneTimeRelics { get; set; } = new();
+
+    public int DamageBuffPercent { get; set; }
+
+    public int DamageBuffExpiresOnTurn { get; set; }
+
+    /// <summary>
+    /// Depth of the floor where the merchant discount was last applied. Defaults to -1
+    /// ("never applied") so saves written before this field existed rehydrate correctly.
+    /// </summary>
+    public int LastMerchantDiscountDepth { get; set; } = -1;
 }
 
 internal sealed class ShrineSaveData
@@ -398,7 +417,7 @@ internal sealed class PositionSaveData
 
 public static class SaveSerializer
 {
-    public const int CurrentVersion = 15;
+    public const int CurrentVersion = 16;
 
     internal static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -555,9 +574,9 @@ public static class SaveSerializer
 
         foreach (var entityData in floor.Entities)
         {
-            if (entityData.SchedulerOrder != 0)
+            if (entityData.SchedulerOrder is { } schedulerOrder)
             {
-                world.SchedulerOrders[EntityId.From(entityData.Id)] = entityData.SchedulerOrder;
+                world.SchedulerOrders[EntityId.From(entityData.Id)] = schedulerOrder;
             }
         }
 
@@ -789,6 +808,16 @@ public static class SaveSerializer
                 RelicIds = relic.RelicIds.ToList(),
                 ShieldCharges = relic.ShieldCharges,
                 LowHpRelicFired = relic.LowHpRelicFired,
+                FirstHitEntityIds = relic.FirstHitEntityIds
+                    .Select(id => id.Value.ToString("N"))
+                    .OrderBy(id => id, StringComparer.Ordinal)
+                    .ToList(),
+                AppliedOneTimeRelics = relic.AppliedOneTimeRelics
+                    .OrderBy(id => id, StringComparer.Ordinal)
+                    .ToList(),
+                DamageBuffPercent = relic.DamageBuffPercent,
+                DamageBuffExpiresOnTurn = relic.DamageBuffExpiresOnTurn,
+                LastMerchantDiscountDepth = relic.LastMerchantDiscountDepth,
             },
             Shrine = shrine is null ? null : new ShrineSaveData
             {
@@ -823,7 +852,7 @@ public static class SaveSerializer
             {
                 AppliedPassiveSynergyIds = synergy.AppliedPassiveSynergyIds.Distinct(StringComparer.Ordinal).OrderBy(id => id, StringComparer.Ordinal).ToList(),
             },
-            SchedulerOrder = world.SchedulerOrders.TryGetValue(entity.Id, out var schedulerOrder) ? schedulerOrder : 0,
+            SchedulerOrder = world.SchedulerOrders.TryGetValue(entity.Id, out var schedulerOrder) ? schedulerOrder : null,
         };
     }
 
@@ -1171,10 +1200,23 @@ public static class SaveSerializer
             {
                 ShieldCharges = data.Relic.ShieldCharges,
                 LowHpRelicFired = data.Relic.LowHpRelicFired,
+                DamageBuffPercent = data.Relic.DamageBuffPercent,
+                DamageBuffExpiresOnTurn = data.Relic.DamageBuffExpiresOnTurn,
+                LastMerchantDiscountDepth = data.Relic.LastMerchantDiscountDepth,
             };
             foreach (var relicId in data.Relic.RelicIds.Where(id => !string.IsNullOrWhiteSpace(id)))
             {
                 relic.RelicIds.Add(relicId);
+            }
+
+            foreach (var firstHitId in data.Relic.FirstHitEntityIds.Where(id => !string.IsNullOrWhiteSpace(id)))
+            {
+                relic.FirstHitEntityIds.Add(EntityId.From(firstHitId));
+            }
+
+            foreach (var oneTimeRelicId in data.Relic.AppliedOneTimeRelics.Where(id => !string.IsNullOrWhiteSpace(id)))
+            {
+                relic.AppliedOneTimeRelics.Add(oneTimeRelicId);
             }
 
             entity.SetComponent(relic);

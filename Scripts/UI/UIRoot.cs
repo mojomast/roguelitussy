@@ -339,18 +339,6 @@ public partial class UIRoot : CanvasLayer
             return handledByExamine;
         }
 
-        if (key == Key.Quoteleft)
-        {
-            ToggleDebugConsole();
-            return true;
-        }
-
-        if (key == Key.Q)
-        {
-            ToggleDebugOverlay();
-            return true;
-        }
-
         if (GameOverScreen.Visible)
         {
             var handled = GameOverScreen.HandleKey(key);
@@ -505,7 +493,31 @@ public partial class UIRoot : CanvasLayer
             return handled;
         }
 
+        if (IsDebugBuild())
+        {
+            if (key == Key.Quoteleft)
+            {
+                ToggleDebugConsole();
+                return true;
+            }
+
+            if (key == Key.Q)
+            {
+                ToggleDebugOverlay();
+                return true;
+            }
+        }
+
         return InputHandler.HandleKey(key);
+    }
+
+    private static bool IsDebugBuild()
+    {
+#if DEBUG
+        return true;
+#else
+        return false;
+#endif
     }
 
     private void OnTurnCompleted()

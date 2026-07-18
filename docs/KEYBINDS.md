@@ -24,8 +24,8 @@ This page reflects the current repository wiring in `InputHandler` and the activ
 | Interact | `F` | Interacts with nearby NPCs, chests, or contextual objects. `E` is not a normal-gameplay interact key. |
 | Help | `H` | Opens help. |
 | Dev tools | `T` | Opens the development tools workbench. |
-| Debug console | `` ` `` | Opens debug console where available. |
-| Debug overlay | `Q` | Toggles debug overlay where available. |
+| Debug console | `` ` `` | Opens the debug console in `DEBUG` builds only. |
+| Debug overlay | `Q` | Toggles the debug overlay in `DEBUG` builds only. |
 
 ## Main Menu / Character Creation
 

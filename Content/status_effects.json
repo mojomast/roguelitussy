@@ -238,6 +238,46 @@
       "color_tint": "#AAAAFF44"
     },
     {
+      "id": "regenerating",
+      "name": "Regenerating",
+      "description": "Flesh knits itself shut, turn by turn.",
+      "icon_path": "res://Assets/Sprites/ui/status_regenerating.svg",
+      "duration_type": "turns",
+      "default_duration": 3,
+      "stackable": true,
+      "max_stacks": 3,
+      "refreshable": true,
+      "tick_timing": "end_of_turn",
+      "tick_effects": [
+        {
+          "type": "heal",
+          "value": 2
+        }
+      ],
+      "stat_modifiers": [],
+      "flags": [],
+      "on_apply_effects": [],
+      "on_expire_effects": [],
+      "color_tint": "#33DD6688"
+    },
+    {
+      "id": "flying",
+      "name": "Flying",
+      "description": "Aloft on dark air. Ground traps go hungry underneath.",
+      "icon_path": "res://Assets/Sprites/ui/status_flying.svg",
+      "duration_type": "turns",
+      "default_duration": 5,
+      "stackable": false,
+      "refreshable": true,
+      "tick_timing": "none",
+      "tick_effects": [],
+      "stat_modifiers": [],
+      "flags": ["flying"],
+      "on_apply_effects": [],
+      "on_expire_effects": [],
+      "color_tint": "#CCDDFF88"
+    },
+    {
       "id": "blinded",
       "name": "Blinded",
       "description": "Vision and accuracy are impaired by smoke, ash, or shadow.",

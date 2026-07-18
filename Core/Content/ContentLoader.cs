@@ -1177,7 +1177,7 @@ public sealed class ContentLoader : IContentDatabase
         ValidateHeader(factions.Schema, factions.Version, "roguelike-factions-v1", "factions.json", errors);
 
         ValidateItems(itemDefinitions, abilityDefinitions, statusDefinitions, errors);
-        ValidateEnemies(enemyDefinitions, abilityDefinitions, lootDefinitions, errors);
+        ValidateEnemies(enemyDefinitions, abilityDefinitions, lootDefinitions, statusDefinitions, errors);
         ValidateAbilities(abilityDefinitions, statusDefinitions, errors);
         ValidatePerks(perkDefinitions, errors);
         ValidateDialogs(dialogueDefinitions, errors);
@@ -1272,6 +1272,11 @@ public sealed class ContentLoader : IContentDatabase
             if (modifier.DayOfWeek < 0 || modifier.DayOfWeek > 6 || !days.Add(modifier.DayOfWeek))
             {
                 errors.Add($"Daily modifier '{id}' must use a unique day_of_week between 0 and 6.");
+            }
+
+            if (!IsAllowedValue(modifier.EffectType, "shop_discount", "elite_every_floor", "curse_every_floor", "speed_score", "starting_relic", "boss_hp_boost", "double_rewards"))
+            {
+                errors.Add($"Daily modifier '{id}' has unsupported effect_type '{modifier.EffectType}'.");
             }
         }
     }
@@ -1546,6 +1551,7 @@ public sealed class ContentLoader : IContentDatabase
         IReadOnlyDictionary<string, EnemyDefinition> enemies,
         IReadOnlyDictionary<string, AbilityDefinition> abilities,
         IReadOnlyDictionary<string, LootTableDefinition> lootTables,
+        IReadOnlyDictionary<string, StatusEffectDefinition> statusEffects,
         ICollection<string> errors)
     {
         foreach (var (id, enemy) in enemies)
@@ -1732,6 +1738,11 @@ public sealed class ContentLoader : IContentDatabase
                 if (!string.IsNullOrWhiteSpace(phase.AbilityId) && !abilities.ContainsKey(phase.AbilityId))
                 {
                     errors.Add($"Enemy '{id}' boss phase {phase.Phase} references unknown ability '{phase.AbilityId}'.");
+                }
+
+                if (!string.IsNullOrWhiteSpace(phase.StatusEffect) && !statusEffects.ContainsKey(phase.StatusEffect))
+                {
+                    errors.Add($"Enemy '{id}' boss phase {phase.Phase} references unknown status effect '{phase.StatusEffect}'.");
                 }
             }
 
@@ -2013,12 +2024,12 @@ public sealed class ContentLoader : IContentDatabase
 
             foreach (var tickEffect in effect.TickEffects)
             {
-                if (!string.Equals(tickEffect.Type, "damage", StringComparison.Ordinal))
+                if (!IsAllowedValue(tickEffect.Type, "damage", "heal"))
                 {
                     errors.Add($"Status effect '{id}' tick effect type '{tickEffect.Type}' is unsupported.");
                 }
 
-                if (!TryParseDamageType(tickEffect.DamageType, out _))
+                if (string.Equals(tickEffect.Type, "damage", StringComparison.Ordinal) && !TryParseDamageType(tickEffect.DamageType, out _))
                 {
                     errors.Add($"Status effect '{id}' tick effect has invalid damage_type '{tickEffect.DamageType}'.");
                 }
@@ -2039,7 +2050,7 @@ public sealed class ContentLoader : IContentDatabase
 
             foreach (var flag in effect.Flags)
             {
-                if (!IsAllowedValue(flag, "skip_turn", "phase_through_walls", "immune_physical"))
+                if (!IsAllowedValue(flag, "skip_turn", "phase_through_walls", "immune_physical", "flying"))
                 {
                     errors.Add($"Status effect '{id}' has invalid flag '{flag}'.");
                 }

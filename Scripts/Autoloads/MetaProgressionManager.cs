@@ -14,7 +14,6 @@ public partial class MetaProgressionManager : Node
 
     private MetaProgressionData _data = new();
     private IReadOnlyList<MetaProgressionUpgrade> _upgrades = Array.Empty<MetaProgressionUpgrade>();
-    private bool _suppressNextSimpleGameOver;
 
     public IReadOnlyList<MetaProgressionUpgrade> Upgrades => _upgrades;
 
@@ -137,7 +136,6 @@ public partial class MetaProgressionManager : Node
 
         _data.AscensionLevel = nextLevel;
         Save();
-        GetNodeOrNull<EventBus>("/root/EventBus")?.EmitAscensionLevelChanged(nextLevel);
     }
 
     public int GetIntBonus(string effect)
@@ -157,13 +155,13 @@ public partial class MetaProgressionManager : Node
             return;
         }
 
+        // GameManager guarantees GameOverWithStats fires exactly once for every player-death
+        // path (combat, status ticks, traps), so this is the single canonical run-ended signal.
         bus.GameOverWithStats += OnGameOverWithStats;
-        bus.GameOver += OnGameOver;
     }
 
     private void OnGameOverWithStats(RunStats stats)
     {
-        _suppressNextSimpleGameOver = true;
         var firstDepth = IsFirstTimeReachedDepth(stats.FloorReached);
         var echoBonus = GetIntBonus("echo_bonus_pct");
         var echoes = MetaProgressionService.CalculateEchoAward(
@@ -183,30 +181,6 @@ public partial class MetaProgressionManager : Node
         RecordRun(entry);
     }
 
-    private void OnGameOver(int finalDepth, int turnsSurvived)
-    {
-        if (_suppressNextSimpleGameOver)
-        {
-            _suppressNextSimpleGameOver = false;
-            return;
-        }
-
-        var entry = new RunHistoryEntry(
-            "Unknown",
-            "unknown",
-            Math.Max(0, finalDepth),
-            0,
-            0,
-            "Unknown",
-            string.Empty,
-            Math.Max(0, turnsSurvived),
-            DateTimeOffset.UtcNow.ToUnixTimeSeconds());
-
-        var echoes = MetaProgressionService.CalculateEchoAward(entry.FloorReached, 0, 0, IsFirstTimeReachedDepth(entry.FloorReached), GetIntBonus("echo_bonus_pct"));
-        AddEchoes(echoes);
-        RecordRun(entry);
-    }
-
     private bool IsFirstTimeReachedDepth(int floorReached)
     {
         return floorReached > 0 && !_data.RunHistory.Any(entry => entry.FloorReached >= floorReached);
@@ -216,14 +190,18 @@ public partial class MetaProgressionManager : Node
     {
         return new RunHistoryEntry(
             stats.CharacterName,
-            "unknown",
+            string.IsNullOrWhiteSpace(stats.Archetype) ? "unknown" : stats.Archetype,
             Math.Max(0, stats.FloorReached),
             Math.Max(0, stats.EnemiesKilled),
             Math.Max(0, stats.GoldCollected),
             string.IsNullOrWhiteSpace(stats.CauseOfDeath) ? "Unknown" : stats.CauseOfDeath,
             stats.BestItemName,
             Math.Max(0, stats.TotalTurns),
-            DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+            DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+            RelicsHeld: stats.RelicIds is null ? new List<string>() : new List<string>(stats.RelicIds),
+            SynergyIds: stats.SynergyIds is null ? new List<string>() : new List<string>(stats.SynergyIds),
+            ActivePerkIds: stats.PerkIds is null ? new List<string>() : new List<string>(stats.PerkIds),
+            FloorsClearedThemes: stats.FloorsClearedThemes?.ToArray() ?? Array.Empty<string>());
     }
 
     private static string GlobalizePath(string path)

@@ -89,7 +89,7 @@
     {
       "id": "perk_undying",
       "name": "Undying",
-      "description": "Survive lethal damage once per floor at 1 HP.",
+      "description": "Death has passed you over before; the flesh remembers. +4 Max HP.",
       "unlock_level": 3,
       "effects": [
         {
@@ -120,7 +120,7 @@
     {
       "id": "perk_volley",
       "name": "Volley",
-      "description": "Ranged attacks hit all enemies in a line.",
+      "description": "Years of loosing shafts under fire steady the hand. +5 Accuracy.",
       "unlock_level": 3,
       "effects": [
         {
@@ -151,7 +151,7 @@
     {
       "id": "perk_death_dance",
       "name": "Death Dance",
-      "description": "Kill streak threshold reduced by 1.",
+      "description": "Footwork learned between falling corpses. +5 Speed.",
       "unlock_level": 3,
       "effects": [
         {
@@ -164,7 +164,7 @@
     {
       "id": "perk_arcane_surge",
       "name": "Arcane Surge",
-      "description": "Abilities deal +30% damage.",
+      "description": "Stolen power hums in the veins and rides every blow. +2 Attack.",
       "unlock_level": 2,
       "effects": [
         {
@@ -177,7 +177,7 @@
     {
       "id": "perk_spell_echo",
       "name": "Spell Echo",
-      "description": "10% chance to cast an ability again for free.",
+      "description": "The incantation lingers in the ear and guides the next strike home. +5 Accuracy.",
       "unlock_level": 3,
       "effects": [
         {
@@ -247,7 +247,7 @@
     {
       "id": "perk_survivalist",
       "name": "Survivalist",
-      "description": "Potions heal +5 bonus HP once runtime support lands.",
+      "description": "Lean seasons taught the body to keep what it takes. +5 Max HP.",
       "unlock_level": 3,
       "effects": [
         {
@@ -260,7 +260,7 @@
     {
       "id": "perk_treasure_sense",
       "name": "Treasure Sense",
-      "description": "Chests should be revealed on floor enter once minimap support lands.",
+      "description": "You read the dark for the gleam of coin and locks. +1 View Radius.",
       "unlock_level": 3,
       "effects": [
         {
@@ -273,7 +273,7 @@
     {
       "id": "perk_iron_gut",
       "name": "Iron Gut",
-      "description": "Intended poison immunity; currently grants toughness until immunity support lands.",
+      "description": "A constitution pickled by worse meals than poison. +2 Defense.",
       "unlock_level": 3,
       "effects": [
         {
@@ -286,7 +286,7 @@
     {
       "id": "perk_berserker",
       "name": "Berserker",
-      "description": "Intended missing-HP attack scaling; currently grants a flat attack bonus.",
+      "description": "Rage kept banked like a coal, spent on every swing. +3 Attack.",
       "unlock_level": 4,
       "effects": [
         {

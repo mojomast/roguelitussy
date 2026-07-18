@@ -35,7 +35,7 @@ public static class LevelValidator
             errors.Add("Stairs down must be on a traversable tile.");
         }
 
-        var reachable = FloodFill(world, data.PlayerSpawn);
+        var reachable = FloodFill(world, data.PlayerSpawn, includeLockedDoors: true);
         if (reachable.Count == 0)
         {
             errors.Add("Player spawn is not on a traversable tile.");
@@ -106,7 +106,7 @@ public static class LevelValidator
                     return errors;
                 }
 
-                if (IsTraversable(world.GetTile(position)) && !reachable.Contains(position))
+                if (IsTraversable(world.GetTile(position), includeLockedDoors: true) && !reachable.Contains(position))
                 {
                     errors.Add($"Disconnected walkable tile found at {position}.");
                     return errors;
@@ -117,10 +117,10 @@ public static class LevelValidator
         return errors;
     }
 
-    public static HashSet<Position> FloodFill(IWorldState world, Position start)
+    public static HashSet<Position> FloodFill(IWorldState world, Position start, bool includeLockedDoors = false)
     {
         var reachable = new HashSet<Position>();
-        if (!world.InBounds(start) || !IsTraversable(world.GetTile(start)))
+        if (!world.InBounds(start) || !IsTraversable(world.GetTile(start), includeLockedDoors))
         {
             return reachable;
         }
@@ -135,7 +135,7 @@ public static class LevelValidator
             for (var i = 0; i < Position.Cardinals.Length; i++)
             {
                 var next = current + Position.Cardinals[i];
-                if (!world.InBounds(next) || reachable.Contains(next) || !IsTraversable(world.GetTile(next)))
+                if (!world.InBounds(next) || reachable.Contains(next) || !IsTraversable(world.GetTile(next), includeLockedDoors))
                 {
                     continue;
                 }
@@ -148,9 +148,19 @@ public static class LevelValidator
         return reachable;
     }
 
-    public static bool IsTraversable(TileType tile)
+    public static bool IsTraversable(TileType tile) => IsTraversable(tile, includeLockedDoors: false);
+
+    public static bool IsTraversable(TileType tile, bool includeLockedDoors)
     {
-        return tile is TileType.Floor or TileType.Door or TileType.StairsDown or TileType.StairsUp or TileType.Water or TileType.Trap;
+        // Mirrors WorldState.IsTileWalkable: water is scenery the player cannot enter,
+        // so it must not count for connectivity. Locked doors are optionally traversable
+        // for validation because their keys are obtainable elsewhere on the floor.
+        if (tile is TileType.Floor or TileType.Door or TileType.StairsDown or TileType.StairsUp or TileType.Trap)
+        {
+            return true;
+        }
+
+        return includeLockedDoors && tile == TileType.LockedDoor;
     }
 
     private static bool HasValidDoorwayShape(IWorldState world, Position position)

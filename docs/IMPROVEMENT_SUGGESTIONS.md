@@ -2,7 +2,7 @@
 
 > Generated from a parallel review pass of 16 focused subagents across combat, items, abilities, status effects, AI, progression, identity, UI/UX, inventory, save/load determinism, tools, dungeon generation, onboarding, game feel, performance, and test/CI quality.
 >
-> Last updated: 2026-07-01
+> Last updated: 2026-07-18
 
 > Update 2026-07-02: Wave 1 roguelite foundations are partially implemented outside the original improvement table: content-backed synergies, ascension modifiers, daily modifiers, narrative templates, factions, boss phase state, deterministic daily seed helpers, run epitaph generation, faction reputation state, and save version 15 persistence. Wave 2 presentation/feel/content-expansion tasks remain open unless their existing table row says otherwise.
 
@@ -102,7 +102,7 @@
 | ONB-5 | Add a temporary key-reminder ribbon to HUD | P1 | Onboarding | open |
 | GFX-1 | Make hit flashes readable and layered | P1 | Game Feel | done |
 | GFX-2 | Add lightweight camera shake on impactful hits | P1 | Game Feel | open |
-| GFX-3 | Polish damage popups (color/scale/crit/miss/heal) | P1 | Game Feel | open |
+| GFX-3 | Polish damage popups (color/scale/crit/miss/heal) | P1 | Game Feel | done |
 | GFX-4 | Wire ability/item `animation` and `sfx` fields | P1 | Game Feel | open |
 | GFX-5 | Add projectile travel for ranged abilities and attacks | P2 | Game Feel | open |
 | PERF-1 | Make `WorldView._Process` event-driven | P1 | Performance | open |
@@ -234,7 +234,7 @@
   - `EnemyTemplate` now carries `LootTableId`, `GoldMin`, and `GoldMax` projected from `enemies.json`.
   - `DeathResolver.ResolveKill` rolls the victim's loot table with a deterministic seed and drops items at the corpse position; it also awards gold to the killer's `WalletComponent` when `gold_max > 0`.
   - Loot and gold are derived from the enemy's `TemplateId` at death time so the save format does not need to change; `EnemyComponent` keeps only `TemplateId`.
-  - `StatusEffectProcessor` surfaces death log messages in `StatusTickResult.LogMessages`; the scheduler/presentation layer still needs to forward them to the combat log.
+  - `GameLoop` now forwards normal-turn status tick logs and dirty positions. Skipped-turn tick output and dedicated status-death combat events remain open.
 - **Acceptance criteria / tests:**
   - `DeathResolver.KillingRatDropsRatLootAndGold` asserts items on the ground and gold in the killer's wallet.
   - `DeathResolver.LootRollIsDeterministicForSameSeed` asserts identical drops for identical seed/depth/position/turn/entity.

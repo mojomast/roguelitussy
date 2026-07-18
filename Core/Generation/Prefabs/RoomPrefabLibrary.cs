@@ -40,6 +40,18 @@ public static class RoomPrefabLibrary
             },
             DefinedTags: new[] { "prison", "crypt", "magma", "generic" }),
         new RoomPrefab(
+            "cell_block",
+            new[]
+            {
+                "########",
+                "#..#...#",
+                "#..#...#",
+                "#......#",
+                "#..#...#",
+                "########",
+            },
+            DefinedTags: new[] { "prison", "generic" }),
+        new RoomPrefab(
             "octagon",
             new[]
             {

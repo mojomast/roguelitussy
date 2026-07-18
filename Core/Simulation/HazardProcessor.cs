@@ -37,12 +37,12 @@ public static class HazardProcessor
             return false;
         }
 
-        if (template.TriggerChance < 100 && world.CombatResolver?.NextRandom(100) >= template.TriggerChance)
+        world.CombatResolver ??= new CombatResolver(world.Seed);
+
+        if (template.TriggerChance < 100 && world.CombatResolver.NextRandom(100) >= template.TriggerChance)
         {
             return false;
         }
-
-        world.CombatResolver ??= new CombatResolver(world.Seed);
 
         trapComponent.IsArmed = false;
         trapComponent.IsRevealed = true;
@@ -67,8 +67,11 @@ public static class HazardProcessor
 
         if (finalDamage > 0)
         {
-            actor.Stats.HP -= finalDamage;
-            outcome.LogMessages.Add($"{actor.Name} takes {finalDamage} {template.DamageType.ToString().ToLowerInvariant()} damage from {template.DisplayName}.");
+            finalDamage = RelicProcessor.ApplyIncomingDamage(world, actor, null, finalDamage, outcome.LogMessages);
+            if (finalDamage > 0)
+            {
+                outcome.LogMessages.Add($"{actor.Name} takes {finalDamage} {template.DamageType.ToString().ToLowerInvariant()} damage from {template.DisplayName}.");
+            }
         }
 
         var isKill = actor.Stats.HP <= 0;

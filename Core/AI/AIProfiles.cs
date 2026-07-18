@@ -37,7 +37,7 @@ public static class AIProfiles
         1,
         0,
         6,
-        0,
+        5,
         CanFlee: false,
         PatrolsWhenIdle: true,
         PhaseThroughWalls: false);
@@ -77,7 +77,7 @@ public static class AIProfiles
         1,
         0,
         6,
-        0,
+        6,
         CanFlee: false,
         PatrolsWhenIdle: true,
         PhaseThroughWalls: false);

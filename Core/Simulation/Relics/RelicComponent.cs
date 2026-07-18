@@ -10,6 +10,16 @@ public sealed class RelicComponent
 
     public bool LowHpRelicFired { get; set; }
 
+    public HashSet<EntityId> FirstHitEntityIds { get; } = new();
+
+    public HashSet<string> AppliedOneTimeRelics { get; } = new();
+
+    public int DamageBuffPercent { get; set; }
+
+    public int DamageBuffExpiresOnTurn { get; set; }
+
+    public int LastMerchantDiscountDepth { get; set; } = -1;
+
     public bool HasRelic(string relicId) => RelicIds.Contains(relicId);
 
     public bool AddRelic(string relicId, RelicTemplate? template = null)

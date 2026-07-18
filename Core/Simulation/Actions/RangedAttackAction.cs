@@ -71,7 +71,8 @@ public sealed class RangedAttackAction : IAction
         inventory.TryConsumeOne(ArrowTemplateId, out _);
 
         world.CombatResolver ??= new CombatResolver(world.Seed);
-        var damage = world.CombatResolver.ResolveMeleeAttack(actor, target, world.TurnNumber);
+        var weapon = FindEquippedRangedWeapon(inventory, world);
+        var damage = world.CombatResolver.ResolveMeleeAttack(actor, target, world.TurnNumber, weapon);
         var outcome = new ActionOutcome
         {
             Result = ActionResult.Success,
@@ -85,21 +86,71 @@ public sealed class RangedAttackAction : IAction
             return outcome;
         }
 
-        target.Stats.HP -= damage.FinalDamage;
-        outcome.CombatEvents.Add(new CombatEvent(world.TurnNumber, Type, new[] { damage }, Array.Empty<StatusEffectInstance>(), TargetId));
+        var modifiedDamage = RelicProcessor.ProcessOutgoingDamage(world, actor, target, damage.FinalDamage, outcome.LogMessages);
+        var dealtDamage = RelicProcessor.ApplyIncomingDamage(world, target, ActorId, modifiedDamage, outcome.LogMessages);
+        damage = damage with { FinalDamage = dealtDamage, IsKill = target.Stats.HP <= 0 };
+        if (target.Stats.HP > 0)
+        {
+            BossPhaseResolver.TryApplyTransitions(world, target, outcome, ActorId);
+        }
 
-        if (damage.IsKill || target.Stats.HP <= 0)
+        var statusEffectsApplied = new System.Collections.Generic.List<StatusEffectInstance>();
+        if (target.Stats.HP > 0 && weapon is not null)
+        {
+            var onHitApplied = world.CombatResolver.ProcessOnHitEffects(target, weapon, ActorId);
+            foreach (var effect in onHitApplied)
+            {
+                statusEffectsApplied.Add(effect);
+                outcome.LogMessages.Add($"{target.Name} is afflicted with {effect.Type}!");
+            }
+        }
+
+        outcome.CombatEvents.Add(new CombatEvent(world.TurnNumber, Type, new[] { damage }, statusEffectsApplied, TargetId));
+
+        if (target.Stats.HP <= 0)
         {
             var death = DeathResolver.ResolveKill(world, actor, target);
             DeathResolver.AppendProgressionLogMessages(outcome.LogMessages, actor.Name, death);
-            outcome.LogMessages.Add($"{actor.Name} shoots down {target.Name} for {damage.FinalDamage} damage.");
+            outcome.LogMessages.Add($"{actor.Name} shoots down {target.Name} for {dealtDamage} damage.");
             DeathResolver.AppendLootLogMessages(outcome.LogMessages, death);
             return outcome;
         }
 
         var criticalText = damage.IsCritical ? " critically" : string.Empty;
-        outcome.LogMessages.Add($"{actor.Name}{criticalText} shoots {target.Name} for {damage.FinalDamage} damage.");
+        outcome.LogMessages.Add($"{actor.Name}{criticalText} shoots {target.Name} for {dealtDamage} damage.");
         return outcome;
+    }
+
+    private static ItemTemplate? FindEquippedRangedWeapon(InventoryComponent inventory, WorldState world)
+    {
+        if (world.ContentDatabase is null)
+        {
+            return null;
+        }
+
+        var equipped = inventory.GetEquipped(EquipSlot.MainHand);
+        if (equipped is null
+            || !world.ContentDatabase.TryGetItemTemplate(equipped.Item.TemplateId, out var template)
+            || template is null
+            || template.Category != ItemCategory.Weapon)
+        {
+            return null;
+        }
+
+        if (template.Tags is null)
+        {
+            return null;
+        }
+
+        foreach (var tag in template.Tags)
+        {
+            if (string.Equals(tag, "ranged", StringComparison.OrdinalIgnoreCase))
+            {
+                return template;
+            }
+        }
+
+        return null;
     }
 
     public int GetEnergyCost() => 1000;

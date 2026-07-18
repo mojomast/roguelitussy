@@ -93,6 +93,7 @@ public partial class CombatLog : Control
             _eventBus.DamageDealt -= OnDamageDealt;
             _eventBus.EntityDied -= OnEntityDied;
             _eventBus.ItemPickedUp -= OnItemPickedUp;
+            _eventBus.ItemDropped -= OnItemDropped;
             _eventBus.StatusEffectApplied -= OnStatusEffectApplied;
             _eventBus.SaveCompleted -= OnSaveCompleted;
             _eventBus.LoadCompleted -= OnLoadCompleted;
@@ -118,6 +119,7 @@ public partial class CombatLog : Control
         _eventBus.DamageDealt += OnDamageDealt;
         _eventBus.EntityDied += OnEntityDied;
         _eventBus.ItemPickedUp += OnItemPickedUp;
+        _eventBus.ItemDropped += OnItemDropped;
         _eventBus.StatusEffectApplied += OnStatusEffectApplied;
         _eventBus.SaveCompleted += OnSaveCompleted;
         _eventBus.LoadCompleted += OnLoadCompleted;
@@ -176,6 +178,11 @@ public partial class CombatLog : Control
         }
 
         AddMessage($"{ResolveName(entityId)} picks up {ResolveItemName(item.TemplateId)}.", LogCategory.Loot);
+    }
+
+    private void OnItemDropped(EntityId entityId, ItemInstance item, Position position)
+    {
+        AddMessage($"{ResolveName(entityId)} drops {ResolveItemName(item.TemplateId)}.", LogCategory.Loot);
     }
 
     private void OnStatusEffectApplied(EntityId entityId, StatusEffectInstance effect)

@@ -176,7 +176,12 @@ public static class StatusEffectProcessor
         var damageTaken = 0;
         var healingDone = 0;
         var expired = new List<StatusEffectType>();
+        var logMessages = new List<string>();
+
+        // Lethal attribution: the first effect (in tick order) that brings HP to 0 or below
+        // owns the kill; later ticks never re-attribute it.
         EntityId? lethalSourceId = null;
+        var lethalAssigned = false;
 
         for (var index = component.Count - 1; index >= 0; index--)
         {
@@ -195,16 +200,23 @@ public static class StatusEffectProcessor
                         };
                         RelicProcessor.ProcessHook("on_poison_tick", poisonSource, world, world.ContentDatabase, context);
                         poisonDamage = Math.Max(0, context.ModifiedValue);
+                        logMessages.AddRange(context.LogMessages);
                     }
 
-                    damageTaken += poisonDamage;
-                    entity.Stats.HP -= poisonDamage;
-                    lethalSourceId = entity.Stats.HP <= 0 ? effect.SourceEntityId : lethalSourceId;
+                    damageTaken += RelicProcessor.ApplyIncomingDamage(world, entity, effect.SourceEntityId, poisonDamage, logMessages);
+                    if (!lethalAssigned && entity.Stats.HP <= 0)
+                    {
+                        lethalSourceId = effect.SourceEntityId;
+                        lethalAssigned = true;
+                    }
                     break;
                 case StatusEffectType.Burning:
-                    damageTaken += 3 * effect.Magnitude;
-                    entity.Stats.HP -= 3 * effect.Magnitude;
-                    lethalSourceId = entity.Stats.HP <= 0 ? effect.SourceEntityId : lethalSourceId;
+                    damageTaken += RelicProcessor.ApplyIncomingDamage(world, entity, effect.SourceEntityId, 3 * effect.Magnitude, logMessages);
+                    if (!lethalAssigned && entity.Stats.HP <= 0)
+                    {
+                        lethalSourceId = effect.SourceEntityId;
+                        lethalAssigned = true;
+                    }
                     break;
                 case StatusEffectType.Regenerating:
                     var healed = Math.Min(2 * effect.Magnitude, Math.Max(0, entity.Stats.MaxHP - entity.Stats.HP));
@@ -228,7 +240,6 @@ public static class StatusEffectProcessor
         entity.Stats.HP = Math.Min(entity.Stats.HP, entity.Stats.MaxHP);
         var died = entity.Stats.HP <= 0;
         DeathResolver.DeathResolution? death = null;
-        var logMessages = new List<string>();
         if (died)
         {
             var killer = lethalSourceId is { } sourceId ? world.GetEntity(sourceId) : null;
@@ -238,10 +249,6 @@ public static class StatusEffectProcessor
 
             var killerName = killer?.Name ?? "Something";
             DeathResolver.AppendDeathLogMessages(logMessages, killerName, entity.Name, death);
-
-            // TODO(ITM-1): TurnScheduler and GameLoop currently discard these log messages
-            // because ITurnScheduler.ConsumeEnergy returns void. Add a log sink to the scheduler
-            // interface or flush StatusTickResult.LogMessages into the round outcome.
         }
 
         return new StatusTickResult
@@ -272,7 +279,12 @@ public static class StatusEffectProcessor
         var damageTaken = 0;
         var healingDone = 0;
         var expired = new List<StatusEffectType>();
+        var logMessages = new List<string>();
+
+        // Lethal attribution: the first effect (in tick order) that brings HP to 0 or below
+        // owns the kill; later ticks never re-attribute it.
         EntityId? lethalSourceId = null;
+        var lethalAssigned = false;
 
         for (var index = component.Count - 1; index >= 0; index--)
         {
@@ -297,11 +309,15 @@ public static class StatusEffectProcessor
                                 };
                                 RelicProcessor.ProcessHook("on_poison_tick", poisonSource, world, db, context);
                                 damage = Math.Max(0, context.ModifiedValue);
+                                logMessages.AddRange(context.LogMessages);
                             }
 
-                            damageTaken += damage;
-                            entity.Stats.HP -= damage;
-                            lethalSourceId = entity.Stats.HP <= 0 ? effect.SourceEntityId : lethalSourceId;
+                            damageTaken += RelicProcessor.ApplyIncomingDamage(world, entity, effect.SourceEntityId, damage, logMessages);
+                            if (!lethalAssigned && entity.Stats.HP <= 0)
+                            {
+                                lethalSourceId = effect.SourceEntityId;
+                                lethalAssigned = true;
+                            }
                             break;
                         case "heal":
                             var heal = tickEffect.Value * effect.Magnitude;
@@ -328,7 +344,6 @@ public static class StatusEffectProcessor
         entity.Stats.HP = Math.Min(entity.Stats.HP, entity.Stats.MaxHP);
         var died = entity.Stats.HP <= 0;
         DeathResolver.DeathResolution? death = null;
-        var logMessages = new List<string>();
         if (died)
         {
             var killer = lethalSourceId is { } sourceId ? world.GetEntity(sourceId) : null;
@@ -338,10 +353,6 @@ public static class StatusEffectProcessor
 
             var killerName = killer?.Name ?? "Something";
             DeathResolver.AppendDeathLogMessages(logMessages, killerName, entity.Name, death);
-
-            // TODO(ITM-1): TurnScheduler and GameLoop currently discard these log messages
-            // because ITurnScheduler.ConsumeEnergy returns void. Add a log sink to the scheduler
-            // interface or flush StatusTickResult.LogMessages into the round outcome.
         }
 
         return new StatusTickResult

@@ -12,6 +12,7 @@ The current game already supports:
 - save/load for run progression
 - reopening pending perk choices after loading a run
 - a first-pass Echo-based meta-progression store with upgrade levels and recent run history persisted to `user://meta_progress.json`
+- schema-versioned meta progression with corruption recovery and rich build snapshots
 
 That is a workable foundation, but it is still a narrow "kill things, get bigger numbers" model. The next pass should make progression shape playstyle, recovery, and decision-making across a run without collapsing the tension that makes a dungeon crawler work.
 
@@ -152,7 +153,7 @@ This project already has room prefabs, shops, NPCs, and floor-based generation. 
 
 ### Phase 1: Refactor The Current Level-Up Core
 
-Status: implemented for the current melee, ability-damage, sourced poison/burning status-tick, and trap-hazard kill paths. XP and level-up mutation now route through shared simulation-side death/progression handling instead of being exclusive to melee attack code. Trap kills are currently unattributed (no XP/kill credit), matching environmental hazard design; future systems can credit a trap setter by routing through `DeathResolver.ResolveKill` with a source entity.
+Status: implemented for the current melee, ranged, ability-damage, sourced poison/burning status-tick, and trap-hazard kill paths. XP and level-up mutation route through shared simulation-side death/progression handling instead of being exclusive to melee attack code. Trap kills are currently unattributed (no XP/kill credit), matching environmental hazard design; future systems can credit a trap setter by routing through `DeathResolver.ResolveKill` with a source entity. Aggregate round outcomes now surface normal-turn status death logs, and `GameManager` emits the canonical `GameOverWithStats` plus compatibility `GameOver` pair once per run end.
 
 Move level-up logic out of `AttackAction`.
 
@@ -255,6 +256,8 @@ Progression should not stop at the level-up screen.
 
 Use existing NPC and shop infrastructure to support build shaping.
 
+Current reputation integration awards Warriors' Order reputation for normal kills, larger Warriors' and Thieves' gains plus a Merchants' loss for boss kills, Merchants' reputation for purchases, and Thieves' Compact reputation for shrine use.
+
 Examples:
 
 - Merchant sells:
@@ -273,6 +276,12 @@ This makes your new NPC/dialog/shop work part of progression instead of a discon
 ### Phase 6: Add Light Meta Unlocks
 
 Status: integrated. `MetaProgressionManager` persists Echoes, purchased upgrade levels, and capped run history; `Content/meta_upgrades.json` authors starting-gold, inventory, archetype-unlock, starting-item, Echo-bonus, and relic-seeker nodes. Character creation shows Vanguard, Ranger, Trickster, and Arcanist, with non-Vanguard archetypes gated by the matching unlock upgrades. The main menu exposes the meta shop, and the death screen shows recent run history plus the Echo formula breakdown.
+
+Meta progression uses its own schema version 1. Unversioned files are normalized on load, malformed files fall back to fresh data, and writes use temporary-file replacement. `GameOverWithStats` is the sole recording signal for meta progression, preventing duplicate history entries. Run history now captures archetype, relics, synergies, perks, and cleared-floor identifiers in addition to the summary/epitaph. A future-version rejection/preservation policy remains open.
+
+## Relics And Build History
+
+Relic hooks can retain behavior-critical state across turns and floors, including first-hit targets, one-time applications, shield/low-HP state, timed buffs, and merchant discount depth. Save version 16 persists that runtime state so loading does not replay one-shot effects or lose active relic behavior. Final run snapshots copy the build-facing relic, synergy, perk, and archetype IDs into meta history.
 
 Only after run progression feels good.
 

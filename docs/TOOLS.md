@@ -75,7 +75,7 @@ Tool scenes live under `Scenes/Tools/`:
 
 `Scripts/UI/UIRoot.cs` wires the gameplay shell to the debug tools.
 
-Current built-in shortcuts:
+Current built-in shortcuts (backquote and `Q` are compiled only in `DEBUG` builds):
 
 - Backquote toggles the debug console.
 - `Q` toggles the debug overlay.

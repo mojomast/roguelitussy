@@ -26,6 +26,53 @@ public sealed class AbilityTests : ITestSuite
         registry.Add("Simulation.Ability multi-kill awards XP and kill credit", AbilityMultiKillAwardsXpAndKills);
         registry.Add("Simulation.Ability does not apply status to killed target", AbilityDoesNotApplyStatusToKilledTarget);
         registry.Add("Simulation.Ability tile targeted ability validates walkable", TileTargetedAbilityValidatesWalkable);
+        registry.Add("Simulation.Ability enemies filter excludes neutral entities", EnemiesFilterExcludesNeutral);
+        registry.Add("Simulation.Ability heal_self resolves after damage effects", HealSelfResolvesAfterDamage);
+    }
+
+    private static void EnemiesFilterExcludesNeutral()
+    {
+        var caster = CreateActor("Caster", new Position(1, 1), Faction.Player);
+        var enemy = CreateActor("Enemy", new Position(2, 1), Faction.Enemy);
+        var neutral = CreateActor("Guide", new Position(3, 1), Faction.Neutral);
+
+        var filtered = AbilityResolver.FilterByRelation(new List<IEntity> { enemy, neutral }, caster, "enemies");
+
+        Expect.Equal(1, filtered.Count, "The enemies filter should exclude neutral entities");
+        Expect.Equal(enemy.Id, filtered[0].Id, "Only the hostile entity should remain");
+    }
+
+    private static void HealSelfResolvesAfterDamage()
+    {
+        var world = CreateWorld(seed: 11);
+        var caster = CreateActor("Caster", new Position(3, 3), Faction.Player,
+            new Stats { HP = 10, MaxHP = 30, Attack = 5, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 100 });
+        var target = CreateActor("Target", new Position(4, 3), Faction.Enemy,
+            new Stats { HP = 30, MaxHP = 30, Attack = 3, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 100 });
+        world.Player = caster;
+        world.AddEntity(caster);
+        world.AddEntity(target);
+
+        // heal_self is authored BEFORE the damage effect; it must still heal from the damage dealt.
+        var ability = new AbilityTemplate(
+            "test_drain",
+            "Test Drain",
+            "Heals from damage dealt.",
+            new AbilityTargeting("single", 8, 0, false, false, false, null),
+            1000,
+            null,
+            new AbilityEffect[]
+            {
+                new("heal_self", DamageType.Physical, 0, null, 0.0, null, 0, 0, null, null, 1.0, null),
+                new("damage", DamageType.Physical, 6, null, 0.0, null, 0, 0, "enemies", null, 0.0, null),
+            });
+
+        var outcome = new CastAbilityAction(caster.Id, ability, target.Position).Execute(world);
+
+        Expect.Equal(ActionResult.Success, outcome.Result, "Drain cast should succeed");
+        var damageDealt = 30 - target.Stats.HP;
+        Expect.True(damageDealt > 0, "Drain should damage the target");
+        Expect.Equal(10 + damageDealt, caster.Stats.HP, "heal_self authored before damage should heal for the damage dealt");
     }
 
     private static void SingleTargetDealsDamage()

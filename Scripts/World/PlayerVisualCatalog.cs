@@ -34,6 +34,7 @@ internal static class PlayerVisualCatalog
             "skirmisher_quickblade" => Load(SpriteBasePath + "Elf_Male_Idle_1.png"),
             "skirmisher_ranger" => Load(SpriteBasePath + "Elf_Female_Idle_1.png"),
             "mystic_apprentice" => Load(SpriteBasePath + "Wizzard_Male_Idle_1.png"),
+            "mystic_wizard" => Load(SpriteBasePath + "Wizzard_Female_Idle_1.png"),
             "orc_raider" => Load(SpriteBasePath + "Orc_Warrior_Idle_1.png"),
             "orc_shaman" => Load(SpriteBasePath + "Orc_Shaman_Idle_1.png"),
             _ => Load(SpriteBasePath + "Wizzard_Female_Idle_1.png"),

@@ -79,7 +79,8 @@ public sealed class EntityRenderer
         var root = spriteRoot!;
         ApplyAppearance(entity, root);
         SyncStatusOverlays(entity, root);
-        if (!isExisting || !_animationController.IsMoveAnimating(entity.Id))
+        if (!isExisting
+            || (!_animationController.IsMoveAnimating(entity.Id) && !_animationController.IsAttackAnimating(entity.Id)))
         {
             root.Position = WorldView.ToCanvasPosition(entity.Position);
         }
@@ -224,6 +225,7 @@ public sealed class EntityRenderer
         StatusEffectType.Corroded => "corroded",
         StatusEffectType.Phased => "phased",
         StatusEffectType.Flying => "flying",
+        StatusEffectType.Blinded => "blinded",
         _ => null,
     };
 
@@ -265,6 +267,14 @@ public sealed class EntityRenderer
                 continue;
             }
 
+            if (_animationController.IsAttackAnimating(entity.Id))
+            {
+                // Attack lunges intentionally leave the logical tile for a few
+                // frames; snapping here would cancel the tween.
+                _lastKnownPositions[entity.Id] = entity.Position;
+                continue;
+            }
+
             var targetPosition = WorldView.ToCanvasPosition(entity.Position);
             if (_animationController.GetMoveTarget(entity.Id) is { } moveTarget)
             {
@@ -291,15 +301,28 @@ public sealed class EntityRenderer
             return;
         }
 
-        if (animateDeath)
+        _sprites.Remove(entityId);
+        _lastKnownPositions.Remove(entityId);
+
+        if (animateDeath && spriteRoot.Visible)
         {
-            _animationController.AnimateDeath(entityId, spriteRoot);
+            // Keep the node in the tree while the fade/pop plays; free it when the
+            // animation completes (or is force-completed via CompleteAll).
+            var layer = _layer;
+            _animationController.AnimateDeath(entityId, spriteRoot, () =>
+            {
+                if (spriteRoot.GetParent() == layer)
+                {
+                    layer.RemoveChild(spriteRoot);
+                }
+
+                spriteRoot.QueueFree();
+            });
+            return;
         }
 
         _layer.RemoveChild(spriteRoot);
         spriteRoot.QueueFree();
-        _sprites.Remove(entityId);
-        _lastKnownPositions.Remove(entityId);
     }
 
     public void UpdateVisibility(IEnumerable<Position> visibleTiles)
@@ -380,12 +403,12 @@ public sealed class EntityRenderer
             var chestBand = GetOrCreateChild<ColorRect>(spriteRoot, "ChestBand");
             chestBand.Position = new Vector2(4f, 10f);
             chestBand.Size = new Vector2(WorldView.TileSize - 8f, 6f);
-            chestBand.Color = new Color(0.35f, 0.2f, 0.08f, 1f);
+            chestBand.Color = RenderPalette.ChestBand;
 
             var chestLatch = GetOrCreateChild<Label>(spriteRoot, "ChestLatch");
             chestLatch.Position = new Vector2(11f, 9f);
             chestLatch.Text = "C";
-            chestLatch.Modulate = new Color(0.98f, 0.87f, 0.48f, 1f);
+            chestLatch.Modulate = RenderPalette.ChestLatch;
             return;
         }
 
@@ -509,7 +532,7 @@ public sealed class EntityRenderer
     {
         if (entity.GetComponent<ChestComponent>() is not null)
         {
-            return new Color(0.67f, 0.46f, 0.19f, 1f);
+            return RenderPalette.ChestBody;
         }
 
         if (entity.Faction is Faction.Player or Faction.Neutral)
@@ -520,36 +543,36 @@ public sealed class EntityRenderer
         var normalizedName = entity.Name.Trim().ToLowerInvariant();
         if (normalizedName.Contains("rat", System.StringComparison.Ordinal))
         {
-            return new Color(0.62f, 0.55f, 0.48f, 1f);
+            return RenderPalette.FallbackRat;
         }
 
         if (normalizedName.Contains("spider", System.StringComparison.Ordinal))
         {
-            return new Color(0.36f, 0.42f, 0.52f, 1f);
+            return RenderPalette.FallbackSpider;
         }
 
         if (normalizedName.Contains("slime", System.StringComparison.Ordinal))
         {
-            return new Color(0.34f, 0.72f, 0.42f, 1f);
+            return RenderPalette.FallbackSlime;
         }
 
         if (normalizedName.Contains("wraith", System.StringComparison.Ordinal)
             || normalizedName.Contains("shadow", System.StringComparison.Ordinal))
         {
-            return new Color(0.62f, 0.54f, 0.82f, 1f);
+            return RenderPalette.FallbackWraith;
         }
 
         if (normalizedName.Contains("flame", System.StringComparison.Ordinal)
             || normalizedName.Contains("elemental", System.StringComparison.Ordinal)
             || normalizedName.Contains("demon", System.StringComparison.Ordinal))
         {
-            return new Color(0.94f, 0.44f, 0.18f, 1f);
+            return RenderPalette.FallbackDemon;
         }
 
         return entity.Faction switch
         {
-            Faction.Enemy => new Color(0.82f, 0.28f, 0.28f, 1f),
-            _ => new Color(0.95f, 0.85f, 0.35f, 1f),
+            Faction.Enemy => RenderPalette.FallbackEnemy,
+            _ => RenderPalette.FallbackNeutral,
         };
     }
 

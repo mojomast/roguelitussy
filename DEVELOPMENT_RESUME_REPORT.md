@@ -71,6 +71,18 @@ godot --headless --path . --quit
 - Verification: stub build, test project build, full harness (470 tests), and rendering-validation profile (422 tests) pass locally.
 - Manual gap: full Godot 4.5.2 runtime playthrough checks for exact banner/toast timing, daily persistence on real user paths, and boss/reputation feel still need editor/runtime verification.
 
+### Follow-up Status - 2026-07-18 Integrity, Generation, Relics, And Feedback
+
+- Completed: save version 16 distinguishes valid scheduler order zero from unscheduled entities and persists behavior-critical relic first-hit, one-time, timed-buff, and merchant-discount state. Version 15's ambiguous zero orders are rederived during migration.
+- Completed: save validation now covers additional progression, wallet, relic, shrine, and kill-streak invariants; meta progression has schema version 1 and corrupt meta/daily files recover without crashing autoload startup.
+- Completed: melee, ranged, ability, status, and hazard damage use expanded relic hooks where applicable; ranged weapons use authored combat stats; synergies remove passive bonuses when requirements are lost; shrine use updates reputation.
+- Completed: generation now handles boss-over-safe precedence, safe-floor spawn suppression, deeper spawn scaling, start-room exclusion, traversal-distance exits, deterministic themed traps, locked-door connectivity, and ragged prefabs. Tagged special-room placement is partially integrated.
+- Completed: attack lunges, deferred death fades, critical/miss/heal/pickup popups, shared render colors, robust floor-event rebinding, and canonical once-only game-over events are covered by new tests.
+- Completed: obsolete generic sprites/tiles were removed; authored SVG/import conventions and resource paths are covered by static tests.
+- Verification: editorless stub build and test build pass with zero warnings; the full harness passes 550/550 tests; rendering validation passes 493/493 tests; `git diff --check` passes.
+- Verification gap: the installed `godot` command is 4.4.1 rather than required 4.5.2 and crashed before import because its .NET host was unavailable, so real Godot import/startup remains unverified.
+- Remaining risks: skipped-turn status output, dedicated DoT death events, player-death consistency, relic milestone/floor-entry ordering, boss-template selection, functional shrine/curse population, lock/key exhaustion, authored enemy sprite-path rendering, and attack/move animation composition.
+
 ### Follow-up Status - Wave 1 Persistence
 
 - Completed: SAV-1 — added `EnemyComponent { TemplateId }`, attached in `GameManager.CreateEnemyEntity`, and round-tripped through v9 save data with validation and migration.
@@ -291,7 +303,9 @@ godot --headless --path . --quit
 
 ## Confirmed High-Priority Findings
 
-### 1. Save/load loses behavior-critical entity components
+### 1. Save/load loses behavior-critical entity components — RESOLVED
+
+**Status: Fixed.** `SaveSerializer` now serializes and rehydrates `IBrain`, `AbilitiesComponent`, `CooldownComponent`, `XpValueComponent`, and `ChestComponent` (see `Core/Persistence/SaveSerializer.cs:666-671` for the save-side component capture and `Core/Persistence/SaveSerializer.cs:1087-1149` for load-side rehydration). Original finding kept below for history.
 
 `SaveSerializer` serializes only generic entity fields plus inventory, status effects, progression, identity, wallet, NPC, and merchant data.
 
@@ -320,7 +334,7 @@ Resume action:
 
 Persist template IDs and component state for enemies/chests, then rehydrate components from content on load. Add save/load integration tests proving loaded enemies act, grant XP, retain abilities/cooldowns, and loaded chests can still open or remain opened as appropriate.
 
-### 2. Save/load does not preserve deterministic combat RNG state
+### 2. Save/load does not preserve deterministic combat RNG state — RESOLVED
 
 `WorldState` stores a `CombatResolver`, and `CombatResolver` owns mutable random state, but save data stores only `Seed` and `TurnNumber`.
 
@@ -336,7 +350,9 @@ Resume action:
 
 Move all simulation randomness behind one serializable deterministic RNG service/state, or derive every roll from stable replayable inputs. Add a regression test: simulate N turns, save/load, simulate M more turns, and compare against an uninterrupted N+M run.
 
-### 3. Consumable item effects drift from authored content
+### 3. Consumable item effects drift from authored content — RESOLVED
+
+**Status: Fixed.** `UseItemAction.TryParseApplyStatus` (see `Core/Simulation/Actions/UseItemAction.cs:245`) now parses the `apply_status:` prefix that content actually emits, alongside the legacy `status:`/`apply:` prefixes. Original finding kept below for history.
 
 `ContentLoader.BuildUseEffect` emits strings such as `heal`, `apply_status:haste`, and `cast_ability:fireball`.
 
@@ -358,7 +374,9 @@ Resume action:
 
 Replace stringly typed use effects with structured item-use data, or fully parse the current string prefixes. Then add content-backed tests for every consumable in `items.json`.
 
-### 4. Ability kills do not share melee death/progression behavior
+### 4. Ability kills do not share melee death/progression behavior — RESOLVED
+
+**Status: Fixed.** `CastAbilityAction` now routes kills through `DeathResolver.ResolveKill` (see `Core/Simulation/Actions/CastAbilityAction.cs:130`), which shares the melee death/progression path (XP, log messages, loot). Original finding kept below for history.
 
 `CastAbilityAction` removes killed targets directly.
 
@@ -375,6 +393,8 @@ Resume action:
 Centralize death handling into a core service or helper used by melee, abilities, status ticks, traps, and future systems. Death handling should cover XP, kill counts, drops, logs, removal, and combat events.
 
 ### 5. `GameManager` is carrying too many responsibilities
+
+**Status: Still open.** `Scripts/Autoloads/GameManager.cs` has grown to ~3,600 lines (up from the ~2,000 noted originally) and still coordinates service setup, save/load, generation, entity factories, floors, turn processing, debug travel, FOV, and progression/event bridging. The Track 5 service-extraction pass (`Scripts/Services/` — `RuntimeServiceFactory`, `WorldSessionService`, `FloorTransitionService`, `EntityFactory`, `TurnOrchestrator`, `ProgressionEventBridge`) described below was never carried out.
 
 `Scripts/Autoloads/GameManager.cs` is over 2,000 lines and coordinates service setup, save/load, generation, entity factories, floors, turn processing, debug travel, FOV, and progression/event bridging.
 
@@ -412,7 +432,7 @@ Content references paths such as:
 - `res://Assets/Sprites/ui/status_poison.png`
 - `res://Assets/Sprites/enemies/rat.png`
 
-Actual `Assets/Sprites/` mostly contains `0x72/`, `player_tiny_dungeon.png`, and `enemies/enemy_tiny_dungeon.png`.
+The repository now uses the committed 0x72 catalogs plus SVG item/status/object sources. The former generic `player_tiny_dungeon.png` and `enemy_tiny_dungeon.png` assets have been removed as unused.
 
 Relevant files:
 

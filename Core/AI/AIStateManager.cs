@@ -140,33 +140,26 @@ public static class AIStateManager
         var best = Position.Invalid;
         long bestScore = long.MinValue;
 
-        var minX = Math.Max(0, self.Position.X - profile.PatrolRadius);
-        var maxX = Math.Min(world.Width - 1, self.Position.X + profile.PatrolRadius);
-        var minY = Math.Max(0, self.Position.Y - profile.PatrolRadius);
-        var maxY = Math.Min(world.Height - 1, self.Position.Y + profile.PatrolRadius);
+        // One BFS over reachable tiles replaces the per-candidate A* searches that made
+        // retargeting cost hundreds of pathfinding calls.
+        var reachable = pathfinder.GetReachable(self.Position, profile.PatrolRadius * 2, world, profile.PhaseThroughWalls);
 
-        for (var y = minY; y <= maxY; y++)
+        foreach (var entry in reachable)
         {
-            for (var x = minX; x <= maxX; x++)
+            var candidate = entry.Key;
+            if (candidate == self.Position
+                || Math.Abs(candidate.X - self.Position.X) > profile.PatrolRadius
+                || Math.Abs(candidate.Y - self.Position.Y) > profile.PatrolRadius
+                || !world.IsWalkable(candidate))
             {
-                var candidate = new Position(x, y);
-                if (candidate == self.Position || !world.IsWalkable(candidate))
-                {
-                    continue;
-                }
+                continue;
+            }
 
-                var path = pathfinder.FindPath(self.Position, candidate, world, profile.PatrolRadius * 4);
-                if (path.Count == 0)
-                {
-                    continue;
-                }
-
-                var score = BuildPatrolScore(self.Position, candidate, patrolSequence, world.TurnNumber);
-                if (score > bestScore)
-                {
-                    best = candidate;
-                    bestScore = score;
-                }
+            var score = BuildPatrolScore(self.Position, candidate, patrolSequence, world.TurnNumber);
+            if (score > bestScore)
+            {
+                best = candidate;
+                bestScore = score;
             }
         }
 

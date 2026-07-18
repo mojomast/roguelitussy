@@ -21,7 +21,7 @@ Tracks 1–6 are fully parallel. Track 7 begins only after all others complete.
 
 ---
 
-## Track 1 — Meta-Progression System
+## Track 1 — Meta-Progression System — COMPLETE
 
 **Owns:** `Core/Persistence/`, `Core/Simulation/MetaProgression*.cs`, `Content/meta_upgrades.json`, `Content/run_history.json` (new files), `Scripts/Autoloads/MetaProgressionManager.cs` (new)
 
@@ -78,7 +78,7 @@ Author at minimum the following upgrade nodes:
 
 ---
 
-## Track 2 — Relic System
+## Track 2 — Relic System — IMPLEMENTED, FOLLOW-UPS OPEN
 
 **Owns:** `Core/Simulation/Relics/` (new directory), `Core/Content/RelicTemplate.cs` (new), `Content/relics.json` (new), modifications to `Core/Simulation/CombatResolver.cs`, `Core/Simulation/DeathResolver.cs`, `Core/Simulation/StatusEffectProcessor.cs`
 
@@ -172,7 +172,7 @@ public sealed class RelicComponent
 
 ---
 
-## Track 3 — Archetype Overhaul
+## Track 3 — Archetype Overhaul — COMPLETE
 
 **Owns:** `Core/Simulation/ArchetypeDefinitions.cs` (new), `Core/Simulation/Actions/RangedAttackAction.cs` (new), modifications to `GameManager.CreatePlayer`, `Core/Simulation/ProgressionService.cs`, `Content/abilities.json`, `Content/perks.json`
 
@@ -273,7 +273,7 @@ Add the following perks (merge into existing perks.json):
 
 ---
 
-## Track 4 — Floor Events & Special Rooms
+## Track 4 — Floor Events & Special Rooms — PARTIAL
 
 **Owns:** `Core/Generation/FloorEventResolver.cs` (new), `Core/Simulation/Actions/InteractShrineAction.cs` (new), `Content/floor_events.json` (new), modifications to `GameManager.PopulateWorld`, `Content/room_prefabs.json`, `Content/loot_tables.json`
 
@@ -340,7 +340,9 @@ Author the floor event catalogue:
 
 ---
 
-## Track 5 — Refactor & Bug Fixes
+## Track 5 — Refactor & Bug Fixes — PARTIAL (service extraction NOT done)
+
+**Status:** T5.1–T5.3 (the `Scripts/Services/` extraction of `FloorTransitionService`, `SpawnService`, `AutoplayService`) were **not done** — no `Scripts/Services/` directory exists in the codebase. T5.4 (bare `catch {}` fix in `CreateFloorItems`) **is done** (see `Scripts/Autoloads/GameManager.cs`, which now logs via `Bus?.EmitLogMessage(...)` instead of swallowing the exception). T5.5–T5.9 have not been independently re-verified by this pass. `GameManager.cs` remains unsplit at more than 3,700 lines.
 
 **Owns:** `Scripts/Autoloads/GameManager.cs` (split), new service files under `Scripts/Services/`, `Core/Simulation/` bug fixes
 
@@ -349,21 +351,21 @@ Start breaking up the 100KB God Object, fix identified bugs, and improve code qu
 
 ### Tasks
 
-#### T5.1 — Extract `FloorTransitionService`
+#### T5.1 — Extract `FloorTransitionService` — NOT DONE
 - Create `Scripts/Services/FloorTransitionService.cs`
 - Move: `TryTravelToFloor`, `CreateGeneratedWorld`, `PlacePlayerInWorld`, `ResolveArrivalPosition`, `EnsureArrivalTile`, `TryPlacePlayerAt`, `EnumerateArrivalFallbacks`, `ResolveFloorEntrances`, `RememberFloorEntrances`, `DiscoverFloorEntrances`, `FindArrivalPosition`, `FindArrivalPositionOrInvalid`, `MixSeed`
 - `FloorTransitionService` takes `GameManager` as a constructor dependency (or better: inject `EventBus`, `WorldState` ref, and floor cache via interfaces)
 
-#### T5.2 — Extract `SpawnService`
+#### T5.2 — Extract `SpawnService` — NOT DONE
 - Create `Scripts/Services/SpawnService.cs`
 - Move: `PopulateWorld`, `SpawnAuthoredNpcs`, `SpawnNpcs`, `SpawnTraps`, `SpawnKeys`, `CreateEnemyEntity`, `CreatePlayer`, `CreateChestEntity`, `CreateNpcEntity`, `CreateTrapEntity`, `EquipStartingLoadout`, `CreateFloorItems`, `ResolveEnemyTemplate`, `SelectEnemyTemplate`, `TryFindNpcSpawn`, `TryResolveSpawnPosition`, `IsValidSpawnPosition`, `FindNpcSpawnCandidates`, `IsEligibleNpcSpawnTile`, `CountWalkableNeighbors`, `IsAdjacentToDoor`, `IsNearStairs`
 - Cache stair positions on world load to fix O(W×H) `IsNearStairs` bug
 
-#### T5.3 — Extract `AutoplayService`
+#### T5.3 — Extract `AutoplayService` — NOT DONE
 - Create `Scripts/Services/AutoplayService.cs`
 - Move: `RunPlayerUntilBlocked`, `RestPlayerUntilHealed`, `AutoExplorePlayer`, `CanRunOneMoreStep`, `CanRestOneMoreTurn`, `CanAutoExploreOneMoreStep`, `TryFindAutoExploreStep`, `CanAutoExploreEnter`, `IsAutoExplorePointOfInterestTarget`, `IsAutoExploreFrontier`, `HasDangerousRestStatus`, `ShouldStopRunAtPointOfInterest`, `HasVisibleOrAdjacentHostile`
 
-#### T5.4 — Fix `catch {}` in `CreateFloorItems`
+#### T5.4 — Fix `catch {}` in `CreateFloorItems` — DONE
 ```csharp
 // BEFORE:
 catch { }
@@ -421,7 +423,7 @@ private static bool IsNearStairs(HashSet<Position> stairCache, Position position
 
 ---
 
-## Track 6 — Content Authoring
+## Track 6 — Content Authoring — IMPLEMENTED, ORIGINAL SPEC PARTLY SUPERSEDED
 
 **Owns:** All files under `Content/` (json data only — no C# changes)
 
@@ -459,11 +461,11 @@ Add new items:
 - `item_shield_basic` — offhand equipment, +3 Defense, `["armor", "shield"]`
 - `scroll_fireball` — consumable, deals 12 AoE damage in 2-tile radius
 - `scroll_frost_nova` — consumable, applies Slowed to all visible enemies for 5 turns
-- `potion_mana` — consumable, restores all ability cooldowns
-- `relic_item_slot` — special item type that routes to RelicComponent (coordinate with Track 2)
+- `potion_mana` — consumable that casts self-targeted `arcane_infusion`
+- `relic_item_slot` — reserved token excluded from runtime loot tables
 
 #### T6.3 — Expand `loot_tables.json`
-- Add `"boss_floor_loot"` table: guaranteed rare/legendary item + relic_item_slot chance 100%
+- Boss-floor rewards must use concrete reachable item/relic flows; reserved `relic_item_slot` tokens are not valid drops.
 - Add `"safe_floor_merchant_stock"` table: higher quality items, lower prices
 - Add `"shrine_reward_table"` table: stat scrolls, rare equipment
 - Add `"curse_room_chest_loot"` table: 2x normal item value, higher rarity
@@ -491,7 +493,7 @@ Add universal (non-archetype) perks:
 
 #### T6.6 — Add `traps.json` entries
 Expand from current minimal set:
-- `trap_spike` — 5–8 damage, revealed by high Perception perk
+- `spike_trap` — canonical spike trap ID; the duplicate `trap_spike` definition was removed
 - `trap_poison_gas` — applies Poisoned for 8 turns
 - `trap_alarm` — alerts all enemies on floor
 - `trap_teleport` — randomly teleports player
@@ -597,7 +599,7 @@ The project is **done** when:
 1. All 7 tracks are complete and their tasks checked off
 2. The T7.8 integration checklist passes entirely
 3. No `catch {}` (bare) swallowing exists in the codebase
-4. `GameManager.cs` has a documented extraction backlog and no new Track 7 UI responsibilities are added to it; the full under-500-line target is a post-Track-7 architecture acceptance goal.
+4. `GameManager.cs` has a documented extraction backlog and no new Track 7 UI responsibilities are added to it; the full under-500-line target is a post-Track-7 architecture acceptance goal. **Status: failing.** `GameManager.cs` is currently more than 3,700 lines (grown, not shrunk) and the Track 5 service-extraction pass (T5.1–T5.3) that would seed the split was never carried out — see Track 5 status above.
 5. At least 20 relics exist in `relics.json`
 6. All 4 archetypes are playable and meaningfully different
 7. Meta shop persists across process restarts (read/write `user://meta_progress.json`)

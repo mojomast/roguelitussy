@@ -15,6 +15,36 @@ public sealed class TurnSchedulerTests : ITestSuite
         registry.Add("Simulation.TurnScheduler unregister removes actor from order", UnregisterRemovesActor);
         registry.Add("Simulation.TurnScheduler mixed speeds follow expected ratios", MixedSpeedsFollowRatios);
         registry.Add("Simulation.TurnScheduler ignores neutral non-brain NPCs", IgnoresNeutralNonBrainNpcs);
+        registry.Add("Simulation.TurnScheduler authored speed modifiers affect initiative", AuthoredSpeedModifiersAffectInitiative);
+    }
+
+    private static void AuthoredSpeedModifiersAffectInitiative()
+    {
+        var world = CreateWorld();
+        var content = new Roguelike.Tests.Stubs.StubContentDatabase();
+        ((System.Collections.Generic.Dictionary<string, StatusEffectDefinition>)content.StatusEffects)["corroded"] = new()
+        {
+            Id = "corroded",
+            Name = "Corroded",
+            Stackable = true,
+            MaxStacks = 3,
+            Refreshable = true,
+            StatModifiers = new() { new() { Stat = "speed", Operation = "multiply", Value = 2.0 } },
+        };
+        world.ContentDatabase = content;
+
+        var plain = new Roguelike.Tests.Stubs.StubEntity("Plain", new Position(1, 1), Faction.Player, stats: Stats(100));
+        var boosted = new Roguelike.Tests.Stubs.StubEntity("Boosted", new Position(2, 1), Faction.Enemy, stats: Stats(100));
+        StatusEffectProcessor.ApplyEffect(boosted, StatusEffectType.Corroded, content, 50, 1);
+        world.AddEntity(plain);
+        world.AddEntity(boosted);
+
+        var scheduler = new TurnScheduler();
+        scheduler.BeginRound(world);
+        var first = scheduler.GetNextActor();
+        scheduler.EndRound(world);
+
+        Expect.Equal("Boosted", first!.Name, "Authored speed stat modifiers should drive initiative gains");
     }
 
     private static void TieBreaksByRegistrationOrder()

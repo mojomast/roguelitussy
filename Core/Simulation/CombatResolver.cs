@@ -82,8 +82,6 @@ public sealed class CombatResolver
         return Math.Clamp(hitChance, 5, 95);
     }
 
-    public bool RollHit(IEntity attacker, IEntity defender) => _rng.Next(100) < CalculateHitChance(attacker, defender);
-
     public DamageResult ResolveMeleeAttack(IEntity attacker, IEntity defender, int turnNumber)
     {
         return ResolveMeleeAttack(attacker, defender, turnNumber, null);

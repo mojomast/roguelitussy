@@ -13,19 +13,60 @@ public static class RoomPlacer
         WorldState world,
         Random rng,
         IReadOnlyList<RoomPrefab> prefabs,
-        string? themeTag = null)
+        string? themeTag = null,
+        IReadOnlyList<string>? specialRoomTags = null)
     {
         var rooms = new List<RoomPlacement>();
+        var pendingSpecialTags = specialRoomTags is { Count: > 0 } ? new List<string>(specialRoomTags) : null;
 
         foreach (var leaf in root.Leaves())
         {
-            var room = CreatePlacement(leaf, rng, prefabs, themeTag);
+            RoomPlacement? room = null;
+            if (rooms.Count > 0 && pendingSpecialTags is { Count: > 0 })
+            {
+                room = TryCreateSpecialPlacement(leaf, rng, prefabs, pendingSpecialTags);
+            }
+
+            room ??= CreatePlacement(leaf, rng, prefabs, themeTag);
             Carve(world, room);
             leaf.Room = room;
             rooms.Add(room);
         }
 
         return rooms;
+    }
+
+    private static RoomPlacement? TryCreateSpecialPlacement(
+        BSPNode leaf,
+        Random rng,
+        IReadOnlyList<RoomPrefab> prefabs,
+        List<string> pendingSpecialTags)
+    {
+        var usableWidth = leaf.Width - (LeafPadding * 2);
+        var usableHeight = leaf.Height - (LeafPadding * 2);
+
+        for (var tagIndex = 0; tagIndex < pendingSpecialTags.Count; tagIndex++)
+        {
+            var tag = pendingSpecialTags[tagIndex];
+            var candidates = new List<RoomPrefab>();
+            for (var i = 0; i < prefabs.Count; i++)
+            {
+                if (prefabs[i].Tags.Contains(tag)
+                    && prefabs[i].FitsWithin(usableWidth, usableHeight)
+                    && prefabs[i].HasWalkableTiles)
+                {
+                    candidates.Add(prefabs[i]);
+                }
+            }
+
+            if (candidates.Count > 0)
+            {
+                pendingSpecialTags.RemoveAt(tagIndex);
+                return BuildPrefabRoom(leaf, candidates[rng.Next(candidates.Count)], rng);
+            }
+        }
+
+        return null;
     }
 
     private static RoomPlacement CreatePlacement(BSPNode leaf, Random rng, IReadOnlyList<RoomPrefab> prefabs, string? themeTag)
@@ -179,6 +220,7 @@ public sealed class RoomPlacement
 
         if (prefab is not null)
         {
+            var spawnableTiles = new List<Position>();
             for (var y = 0; y < prefab.Height; y++)
             {
                 for (var x = 0; x < prefab.Width; x++)
@@ -187,8 +229,21 @@ public sealed class RoomPlacement
                     {
                         _doorTiles.Add(new Position(origin.X + x, origin.Y + y));
                     }
+
+                    if (prefab.GetTileType(x, y) == TileType.Floor)
+                    {
+                        spawnableTiles.Add(new Position(origin.X + x, origin.Y + y));
+                    }
                 }
             }
+
+            // Doors, water, and trap tiles stay out of the spawn pool so entities and
+            // stairs only land on tiles the simulation treats as plain walkable floor.
+            SpawnableTiles = spawnableTiles.Count > 0 ? spawnableTiles : walkableTiles;
+        }
+        else
+        {
+            SpawnableTiles = walkableTiles;
         }
 
         ConnectionPoint = GetConnectionPointTowards(room.Center);
@@ -197,6 +252,8 @@ public sealed class RoomPlacement
     public RoomData Room { get; }
 
     public IReadOnlyList<Position> WalkableTiles { get; }
+
+    public IReadOnlyList<Position> SpawnableTiles { get; }
 
     public Position Origin { get; }
 
@@ -270,11 +327,11 @@ public sealed class RoomPlacement
 
     public Position GetRandomWalkableTile(Random rng, HashSet<Position> occupied)
     {
-        var startIndex = rng.Next(WalkableTiles.Count);
+        var startIndex = rng.Next(SpawnableTiles.Count);
 
-        for (var offset = 0; offset < WalkableTiles.Count; offset++)
+        for (var offset = 0; offset < SpawnableTiles.Count; offset++)
         {
-            var candidate = WalkableTiles[(startIndex + offset) % WalkableTiles.Count];
+            var candidate = SpawnableTiles[(startIndex + offset) % SpawnableTiles.Count];
             if (!occupied.Contains(candidate))
             {
                 return candidate;

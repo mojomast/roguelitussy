@@ -233,9 +233,9 @@ public static class SaveValidator
             errors.Add($"Entity '{entity.Name}' has an invalid HP value {entity.Stats.HP}.");
         }
 
-        if (entity.Stats.Speed < 0 || (entity.Stats.Speed == 0 && entity.Chest is null && entity.Trap is null))
+        if (entity.Stats.Speed < 0 || (entity.Stats.Speed == 0 && !IsStaticObject(entity)))
         {
-            errors.Add($"Entity '{entity.Name}' must have positive speed unless it is a chest or trap.");
+            errors.Add($"Entity '{entity.Name}' must have positive speed unless it is a static object (chest, trap, shrine, npc, or merchant).");
         }
 
         if (entity.Stats.ViewRadius < 0)
@@ -431,9 +431,126 @@ public static class SaveValidator
             }
         }
 
-        if (entity.SchedulerOrder < 0)
+        if (entity.SchedulerOrder is < 0)
         {
             errors.Add($"Entity '{entity.Name}' has a negative scheduler order {entity.SchedulerOrder}.");
+        }
+
+        if (entity.Wallet is not null && entity.Wallet.Gold < 0)
+        {
+            errors.Add($"Entity '{entity.Name}' has a negative gold amount {entity.Wallet.Gold}.");
+        }
+
+        if (entity.Progression is not null)
+        {
+            if (entity.Progression.Level < 1)
+            {
+                errors.Add($"Entity '{entity.Name}' has an invalid progression level {entity.Progression.Level}.");
+            }
+
+            if (entity.Progression.Experience < 0)
+            {
+                errors.Add($"Entity '{entity.Name}' has negative experience {entity.Progression.Experience}.");
+            }
+
+            if (entity.Progression.ExperienceToNextLevel < 0)
+            {
+                errors.Add($"Entity '{entity.Name}' has a negative experience threshold {entity.Progression.ExperienceToNextLevel}.");
+            }
+
+            if (entity.Progression.UnspentStatPoints < 0)
+            {
+                errors.Add($"Entity '{entity.Name}' has negative unspent stat points {entity.Progression.UnspentStatPoints}.");
+            }
+
+            if (entity.Progression.UnspentPerkChoices < 0)
+            {
+                errors.Add($"Entity '{entity.Name}' has negative unspent perk choices {entity.Progression.UnspentPerkChoices}.");
+            }
+
+            if (entity.Progression.Kills < 0)
+            {
+                errors.Add($"Entity '{entity.Name}' has a negative kill count {entity.Progression.Kills}.");
+            }
+
+            if (entity.Progression.SelectedPerkIds.Any(string.IsNullOrWhiteSpace))
+            {
+                errors.Add($"Entity '{entity.Name}' has progression state with a blank perk id.");
+            }
+        }
+
+        if (entity.Relic is not null)
+        {
+            if (entity.Relic.ShieldCharges < 0)
+            {
+                errors.Add($"Entity '{entity.Name}' has negative relic shield charges {entity.Relic.ShieldCharges}.");
+            }
+
+            if (entity.Relic.RelicIds.Any(string.IsNullOrWhiteSpace))
+            {
+                errors.Add($"Entity '{entity.Name}' has relic state with a blank relic id.");
+            }
+
+            if (entity.Relic.FirstHitEntityIds.Any(id => string.IsNullOrWhiteSpace(id) || !Guid.TryParse(id, out _)))
+            {
+                errors.Add($"Entity '{entity.Name}' has relic first-hit state with an invalid entity id.");
+            }
+
+            if (entity.Relic.AppliedOneTimeRelics.Any(string.IsNullOrWhiteSpace))
+            {
+                errors.Add($"Entity '{entity.Name}' has relic one-time state with a blank relic id.");
+            }
+
+            if (entity.Relic.DamageBuffPercent < 0)
+            {
+                errors.Add($"Entity '{entity.Name}' has a negative relic damage buff {entity.Relic.DamageBuffPercent}.");
+            }
+
+            if (entity.Relic.DamageBuffExpiresOnTurn < 0)
+            {
+                errors.Add($"Entity '{entity.Name}' has a negative relic damage buff expiry turn {entity.Relic.DamageBuffExpiresOnTurn}.");
+            }
+
+            if (entity.Relic.LastMerchantDiscountDepth < -1)
+            {
+                errors.Add($"Entity '{entity.Name}' has an invalid relic merchant discount depth {entity.Relic.LastMerchantDiscountDepth}.");
+            }
+        }
+
+        if (entity.Shrine is not null)
+        {
+            if (string.IsNullOrWhiteSpace(entity.Shrine.ShrineType))
+            {
+                errors.Add($"Entity '{entity.Name}' has a shrine component without a shrine type.");
+            }
+
+            if (entity.Shrine.HPCost < 0)
+            {
+                errors.Add($"Entity '{entity.Name}' has a negative shrine HP cost {entity.Shrine.HPCost}.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(entity.Shrine.PendingActorId) && !Guid.TryParse(entity.Shrine.PendingActorId, out _))
+            {
+                errors.Add($"Entity '{entity.Name}' has an invalid shrine pending actor id '{entity.Shrine.PendingActorId}'.");
+            }
+        }
+
+        if (entity.KillStreak is not null)
+        {
+            if (entity.KillStreak.CurrentStreak < 0)
+            {
+                errors.Add($"Entity '{entity.Name}' has a negative kill streak {entity.KillStreak.CurrentStreak}.");
+            }
+
+            if (entity.KillStreak.HighestStreak < 0)
+            {
+                errors.Add($"Entity '{entity.Name}' has a negative highest kill streak {entity.KillStreak.HighestStreak}.");
+            }
+
+            if (entity.KillStreak.BonusXpAwarded < 0)
+            {
+                errors.Add($"Entity '{entity.Name}' has negative kill streak bonus XP {entity.KillStreak.BonusXpAwarded}.");
+            }
         }
 
         if (entity.BossPhase is not null)
@@ -544,6 +661,17 @@ public static class SaveValidator
             }
         }
     }
+
+    /// <summary>
+    /// Static payloads (chests, traps, shrines, NPCs, merchants) are legitimate
+    /// world objects that never take turns, so a speed of zero is valid for them.
+    /// </summary>
+    private static bool IsStaticObject(EntitySaveData entity) =>
+        entity.Chest is not null ||
+        entity.Trap is not null ||
+        entity.Shrine is not null ||
+        entity.Npc is not null ||
+        entity.Merchant is not null;
 
     private static bool IsInBounds(PositionSaveData position, int width, int height) =>
         position.X >= 0 && position.X < width && position.Y >= 0 && position.Y < height;

@@ -77,14 +77,16 @@ public sealed class AttackAction : IAction
             return outcome;
         }
 
-        target.Stats.HP -= damage.FinalDamage;
+        var modifiedDamage = RelicProcessor.ProcessOutgoingDamage(world, actor, target, damage.FinalDamage, outcome.LogMessages);
+        var dealtDamage = RelicProcessor.ApplyIncomingDamage(world, target, ActorId, modifiedDamage, outcome.LogMessages);
+        damage = damage with { FinalDamage = dealtDamage, IsKill = target.Stats.HP <= 0 };
         if (target.Stats.HP > 0)
         {
             BossPhaseResolver.TryApplyTransitions(world, target, outcome, ActorId);
         }
 
         // Process on-hit effects before kill check
-        if (!damage.IsKill && target.Stats.HP > 0 && weapon is not null)
+        if (target.Stats.HP > 0 && weapon is not null)
         {
             var onHitApplied = world.CombatResolver.ProcessOnHitEffects(target, weapon, ActorId);
             foreach (var effect in onHitApplied)
@@ -96,21 +98,21 @@ public sealed class AttackAction : IAction
 
         outcome.CombatEvents.Add(new CombatEvent(world.TurnNumber, Type, new[] { damage }, statusEffectsApplied, TargetId));
 
-        if (damage.IsKill || target.Stats.HP <= 0)
+        if (target.Stats.HP <= 0)
         {
             var death = DeathResolver.ResolveKill(world, actor, target);
             DeathResolver.AppendProgressionLogMessages(outcome.LogMessages, actor.Name, death);
             outcome.LogMessages.Add(weaponName is not null
-                ? $"{actor.Name} kills {target.Name} with {weaponName} for {damage.FinalDamage} damage."
-                : $"{actor.Name} kills {target.Name} for {damage.FinalDamage} damage.");
+                ? $"{actor.Name} kills {target.Name} with {weaponName} for {dealtDamage} damage."
+                : $"{actor.Name} kills {target.Name} for {dealtDamage} damage.");
             DeathResolver.AppendLootLogMessages(outcome.LogMessages, death);
             return outcome;
         }
 
         var criticalText = damage.IsCritical ? " critically" : string.Empty;
         outcome.LogMessages.Add(weaponName is not null
-            ? $"{actor.Name}{criticalText} strikes {target.Name} with {weaponName} for {damage.FinalDamage} damage."
-            : $"{actor.Name}{criticalText} hits {target.Name} for {damage.FinalDamage} damage.");
+            ? $"{actor.Name}{criticalText} strikes {target.Name} with {weaponName} for {dealtDamage} damage."
+            : $"{actor.Name}{criticalText} hits {target.Name} for {dealtDamage} damage.");
         return outcome;
     }
 

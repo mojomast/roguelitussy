@@ -42,6 +42,7 @@ public partial class CharacterSheet : Control
         {
             _eventBus.TurnCompleted -= OnTurnCompleted;
             _eventBus.InventoryChanged -= OnInventoryChanged;
+            _eventBus.EquipmentChanged -= OnEquipmentChanged;
             _eventBus.LoadCompleted -= OnLoadCompleted;
             _eventBus.CurrencyChanged -= OnCurrencyChanged;
             _eventBus.ProgressionChanged -= OnProgressionChanged;
@@ -54,6 +55,7 @@ public partial class CharacterSheet : Control
         {
             _eventBus.TurnCompleted += OnTurnCompleted;
             _eventBus.InventoryChanged += OnInventoryChanged;
+            _eventBus.EquipmentChanged += OnEquipmentChanged;
             _eventBus.LoadCompleted += OnLoadCompleted;
             _eventBus.CurrencyChanged += OnCurrencyChanged;
             _eventBus.ProgressionChanged += OnProgressionChanged;
@@ -133,6 +135,14 @@ public partial class CharacterSheet : Control
     }
 
     private void OnInventoryChanged(EntityId entityId)
+    {
+        if (_gameManager?.World?.Player?.Id == entityId)
+        {
+            Refresh();
+        }
+    }
+
+    private void OnEquipmentChanged(EntityId entityId, EquipSlot slot, ItemInstance? item)
     {
         if (_gameManager?.World?.Player?.Id == entityId)
         {

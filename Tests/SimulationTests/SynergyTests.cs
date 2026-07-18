@@ -12,6 +12,30 @@ public sealed class SynergyTests : ITestSuite
         registry.Add("Simulation.Synergy detects one piece away potential synergies", DetectsPotentialSynergies);
         registry.Add("Simulation.Synergy requires item tags from inventory", RequiresItemTagsFromInventory);
         registry.Add("Simulation.Synergy passive stat application is idempotent", PassiveStatApplicationIsIdempotent);
+        registry.Add("Simulation.Synergy passive bonus is removed when synergy deactivates", PassiveBonusRemovedWhenDeactivated);
+    }
+
+    private static void PassiveBonusRemovedWhenDeactivated()
+    {
+        var content = new StubContentDatabase();
+        var world = new WorldState();
+        world.InitGrid(3, 3);
+        var player = CreatePlayer();
+        player.SetComponent(new RelicComponent());
+        player.GetComponent<RelicComponent>()!.RelicIds.Add("vampire_fang");
+        player.SetComponent(new ProgressionComponent());
+        player.GetComponent<ProgressionComponent>()!.SelectedPerkIds.Add("perk_tough");
+
+        SynergyResolver.ApplyPassiveSynergies(player, content, world);
+        var boostedAttack = player.Stats.Attack;
+
+        player.GetComponent<RelicComponent>()!.RelicIds.Remove("vampire_fang");
+        SynergyResolver.ApplyPassiveSynergies(player, content, world);
+
+        Expect.Equal(boostedAttack - 1, player.Stats.Attack, "Deactivated synergy should remove its stat bonus");
+        Expect.False(
+            player.GetComponent<SynergyComponent>()!.AppliedPassiveSynergyIds.Contains("stub_synergy"),
+            "Applied passive list should drop the inactive synergy");
     }
 
     private static void ActivatesFromRelicAndPerkRequirements()

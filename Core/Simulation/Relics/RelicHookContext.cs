@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Roguelike.Core;
 
 public sealed class RelicHookContext
@@ -11,4 +13,6 @@ public sealed class RelicHookContext
     public string? EnemyTag { get; init; }
 
     public int ModifiedValue { get; set; }
+
+    public List<string> LogMessages { get; } = new();
 }

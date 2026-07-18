@@ -14,19 +14,6 @@ public static class ReputationService
         }
     }
 
-    public static void OnBossKilled(IEntity player, IContentDatabase? content)
-    {
-        Adjust(player, "warriors_order", 10);
-        Adjust(player, "thieves_compact", 5);
-        Adjust(player, "merchants_guild", -5);
-    }
-
-    public static void OnShopSteal(IEntity player, IContentDatabase? content)
-    {
-        Adjust(player, "merchants_guild", -20);
-        Adjust(player, "thieves_compact", 15);
-    }
-
     public static void OnShopPurchase(IEntity player, int goldSpent, IContentDatabase? content) =>
         Adjust(player, "merchants_guild", Math.Max(0, goldSpent) / 50);
 

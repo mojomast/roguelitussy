@@ -32,8 +32,18 @@ public static class SaveMigrator
                 ?? throw new InvalidOperationException("Unable to deserialize save data."),
             13 => MigrateV13(root),
             14 => MigrateV14(root),
+            15 => MigrateV15(root),
             _ => throw new InvalidOperationException($"Unsupported save version {version}.")
         };
+    }
+
+    private static SaveFileData MigrateV15(JsonElement root)
+    {
+        var data = JsonSerializer.Deserialize<SaveFileData>(root.GetRawText(), SaveSerializer.JsonOptions)
+            ?? throw new InvalidOperationException("Unable to deserialize version 15 save data.");
+
+        data.Version = SaveSerializer.CurrentVersion;
+        return FinalizeSingleFloor(data);
     }
 
     private static SaveFileData MigrateV14(JsonElement root)
@@ -332,7 +342,37 @@ public static class SaveMigrator
 
         var activeFloor = data.Floors.Find(floor => floor.Depth == data.Depth) ?? data.Floors[0];
         SaveSerializer.ApplyActiveFloorAliases(data, activeFloor);
+        NormalizeLegacySchedulerOrders(data);
         return data;
+    }
+
+    /// <summary>
+    /// Saves written before version 16 stored scheduler order 0 both for entities the
+    /// scheduler never tracked and for the first-registered actor (whose real order 0
+    /// was dropped on write). Version 16 distinguishes the two with a nullable order,
+    /// so legacy zeros are normalized to "not scheduled" and the scheduler re-derives
+    /// them on registration, matching the legacy load behavior.
+    /// </summary>
+    private static void NormalizeLegacySchedulerOrders(SaveFileData data)
+    {
+        foreach (var entity in data.Entities)
+        {
+            if (entity.SchedulerOrder == 0)
+            {
+                entity.SchedulerOrder = null;
+            }
+        }
+
+        foreach (var floor in data.Floors)
+        {
+            foreach (var entity in floor.Entities)
+            {
+                if (entity.SchedulerOrder == 0)
+                {
+                    entity.SchedulerOrder = null;
+                }
+            }
+        }
     }
 
     private static EntitySaveData MigrateLegacyEntity(JsonElement element, IReadOnlyDictionary<string, int> schedulerEnergy, bool forceInventory, int entityIndex, string itemSeedPrefix)

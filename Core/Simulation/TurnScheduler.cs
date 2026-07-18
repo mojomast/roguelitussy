@@ -172,7 +172,9 @@ public sealed class TurnScheduler : ITurnScheduler
                 continue;
             }
 
-            var speed = Math.Max(1, StatusEffectProcessor.GetEffectiveSpeed(entity));
+            var speed = Math.Max(1, world.ContentDatabase is { } db
+                ? StatusEffectProcessor.GetEffectiveSpeed(entity, db)
+                : StatusEffectProcessor.GetEffectiveSpeed(entity));
             pair.Value.BaseSpeed = entity.Stats.Speed;
             pair.Value.Energy += (BaseEnergyGain * speed) / 100;
             entity.Stats.Energy = pair.Value.Energy;

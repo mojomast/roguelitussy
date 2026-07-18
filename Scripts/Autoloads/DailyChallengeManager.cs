@@ -38,32 +38,57 @@ public partial class DailyChallengeManager : Node
     public override void _Ready()
     {
         Load();
-        GetNodeOrNull<EventBus>("/root/EventBus")!.GameOverWithStats += RecordDailyAttempt;
+        var bus = GetNodeOrNull<EventBus>("/root/EventBus");
+        if (bus is not null)
+        {
+            bus.GameOverWithStats += RecordDailyAttempt;
+        }
     }
 
-    public void Load()
+    public void Load() => LoadFromFile(GlobalizePath(DailyChallengeUserPath));
+
+    public void LoadFromFile(string path)
     {
-        var path = GlobalizePath(DailyChallengeUserPath);
         if (!File.Exists(path))
         {
             _data = new DailyChallengeData();
             return;
         }
 
-        _data = JsonSerializer.Deserialize<DailyChallengeData>(File.ReadAllText(path)) ?? new DailyChallengeData();
+        try
+        {
+            _data = JsonSerializer.Deserialize<DailyChallengeData>(File.ReadAllText(path)) ?? new DailyChallengeData();
+        }
+        catch
+        {
+            // A corrupt or unreadable daily-challenge file must never take down the autoload;
+            // fall back to a fresh day so the challenge stays playable.
+            _data = new DailyChallengeData();
+        }
+
         ResetIfNewDay();
     }
 
-    public void Save()
-    {
-        var path = GlobalizePath(DailyChallengeUserPath);
-        var directory = Path.GetDirectoryName(path);
-        if (!string.IsNullOrEmpty(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
+    public void Save() => SaveToFile(GlobalizePath(DailyChallengeUserPath));
 
-        File.WriteAllText(path, JsonSerializer.Serialize(_data, new JsonSerializerOptions { WriteIndented = true }));
+    public void SaveToFile(string path)
+    {
+        try
+        {
+            var directory = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            var tempPath = path + ".tmp";
+            File.WriteAllText(tempPath, JsonSerializer.Serialize(_data, new JsonSerializerOptions { WriteIndented = true }));
+            File.Move(tempPath, path, true);
+        }
+        catch
+        {
+            // Daily-challenge persistence should never crash gameplay; a failed write is retried on the next save.
+        }
     }
 
     public void RecordDailyAttempt(RunStats stats)

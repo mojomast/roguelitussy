@@ -14,6 +14,18 @@ public sealed class DeathResolverTests : ITestSuite
         registry.Add("Simulation.DeathResolver loot seed uses stable entity hash", LootSeedUsesStableEntityHash);
         registry.Add("Simulation.DeathResolver gold roll respects min max", GoldRollRespectsMinMax);
         registry.Add("Simulation.DeathResolver unattributed death drops loot but no gold", UnattributedDeathDropsLootButNoGold);
+        registry.Add("Simulation.DeathResolver kill streak reset clears milestone marker", KillStreakResetClearsMilestoneMarker);
+    }
+
+    private static void KillStreakResetClearsMilestoneMarker()
+    {
+        var streak = new KillStreakComponent { CurrentStreak = 5, HighestStreak = 5, BonusXpAwarded = 5 };
+
+        streak.Reset();
+
+        Expect.Equal(0, streak.CurrentStreak, "Reset should clear the current streak");
+        Expect.Equal(0, streak.BonusXpAwarded, "Reset should clear the milestone marker so future streaks can award XP again");
+        Expect.Equal(5, streak.HighestStreak, "Reset should preserve the highest streak");
     }
 
     private static void KillingRatDropsRatLootAndGold()

@@ -22,25 +22,6 @@
       "trigger_chance": 100
     },
     {
-      "id": "trap_spike",
-      "name": "Spike Trap",
-      "description": "Sharp iron spikes hidden in the floor impale whoever steps on the tile.",
-      "ability_id": "spike_trap",
-      "damage_min": 5,
-      "damage_max": 8,
-      "damage_type": "physical",
-      "sprite_path": "res://Assets/Sprites/objects/trap_spikes.svg",
-      "sprite_atlas_coords": [
-        0,
-        0
-      ],
-      "avoid_flags": [
-        "phased",
-        "flying"
-      ],
-      "trigger_chance": 100
-    },
-    {
       "id": "trap_poison_gas",
       "name": "Poison Gas Trap",
       "description": "A pressure plate vents poison gas for 8 turns.",
@@ -100,12 +81,15 @@
     },
     {
       "id": "trap_gold_drain",
-      "name": "Gold Drain Trap",
-      "description": "A greedy curse should steal 20-50 gold once trap economy support lands.",
+      "name": "Leeching Hex",
+      "description": "A miser's curse cut into the tile. It takes its toll in blood and leaves the sword arm heavy.",
       "ability_id": "gold_drain_trap",
-      "damage_min": 1,
-      "damage_max": 1,
+      "damage_min": 3,
+      "damage_max": 7,
       "damage_type": "dark",
+      "status_effect": "weakened",
+      "status_duration": 3,
+      "status_magnitude": 1,
       "sprite_path": "res://Assets/Sprites/objects/trap_spikes.svg",
       "sprite_atlas_coords": [
         4,

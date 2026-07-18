@@ -11,8 +11,13 @@ The turn model is energy-based.
 - Player actions are submitted through `GameManager.ProcessPlayerAction(...)`.
 - Non-player actors fall back to brain-driven decisions when the loop requests an action for them.
 - End-of-round processing now also ticks entity ability cooldowns through `CooldownComponent`.
+- Scheduler energy consumption returns status tick output; `GameLoop` merges normal-action tick logs, expirations, and dirty positions into the round outcome.
+- Initiative gain uses content-authored status speed modifiers when content is available.
+- End-of-round relic upkeep, including Cursed Blade drain, runs before cooldown ticking.
 
 Validation failures still consume action energy in the current loop implementation. That behavior is intentional and covered by tests.
+
+Known limitation: when `TurnScheduler.GetNextActor()` consumes a stunned/frozen actor internally, that skipped turn's `StatusTickResult` is not yet merged into the round outcome. Status deaths also do not currently add a dedicated death `CombatEvent`.
 
 ## Actions And Outcomes
 
@@ -98,7 +103,11 @@ Combat is still resolved inside `Core/Simulation/CombatResolver.cs`, but it is n
 
 The ability pipeline is shared by item casts and AI casts so the runtime rules stay in one place.
 
-Relics are content-authored passive hooks in `Content/relics.json`. `RelicComponent` and `RelicProcessor` support kill and poison-tick hooks, `GameManager.ProcessRelicChoice(...)` claims a selected relic, `EventBus.RelicsChanged` refreshes the HUD relic tray, and `RelicChoiceOverlay` presents the three-choice modal emitted by `EventBus.RelicChoiceReady`.
+Relics are content-authored passive hooks in `Content/relics.json`. Melee, ranged, ability, status, and trap damage now use `RelicProcessor` for applicable outgoing and incoming hooks. Runtime support includes first-hit tracking, timed damage buffs, shields, damage reduction/negation, reflection, one lethal save, floor-entry effects, merchant discounts, kill/rest effects, and Cursed Blade upkeep. `GameManager.ProcessRelicChoice(...)` claims a selected relic, `EventBus.RelicsChanged` refreshes the HUD relic tray, and `RelicChoiceOverlay` presents the three-choice modal emitted by `EventBus.RelicChoiceReady`.
+
+Ranged attacks use equipped `ranged` weapon damage, accuracy, crit chance, and on-hit effects when available. Ability `heal_self` effects resolve after damage, and `enemies` relation filters exclude neutral entities. Synergy passive stat bonuses are removed when requirements cease to be met. Shrine use grants Thieves' Compact reputation.
+
+Known relic follow-ups include exact kill-milestone ordering, repeated floor-entry stat effects, delivery of all hook log messages, and cross-source player-death consistency.
 
 Synergies are content-authored build identities in `Content/synergies.json`. `SynergyResolver` derives active and one-piece-away synergies from the player's relics, selected perks, archetype, and item tags, and applies idempotent passive stat bonuses through `SynergyComponent`.
 
@@ -127,7 +136,9 @@ The current flow in `DungeonGenerator` is:
 
 Traps are walkable but hazardous stationary features. Authored trap definitions live in `Content/traps.json`; each room `trap_id` must reference a known trap. `LevelData` exposes `TrapSpawnDetails` so `GameManager.PopulateWorld` can instantiate trap entities.
 
-Floor-event planning lives in `Core/Generation/FloorEventResolver.cs`. It classifies every 5th floor as safe, every non-safe 3rd floor as a boss floor, and standard floors as candidates for shrine or curse rooms. Full room injection and presentation remain GameManager/UI integration work.
+Floor-event planning lives in `Core/Generation/FloorEventResolver.cs`. Boss floors take precedence at depths divisible by both 3 and 5; other fifth floors are safe, and standard floors can request shrine or curse rooms. Safe floors suppress enemy spawn output. Requested special-room tags are preferred during BSP placement, boss floors receive a fallback boss-marked spawn, deep-floor spawn caps scale with map area, random enemies avoid the start room, and exits use carved traversal distance. Bare trap tiles receive deterministic theme-specific trap IDs. Connectivity validation can treat locked doors as passable while still treating water as non-traversable, and ragged prefab rows read as walls.
+
+Special-room integration remains partial. A boss-marked spawn is not yet guaranteed to resolve to a boss-tagged enemy template in `GameManager`, shrine/curse event metadata is not carried into `LevelData`, requested rooms are best-effort, and key placement can still under-provision a floor when key candidates are exhausted.
 
 ## Rendering And UI Flow
 
@@ -153,6 +164,10 @@ Current presentation-specific behavior worth knowing:
 - `WorldView` hides the legacy tilemap visuals and scales the imported 16x16 art up to the runtime 40x40 cell size.
 - `WorldView` only mirrors fog/FOV state from the active world; `GameManager`/`WorldState` own authoritative visibility and exploration mutation.
 - `AnimationController` now advances short eased move animations over multiple `_Process(...)` frames instead of snapping movement immediately. `WorldView` clears transient popups/flashes on full world rebinds and floor changes so damage numbers cannot leak between redraws.
+- Attacks use a short eased lunge, and killed entities fade/shrink before their render nodes are freed. Normal, critical, miss, healing, and item-pickup popups use distinct presentation.
+- `EventBus.Healed` drives healing popups, while `RenderPalette` centralizes fallback tiles, entity tints, targeting colors, wall accents, chests, and pickup text.
+- `CharacterSheet` refreshes on equipment changes, `CombatLog` accepts dropped-item messages, and floor-event UI safely rebinds and shows floor transitions.
+- Backquote/`Q` debug input is compiled only for `DEBUG` builds.
 - `DamageDealt` events trigger an immediate non-white defender flash. The flash fades back to exact white over about 0.12 seconds, and entity refreshes avoid clobbering the active tint.
 - `CameraController.DefaultZoom` is `2f`, which is the baseline zoomed-out framing used by `WorldView`.
 - `HUD` presents HP as the primary status readout with a prominent label/bar, while non-HP stats are grouped separately for quick scanning.
@@ -190,12 +205,12 @@ Persistence lives in `Core/Persistence/`.
 
 ### Current Save Version
 
-The current normalized save version is `15`.
+The current normalized save version is `16`.
 
 Notable details:
 
 - Explored and visible map flags are stored as packed bitfields.
-- Legacy version 1 through version 12 payloads are migrated on load.
+- Legacy payloads through version 15 are migrated on load.
 - Saves now persist the active floor plus cached inactive floors through a normalized floor list, while retaining active-floor root aliases for compatibility with metadata and existing tooling.
 - New saves include optional content metadata (`contentVersion` and a deterministic content hash) so load flows can warn when the authored JSON set differs from the one that created the save.
 - Multi-floor validation requires unique floor depths, an active floor payload, and exactly one player entity across all saved floors on the active floor.
@@ -206,6 +221,11 @@ Notable details:
 - Enemy loot and gold drops use a deterministic seed derived from world seed, depth, position, turn number, and a stable byte hash of the victim `EntityId`; the seed does not depend on runtime `GetHashCode()` behavior.
 - Content metadata is warning-only: legacy or migrated saves with missing metadata still load, and hash/version mismatches emit a runtime log warning instead of failing validation.
 - Save validation checks dimensions, entity IDs, inventory/equipment integrity, persisted component payloads, status effects, payload sizes, and trap entity consistency (an entity with a `TrapComponent` must sit on a `Trap` tile and have a non-empty template id).
+- Version 16 makes per-entity scheduler order nullable, preserving `0` as the valid first registration order. Version 15's ambiguous zero values migrate to `null` and are rederived from registration order.
+- Relic persistence includes first-hit target IDs, one-time applied relic IDs, timed damage-buff state, and the last merchant-discount depth.
+- Validation now covers negative wallet/progression/relic/shrine/kill-streak values while allowing speed-zero static shrines, NPCs, merchants, chests, and traps.
+- Meta progression has an independent schema version 1, normalizes legacy/unversioned data, and falls back to fresh data on malformed files. Daily challenge persistence likewise recovers from corrupt files; both use temporary-file replacement.
+- Lucky Coin consumes persisted combat RNG, and merchant item creation consumes persisted item RNG. These improve continuation determinism but intentionally change outcomes relative to older builds.
 
 ### Traps
 

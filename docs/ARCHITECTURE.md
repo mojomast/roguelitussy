@@ -82,16 +82,18 @@ Planned direction: keep `GameManager` as the stable Godot autoload facade, but c
 `Scripts/Autoloads/EventBus.cs` is the shared notification surface between systems. It exposes gameplay, rendering, persistence, and UI lifecycle events such as:
 
 - turn started/completed
-- entity turn started
 - damage dealt
+- healed
 - HP changed
 - floor changed
 - save/load requested and completed
-- level generated/transitioned
+- level transitioned
 - equipment changed
 - experience gained
 - leveled up
 - game over
+
+`GameOverWithStats` is the canonical run-ended integration event. `GameOver` is emitted once afterward for compatibility. The former `EntityTurnStarted`, `LevelGenerated`, and `AscensionLevelChanged` surfaces have been removed.
 
 If a presentation system needs to react to a simulation change, prefer adding or using an event here rather than introducing direct references into `Core/`.
 
@@ -144,6 +146,7 @@ Quick-reference entry points for agents working on this codebase.
 | Turn loop | `Core/Simulation/GameLoop.cs` | 7 | `ProcessRound` drives actors and ticks cooldowns |
 | Scheduler | `Core/Simulation/TurnScheduler.cs` | 7 | Energy-based; status ticks happen in `ConsumeEnergy` |
 | Combat | `Core/Simulation/CombatResolver.cs` | 6 | Deterministic hit/damage/crit/on-hit |
+| Relic hooks | `Core/Simulation/Relics/RelicProcessor.cs` | — | Shared outgoing/incoming damage and lifecycle hooks |
 | Death | `Core/Simulation/DeathResolver.cs` | 6 | Central kill handler; awards XP |
 | Items | `Core/Simulation/Actions/UseItemAction.cs` | 6 | `heal`, `apply_status`, `cast_ability`, `cure` |
 | Abilities | `Core/Simulation/Actions/CastAbilityAction.cs` | 6 | Damage/status/teleport/heal_self |
@@ -152,7 +155,7 @@ Quick-reference entry points for agents working on this codebase.
 | Progression | `Core/Simulation/ProgressionService.cs` | 7 | XP/level-up helpers |
 | Content load | `Core/Content/ContentLoader.cs` | 122 | `LoadFromDirectory` entry point |
 | Save | `Core/Persistence/SaveManager.cs` | 9 | File I/O and slot management |
-| Serialize | `Core/Persistence/SaveSerializer.cs` | 9 | JSON round-trip, current version 13 |
+| Serialize | `Core/Persistence/SaveSerializer.cs` | 9 | JSON round-trip, current version 16 (see `SaveSerializer.CurrentVersion`) |
 
 ### Godot layer entry points
 
@@ -160,13 +163,14 @@ Quick-reference entry points for agents working on this codebase.
 |---|---|---|---|
 | Autoloads | `project.godot` | 11 | `GameManager`, `EventBus`, `ContentDatabase` |
 | Facade | `Scripts/Autoloads/GameManager.cs` | 10 | Owns world, services, turn processing, save/load |
-| Events | `Scripts/Autoloads/EventBus.cs` | 7 | 39 events; GameManager emits, UI/World subscribes |
+| Events | `Scripts/Autoloads/EventBus.cs` | 7 | Large, growing set of events spanning turn flow, combat, inventory, progression, and UI; GameManager emits, UI/World subscribes (see file for the current list) |
 | Input | `Scripts/UI/UIRoot.cs` | 162 | `_UnhandledInput` routes all keys |
 | Input mapping | `Scripts/UI/InputHandler.cs` | 37 | Key-to-action mapping |
 | Action factory | `Scripts/UI/UIActionFactory.cs` | 7 | Builds `IAction` from UI intent |
 | World render | `Scripts/World/WorldView.cs` | 83 | Mirrors `WorldState`; no FOV computation |
 | Entity sprites | `Scripts/World/EntityRenderer.cs` | — | Procedural sprites from catalogs |
 | Catalogs | `Scripts/World/WorldArtCatalog.cs` | 16 | Builds `res://Assets/...` paths |
+| Shared colors | `Scripts/World/RenderPalette.cs` | — | Central world, entity, targeting, and popup colors |
 
 ### Data flow cheat sheet
 
@@ -193,3 +197,5 @@ Content:
 - `aoe_line` and `aoe_cone` ability targeting validate but are not resolved at runtime.
 - `GameManager` directly mutates `WorldState` for map reveal, teleport, and floor travel.
 - `GameManager.cs` is still oversized; remaining extraction work is tracked as non-blocking architecture backlog and should not delay UI polish that only consumes the existing facade API.
+- Enemy rendering still uses `WorldArtCatalog` name mappings rather than authored `EnemyTemplate.SpritePath` values.
+- Floor-event tags influence room placement, but shrine/curse entities and event metadata are not yet fully propagated into world population.

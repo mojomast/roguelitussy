@@ -54,6 +54,11 @@ public static class RelicProcessor
             return;
         }
 
+        if (string.Equals(hook, "on_floor_enter", StringComparison.OrdinalIgnoreCase))
+        {
+            component.FirstHitEntityIds.Clear();
+        }
+
         foreach (var relicId in component.RelicIds.ToArray())
         {
             if (!TryGetRelicTemplate(content, relicId, out var relic)
@@ -67,28 +72,165 @@ public static class RelicProcessor
         }
     }
 
+    /// <summary>
+    /// Dispatches the on_hit relic hook for damage the attacker is about to deal and
+    /// applies any active timed damage buff (e.g. Death Mask). Returns the modified damage.
+    /// </summary>
+    public static int ProcessOutgoingDamage(WorldState world, IEntity attacker, IEntity target, int damage, ICollection<string>? logMessages = null)
+    {
+        var component = attacker.GetComponent<RelicComponent>();
+        if (component is null || component.RelicIds.Count == 0 || damage <= 0)
+        {
+            return damage;
+        }
+
+        var ctx = new RelicHookContext
+        {
+            TargetId = target.Id,
+            DamageAmount = damage,
+            ModifiedValue = damage,
+            EnemyTag = target.GetComponent<EnemyComponent>()?.TemplateId,
+        };
+        ProcessHook("on_hit", attacker, world, world.ContentDatabase, ctx);
+        var result = Math.Max(0, ctx.ModifiedValue);
+
+        if (component.DamageBuffPercent > 0)
+        {
+            if (world.TurnNumber <= component.DamageBuffExpiresOnTurn)
+            {
+                if (result > 0)
+                {
+                    result += Math.Max(1, result * component.DamageBuffPercent / 100);
+                }
+            }
+            else
+            {
+                component.DamageBuffPercent = 0;
+                component.DamageBuffExpiresOnTurn = 0;
+            }
+        }
+
+        FlushLog(ctx, logMessages);
+        return result;
+    }
+
+    /// <summary>
+    /// Applies damage to the victim, routing it through the on_damaged relic hook
+    /// (negation, cushioning, reflection, shield charges) and firing on_low_hp when the
+    /// victim crosses the low-HP threshold or would die. Returns the damage actually applied.
+    /// </summary>
+    public static int ApplyIncomingDamage(WorldState world, IEntity victim, EntityId? attackerId, int damage, ICollection<string>? logMessages = null)
+    {
+        damage = Math.Max(0, damage);
+        var component = victim.GetComponent<RelicComponent>();
+        if (component is null || component.RelicIds.Count == 0)
+        {
+            victim.Stats.HP -= damage;
+            return damage;
+        }
+
+        var hpBefore = victim.Stats.HP;
+        if (damage > 0)
+        {
+            var ctx = new RelicHookContext
+            {
+                TargetId = attackerId,
+                DamageAmount = damage,
+                ModifiedValue = damage,
+            };
+            ProcessHook("on_damaged", victim, world, world.ContentDatabase, ctx);
+            damage = Math.Max(0, ctx.ModifiedValue);
+            FlushLog(ctx, logMessages);
+
+            if (component.ShieldCharges > 0 && damage > 0)
+            {
+                var absorbed = Math.Min(component.ShieldCharges, damage);
+                component.ShieldCharges -= absorbed;
+                damage -= absorbed;
+                logMessages?.Add($"{victim.Name}'s shield absorbs {absorbed} damage.");
+            }
+        }
+
+        victim.Stats.HP -= damage;
+
+        var threshold = victim.Stats.MaxHP / 4;
+        if (victim.Stats.HP <= 0 || (hpBefore > threshold && victim.Stats.HP <= threshold))
+        {
+            var lowCtx = new RelicHookContext
+            {
+                TargetId = attackerId,
+                DamageAmount = damage,
+                ModifiedValue = damage,
+            };
+            ProcessHook("on_low_hp", victim, world, world.ContentDatabase, lowCtx);
+            FlushLog(lowCtx, logMessages);
+        }
+
+        return damage;
+    }
+
+    /// <summary>
+    /// End-of-round relic upkeep (e.g. Cursed Blade's HP drain). Called by GameLoop.
+    /// </summary>
+    public static void ProcessRoundEnd(WorldState world, IEntity player, ICollection<string> logMessages)
+    {
+        var component = player.GetComponent<RelicComponent>();
+        if (component is null || !player.IsAlive || !component.HasRelic("cursed_blade"))
+        {
+            return;
+        }
+
+        player.Stats.HP -= 1;
+        logMessages.Add($"Cursed Blade saps 1 HP from {player.Name}.");
+        if (player.Stats.HP <= 0)
+        {
+            var death = DeathResolver.ResolveUnattributedDeath(world, player);
+            logMessages.Add($"{player.Name} succumbs to the Cursed Blade.");
+            DeathResolver.AppendLootLogMessages(logMessages, death);
+        }
+    }
+
+    private static void FlushLog(RelicHookContext ctx, ICollection<string>? logMessages)
+    {
+        if (logMessages is null)
+        {
+            return;
+        }
+
+        foreach (var message in ctx.LogMessages)
+        {
+            logMessages.Add(message);
+        }
+    }
+
     private static void ApplyRelic(RelicTemplate relic, RelicComponent component, IEntity player, IWorldState world, RelicHookContext ctx)
     {
         switch (relic.EffectType)
         {
             case "heal":
-                player.Stats.HP = Math.Min(player.Stats.MaxHP, player.Stats.HP + Math.Max(0, relic.EffectValue));
+                var healed = Math.Min(Math.Max(0, relic.EffectValue), Math.Max(0, player.Stats.MaxHP - player.Stats.HP));
+                if (healed > 0)
+                {
+                    player.Stats.HP += healed;
+                    ctx.LogMessages.Add($"{relic.DisplayName} restores {healed} HP.");
+                }
                 break;
             case "damage_bonus":
-                ApplyDamageBonus(relic, world, ctx);
+                ApplyDamageBonus(relic, component, player, world, ctx);
                 break;
             case "gold_bonus":
                 var wallet = player.GetComponent<WalletComponent>();
-                if (wallet is not null)
+                if (wallet is not null && relic.EffectValue > 0)
                 {
-                    wallet.Gold += Math.Max(0, relic.EffectValue);
+                    wallet.Gold += relic.EffectValue;
+                    ctx.LogMessages.Add($"{relic.DisplayName} grants {relic.EffectValue} gold.");
                 }
                 break;
             case "stat_mod":
-                ApplyStatMod(relic, player, world);
+                ApplyStatMod(relic, component, player, world, ctx);
                 break;
             case "shield":
-                ApplyShield(relic, component, player, ctx);
+                ApplyShield(relic, component, player, world, ctx);
                 break;
             case "echo_bonus":
                 if (relic.RelicId == "soul_collector")
@@ -99,6 +241,7 @@ public static class RelicProcessor
                         var amount = Math.Max(0, relic.EffectValue);
                         player.Stats.MaxHP += amount;
                         player.Stats.HP += amount;
+                        ctx.LogMessages.Add($"{relic.DisplayName} swells with souls: +{amount} max HP.");
                     }
                 }
 
@@ -106,35 +249,52 @@ public static class RelicProcessor
         }
     }
 
-    private static void ApplyDamageBonus(RelicTemplate relic, IWorldState world, RelicHookContext ctx)
+    private static void ApplyDamageBonus(RelicTemplate relic, RelicComponent component, IEntity player, IWorldState world, RelicHookContext ctx)
     {
-        if (relic.RelicId == "predator_mark" && ctx.ModifiedValue > 0)
+        switch (relic.RelicId)
         {
-            ctx.ModifiedValue *= 2;
-            return;
+            case "predator_mark":
+                if (ctx.TargetId is { } markTargetId
+                    && component.FirstHitEntityIds.Add(markTargetId)
+                    && ctx.ModifiedValue > 0)
+                {
+                    ctx.ModifiedValue *= 2;
+                    ctx.LogMessages.Add($"{relic.DisplayName} doubles the blow!");
+                }
+
+                return;
+            case "death_mask":
+                // on_damaged: arm a timed outgoing-damage buff instead of amplifying the incoming hit.
+                component.DamageBuffPercent = Math.Max(0, relic.EffectValue);
+                component.DamageBuffExpiresOnTurn = world.TurnNumber + 5;
+                ctx.LogMessages.Add($"{relic.DisplayName} feeds on pain: +{relic.EffectValue}% damage for 5 turns.");
+                return;
+            case "thorn_wrap":
+            case "mirror_shard":
+                if (ctx.TargetId is { } attackerId
+                    && world.GetEntity(attackerId) is { IsAlive: true } attacker
+                    && relic.EffectValue > 0)
+                {
+                    attacker.Stats.HP -= relic.EffectValue;
+                    ctx.LogMessages.Add($"{relic.DisplayName} reflects {relic.EffectValue} damage to {attacker.Name}.");
+                    if (attacker.Stats.HP <= 0 && world is WorldState worldState)
+                    {
+                        var death = DeathResolver.ResolveKill(worldState, player, attacker);
+                        DeathResolver.AppendDeathLogMessages(ctx.LogMessages, player.Name, attacker.Name, death);
+                    }
+                }
+
+                return;
         }
 
-        if (relic.RelicId == "death_mask" && ctx.ModifiedValue > 0)
+        if (ctx.ModifiedValue > 0 && relic.EffectValue > 0)
         {
-            ctx.ModifiedValue += Math.Max(1, ctx.ModifiedValue * relic.EffectValue / 100);
-            return;
+            ctx.ModifiedValue += relic.EffectValue;
+            ctx.LogMessages.Add($"{relic.DisplayName} adds {relic.EffectValue} damage.");
         }
-
-        if (relic.RelicId == "thorn_wrap" && ctx.TargetId is { } attackerId)
-        {
-            var attacker = world.GetEntity(attackerId);
-            if (attacker is not null && attacker.IsAlive)
-            {
-                attacker.Stats.HP = Math.Max(0, attacker.Stats.HP - Math.Max(0, relic.EffectValue));
-            }
-
-            return;
-        }
-
-        ctx.ModifiedValue += Math.Max(0, relic.EffectValue);
     }
 
-    private static void ApplyStatMod(RelicTemplate relic, IEntity player, IWorldState world)
+    private static void ApplyStatMod(RelicTemplate relic, RelicComponent component, IEntity player, IWorldState world, RelicHookContext ctx)
     {
         switch (relic.RelicId)
         {
@@ -144,6 +304,7 @@ public static class RelicProcessor
                 break;
             case "berserker_heart":
                 player.Stats.Attack += Math.Max(0, relic.EffectValue);
+                ctx.LogMessages.Add($"{relic.DisplayName} surges: +{relic.EffectValue} attack!");
                 break;
             case "warlord_crest":
                 player.Stats.Attack += Math.Min(10, Math.Max(0, world.Depth - 1) * Math.Max(0, relic.EffectValue));
@@ -155,29 +316,107 @@ public static class RelicProcessor
                     var amount = Math.Max(0, relic.EffectValue);
                     player.Stats.MaxHP += amount;
                     player.Stats.HP += amount;
+                    ctx.LogMessages.Add($"{relic.DisplayName} hardens: +{amount} max HP.");
                 }
                 break;
             case "shadow_step":
                 StatusEffectProcessor.ApplyEffect(player, StatusEffectType.Hasted, 2, sourceEntityId: player.Id);
+                ctx.LogMessages.Add($"{relic.DisplayName} quickens your step.");
                 break;
             case "cartographer_lens":
+                if (world is WorldState lensWorld)
+                {
+                    var explored = lensWorld.GetRawExplored();
+                    Array.Fill(explored, true);
+                    ctx.LogMessages.Add($"{relic.DisplayName} reveals the floor.");
+                }
+                break;
             case "merchant_badge":
+                ApplyMerchantDiscount(relic, component, world, ctx);
+                break;
             case "cursed_blade":
+                if (component.AppliedOneTimeRelics.Add(relic.RelicId))
+                {
+                    player.Stats.Attack += Math.Max(0, relic.EffectValue);
+                    ctx.LogMessages.Add($"{relic.DisplayName} thrums: +{relic.EffectValue} attack, but it drinks 1 HP each turn.");
+                }
                 break;
         }
     }
 
-    private static void ApplyShield(RelicTemplate relic, RelicComponent component, IEntity player, RelicHookContext ctx)
+    private static void ApplyMerchantDiscount(RelicTemplate relic, RelicComponent component, IWorldState world, RelicHookContext ctx)
+    {
+        if (component.LastMerchantDiscountDepth == world.Depth)
+        {
+            return;
+        }
+
+        component.LastMerchantDiscountDepth = world.Depth;
+        var discounted = false;
+        foreach (var entity in world.Entities)
+        {
+            var merchant = entity.GetComponent<MerchantComponent>();
+            if (merchant is null)
+            {
+                continue;
+            }
+
+            foreach (var offer in merchant.Offers)
+            {
+                if (offer.Price > 1)
+                {
+                    offer.Price = Math.Max(1, offer.Price * (100 - Math.Max(0, relic.EffectValue)) / 100);
+                    discounted = true;
+                }
+            }
+        }
+
+        if (discounted)
+        {
+            ctx.LogMessages.Add($"{relic.DisplayName} secures better prices from merchants.");
+        }
+    }
+
+    private static void ApplyShield(RelicTemplate relic, RelicComponent component, IEntity player, IWorldState world, RelicHookContext ctx)
     {
         switch (relic.RelicId)
         {
             case "iron_skin":
+                var previousCharges = component.ShieldCharges;
                 component.ShieldCharges = Math.Max(component.ShieldCharges, Math.Max(0, relic.EffectValue));
+                if (component.ShieldCharges > previousCharges)
+                {
+                    ctx.LogMessages.Add($"{relic.DisplayName} forms a {component.ShieldCharges} HP shield.");
+                }
                 break;
             case "lucky_coin":
-                if (ctx.ModifiedValue > 0 && DeterministicChance(player.Id, ctx.ModifiedValue, 10))
+                if (ctx.ModifiedValue > 0 && world is WorldState luckWorld)
                 {
-                    ctx.ModifiedValue = 0;
+                    luckWorld.CombatResolver ??= new CombatResolver(luckWorld.Seed);
+                    if (luckWorld.CombatResolver.NextRandom(100) < 10)
+                    {
+                        ctx.ModifiedValue = 0;
+                        ctx.LogMessages.Add($"{relic.DisplayName} flashes and negates the damage!");
+                    }
+                }
+                break;
+            case "void_amulet":
+                if (ctx.ModifiedValue > 0 && relic.EffectValue > 0)
+                {
+                    var cushioned = ctx.ModifiedValue - Math.Max(1, ctx.ModifiedValue - relic.EffectValue);
+                    if (cushioned > 0)
+                    {
+                        ctx.ModifiedValue -= cushioned;
+                        ctx.LogMessages.Add($"{relic.DisplayName} cushions the blow (-{cushioned} damage).");
+                    }
+                }
+                break;
+            case "time_anchor":
+                var removedHaste = StatusEffectProcessor.RemoveEffect(player, StatusEffectType.Hasted);
+                var removedFrozen = StatusEffectProcessor.RemoveEffect(player, StatusEffectType.Frozen);
+                if (removedHaste || removedFrozen)
+                {
+                    ctx.LogMessages.Add($"{relic.DisplayName} steadies your tempo.");
                 }
                 break;
             case "phoenix_ash":
@@ -185,6 +424,7 @@ public static class RelicProcessor
                 {
                     component.LowHpRelicFired = true;
                     player.Stats.HP = Math.Max(1, relic.EffectValue);
+                    ctx.LogMessages.Add($"{relic.DisplayName} blazes! {player.Name} survives with {player.Stats.HP} HP.");
                 }
                 break;
             default:
@@ -219,17 +459,6 @@ public static class RelicProcessor
         }
 
         return false;
-    }
-
-    private static bool DeterministicChance(EntityId entityId, int salt, int percent)
-    {
-        var hash = entityId.Value.GetHashCode();
-        unchecked
-        {
-            hash = (hash * 397) ^ salt;
-        }
-
-        return Math.Abs(hash % 100) < percent;
     }
 
     private static IReadOnlyDictionary<string, RelicTemplate> CreateBuiltInRelics()
@@ -269,6 +498,11 @@ public static class RelicProcessor
             R("predator_mark", "Predator's Mark", "First hit on an enemy each floor deals double damage.", "rare", "on_hit", "damage_bonus", 0),
             R("leech_stone", "Leech Stone", "Poisoned enemies take +2 bonus damage from all attacks.", "uncommon", "on_hit", "damage_bonus", 2, "poisoned"),
             R("death_mask", "Death Mask", "+20% damage for 5 turns after taking damage.", "rare", "on_damaged", "damage_bonus", 20),
+            R("mirror_shard", "Mirror Shard", "Reflect a sliver of damage back when struck.", "uncommon", "on_damaged", "damage_bonus", 2),
+            R("time_anchor", "Time Anchor", "Start each floor steadied against haste and slow effects.", "rare", "on_floor_enter", "shield", 3),
+            R("soul_collector", "Soul Collector", "Gain extra power from each kill.", "rare", "on_kill", "echo_bonus", 3),
+            R("void_amulet", "Void Amulet", "Darkness cushions incoming blows.", "legendary", "on_damaged", "shield", 4),
+            R("alchemist_stone", "Alchemist Stone", "Healing effects are modestly amplified.", "uncommon", "on_rest", "heal", 2),
         };
 
         return relics.ToDictionary(relic => relic.RelicId, StringComparer.OrdinalIgnoreCase);

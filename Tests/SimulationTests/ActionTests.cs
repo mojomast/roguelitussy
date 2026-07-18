@@ -37,6 +37,71 @@ public sealed class ActionTests : ITestSuite
         registry.Add("Simulation.Actions take chest loot transfers selected items", TakeChestLootTransfersSelectedItems);
         registry.Add("Simulation.Actions open chest reports loot names in the log", OpenChestReportsLootNamesInLog);
         registry.Add("Simulation.Actions stairs validation requires matching tile", StairsValidationRequiresMatchingTile);
+        registry.Add("Simulation.Actions ranged attack uses equipped ranged weapon", RangedAttackUsesEquippedRangedWeapon);
+        registry.Add("Simulation.Actions shrine use raises thieves reputation", ShrineUseRaisesThievesReputation);
+    }
+
+    private static void RangedAttackUsesEquippedRangedWeapon()
+    {
+        for (var seed = 0; seed < 100; seed++)
+        {
+            var world = CreateWorld(seed);
+            var content = new StubContentDatabase();
+            var items = (Dictionary<string, ItemTemplate>)content.ItemTemplates;
+            items[RangedAttackAction.ArrowTemplateId] = new(
+                RangedAttackAction.ArrowTemplateId, "Arrows", "A bundle of arrows.",
+                ItemCategory.Consumable, EquipSlot.None, new Dictionary<string, int>(), null, 0, 20, "common");
+            items["bow_test"] = new(
+                "bow_test", "Test Bow", "A ranged test weapon.",
+                ItemCategory.Weapon, EquipSlot.MainHand, new Dictionary<string, int>(), null, 0, 1, "common",
+                DamageMin: 6, DamageMax: 6, CritChance: 0, WeaponAccuracy: 10,
+                OnHitEffects: new[] { new WeaponOnHitEffect(StatusEffectType.Poisoned, 100, 3) },
+                Tags: new[] { "weapon", "ranged" });
+            world.ContentDatabase = content;
+
+            var actor = CreateActor("Archer", new Position(1, 1), Faction.Player);
+            var target = CreateActor("Target", new Position(5, 1), Faction.Enemy,
+                new Stats { HP = 30, MaxHP = 30, Attack = 3, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 100 });
+            world.Player = actor;
+            world.AddEntity(actor);
+            world.AddEntity(target);
+            world.SetVisible(target.Position, true);
+
+            var inventory = actor.GetComponent<InventoryComponent>()!;
+            inventory.Add(new ItemInstance { TemplateId = RangedAttackAction.ArrowTemplateId, StackCount = 5 });
+            var bow = new ItemInstance { TemplateId = "bow_test" };
+            inventory.Add(bow);
+            Expect.True(inventory.TryEquip(bow, EquipSlot.MainHand, new Dictionary<string, int>(), out _), "Test bow should equip");
+
+            var outcome = new RangedAttackAction(actor.Id, target.Id).Execute(world);
+            Expect.Equal(ActionResult.Success, outcome.Result, "Ranged attack should succeed");
+            if (target.Stats.HP == 30)
+            {
+                continue; // missed; try another seed
+            }
+
+            Expect.Equal(8, 30 - target.Stats.HP, "Damage should come from the bow (6) plus attack/2 (2)");
+            Expect.True(StatusEffectProcessor.HasEffect(target, StatusEffectType.Poisoned), "The bow's on-hit effect should apply");
+            return;
+        }
+
+        Expect.True(false, "No seed produced a landed ranged attack within 100 attempts");
+    }
+
+    private static void ShrineUseRaisesThievesReputation()
+    {
+        var world = CreateWorld();
+        var actor = CreateActor("Player", new Position(1, 1), Faction.Player);
+        var shrine = new StubEntity("Shrine", new Position(2, 1), Faction.Neutral, blocksMovement: false);
+        shrine.SetComponent(new ShrineComponent { ShrineType = "stat", HPCost = 2 });
+        world.Player = actor;
+        world.AddEntity(actor);
+        world.AddEntity(shrine);
+
+        var outcome = new InteractShrineAction(actor.Id, shrine.Id).Execute(world);
+
+        Expect.Equal(ActionResult.Success, outcome.Result, "Shrine interaction should succeed");
+        Expect.Equal(5, actor.GetComponent<FactionComponent>()!.Get("thieves_compact"), "Using a shrine should grant thieves' compact reputation");
     }
 
     private static void MoveActionExecutesOnOpenFloor()

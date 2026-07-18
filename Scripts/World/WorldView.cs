@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
@@ -17,8 +18,8 @@ public partial class WorldView : Node2D
     public const int TileSize = 40;
     private const int EntityLayerZIndex = 20;
     private const float SourceArtTileSize = 16f;
-    private static readonly Color BoundaryTrimColor = new(0.79f, 0.71f, 0.63f, 0.95f);
-    private static readonly Color BoundaryShadowColor = new(0.11f, 0.08f, 0.07f, 0.35f);
+    private static readonly Color BoundaryTrimColor = RenderPalette.BoundaryTrim;
+    private static readonly Color BoundaryShadowColor = RenderPalette.BoundaryShadow;
     private const float BoundaryThickness = 3f;
     private const float BoundaryShadowThickness = 2f;
     private const float FrontWallCoverDepth = 10f;
@@ -148,6 +149,8 @@ public partial class WorldView : Node2D
             _eventBus.TargetingPreviewChanged -= OnTargetingPreviewChanged;
             _eventBus.StatusEffectApplied -= OnStatusEffectApplied;
             _eventBus.StatusEffectRemoved -= OnStatusEffectRemoved;
+            _eventBus.ItemPickedUp -= OnItemPickedUp;
+            _eventBus.Healed -= OnHealed;
         }
 
         _eventBus = eventBus;
@@ -170,6 +173,8 @@ public partial class WorldView : Node2D
         _eventBus.TargetingPreviewChanged += OnTargetingPreviewChanged;
         _eventBus.StatusEffectApplied += OnStatusEffectApplied;
         _eventBus.StatusEffectRemoved += OnStatusEffectRemoved;
+        _eventBus.ItemPickedUp += OnItemPickedUp;
+        _eventBus.Healed += OnHealed;
     }
 
     private GameManager? ResolveGameManager()
@@ -423,14 +428,14 @@ public partial class WorldView : Node2D
     {
         return tileType switch
         {
-            TileType.Floor => new Color(0.18f, 0.18f, 0.2f, 1f),
-            TileType.Wall => new Color(0.07f, 0.07f, 0.09f, 1f),
-            TileType.Door => new Color(0.58f, 0.36f, 0.12f, 1f),
-            TileType.StairsDown => new Color(0.2f, 0.42f, 0.75f, 1f),
-            TileType.StairsUp => new Color(0.32f, 0.58f, 0.28f, 1f),
-            TileType.Water => new Color(0.12f, 0.24f, 0.55f, 1f),
-            TileType.Lava => new Color(0.7f, 0.24f, 0.08f, 1f),
-            _ => new Color(0f, 0f, 0f, 1f),
+            TileType.Floor => RenderPalette.TileFloor,
+            TileType.Wall => RenderPalette.TileWall,
+            TileType.Door => RenderPalette.TileDoor,
+            TileType.StairsDown => RenderPalette.TileStairsDown,
+            TileType.StairsUp => RenderPalette.TileStairsUp,
+            TileType.Water => RenderPalette.TileWater,
+            TileType.Lava => RenderPalette.TileLava,
+            _ => RenderPalette.TileUnknown,
         };
     }
 
@@ -642,7 +647,7 @@ public partial class WorldView : Node2D
                         Name = "NorthCoverShadow",
                         Position = new Vector2(0f, ResolveScaledTextureHeight(stripHeight)),
                         Size = new Vector2(TileSize, FrontWallShadowDepth),
-                        Color = new Color(0.08f, 0.06f, 0.05f, 0.55f),
+                        Color = RenderPalette.WallStripShadow,
                         ZIndex = 1,
                     });
 
@@ -673,7 +678,7 @@ public partial class WorldView : Node2D
                 Name = "NorthCoverFace",
                 Position = new Vector2(0f, BoundaryThickness),
                 Size = new Vector2(TileSize, FrontWallCoverDepth),
-                Color = new Color(0.17f, 0.13f, 0.12f, 0.96f),
+                Color = RenderPalette.WallCoverFace,
                 ZIndex = 40,
             });
 
@@ -691,7 +696,7 @@ public partial class WorldView : Node2D
                 Name = "NorthCoverShadow",
                 Position = new Vector2(0f, BoundaryThickness + FrontWallCoverDepth),
                 Size = new Vector2(TileSize, FrontWallShadowDepth),
-                Color = new Color(0.08f, 0.06f, 0.05f, 0.7f),
+                Color = RenderPalette.WallCoverShadow,
                 ZIndex = 39,
             });
         }
@@ -703,7 +708,7 @@ public partial class WorldView : Node2D
                 Name = "EastCoverShadow",
                 Position = new Vector2(TileSize - SideWallCoverDepth, 0f),
                 Size = new Vector2(SideWallCoverDepth, TileSize),
-                Color = new Color(0.08f, 0.06f, 0.05f, 0.42f),
+                Color = RenderPalette.WallCoverSideShadow,
                 ZIndex = 40,
             });
         }
@@ -715,7 +720,7 @@ public partial class WorldView : Node2D
                 Name = "WestCoverShadow",
                 Position = Vector2.Zero,
                 Size = new Vector2(SideWallCoverDepth, TileSize),
-                Color = new Color(0.08f, 0.06f, 0.05f, 0.42f),
+                Color = RenderPalette.WallCoverSideShadow,
                 ZIndex = 40,
             });
         }
@@ -853,12 +858,15 @@ public partial class WorldView : Node2D
         _entityRenderer.AnimateDamage(damage.DefenderId);
         if (defenderPosition != Roguelike.Core.Position.Invalid)
         {
+            // Negative final damage means the hit actually restored health; route it
+            // through the heal styling instead of showing a white "-N".
+            var isHeal = damage.FinalDamage < 0 && !damage.IsMiss;
             _animationController.SpawnDamagePopup(
                 _entityLayer,
                 ToCanvasPosition(defenderPosition),
-                damage.FinalDamage,
+                Math.Abs(damage.FinalDamage),
                 damage.IsCritical,
-                isHeal: false,
+                isHeal,
                 damage.IsMiss);
         }
 
@@ -866,6 +874,57 @@ public partial class WorldView : Node2D
         {
             _entityRenderer.RemoveEntity(damage.DefenderId, animateDeath: true);
         }
+    }
+
+    private void OnHealed(EntityId entityId, int amount)
+    {
+        if (amount <= 0)
+        {
+            return;
+        }
+
+        var position = _world?.GetEntity(entityId)?.Position
+            ?? _entityRenderer.GetLastKnownPosition(entityId)
+            ?? Roguelike.Core.Position.Invalid;
+        if (position == Roguelike.Core.Position.Invalid)
+        {
+            return;
+        }
+
+        _animationController.SpawnDamagePopup(
+            _entityLayer,
+            ToCanvasPosition(position),
+            amount,
+            isCrit: false,
+            isHeal: true);
+    }
+
+    private void OnItemPickedUp(EntityId entityId, ItemInstance item)
+    {
+        var position = _world?.GetEntity(entityId)?.Position
+            ?? _entityRenderer.GetLastKnownPosition(entityId)
+            ?? Roguelike.Core.Position.Invalid;
+        if (position == Roguelike.Core.Position.Invalid)
+        {
+            return;
+        }
+
+        _animationController.SpawnTextPopup(
+            _entityLayer,
+            ToCanvasPosition(position),
+            ResolveItemDisplayName(item),
+            RenderPalette.PickupPopup);
+    }
+
+    private string ResolveItemDisplayName(ItemInstance item)
+    {
+        var content = (_world as WorldState)?.ContentDatabase;
+        if (content is not null && content.TryGetItemTemplate(item.TemplateId, out var template))
+        {
+            return template.DisplayName;
+        }
+
+        return item.TemplateId.Replace('_', ' ');
     }
 
     private void OnEntityMoved(EntityId entityId, Position from, Position to)
@@ -980,11 +1039,11 @@ public partial class WorldView : Node2D
         }
 
         var previewColor = _targetingCursorValid
-            ? new Color(0.9f, 0.4f, 0.1f, 0.35f)
-            : new Color(0.9f, 0.1f, 0.1f, 0.35f);
+            ? RenderPalette.TargetingPreviewValid
+            : RenderPalette.TargetingPreviewInvalid;
         var cursorColor = _targetingCursorValid
-            ? new Color(0.95f, 0.85f, 0.2f, 0.85f)
-            : new Color(0.95f, 0.15f, 0.15f, 0.85f);
+            ? RenderPalette.TargetingCursorValid
+            : RenderPalette.TargetingCursorInvalid;
 
         foreach (var position in _targetingPreviewTiles)
         {

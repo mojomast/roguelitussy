@@ -632,21 +632,21 @@
       "sfx": "flame_loop"
     },
     {
-      "id": "summon_hound",
-      "name": "Summon Hound",
-      "description": "Calls a spectral hound from the nearest shadow.",
+      "id": "shadow_surge",
+      "name": "Shadow Surge",
+      "description": "Drinks the surrounding dark and moves like spilled ink.",
       "targeting": { "type": "self", "range": 0, "requires_los": false },
       "costs": { "energy": 1000 },
       "effects": [
         { "type": "apply_status", "status_effect": "haste", "chance": 100, "duration": 2 }
       ],
-      "animation": "summon_shadow",
-      "sfx": "hound_howl"
+      "animation": "ghost_shimmer",
+      "sfx": "phase_shift"
     },
     {
       "id": "gold_drain_trap",
-      "name": "Gold Drain Trap",
-      "description": "A hexed sigil lashes out and drains coin.",
+      "name": "Leeching Hex",
+      "description": "A miser's curse lashes out, taking its toll in blood.",
       "targeting": {
         "type": "single",
         "range": 0,
@@ -659,7 +659,7 @@
         {
           "type": "damage",
           "damage_type": "dark",
-          "base_value": 1
+          "base_value": 5
         }
       ],
       "animation": "curse_flash",
@@ -721,6 +721,35 @@
       ],
       "animation": "smoke_burst",
       "sfx": "smoke_puff"
+    },
+    {
+      "id": "arcane_infusion",
+      "name": "Arcane Infusion",
+      "description": "Raw aether floods the veins, lending strength and speed alike.",
+      "targeting": {
+        "type": "self",
+        "range": 0,
+        "requires_los": false
+      },
+      "costs": {
+        "energy": 500
+      },
+      "effects": [
+        {
+          "type": "apply_status",
+          "status_effect": "empowered",
+          "chance": 100,
+          "duration": 4
+        },
+        {
+          "type": "apply_status",
+          "status_effect": "haste",
+          "chance": 100,
+          "duration": 4
+        }
+      ],
+      "animation": "shout_ring",
+      "sfx": "war_cry"
     },
     {
       "id": "chain_lightning",

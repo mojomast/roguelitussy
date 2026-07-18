@@ -46,6 +46,8 @@ public static class DoorSanitizer
             return false;
         }
 
-        return world.GetTile(position) is TileType.Floor or TileType.Door or TileType.StairsDown or TileType.StairsUp or TileType.Water;
+        // Keep doorway support aligned with the validator's traversability rules so
+        // sanitized doors are never rejected later for mismatched semantics.
+        return LevelValidator.IsTraversable(world.GetTile(position));
     }
 }

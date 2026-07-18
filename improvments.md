@@ -1,5 +1,7 @@
 # Godotussy Improvement Spec
 
+> **ARCHIVED / HISTORICAL DOCUMENT.** This file is not maintained and does not reflect current code. It captures a point-in-time audit from an earlier project name (`godotussy`) and contains dead Windows file paths (`c:/Users/kyle/projects/godotussy/...`) that no longer resolve in this repository (now `roguelitussy`). Several "Missing" items below (XP/leveling, runtime ability casting, ability-kill progression, equipment requirements) have since shipped — see the corrections inline under "Verified Current Gaps." **For the live, maintained improvement tracker, use `docs/IMPROVEMENT_SUGGESTIONS.md`.**
+
 > **Note (2026-06-26):** A fresh, actionable suggestions document has been created at `docs/IMPROVEMENT_SUGGESTIONS.md`. It is organized by topic with IDs, target files, acceptance criteria, and implementation waves for worker subagents. This file remains as historical backlog context; prefer the new document for current work planning.
 
 > Status note (2026-06-26): this file is historical backlog context. Many gap sections below have since been resolved or partially resolved, including identity/progression persistence, runtime ability casting, combat item stats, AI role support, equipment requirements, content expansion, save versioning, workflow documentation, ability RNG save/load continuation, sourced status-kill progression attribution, AI parameter projection, and character creation option persistence. Treat older "Missing" lists as audit history; confirm against the live code and current docs before starting work.
@@ -11,8 +13,6 @@
 > Chest/overflow follow-up note (2026-06-28): mobs ignore and cannot melee neutral chests. Chests now roll persistent contents on interaction, show a selectable loot modal, and preserve leave-behind contents through save/load. Text-driven inventory/dialog/shop/tooltip surfaces window or clamp long content, and the bottom-right tooltip is taller for equipment comparison text.
 
 > Consumable stack follow-up note (2026-06-10): stacked consumables and scrolls now consume one item per successful use, leaving the remaining stack in inventory.
-
-> Progression/mechanics follow-up note (2026-06-26): save/load restores visible pending perk choices by reopening the level-up overlay, pickup stack merging resolves item templates from Core content state, AI parameter projection now drives runtime enemy behavior from `ai_params`, character creation options round-trip through saves, and save/load brain rehydration preserves authored AI profiles. Larger audited follow-ups remain: finite perk offer pools and trap/lock-door room hooks. Aimed item targeting UI is implemented (ITM-5 / ABI-1).
 
 > Progression/mechanics follow-up note (2026-06-26): save/load restores visible pending perk choices by reopening the level-up overlay, pickup stack merging resolves item templates from Core content state, AI parameter projection now drives runtime enemy behavior from `ai_params`, character creation options round-trip through saves, and save/load brain rehydration preserves authored AI profiles. Larger audited follow-ups remain: finite perk offer pools and trap/lock-door room hooks. Aimed item targeting UI is implemented (ITM-5 / ABI-1).
 
@@ -28,13 +28,13 @@
 
 > UI modal/overlap follow-up note (2026-07-02): Echo Workshop now routes above the title menu and exits through `Escape` or an explicit Back row. Inventory header, grid, detail, and footer text now fit compact panels to prevent text overlap.
 
-> Wave 1 roguelite systems note (2026-07-02): content-backed synergies, ascension modifiers, daily modifiers, narrative templates, faction definitions, boss phase data, deterministic daily seed helpers, run epitaph generation, faction reputation state, and save version 15 persistence are implemented and covered by focused tests. Remaining follow-up is richer Wave 2 presentation/feel wiring for every new EventBus surface.
+> Wave 1 roguelite systems note (2026-07-02): content-backed synergies, ascension modifiers, daily modifiers, narrative templates, faction definitions, boss phase data, deterministic daily seed helpers, run epitaph generation, faction reputation state, and save version 15 persistence were implemented and covered by focused tests. Save version 16 has since corrected scheduler order-zero persistence and added relic runtime hook state.
 
 > Wave 2 roguelite integration note (2026-07-02): requested Wave 2 content expansion and text/UI-event integration are implemented. HUD/combat log now surface synergies, reputation, boss phases, floor clears, momentum/crit callouts, and daily/ascension entry points; runtime support exists for `blinded`, `chain_lightning`, and `soul_collector`; save serialization now writes boss phase, faction reputation, and applied synergy state. Manual Godot runtime playthrough remains needed for exact banner/toast feel.
 
 ## Purpose
 
-This document is the current-state improvement spec for turning the existing project into a more complete, playable roguelike. It is intentionally written for parallel subagents. It replaces vague backlog work with concrete, codebase-specific workstreams, ordering, file targets, and acceptance criteria.
+This document is an archived point-in-time improvement spec retained for historical context. It was written for parallel subagents, but current work must use `docs/IMPROVEMENT_SUGGESTIONS.md` and verify every claim against the live repository.
 
 This spec is based on:
 
@@ -89,16 +89,18 @@ Missing:
 - appearance metadata persisted into runtime state and saves
 - character sheet display of identity choices
 
-### 2. No experience or leveling system
+### 2. No experience or leveling system — IMPLEMENTED, NO LONGER A GAP
 
-Current state:
+**Correction:** This gap is resolved. `Core/Simulation/ProgressionComponent.cs` and `Core/Simulation/ProgressionService.cs` implement XP gain on kill, level thresholds, and level-up rewards; `DeathResolver` awards XP centrally (including for ability kills); `SaveSerializer` persists progression state; and the HUD/level-up UI surfaces XP and level. Kept below for history only.
+
+Current state (historical, pre-fix):
 
 - enemy JSON includes `xp_value` in [Content/enemies.json](c:/Users/kyle/projects/godotussy/Content/enemies.json)
 - [Core/Contracts/Types/Stats.cs](c:/Users/kyle/projects/godotussy/Core/Contracts/Types/Stats.cs) has no XP or level fields
 - [Core/Simulation/Actions/AttackAction.cs](c:/Users/kyle/projects/godotussy/Core/Simulation/Actions/AttackAction.cs) kills enemies but grants no progression
 - [Core/Persistence/SaveSerializer.cs](c:/Users/kyle/projects/godotussy/Core/Persistence/SaveSerializer.cs) has no progression payload
 
-Missing:
+Missing (historical, pre-fix):
 
 - XP gain on kill
 - level thresholds and carryover XP
@@ -106,9 +108,11 @@ Missing:
 - UI surfaces for XP and level
 - save/load migration for progression data
 
-### 3. Ability content exists but runtime ability usage is incomplete
+### 3. Ability content exists but runtime ability usage is incomplete — IMPLEMENTED, NO LONGER A GAP
 
-Current state:
+**Correction:** This gap is resolved. `Core/Simulation/Actions/CastAbilityAction.cs` implements a dedicated cast-ability action; `Core/Simulation/AbilityResolver.cs` resolves self/single/tile/aoe_circle targeting; `UseItemAction` supports `cast_ability` items; and ability kills route through `DeathResolver.ResolveKill` for shared death/progression handling. Kept below for history only.
+
+Current state (historical, pre-fix):
 
 - [Content/abilities.json](c:/Users/kyle/projects/godotussy/Content/abilities.json) defines targeted, AoE, teleport, and status abilities
 - enemies reference abilities in [Content/enemies.json](c:/Users/kyle/projects/godotussy/Content/enemies.json)
@@ -155,15 +159,17 @@ Missing:
 - role-specific target selection
 - boss or elite encounter patterns
 
-### 6. Progression economy is underdeveloped
+### 6. Progression economy is underdeveloped — PARTIALLY IMPLEMENTED
 
-Current state:
+**Correction:** Equipment requirement validation is resolved — `Core/Simulation/Actions/ToggleEquipAction.cs` now calls `RequirementValidator.MeetsRequirements`/`GetFailedRequirements` before equipping. The broader "stronger long-run progression than pure item RNG" gap has since been substantially addressed by the meta-progression/relic/archetype systems (see `ORCHESTRATOR_PLAN.md` Tracks 1-3), though deterministic floor-based pacing and loadout decision UI may still warrant follow-up — verify against current code before treating as open.
+
+Current state (historical, pre-fix):
 
 - player strength mostly comes from starting package and random loot
 - item `requirements` exist in [Content/items.json](c:/Users/kyle/projects/godotussy/Content/items.json)
 - those requirements are not enforced in equip flow
 
-Missing:
+Missing (historical, pre-fix):
 
 - requirement validation for equipment
 - stronger long-run progression than pure item RNG

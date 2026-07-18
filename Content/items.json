@@ -472,7 +472,7 @@
       "tags": [
         "weapon",
         "melee",
-        "heavy"
+        "arcane"
       ]
     },
     {
@@ -711,16 +711,16 @@
     {
       "id": "item_arrows_bundle",
       "name": "Arrow Bundle",
-      "description": "A wrapped bundle of arrows for ranged attacks.",
+      "description": "A wrapped sheaf of goose-fletched arrows. Loose one at whatever is coming.",
       "type": "consumable",
       "slot": "none",
       "stats": {},
       "effects": [
         {
           "type": "on_use",
-          "action": "heal",
-          "value": 1,
-          "target": "self"
+          "action": "cast_ability",
+          "ability_id": "arrow_shot",
+          "target": "aimed"
         }
       ],
       "rarity": "common",
@@ -729,7 +729,7 @@
       "requirements": {},
       "stackable": true,
       "max_stack": 20,
-      "sprite_path": "res://Assets/Sprites/items/dungeon_key.svg",
+      "sprite_path": "res://Assets/Sprites/items/arrows_bundle.svg",
       "sprite_atlas_coords": [
         7,
         2
@@ -775,7 +775,7 @@
     {
       "id": "item_shield_basic",
       "name": "Basic Shield",
-      "description": "A dependable off-hand shield.",
+      "description": "Scuffed oak rimmed in iron. It has outlived three owners.",
       "type": "armor",
       "slot": "off_hand",
       "stats": {
@@ -820,7 +820,7 @@
       "requirements": {},
       "stackable": true,
       "max_stack": 3,
-      "sprite_path": "res://Assets/Sprites/items/scroll_blink.svg",
+      "sprite_path": "res://Assets/Sprites/items/scroll_frost_nova.svg",
       "sprite_atlas_coords": [
         10,
         2
@@ -833,16 +833,15 @@
     {
       "id": "potion_mana",
       "name": "Mana Potion",
-      "description": "Restores mental clarity; intended to refresh ability cooldowns when runtime support lands.",
+      "description": "Raw aether, bottled cold. Strength and speed flood the blood for a few turns.",
       "type": "consumable",
       "slot": "none",
       "stats": {},
       "effects": [
         {
           "type": "on_use",
-          "action": "apply_status",
-          "status_effect": "empowered",
-          "duration": 1,
+          "action": "cast_ability",
+          "ability_id": "arcane_infusion",
           "target": "self"
         }
       ],
@@ -852,7 +851,7 @@
       "requirements": {},
       "stackable": true,
       "max_stack": 5,
-      "sprite_path": "res://Assets/Sprites/items/potion_haste.svg",
+      "sprite_path": "res://Assets/Sprites/items/potion_mana.svg",
       "sprite_atlas_coords": [
         11,
         2
@@ -866,7 +865,7 @@
     {
       "id": "relic_item_slot",
       "name": "Relic Cache",
-      "description": "A placeholder pickup that should route directly to the relic component once Track 2 is integrated.",
+      "description": "A lead-sealed reliquary, cold and heavier than it looks. Whatever it once held, the dungeon wants it back.",
       "type": "key",
       "slot": "none",
       "stats": {},

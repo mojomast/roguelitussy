@@ -104,6 +104,8 @@ Consumable authoring rules:
 - `on_use` status effects should reference existing `status_effects.json` IDs and use the `apply_status` behavior recognized by item use.
 - `on_use` ability casts should reference an existing `abilities.json` ID through `cast_ability`; aimed casts still require valid target information from UI or AI before `CastAbilityAction` executes.
 - Keep item effects content-backed and covered by tests when adding a new effect family.
+- `item_arrows_bundle` delegates to aimed `arrow_shot`; `potion_mana` delegates to self-targeted `arcane_infusion`; and `scroll_frost_nova` has dedicated art.
+- `relic_item_slot` is a reserved token and must not be emitted by loot tables.
 
 ### Enemies
 
@@ -133,7 +135,7 @@ Recognized `ai_params` keys are:
 
 Enemy speed values should stay on the engine's current 100-based scale.
 
-Boss enemies may declare `boss_phase_data`. Each phase entry includes `phase`, `threshold` as an HP fraction, optional `ability_id`, `stat_boost`, `status_effect`, and `message`. Referenced abilities must exist in `abilities.json`; triggered phase state persists in save version 15.
+Boss enemies may declare `boss_phase_data`. Each phase entry includes `phase`, `threshold` as an HP fraction, optional `ability_id`, `stat_boost`, `status_effect`, and `message`. Referenced abilities and statuses must exist; triggered phase state persists in save version 16. The current catalog includes the phased `boss_magma_titan`.
 
 ### Abilities And Status Effects
 
@@ -141,7 +143,9 @@ When linking abilities or status effects from other content, make sure the refer
 
 Supported ability targeting types currently in runtime use are `self`, `single`, `tile`, and `aoe_circle`. Supported effect types currently executed by the runtime are `damage`, `apply_status`, `teleport`, and `heal_self`. Targeting is validated by `CastAbilityAction`; keep content targeting definitions precise so direct casts and item-delegated casts behave the same way. For harmful area damage or harmful statuses, `hits_allies: false` defaults unfiltered effects to enemies only, while explicit effect filters and `hits_allies: true` preserve broader targeting.
 
-Status-effect runtime behavior currently includes authored corroded stacking up to three stacks, burning/frozen mutual removal on apply, and `blinded` as an accuracy-reducing combat status. Status effects applied by melee on-hit effects or abilities retain source attribution for delayed poison/burning kill credit and save/load round-trips.
+Status-effect runtime behavior currently includes authored corroded stacking up to three stacks, burning/frozen mutual removal on apply, `blinded` as an accuracy-reducing combat status, `regenerating` healing ticks, and the `flying` avoidance flag. Status effects applied by melee on-hit effects or abilities retain source attribution for delayed poison/burning kill credit and save/load round-trips.
+
+Daily modifier `effect_type` values are validated against `shop_discount`, `elite_every_floor`, `curse_every_floor`, `speed_score`, `starting_relic`, `boss_hp_boost`, and `double_rewards`. Status tick effects may use `damage` or `heal`; only damage ticks require a valid damage type.
 
 `chain_lightning` is an authored lightning ability with a deterministic runtime special case: it starts from the authored AoE candidate set and resolves up to three nearest hostile targets to the selected tile.
 
@@ -170,6 +174,8 @@ Traps are authored in `Content/traps.json`. A trap definition contains:
 
 Room prefabs can place traps by using the `^` tile in the layout and/or a `type: "trap"` spawn point with `trap_id` referencing a trap definition. `ContentLoader` validates every `trap_id` and every trap `ability_id`.
 
+`spike_trap` is the canonical spike ID; the duplicate `trap_spike` definition was removed. Unqualified trap tiles are assigned deterministically by theme: prison uses `spike_trap`/`trap_alarm`, crypt uses `trap_poison_gas`/`trap_teleport`, and magma uses `spike_trap`/`trap_gold_drain`. The latter is currently a damaging weakening hex, not a gold-theft mechanic. `ability_id` is validated metadata; `HazardProcessor` currently executes the trap's direct damage/status fields.
+
 ### Room Prefabs
 
 Room prefab authoring depends on the shared tile legend in `room_prefabs.json`. Keep the legend and room definitions in sync when adding new symbols. The `+` symbol represents a door; doors may be converted into locked doors at generation time for rooms with `lock_doors_on_enter: true`.
@@ -182,7 +188,9 @@ Each room should include `tags` that describe its role and, for procedural floor
 
 When a floor has at least four theme-matching prefabs that fit the BSP leaves, the generator prefers those prefabs; otherwise it falls back to all valid prefabs. Tag rooms with the appropriate theme(s) (`prison`, `crypt`, `magma`) plus functional tags such as `combat`, `loot`, `hazard`, or `boss` so the theme filter can select them.
 
-When a room has `lock_doors_on_enter: true` (typically arenas, vaults, or boss rooms), the generator converts its connecting door tiles into locked doors and places a `dungeon_key` item in a reachable non-locked room. The player must pick up the key and use it via `OpenDoorAction` to unlock the door permanently.
+When a room has `lock_doors_on_enter: true` (typically arenas, vaults, or boss rooms), the generator converts its connecting door tiles into locked doors and attempts to place one `dungeon_key` per locked room in reachable non-locked rooms. The player must pick up a key and use it via `OpenDoorAction` to unlock a door permanently. Candidate exhaustion remains a known generation validation gap.
+
+Functional tags such as `boss`, `shrine`, and `curse` can be requested by floor-event planning and influence placement. Placement is currently best-effort, and shrine/curse spawn semantics are not yet fully projected into generated world entities.
 
 ## Validation Workflow
 
@@ -196,7 +204,9 @@ Content validation tests assert the expected item, enemy, loot table, room prefa
 
 Authored item, enemy, trap, and status-effect visual paths are also audited by tests to ensure each `res://` path resolves to a committed source file. Runtime loading remains soft: missing art should not crash content loading, but repository content should keep these paths valid.
 
-Current item, status, and trap icons are simple limited-palette SVG source files under `Assets/Sprites/items/`, `Assets/Sprites/ui/`, and `Assets/Sprites/objects/`. Keep future SVGs simple, avoid embedded text, commit the matching `.svg.import` sidecars, and run the Godot headless editor import after changing assets so ignored `.godot/imported` cache files can be regenerated locally.
+Current item, status, and trap icons are simple limited-palette SVG source files under `Assets/Sprites/items/`, `Assets/Sprites/ui/`, and `Assets/Sprites/objects/`. SVGs must use an explicit transparent 32x32 canvas without XML prologs or opaque backgrounds; status icons use the shared circular badge convention. Commit matching `.svg.import` sidecars. Tests reject missing/orphaned sidecars, duplicate import UIDs, and sidecars that reference the wrong source. Run the Godot headless editor import after changing assets so ignored `.godot/imported` cache files can be regenerated locally.
+
+Enemy `sprite_path` values are validated for existence, but runtime enemy rendering still selects art through `WorldArtCatalog` display-name mappings. Treat authored paths as validated content metadata until that renderer gap is closed.
 
 ## Godot Tooling And Content
 

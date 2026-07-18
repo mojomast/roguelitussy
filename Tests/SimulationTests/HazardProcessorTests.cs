@@ -17,6 +17,7 @@ public sealed class HazardProcessorTests : ITestSuite
         registry.Add("Simulation.Hazard NPC swap triggers both tiles", NpcSwapTriggersBothTiles);
         registry.Add("Simulation.Hazard disarmed trap does not trigger", DisarmedTrapDoesNotTrigger);
         registry.Add("Simulation.Hazard trap applies status effect", TrapAppliesStatusEffect);
+        registry.Add("Simulation.Hazard chance trap rolls even before resolver init", ChanceTrapRollsBeforeResolverInit);
     }
 
     private static void TrapTriggersOnMove()
@@ -76,7 +77,8 @@ public sealed class HazardProcessorTests : ITestSuite
         var outcome = new MoveAction(actor.Id, new Position(1, 0)).Execute(world);
 
         Expect.Equal(ActionResult.Success, outcome.Result, "Moving onto a lethal trap should still succeed");
-        Expect.True(world.GetEntity(actor.Id) is null, "Actor should be removed after dying to the trap");
+        Expect.True(world.GetEntity(actor.Id) is not null, "The player entity should remain in the world for game-over handling");
+        Expect.Equal(0, actor.Stats.HP, "The player should be dead after the lethal trap");
         Expect.True(outcome.LogMessages.Exists(message => message.Contains("dies to", System.StringComparison.Ordinal)), "Outcome should log an unattributed death");
     }
 
@@ -183,6 +185,36 @@ public sealed class HazardProcessorTests : ITestSuite
         Expect.Equal(ActionResult.Success, outcome.Result, "Move onto a status trap should succeed");
         Expect.True(StatusEffectProcessor.HasEffect(actor, StatusEffectType.Poisoned), "Poison needle should apply poison");
         Expect.True(outcome.CombatEvents.Exists(e => e.StatusEffectsApplied.Count > 0), "Combat event should report applied status effect");
+    }
+
+    private static void ChanceTrapRollsBeforeResolverInit()
+    {
+        // Pick a seed whose first roll is at or above the trigger chance so the trap must NOT fire.
+        var seed = 0;
+        while (new CombatResolver(seed).NextRandom(100) < 30)
+        {
+            seed++;
+        }
+
+        var world = CreateWorld(seed);
+        var content = (StubContentDatabase)world.ContentDatabase!;
+        ((System.Collections.Generic.Dictionary<string, TrapTemplate>)content.TrapTemplates)["chancy_trap"] =
+            new("chancy_trap", "Chancy Trap", "Sometimes fires.", 3, 3, DamageType.Physical, null, 0, 0, null, 30);
+
+        var actor = CreateActor("Player", new Position(1, 1), Faction.Player);
+        var trap = CreateTrap(world, "chancy_trap", new Position(2, 1));
+
+        world.Player = actor;
+        world.AddEntity(actor);
+        world.AddEntity(trap);
+        world.CombatResolver = null; // simulate the pre-initialized state
+
+        var startHp = actor.Stats.HP;
+        new MoveAction(actor.Id, new Position(1, 0)).Execute(world);
+
+        Expect.NotNull(world.CombatResolver, "The resolver should be initialized before the trigger roll");
+        Expect.Equal(startHp, actor.Stats.HP, "Trap must not fire when the seeded roll beats its trigger chance");
+        Expect.True(trap.GetComponent<TrapComponent>()!.IsArmed, "Non-triggered trap should stay armed");
     }
 
     private static WorldState CreateWorld(int seed = 123)

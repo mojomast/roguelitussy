@@ -388,7 +388,10 @@ public static class UtilityScorer
 
         if (cast.Ability.Targeting.Type == "self" || string.Equals(cast.Ability.Targeting.Center, "self", StringComparison.OrdinalIgnoreCase))
         {
-            if (profile.SupportRange > 0 && self.Faction != Faction.Neutral)
+            // Only dedicated support profiles weigh ally proximity; every base profile
+            // carries a nonzero SupportRange, so gating on it alone would penalize
+            // self-buffs and self-heals for solo enemies.
+            if (profile.Name == "support" && profile.SupportRange > 0 && self.Faction != Faction.Neutral)
             {
                 var alliesInRange = 0;
                 foreach (var entity in world.Entities)

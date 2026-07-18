@@ -15,6 +15,7 @@ public sealed class GameLoopTests : ITestSuite
         registry.Add("Simulation.GameLoop failed validation still consumes energy", FailedValidationStillConsumesEnergy);
         registry.Add("Simulation.GameLoop aggregates action outcomes", ProcessRoundAggregatesOutcomes);
         registry.Add("Simulation.GameLoop ticks status effects through scheduler", ProcessRoundTicksStatusEffects);
+        registry.Add("Simulation.GameLoop surfaces DoT death output in round outcome", ProcessRoundSurfacesDotDeath);
     }
 
     private static void ProcessRoundExecutesAllActors()
@@ -90,6 +91,24 @@ public sealed class GameLoopTests : ITestSuite
         gameLoop.ProcessRound(world, scheduler, entity => new WaitAction(entity.Id));
 
         Expect.Equal(8, actor.Stats.HP, "Status effects should tick as turns are consumed");
+    }
+
+    private static void ProcessRoundSurfacesDotDeath()
+    {
+        var world = CreateWorld();
+        var player = CreateActor("Player", new Position(1, 1), Faction.Player);
+        var enemy = CreateActor("Enemy", new Position(3, 3), Faction.Enemy, new Stats { HP = 2, MaxHP = 2, Attack = 3, Defense = 1, Accuracy = 0, Evasion = 0, Speed = 100, Energy = 1000 });
+        world.Player = player;
+        world.AddEntity(player);
+        world.AddEntity(enemy);
+        StatusEffectProcessor.ApplyEffect(enemy, StatusEffectType.Poisoned, 3, 1, sourceEntityId: player.Id);
+
+        var gameLoop = new GameLoop();
+        var scheduler = new ScriptedScheduler(new[] { player.Id, enemy.Id });
+        var outcome = gameLoop.ProcessRound(world, scheduler, entity => new WaitAction(entity.Id));
+
+        Expect.True(world.GetEntity(enemy.Id) is null, "Enemy killed by poison should be removed");
+        Expect.True(outcome.LogMessages.Any(message => message.Contains("kills", StringComparison.Ordinal)), "DoT death should be logged in the aggregate round outcome");
     }
 
     private static WorldState CreateWorld(int seed = 123)

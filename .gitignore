@@ -3,6 +3,7 @@
 bin/
 obj/
 .vs/
+.nexdev/
 TestResults/
 *.tmp
 godot-*.log

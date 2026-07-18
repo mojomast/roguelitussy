@@ -49,7 +49,8 @@ public static class AbilityResolver
             return targets
                 .Where(target => target.Id != caster.Id && target.Faction != caster.Faction && target.Faction != Faction.Neutral)
                 .OrderBy(target => target.Position.ChebyshevTo(targetPos))
-                .ThenBy(target => target.Id.Value.ToString("N"), StringComparer.Ordinal)
+                .ThenBy(target => target.Position.Y)
+                .ThenBy(target => target.Position.X)
                 .Take(3)
                 .ToList();
         }
@@ -130,7 +131,7 @@ public static class AbilityResolver
 
         return filter switch
         {
-            "enemies" => targets.Where(t => t.Faction != caster.Faction).ToList(),
+            "enemies" => targets.Where(t => t.Faction != caster.Faction && t.Faction != Faction.Neutral).ToList(),
             "allies" => targets.Where(t => t.Faction == caster.Faction).ToList(),
             _ => targets,
         };

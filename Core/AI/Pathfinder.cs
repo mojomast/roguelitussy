@@ -5,6 +5,10 @@ namespace Roguelike.Core;
 
 public sealed class Pathfinder : IPathfinder
 {
+    // Entity-occupied tiles cost extra instead of blocking outright, so units route
+    // through congested corridors instead of stalling behind allies.
+    private const int OccupiedTileCost = 3;
+
     public IReadOnlyList<Position> FindPath(Position start, Position goal, IWorldState world, int maxLength = 50, bool phaseThroughWalls = false)
     {
         if (maxLength < 0 || !world.InBounds(start) || !world.InBounds(goal))
@@ -31,9 +35,9 @@ public sealed class Pathfinder : IPathfinder
                 return ReconstructPath(cameFrom, current);
             }
 
-            foreach (var neighbor in GetNeighbors(current, goal, world, phaseThroughWalls))
+            foreach (var neighbor in GetNeighbors(current, goal, world, phaseThroughWalls, allowOccupied: true))
             {
-                var nextCost = costs[current] + 1;
+                var nextCost = costs[current] + StepCost(neighbor, world, phaseThroughWalls);
                 if (nextCost > maxLength)
                 {
                     continue;
@@ -94,12 +98,12 @@ public sealed class Pathfinder : IPathfinder
         return reachable;
     }
 
-    private static IEnumerable<Position> GetNeighbors(Position current, Position goal, IWorldState world, bool phaseThroughWalls)
+    private static IEnumerable<Position> GetNeighbors(Position current, Position goal, IWorldState world, bool phaseThroughWalls, bool allowOccupied = false)
     {
         foreach (var delta in Position.AllDirections)
         {
             var next = current + delta;
-            if (!IsTraversable(next, goal, world, phaseThroughWalls))
+            if (!IsTraversable(next, goal, world, phaseThroughWalls, allowOccupied))
             {
                 continue;
             }
@@ -108,7 +112,7 @@ public sealed class Pathfinder : IPathfinder
             {
                 var adjacentX = current.Offset(delta.X, 0);
                 var adjacentY = current.Offset(0, delta.Y);
-                if (!IsTraversable(adjacentX, goal, world, phaseThroughWalls) && !IsTraversable(adjacentY, goal, world, phaseThroughWalls))
+                if (!IsTraversable(adjacentX, goal, world, phaseThroughWalls, allowOccupied) && !IsTraversable(adjacentY, goal, world, phaseThroughWalls, allowOccupied))
                 {
                     continue;
                 }
@@ -118,7 +122,7 @@ public sealed class Pathfinder : IPathfinder
         }
     }
 
-    private static bool IsTraversable(Position pos, Position goal, IWorldState world, bool phaseThroughWalls)
+    private static bool IsTraversable(Position pos, Position goal, IWorldState world, bool phaseThroughWalls, bool allowOccupied = false)
     {
         if (!world.InBounds(pos))
         {
@@ -130,12 +134,27 @@ public sealed class Pathfinder : IPathfinder
             return true;
         }
 
-        if (goal != Position.Invalid && pos == goal && world.GetEntityAt(pos) is not null)
+        if (world.GetEntityAt(pos) is not null && IsOpenTile(world, pos))
         {
-            return world.GetTile(pos) is TileType.Floor or TileType.StairsDown or TileType.StairsUp or TileType.Trap;
+            return allowOccupied || (goal != Position.Invalid && pos == goal);
         }
 
         return false;
+    }
+
+    private static bool IsOpenTile(IWorldState world, Position pos)
+    {
+        return world.GetTile(pos) is TileType.Floor or TileType.StairsDown or TileType.StairsUp or TileType.Trap;
+    }
+
+    private static int StepCost(Position pos, IWorldState world, bool phaseThroughWalls)
+    {
+        if (phaseThroughWalls || world.IsWalkable(pos))
+        {
+            return 1;
+        }
+
+        return OccupiedTileCost;
     }
 
     private static int Heuristic(Position from, Position to) => from.ChebyshevTo(to);

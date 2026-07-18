@@ -53,6 +53,7 @@ public sealed class InteractShrineAction : IAction
         shrineComponent.RewardChoicePending = true;
         shrineComponent.PendingRewardType = NormalizeShrineType(shrineComponent.ShrineType);
         shrineComponent.PendingActorId = ActorId;
+        ReputationService.OnShrineUsed(actor, world.ContentDatabase);
 
         return new ActionOutcome
         {

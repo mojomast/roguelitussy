@@ -217,11 +217,7 @@ public sealed class ComponentPersistenceTests : ITestSuite
         world.SchedulerOrders.Clear();
         foreach (var entity in world.Entities)
         {
-            var order = scheduler.GetOrder(entity.Id);
-            if (order != 0)
-            {
-                world.SchedulerOrders[entity.Id] = order;
-            }
+            world.SchedulerOrders[entity.Id] = scheduler.GetOrder(entity.Id);
         }
 
         world.SchedulerNextOrder = scheduler.NextOrder;

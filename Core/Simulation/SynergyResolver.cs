@@ -41,7 +41,29 @@ public static class SynergyResolver
             player.SetComponent(component);
         }
 
-        foreach (var synergy in GetActiveSynergies(player, content))
+        var active = GetActiveSynergies(player, content);
+        var activeIds = new HashSet<string>(active.Select(synergy => synergy.SynergyId), StringComparer.Ordinal);
+
+        for (var index = component.AppliedPassiveSynergyIds.Count - 1; index >= 0; index--)
+        {
+            var appliedId = component.AppliedPassiveSynergyIds[index];
+            if (activeIds.Contains(appliedId))
+            {
+                continue;
+            }
+
+            // Only reconcile synergies with a known definition: without one we can neither
+            // verify the requirements nor know which bonus to remove.
+            if (!content.TryGetSynergy(appliedId, out var definition))
+            {
+                continue;
+            }
+
+            RemovePassive(definition, player);
+            component.AppliedPassiveSynergyIds.RemoveAt(index);
+        }
+
+        foreach (var synergy in active)
         {
             if (component.AppliedPassiveSynergyIds.Contains(synergy.SynergyId, StringComparer.Ordinal))
             {
@@ -61,6 +83,16 @@ public static class SynergyResolver
         }
 
         player.Stats.Attack += Math.Max(0, synergy.BonusValue);
+    }
+
+    private static void RemovePassive(SynergyDefinition synergy, IEntity player)
+    {
+        if (!string.Equals(synergy.BonusEffectType, "stat_mod", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        player.Stats.Attack -= Math.Max(0, synergy.BonusValue);
     }
 
     private static bool IsActive(SynergyDefinition synergy, IEntity player, IContentDatabase content) =>

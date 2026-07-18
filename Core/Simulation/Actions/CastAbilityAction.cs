@@ -107,17 +107,18 @@ public sealed class CastAbilityAction : IAction
 
                         var rawDamage = AbilityResolver.CalculateAbilityDamage(effect, actor, rng);
                         var finalDamage = world.CombatResolver.ApplyArmor(rawDamage, target, effect.DamageType);
-                        var isKill = target.Stats.HP - finalDamage <= 0;
+                        finalDamage = RelicProcessor.ProcessOutgoingDamage(world, actor, target, finalDamage, outcome.LogMessages);
+                        var dealtDamage = RelicProcessor.ApplyIncomingDamage(world, target, ActorId, finalDamage, outcome.LogMessages);
+                        var isKill = target.Stats.HP <= 0;
 
-                        target.Stats.HP -= finalDamage;
-                        totalDamageDealt += finalDamage;
+                        totalDamageDealt += dealtDamage;
                         outcome.DirtyPositions.Add(target.Position);
                         if (target.Stats.HP > 0)
                         {
                             BossPhaseResolver.TryApplyTransitions(world, target, outcome, ActorId);
                         }
 
-                        var result = new DamageResult(ActorId, target.Id, rawDamage, finalDamage, effect.DamageType, false, false, isKill);
+                        var result = new DamageResult(ActorId, target.Id, rawDamage, dealtDamage, effect.DamageType, false, false, isKill);
                         damageResults.Add(result);
 
                         if (!affectedTargetId.IsValid)
@@ -125,16 +126,16 @@ public sealed class CastAbilityAction : IAction
                             affectedTargetId = target.Id;
                         }
 
-                        if (isKill || target.Stats.HP <= 0)
+                        if (isKill)
                         {
                             var death = DeathResolver.ResolveKill(world, actor, target);
                             DeathResolver.AppendProgressionLogMessages(outcome.LogMessages, actor.Name, death);
-                            outcome.LogMessages.Add($"{actor.Name}'s {Ability.DisplayName} kills {target.Name} for {finalDamage} damage.");
+                            outcome.LogMessages.Add($"{actor.Name}'s {Ability.DisplayName} kills {target.Name} for {dealtDamage} damage.");
                             DeathResolver.AppendLootLogMessages(outcome.LogMessages, death);
                         }
                         else
                         {
-                            outcome.LogMessages.Add($"{actor.Name}'s {Ability.DisplayName} hits {target.Name} for {finalDamage} damage.");
+                            outcome.LogMessages.Add($"{actor.Name}'s {Ability.DisplayName} hits {target.Name} for {dealtDamage} damage.");
                         }
                     }
                     break;
@@ -186,13 +187,23 @@ public sealed class CastAbilityAction : IAction
                     break;
 
                 case "heal_self":
-                    var healAmount = (int)(totalDamageDealt * effect.HealFactor);
-                    if (healAmount > 0)
-                    {
-                        actor.Stats.HP = Math.Min(actor.Stats.MaxHP, actor.Stats.HP + healAmount);
-                        outcome.LogMessages.Add($"{actor.Name} heals for {healAmount}.");
-                    }
+                    // Resolved after all damage effects; see the loop below.
                     break;
+            }
+        }
+
+        foreach (var effect in Ability.Effects)
+        {
+            if (effect.Type != "heal_self")
+            {
+                continue;
+            }
+
+            var healAmount = (int)(totalDamageDealt * effect.HealFactor);
+            if (healAmount > 0)
+            {
+                actor.Stats.HP = Math.Min(actor.Stats.MaxHP, actor.Stats.HP + healAmount);
+                outcome.LogMessages.Add($"{actor.Name} heals for {healAmount}.");
             }
         }
 

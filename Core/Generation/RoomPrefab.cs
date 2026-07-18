@@ -37,7 +37,19 @@ public sealed record RoomPrefab(
 
     public TileType GetTileType(int x, int y)
     {
-        return Rows[y][x] switch
+        // Guard against ragged layout rows so a short row reads as wall instead of throwing.
+        if (y < 0 || y >= Rows.Count)
+        {
+            return TileType.Wall;
+        }
+
+        var row = Rows[y];
+        if (x < 0 || x >= row.Length)
+        {
+            return TileType.Wall;
+        }
+
+        return row[x] switch
         {
             '.' or 'P' or 'S' or 'I' or 'C' or '<' or '>' => TileType.Floor,
             '^' => TileType.Trap,
@@ -48,7 +60,8 @@ public sealed record RoomPrefab(
         };
     }
 
-    public bool IsDoor(int x, int y) => Rows[y][x] == '+';
+    public bool IsDoor(int x, int y) =>
+        y >= 0 && y < Rows.Count && x >= 0 && x < Rows[y].Length && Rows[y][x] == '+';
 
     public IReadOnlyList<Position> GetWalkableOffsets()
     {

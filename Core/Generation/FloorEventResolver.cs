@@ -39,14 +39,15 @@ public static class FloorEventResolver
 {
     public static FloorType ResolveFloorType(int depth, int seed)
     {
-        if (depth > 0 && depth % 5 == 0)
-        {
-            return FloorType.SafeFloor;
-        }
-
+        // Boss floors take precedence so depths divisible by both (15, 30, ...) keep their boss.
         if (depth > 0 && depth % 3 == 0)
         {
             return FloorType.BossFloor;
+        }
+
+        if (depth > 0 && depth % 5 == 0)
+        {
+            return FloorType.SafeFloor;
         }
 
         return FloorType.StandardFloor;

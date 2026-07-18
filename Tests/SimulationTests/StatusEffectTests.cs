@@ -25,6 +25,8 @@ public sealed class StatusEffectTests : ITestSuite
         registry.Add("Simulation.StatusEffects immune entity takes zero physical damage", ImmuneEntityTakesZeroPhysicalDamage);
         registry.Add("Simulation.StatusEffects authored tick damage changes runtime tick damage", AuthoredTickDamageChangesRuntimeTickDamage);
         registry.Add("Simulation.StatusEffects data driven speed modifiers replace hardcoded defaults", DataDrivenSpeedModifiersReplaceHardcodedDefaults);
+        registry.Add("Simulation.StatusEffects lethal tick attribution is deterministic", LethalTickAttributionIsDeterministic);
+        registry.Add("Simulation.StatusEffects unattributed death never removes the player", UnattributedDeathKeepsPlayer);
     }
 
     private static void PoisonTicksAndExpires()
@@ -113,15 +115,15 @@ public sealed class StatusEffectTests : ITestSuite
     private static void PoisonCanKill()
     {
         var world = CreateWorld();
-        var actor = CreateActor(hp: 2);
+        var victim = new StubEntity("Victim", new Position(2, 2), Faction.Enemy,
+            stats: new Stats { HP = 2, MaxHP = 20, Attack = 3, Defense = 1, Accuracy = 0, Evasion = 0, Speed = 100 });
 
-        world.Player = actor;
-        world.AddEntity(actor);
-        StatusEffectProcessor.ApplyEffect(actor, StatusEffectType.Poisoned, 1);
+        world.AddEntity(victim);
+        StatusEffectProcessor.ApplyEffect(victim, StatusEffectType.Poisoned, 1);
 
-        var result = StatusEffectProcessor.Tick(world, actor.Id);
+        var result = StatusEffectProcessor.Tick(world, victim.Id);
         Expect.True(result.Died, "Ticking poison should report lethal damage");
-        Expect.True(world.GetEntity(actor.Id) is null, "Dead entities should be removed from the world");
+        Expect.True(world.GetEntity(victim.Id) is null, "Dead non-player entities should be removed from the world");
     }
 
     private static void SourcedPoisonKillAwardsXp()
@@ -321,6 +323,49 @@ public sealed class StatusEffectTests : ITestSuite
         Expect.Equal(ActionResult.Success, outcome.Result, "Cast ability should succeed.");
         Expect.True(capturedTargetId.HasValue, "StatusEffectApplied event should have been emitted.");
         Expect.Equal(target.Id, capturedTargetId!.Value, "StatusEffectApplied event should carry the target's id, not the caster's id.");
+    }
+
+    private static void LethalTickAttributionIsDeterministic()
+    {
+        var world = CreateWorld();
+        var poisoner = new StubEntity("Poisoner", new Position(0, 0), Faction.Player);
+        var burninator = new StubEntity("Burninator", new Position(0, 1), Faction.Player);
+        var victim = new StubEntity("Victim", new Position(2, 2), Faction.Enemy,
+            stats: new Stats { HP = 3, MaxHP = 10, Attack = 1, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 100 });
+        world.AddEntity(poisoner);
+        world.AddEntity(burninator);
+        world.AddEntity(victim);
+
+        StatusEffectProcessor.ApplyEffect(victim, StatusEffectType.Poisoned, 3, 1, sourceEntityId: poisoner.Id);
+        StatusEffectProcessor.ApplyEffect(victim, StatusEffectType.Burning, 3, 1, sourceEntityId: burninator.Id);
+
+        var result = StatusEffectProcessor.Tick(world, victim.Id);
+
+        Expect.True(result.Died, "Combined DoT ticks should kill the victim");
+        var attributed = false;
+        foreach (var message in result.LogMessages)
+        {
+            if (message.Contains("Burninator kills Victim", System.StringComparison.Ordinal))
+            {
+                attributed = true;
+            }
+        }
+
+        Expect.True(attributed, "The first effect to reach lethal (burning, ticked first) should own the kill");
+    }
+
+    private static void UnattributedDeathKeepsPlayer()
+    {
+        var world = CreateWorld();
+        var player = CreateActor(hp: 2);
+        world.Player = player;
+        world.AddEntity(player);
+        StatusEffectProcessor.ApplyEffect(player, StatusEffectType.Burning, 2, 1);
+
+        var result = StatusEffectProcessor.Tick(world, player.Id);
+
+        Expect.True(result.Died, "The player should die to the unsourced burn");
+        Expect.NotNull(world.GetEntity(player.Id), "The player entity must never be removed from the world");
     }
 
     private static WorldState CreateWorld()

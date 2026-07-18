@@ -19,6 +19,7 @@ public partial class GameManager : Node
     private FloorStats _floorStats = CreateDefaultFloorStats(0);
     private int _floorStartTurnNumber;
     private bool _readyInitialized;
+    private bool _runEndedEmitted;
     private readonly HashSet<int> _clearedFloors = new();
 
     private sealed record FloorEntrances(Position StairsUp, Position StairsDown);
@@ -494,6 +495,7 @@ public partial class GameManager : Node
         }
 
         Scheduler = new TurnScheduler();
+        _runEndedEmitted = false;
         LoadWorld(snapshot.ActiveWorld);
         ResetFloorStats(CurrentFloor);
         Bus?.EmitLoadCompleted(true);
@@ -576,11 +578,7 @@ public partial class GameManager : Node
         world.SchedulerOrders.Clear();
         foreach (var entity in world.Entities)
         {
-            var order = Scheduler.GetOrder(entity.Id);
-            if (order != 0)
-            {
-                world.SchedulerOrders[entity.Id] = order;
-            }
+            world.SchedulerOrders[entity.Id] = Scheduler.GetOrder(entity.Id);
         }
 
         world.SchedulerNextOrder = Scheduler.NextOrder;
@@ -671,6 +669,7 @@ public partial class GameManager : Node
         Seed = world.Seed;
         CurrentFloor = world.Depth;
         Scheduler = new TurnScheduler();
+        _runEndedEmitted = false;
         LoadWorld(world);
         ResetFloorStats(CurrentFloor);
 
@@ -686,6 +685,7 @@ public partial class GameManager : Node
         Seed = seed;
         CurrentFloor = 0;
         _runStats = CreateFreshRunStats(seed);
+        _runEndedEmitted = false;
         ResetFloorStats(CurrentFloor);
         _clearedFloors.Clear();
         _cachedFloors.Clear();
@@ -740,7 +740,6 @@ public partial class GameManager : Node
         }
 
         RecalculatePlayerVisibility(world);
-        Bus?.EmitLevelGenerated(world.Depth, world.Width, world.Height);
         Bus?.EmitFloorChanged(CurrentFloor);
         EmitFloorEventHooks(world);
         EmitWorldSnapshot(world);
@@ -871,7 +870,7 @@ public partial class GameManager : Node
 
         var purchasedItem = new ItemInstance
         {
-            InstanceId = EntityId.New(),
+            InstanceId = World!.AllocateItemInstanceId(),
             TemplateId = offer.ItemTemplateId,
             StackCount = 1,
             IsIdentified = true,
@@ -1002,7 +1001,6 @@ public partial class GameManager : Node
             new OneShotScheduler(Scheduler, action.ActorId),
             actor =>
             {
-                Bus?.EmitEntityTurnStarted(actor.Id);
                 if (!playerActionConsumed && actor.Id == action.ActorId)
                 {
                     playerActionConsumed = true;
@@ -1043,14 +1041,10 @@ public partial class GameManager : Node
                         CurrentState = GameState.GameOver;
                         UpdateRunStatsFromAction(playerId, walletBefore, inventoryBefore, playerHpBefore, outcome, damage, action.Type);
                         runStatsUpdatedForDeath = true;
-                        Bus?.EmitGameOverWithStats(_runStats);
+                        EmitRunEnded();
                     }
 
                     Bus?.EmitEntityDied(damage.DefenderId);
-                    if (damage.DefenderId == playerId)
-                    {
-                        Bus?.EmitGameOver(CurrentFloor, World.TurnNumber);
-                    }
                 }
 
                 if (damage.DefenderId == playerId && damage.FinalDamage > 0)
@@ -1104,6 +1098,25 @@ public partial class GameManager : Node
         if (!runStatsUpdatedForDeath && World.GetEntity(playerId) is not null)
         {
             UpdateRunStatsFromAction(playerId, walletBefore, inventoryBefore, playerHpBefore, outcome, null, action.Type);
+        }
+
+        var playerAfterAction = World.GetEntity(playerId);
+        if (playerAfterAction is not null && playerAfterAction.Stats.HP > playerHpBefore)
+        {
+            Bus?.EmitHealed(playerId, playerAfterAction.Stats.HP - playerHpBefore);
+        }
+
+        if (!runStatsUpdatedForDeath && IsPlayerDefeated(playerId))
+        {
+            // Deaths without a lethal DamageResult (status ticks, traps, hazards) must still end the run.
+            CurrentState = GameState.GameOver;
+            _runStats = _runStats with
+            {
+                FloorReached = CurrentFloor,
+                TotalTurns = World.TurnNumber,
+                CauseOfDeath = ResolveNonCombatCauseOfDeath(),
+            };
+            EmitRunEnded();
         }
 
         foreach (var message in outcome.LogMessages)
@@ -1195,6 +1208,11 @@ public partial class GameManager : Node
         else if (World.Player is { IsAlive: true } playerAfterRest && TryFindVisibleOrAdjacentHostile(World, playerAfterRest, out var hostileName))
         {
             Bus?.EmitLogMessage($"Rest interrupted - enemy spotted! {hostileName}", LogCategory.Warning);
+        }
+
+        if (turns > 0 && World.Player is { IsAlive: true })
+        {
+            ProcessRelicHookOnPlayer("on_rest");
         }
 
         return turns;
@@ -1517,7 +1535,7 @@ public partial class GameManager : Node
             world.AddEntity(CreateChestEntity(chestPosition, world.Depth, rng, spawn.LootTableId));
         }
 
-        SpawnAuthoredNpcs(world, level.NpcSpawns ?? Array.Empty<NpcSpawnData>());
+        SpawnAuthoredNpcs(world, level.NpcSpawns ?? Array.Empty<NpcSpawnData>(), rng);
         SpawnNpcs(world, rng);
         SpawnTraps(world, level, rng);
         SpawnKeys(world, level, rng);
@@ -1925,6 +1943,7 @@ public partial class GameManager : Node
             Bus?.EmitFloorSummaryReady(BuildCurrentFloorStats());
             LoadWorld(targetWorld);
             ResetFloorStats(targetFloor);
+            ProcessRelicHookOnPlayer("on_floor_enter");
             Bus?.EmitLevelTransition(previousFloor, targetFloor);
             Bus?.EmitLogMessage($"Travelled to floor {targetFloor}.", LogCategory.System);
             return true;
@@ -2157,7 +2176,6 @@ public partial class GameManager : Node
                 new NextActorScheduler(Scheduler, actor => actor.Id != playerId),
                 actor =>
                 {
-                    Bus?.EmitEntityTurnStarted(actor.Id);
                     var brain = actor.GetComponent<IBrain>();
                     return brain?.DecideAction(actor, World, _pathfinder) ?? new WaitAction(actor.Id);
                 });
@@ -2711,6 +2729,89 @@ public partial class GameManager : Node
         _floorStartTurnNumber = World?.TurnNumber ?? 0;
     }
 
+    private void ProcessRelicHookOnPlayer(string hook)
+    {
+        if (World?.Player is not { } player)
+        {
+            return;
+        }
+
+        var hpBefore = player.Stats.HP;
+        RelicProcessor.ProcessHook(hook, player, World, Content, new RelicHookContext());
+        if (player.Stats.HP != hpBefore)
+        {
+            Bus?.EmitHPChanged(player.Id, player.Stats.HP, player.Stats.MaxHP);
+            if (player.Stats.HP > hpBefore)
+            {
+                Bus?.EmitHealed(player.Id, player.Stats.HP - hpBefore);
+            }
+        }
+    }
+
+    private bool IsPlayerDefeated(EntityId playerId)
+    {
+        if (World is null)
+        {
+            return false;
+        }
+
+        var player = World.GetEntity(playerId) ?? World.Player;
+        return player is null || player.Stats.HP <= 0 || World.GetEntity(playerId) is null;
+    }
+
+    private string ResolveNonCombatCauseOfDeath()
+    {
+        var effects = World?.Player?.GetComponent<StatusEffectsComponent>();
+        if (effects is not null)
+        {
+            for (var index = 0; index < effects.Count; index++)
+            {
+                switch (effects[index].Type)
+                {
+                    case StatusEffectType.Poisoned:
+                        return "Poison";
+                    case StatusEffectType.Burning:
+                        return "Burning";
+                }
+            }
+        }
+
+        return string.IsNullOrWhiteSpace(_runStats.CauseOfDeath) || _runStats.CauseOfDeath == "Unknown"
+            ? "The dungeon"
+            : _runStats.CauseOfDeath;
+    }
+
+    private void EmitRunEnded()
+    {
+        if (_runEndedEmitted)
+        {
+            return;
+        }
+
+        _runEndedEmitted = true;
+        _runStats = WithRunBuildSnapshot(_runStats);
+        Bus?.EmitGameOverWithStats(_runStats);
+        Bus?.EmitGameOver(CurrentFloor, World?.TurnNumber ?? _runStats.TotalTurns);
+    }
+
+    private RunStats WithRunBuildSnapshot(RunStats stats)
+    {
+        var player = World?.Player;
+        if (player is null)
+        {
+            return stats;
+        }
+
+        return stats with
+        {
+            Archetype = player.GetComponent<ArchetypeComponent>()?.ArchetypeId ?? CharacterOptions.Archetype,
+            RelicIds = player.GetComponent<RelicComponent>()?.RelicIds.ToArray() ?? Array.Empty<string>(),
+            SynergyIds = player.GetComponent<SynergyComponent>()?.AppliedPassiveSynergyIds.ToArray() ?? Array.Empty<string>(),
+            PerkIds = player.GetComponent<ProgressionComponent>()?.SelectedPerkIds.ToArray() ?? Array.Empty<string>(),
+            FloorsClearedThemes = _clearedFloors.OrderBy(floor => floor).Select(floor => $"floor_{floor}").ToArray(),
+        };
+    }
+
     private string ResolveDamageSourceName(EntityId attackerId)
     {
         if (!attackerId.IsValid || World?.GetEntity(attackerId) is not { } attacker)
@@ -3066,9 +3167,10 @@ public partial class GameManager : Node
 
     private static void ResetKillStreak(IEntity? entity)
     {
-        if (entity?.GetComponent<KillStreakComponent>() is { } streak && streak.CurrentStreak != 0)
+        if (entity?.GetComponent<KillStreakComponent>() is { } streak && (streak.CurrentStreak != 0 || streak.BonusXpAwarded != 0))
         {
             streak.CurrentStreak = 0;
+            streak.BonusXpAwarded = 0;
         }
     }
 
@@ -3170,7 +3272,7 @@ public partial class GameManager : Node
         return "floor_loot";
     }
 
-    private void SpawnAuthoredNpcs(WorldState world, IReadOnlyList<NpcSpawnData> npcSpawns)
+    private void SpawnAuthoredNpcs(WorldState world, IReadOnlyList<NpcSpawnData> npcSpawns, Random rng)
     {
         if (Content is null || npcSpawns.Count == 0)
         {
@@ -3189,7 +3291,7 @@ public partial class GameManager : Node
                 continue;
             }
 
-            world.AddEntity(CreateNpcEntity(template, npcPosition));
+            world.AddEntity(CreateNpcEntity(template, npcPosition, rng));
         }
     }
 
@@ -3236,7 +3338,7 @@ public partial class GameManager : Node
                 break;
             }
 
-            world.AddEntity(CreateNpcEntity(npcTemplate, spawn));
+            world.AddEntity(CreateNpcEntity(npcTemplate, spawn, rng));
             existingTemplates.Add(npcTemplate.TemplateId);
             spawned++;
         }
@@ -3439,7 +3541,7 @@ public partial class GameManager : Node
         return false;
     }
 
-    private static Entity CreateNpcEntity(NpcTemplate template, Position spawn)
+    private static Entity CreateNpcEntity(NpcTemplate template, Position spawn, Random rng)
     {
         var npc = new Entity(
             template.DisplayName,
@@ -3456,7 +3558,7 @@ public partial class GameManager : Node
                 ViewRadius = 6,
             },
             Faction.Neutral,
-            id: EntityId.New());
+            id: EntityId.NewSeeded(rng));
 
         npc.SetComponent(new NpcComponent
         {

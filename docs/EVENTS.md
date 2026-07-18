@@ -8,7 +8,6 @@
 |---|---|---|---|
 | `TurnStarted` | `int turnNumber` | A processed turn begins. | HUD/log refresh, turn-dependent UI. |
 | `TurnCompleted` | none | A processed turn finishes. | UI refresh and input gating. |
-| `EntityTurnStarted` | `EntityId entityId` | An actor begins its scheduled turn. | Presentation hooks for actor focus. |
 | `PlayerActionSubmitted` | `IAction action` | UI submits a player action. | `GameManager` validates and processes the action. |
 | `DamageDealt` | `DamageResult result` | Combat, ability, trap, or status damage resolves. | World animation, HUD, combat log. |
 | `EntityDied` | `EntityId entityId` | An entity is killed and removed through the death pipeline. | World view cleanup, run stats, log/UI updates. |
@@ -24,12 +23,12 @@
 | `LogMessage` | `string message, LogCategory category` | Any system wants a categorized text log entry. | `CombatLog`, `MainMenu`, `DebugConsole`. |
 | `InventoryChanged` | `EntityId entityId` | Inventory content changes. | HUD hotbar, inventory panel. |
 | `HPChanged` | `EntityId entityId, int currentHp, int maxHp` | HP or max HP changes. | HUD bars and damage/heal presentation. |
+| `Healed` | `EntityId entityId, int amount` | GameManager observes a positive player HP change. | World healing popup. |
 | `SaveRequested` | `int slot` | UI requests save to a slot. | Save facade. |
 | `LoadRequested` | `int slot` | UI requests load from a slot. | Load facade. |
 | `SaveCompleted` | `bool success` | Save operation finishes. | UI status/log feedback. |
 | `LoadCompleted` | `bool success` | Load operation finishes. | UI status/log feedback. |
 | `FovRecalculated` | none | Visibility/exploration is recalculated. | World view and minimap refresh. |
-| `LevelGenerated` | `int depth, int width, int height` | A level is generated. | Debug/UI diagnostics. |
 | `LevelTransition` | `int fromDepth, int toDepth` | Floor travel begins. | UI transition and stats handling. |
 | `EquipmentChanged` | `EntityId entityId, EquipSlot slot, ItemInstance? item` | Equipment in a slot changes. | Inventory, character sheet, HUD stat refresh. |
 | `GameOver` | `int finalDepth, int turnsSurvived` | Legacy game-over notification. | Compatibility consumers. |
@@ -45,6 +44,18 @@
 | `TargetingCursorMoved` | `Position position, bool isValid` | Targeting cursor moves or validity changes. | World targeting cursor. |
 | `TargetingPreviewChanged` | `IReadOnlyList<Position> tiles, bool isValid` | Targeting AoE/preview changes. | World targeting preview. |
 | `TrapTriggered` | `TrapTriggeredEventArgs args` | An armed trap triggers. | Animation/log/UI feedback. |
+| `RelicChoiceReady` | `IReadOnlyList<RelicTemplate> choices` | A relic choice is offered. | Relic choice overlay. |
+| `RelicsChanged` | `EntityId entityId, IReadOnlyList<RelicTemplate> relics` | Owned relics change. | HUD relic tray. |
+| `KillStreakChanged` | `EntityId entityId, int current, int highest` | Trickster streak state changes. | HUD streak display. |
+| `ShrineConfirmationRequested` | `ShrineConfirmationRequest request` | Shrine interaction needs confirmation. | Shrine confirmation modal. |
+| `CurseRoomEntered` | none | Curse-room presentation is requested. | Floor event popup. |
+| `BossRoomEntered` | `EntityId bossId` | A boss-room encounter is surfaced. | HUD boss display. |
+| `ActionFeedback` | `ActionFeedbackEventArgs args` | A player action succeeds or is blocked. | HUD action feedback. |
+| `SynergyActivated` | `SynergyDefinition synergy` | A build synergy activates. | HUD/combat log. |
+| `BossPhaseTransition` | `EntityId entityId, int phase` | A boss crosses a phase threshold. | HUD/combat log. |
+| `ReputationChanged` | `string factionId, int delta, int total` | Faction reputation changes. | HUD/combat log. |
+| `CriticalHitDealt` | `EntityId attackerId, EntityId targetId, int damage` | A critical hit resolves. | Combat feedback. |
+| `FloorCleared` | `int depth` | The final hostile on a floor dies. | Reward/presentation feedback. |
 
 ## InputHandler Routing
 
@@ -63,12 +74,13 @@
 | `1`-`5` | `HandleQuickUse(...)` | Uses HUD-derived quick-use candidates through normal item action creation. |
 | `I` | `InventoryRequested` | UI event. |
 | `C` | `CharacterSheetRequested` | UI event. |
-| `E`, `F` | `InteractRequested` | UI event. |
+| `F` | `InteractRequested` | UI event. `E` is contextual inside inventory only. |
 | `H` | `HelpRequested` | UI event. |
 | `T` | `ToolsRequested` | UI event. |
 | `X` | `ExamineRequested` | UI event. |
 | `Escape` | `PauseRequested` | UI event when not consumed by run-prefix/modal handling. |
 | `M`, `Tab` | `MinimapToggleRequested` | UI event. |
+| Backquote, `Q` | Debug console/overlay routing | Available only in `DEBUG` builds. |
 
 ## UI Log
 
@@ -86,7 +98,7 @@
 | `FloorSummaryReady` | `FloorStats stats` | The player leaves a floor and the floor-local counters have been finalized, just before the destination floor is loaded. | `FloorSummaryUI` opens the summary panel. |
 | `FloorTransitionConfirmed` | none | The floor summary is dismissed by Enter/Space or its auto-dismiss timer. | `UIRoot` refreshes modal input gating. |
 
-`GameOverWithStats` is additive. The existing `GameOver(int finalDepth, int turnsSurvived)` event remains for compatibility.
+`GameOverWithStats` is the canonical run-ended event and carries final build metadata. `GameOver(int finalDepth, int turnsSurvived)` is emitted once afterward for compatibility. Meta and daily managers subscribe to the canonical event so one death cannot create duplicate records.
 
 ## Run Movement
 

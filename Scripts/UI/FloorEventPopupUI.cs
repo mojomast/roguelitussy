@@ -7,6 +7,7 @@ public partial class FloorEventPopupUI : Control
     private const double DefaultSeconds = 3d;
     private readonly Label _label = new() { Name = "FloorEventPopupLabel" };
     private double _remainingSeconds;
+    private EventBus? _eventBus;
 
     public string MessageText { get; private set; } = string.Empty;
 
@@ -19,12 +20,28 @@ public partial class FloorEventPopupUI : Control
 
     public void Bind(EventBus? eventBus)
     {
-        if (eventBus is null)
+        if (_eventBus is not null)
         {
-            return;
+            _eventBus.CurseRoomEntered -= OnCurseRoomEntered;
+            _eventBus.LevelTransition -= OnLevelTransition;
         }
 
-        eventBus.CurseRoomEntered += () => ShowMessage("Dark power fills this room. Treasure glitters through the curse.");
+        _eventBus = eventBus;
+        if (_eventBus is not null)
+        {
+            _eventBus.CurseRoomEntered += OnCurseRoomEntered;
+            _eventBus.LevelTransition += OnLevelTransition;
+        }
+    }
+
+    private void OnCurseRoomEntered()
+    {
+        ShowMessage("Dark power fills this room. Treasure glitters through the curse.");
+    }
+
+    private void OnLevelTransition(int fromDepth, int toDepth)
+    {
+        ShowMessage(toDepth >= fromDepth ? $"You descend to floor {toDepth}." : $"You ascend to floor {toDepth}.");
     }
 
     public void ShowMessage(string message, double seconds = DefaultSeconds)
