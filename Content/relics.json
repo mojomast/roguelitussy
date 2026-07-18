@@ -21,7 +21,7 @@
   { "relic_id": "death_mask", "display_name": "Death Mask", "description": "+20% damage for 5 turns after taking damage.", "rarity": "rare", "trigger_hook": "on_damaged", "effect_type": "damage_bonus", "effect_value": 20 },
   { "relic_id": "mirror_shard", "display_name": "Mirror Shard", "description": "Reflect a sliver of damage back when struck.", "rarity": "uncommon", "trigger_hook": "on_damaged", "effect_type": "damage_bonus", "effect_value": 2 },
   { "relic_id": "time_anchor", "display_name": "Time Anchor", "description": "Start each floor steadied against haste and slow effects.", "rarity": "rare", "trigger_hook": "on_floor_enter", "effect_type": "shield", "effect_value": 3 },
-  { "relic_id": "soul_collector", "display_name": "Soul Collector", "description": "Gain extra power from each kill.", "rarity": "rare", "trigger_hook": "on_kill", "effect_type": "echo_bonus", "effect_value": 3 },
+  { "relic_id": "soul_collector", "display_name": "Soul Collector", "description": "Gain +3 max HP every 5 enemies killed.", "rarity": "rare", "trigger_hook": "on_kill", "effect_type": "echo_bonus", "effect_value": 3 },
   { "relic_id": "void_amulet", "display_name": "Void Amulet", "description": "Darkness cushions incoming blows.", "rarity": "legendary", "trigger_hook": "on_damaged", "effect_type": "shield", "effect_value": 4, "is_unique": true },
   { "relic_id": "alchemist_stone", "display_name": "Alchemist Stone", "description": "Healing effects are modestly amplified.", "rarity": "uncommon", "trigger_hook": "on_rest", "effect_type": "heal", "effect_value": 2 }
 ]

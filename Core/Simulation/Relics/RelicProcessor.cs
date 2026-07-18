@@ -299,15 +299,27 @@ public static class RelicProcessor
         switch (relic.RelicId)
         {
             case "glass_cannon":
-                player.Stats.Attack *= 2;
-                player.Stats.Defense = Math.Max(0, player.Stats.Defense / 2);
+                if (component.AppliedOneTimeRelics.Add(relic.RelicId))
+                {
+                    player.Stats.Attack *= 2;
+                    player.Stats.Defense = Math.Max(0, player.Stats.Defense / 2);
+                    ctx.LogMessages.Add($"{relic.DisplayName} reshapes your offense and defense.");
+                }
                 break;
             case "berserker_heart":
                 player.Stats.Attack += Math.Max(0, relic.EffectValue);
                 ctx.LogMessages.Add($"{relic.DisplayName} surges: +{relic.EffectValue} attack!");
                 break;
             case "warlord_crest":
-                player.Stats.Attack += Math.Min(10, Math.Max(0, world.Depth - 1) * Math.Max(0, relic.EffectValue));
+                var targetBonus = Math.Min(10, Math.Max(0, world.Depth - 1) * Math.Max(0, relic.EffectValue));
+                component.AppliedStatTotals.TryGetValue(relic.RelicId, out var appliedBonus);
+                var missingBonus = Math.Max(0, targetBonus - appliedBonus);
+                if (missingBonus > 0)
+                {
+                    player.Stats.Attack += missingBonus;
+                    component.AppliedStatTotals[relic.RelicId] = appliedBonus + missingBonus;
+                    ctx.LogMessages.Add($"{relic.DisplayName} grants +{missingBonus} attack ({component.AppliedStatTotals[relic.RelicId]} total).");
+                }
                 break;
             case "bone_amulet":
                 var progression = player.GetComponent<ProgressionComponent>();
@@ -500,7 +512,7 @@ public static class RelicProcessor
             R("death_mask", "Death Mask", "+20% damage for 5 turns after taking damage.", "rare", "on_damaged", "damage_bonus", 20),
             R("mirror_shard", "Mirror Shard", "Reflect a sliver of damage back when struck.", "uncommon", "on_damaged", "damage_bonus", 2),
             R("time_anchor", "Time Anchor", "Start each floor steadied against haste and slow effects.", "rare", "on_floor_enter", "shield", 3),
-            R("soul_collector", "Soul Collector", "Gain extra power from each kill.", "rare", "on_kill", "echo_bonus", 3),
+            R("soul_collector", "Soul Collector", "Gain +3 max HP every 5 enemies killed.", "rare", "on_kill", "echo_bonus", 3),
             R("void_amulet", "Void Amulet", "Darkness cushions incoming blows.", "legendary", "on_damaged", "shield", 4),
             R("alchemist_stone", "Alchemist Stone", "Healing effects are modestly amplified.", "uncommon", "on_rest", "heal", 2),
         };

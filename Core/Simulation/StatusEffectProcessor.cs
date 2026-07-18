@@ -16,6 +16,8 @@ public sealed class StatusTickResult
     public IReadOnlyList<StatusEffectType> ExpiredEffects { get; init; } = Array.Empty<StatusEffectType>();
 
     public IReadOnlyList<string> LogMessages { get; init; } = Array.Empty<string>();
+
+    public IReadOnlyList<CombatEvent> CombatEvents { get; init; } = Array.Empty<CombatEvent>();
 }
 
 public static class StatusEffectProcessor
@@ -177,11 +179,13 @@ public static class StatusEffectProcessor
         var healingDone = 0;
         var expired = new List<StatusEffectType>();
         var logMessages = new List<string>();
+        var damageResults = new List<DamageResult>();
 
         // Lethal attribution: the first effect (in tick order) that brings HP to 0 or below
         // owns the kill; later ticks never re-attribute it.
         EntityId? lethalSourceId = null;
         var lethalAssigned = false;
+        var lethalDamageIndex = -1;
 
         for (var index = component.Count - 1; index >= 0; index--)
         {
@@ -203,20 +207,29 @@ public static class StatusEffectProcessor
                         logMessages.AddRange(context.LogMessages);
                     }
 
-                    damageTaken += RelicProcessor.ApplyIncomingDamage(world, entity, effect.SourceEntityId, poisonDamage, logMessages);
+                    var poisonApplied = RelicProcessor.ApplyIncomingDamage(world, entity, effect.SourceEntityId, poisonDamage, logMessages);
+                    damageTaken += poisonApplied;
                     if (!lethalAssigned && entity.Stats.HP <= 0)
                     {
                         lethalSourceId = effect.SourceEntityId;
                         lethalAssigned = true;
+                        lethalDamageIndex = damageResults.Count;
                     }
+
+                    damageResults.Add(CreateTickDamageResult(effect.SourceEntityId, entity.Id, poisonDamage, poisonApplied, DamageType.Poison));
                     break;
                 case StatusEffectType.Burning:
-                    damageTaken += RelicProcessor.ApplyIncomingDamage(world, entity, effect.SourceEntityId, 3 * effect.Magnitude, logMessages);
+                    var burningDamage = 3 * effect.Magnitude;
+                    var burningApplied = RelicProcessor.ApplyIncomingDamage(world, entity, effect.SourceEntityId, burningDamage, logMessages);
+                    damageTaken += burningApplied;
                     if (!lethalAssigned && entity.Stats.HP <= 0)
                     {
                         lethalSourceId = effect.SourceEntityId;
                         lethalAssigned = true;
+                        lethalDamageIndex = damageResults.Count;
                     }
+
+                    damageResults.Add(CreateTickDamageResult(effect.SourceEntityId, entity.Id, burningDamage, burningApplied, DamageType.Fire));
                     break;
                 case StatusEffectType.Regenerating:
                     var healed = Math.Min(2 * effect.Magnitude, Math.Max(0, entity.Stats.MaxHP - entity.Stats.HP));
@@ -242,6 +255,7 @@ public static class StatusEffectProcessor
         DeathResolver.DeathResolution? death = null;
         if (died)
         {
+            MarkLethalDamage(damageResults, lethalDamageIndex);
             var killer = lethalSourceId is { } sourceId ? world.GetEntity(sourceId) : null;
             death = killer is null
                 ? DeathResolver.ResolveUnattributedDeath(world, entity)
@@ -259,6 +273,7 @@ public static class StatusEffectProcessor
             Death = death,
             ExpiredEffects = expired,
             LogMessages = logMessages,
+            CombatEvents = CreateTickCombatEvents(world.TurnNumber, entity.Id, damageResults),
         };
     }
 
@@ -280,11 +295,13 @@ public static class StatusEffectProcessor
         var healingDone = 0;
         var expired = new List<StatusEffectType>();
         var logMessages = new List<string>();
+        var damageResults = new List<DamageResult>();
 
         // Lethal attribution: the first effect (in tick order) that brings HP to 0 or below
         // owns the kill; later ticks never re-attribute it.
         EntityId? lethalSourceId = null;
         var lethalAssigned = false;
+        var lethalDamageIndex = -1;
 
         for (var index = component.Count - 1; index >= 0; index--)
         {
@@ -312,12 +329,21 @@ public static class StatusEffectProcessor
                                 logMessages.AddRange(context.LogMessages);
                             }
 
-                            damageTaken += RelicProcessor.ApplyIncomingDamage(world, entity, effect.SourceEntityId, damage, logMessages);
+                            var appliedDamage = RelicProcessor.ApplyIncomingDamage(world, entity, effect.SourceEntityId, damage, logMessages);
+                            damageTaken += appliedDamage;
                             if (!lethalAssigned && entity.Stats.HP <= 0)
                             {
                                 lethalSourceId = effect.SourceEntityId;
                                 lethalAssigned = true;
+                                lethalDamageIndex = damageResults.Count;
                             }
+
+                            damageResults.Add(CreateTickDamageResult(
+                                effect.SourceEntityId,
+                                entity.Id,
+                                damage,
+                                appliedDamage,
+                                ResolveDamageType(tickEffect.DamageType)));
                             break;
                         case "heal":
                             var heal = tickEffect.Value * effect.Magnitude;
@@ -346,6 +372,7 @@ public static class StatusEffectProcessor
         DeathResolver.DeathResolution? death = null;
         if (died)
         {
+            MarkLethalDamage(damageResults, lethalDamageIndex);
             var killer = lethalSourceId is { } sourceId ? world.GetEntity(sourceId) : null;
             death = killer is null
                 ? DeathResolver.ResolveUnattributedDeath(world, entity)
@@ -363,7 +390,51 @@ public static class StatusEffectProcessor
             Death = death,
             ExpiredEffects = expired,
             LogMessages = logMessages,
+            CombatEvents = CreateTickCombatEvents(world.TurnNumber, entity.Id, damageResults),
         };
+    }
+
+    private static DamageResult CreateTickDamageResult(
+        EntityId? sourceEntityId,
+        EntityId targetId,
+        int rawDamage,
+        int finalDamage,
+        DamageType damageType) => new(
+            sourceEntityId ?? EntityId.Invalid,
+            targetId,
+            rawDamage,
+            finalDamage,
+            damageType,
+            false,
+            false,
+            false);
+
+    private static void MarkLethalDamage(List<DamageResult> damageResults, int lethalDamageIndex)
+    {
+        if (lethalDamageIndex >= 0 && lethalDamageIndex < damageResults.Count)
+        {
+            damageResults[lethalDamageIndex] = damageResults[lethalDamageIndex] with { IsKill = true };
+        }
+    }
+
+    private static IReadOnlyList<CombatEvent> CreateTickCombatEvents(
+        int turnNumber,
+        EntityId targetId,
+        IReadOnlyList<DamageResult> damageResults) => damageResults.Count == 0
+            ? Array.Empty<CombatEvent>()
+            : new[]
+            {
+                new CombatEvent(turnNumber, ActionType.StatusTick, damageResults, Array.Empty<StatusEffectInstance>(), targetId),
+            };
+
+    private static DamageType ResolveDamageType(string? value)
+    {
+        if (string.Equals(value, "ice", StringComparison.OrdinalIgnoreCase))
+        {
+            return DamageType.Cold;
+        }
+
+        return Enum.TryParse<DamageType>(value, true, out var parsed) ? parsed : DamageType.Physical;
     }
 
     public static bool HasFlag(IEntity entity, string flag)

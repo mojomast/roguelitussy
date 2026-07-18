@@ -212,8 +212,8 @@ UIRoot / WorldView  <--  EventBus  <--  GameManager.ProcessPlayerAction
 - Content JSON is projected into `ItemTemplate`, `AbilityTemplate`, etc.
 - `UseItemAction` (`Core/Simulation/Actions/UseItemAction.cs`) handles `heal`, `apply_status`, `cast_ability`, `cure`, and stat modifiers.
 - `CastAbilityAction` (`Core/Simulation/Actions/CastAbilityAction.cs`) resolves targets via `AbilityResolver` and applies damage/status/teleport/heal_self effects.
-- `StatusEffectProcessor` (`Core/Simulation/StatusEffectProcessor.cs`) hardcodes most status behavior at the moment; `Content/status_effects.json` is largely descriptive.
-- **Known gap**: targeted scrolls (`cast_ability:` with non-`self` targeting) cannot be used from the normal UI because `UIActionFactory.CreateUseItemAction` returns `null` for them.
+- `StatusEffectProcessor` (`Core/Simulation/StatusEffectProcessor.cs`) consumes authored tick effects, stat modifiers, flags, stacking, and lifecycle rules with legacy fallbacks.
+- Aimed `cast_ability:` items use the inventory targeting overlay; the quick-use hotbar intentionally rejects them.
 
 ### Content pipeline
 
@@ -223,11 +223,11 @@ UIRoot / WorldView  <--  EventBus  <--  GameManager.ProcessPlayerAction
 
 ### Persistence
 
-- `SaveManager` / `SaveSerializer` / `SaveMigrator` implement JSON save/load (current version 8).
+- `SaveManager` / `SaveSerializer` / `SaveMigrator` implement JSON save/load (current version 17).
 - Saves include: map tiles, explored/visible flags, entities + components, ground items, open doors, RNG states, multi-floor cache.
 - `GameManager.SaveToSlot` / `LoadFromSlot` are the Godot-facing entry points.
 - RNG states restored: `CombatRandomState` and `ItemRandomState`.
-- **Known gaps**: enemy template identity is not saved (brain is recreated generically), and `TurnScheduler` actor order is not persisted.
+- Enemy template identity, authored brain reconstruction, RNG state, scheduler order, and behavior-critical relic state are persisted. Remaining persistence follow-ups are tracked in `docs/TODO.md` and `docs/IMPROVEMENT_SUGGESTIONS.md`.
 
 ### Godot facade and presentation
 

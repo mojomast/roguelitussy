@@ -24,6 +24,16 @@ public sealed class GameLoop
                 continue;
             }
 
+            var skipsTurn = world.ContentDatabase is { } db
+                ? StatusEffectProcessor.HasFlag(actor, "skip_turn", db)
+                : StatusEffectProcessor.HasFlag(actor, "skip_turn");
+            if (skipsTurn)
+            {
+                var skippedTick = scheduler.ConsumeEnergy(actor.Id, scheduler.EnergyThreshold);
+                MergeTickResult(outcome, actor.Id, skippedTick);
+                continue;
+            }
+
             var action = getAction(actor);
             var validation = action.Validate(world);
             if (validation != ActionResult.Success)
@@ -72,6 +82,7 @@ public sealed class GameLoop
         }
 
         outcome.LogMessages.AddRange(tickResult.LogMessages);
+        outcome.CombatEvents.AddRange(tickResult.CombatEvents);
         if (tickResult.Death is { } death)
         {
             outcome.DirtyPositions.Add(death.DropPosition);

@@ -16,9 +16,11 @@ public sealed class AutoloadRobustnessTests : ITestSuite
     public void Register(TestRegistry registry)
     {
         registry.Add("UI.GameManager status-tick death emits canonical game-over pair exactly once", StatusTickDeathEmitsCanonicalGameOverOnce);
+        registry.Add("UI.GameManager sourced status death emits entity death and retains player", SourcedStatusDeathRetainsPlayer);
         registry.Add("UI.GameManager game-over stats capture relics, archetype, synergies, and perks", GameOverStatsCaptureRunBuild);
         registry.Add("UI.DailyChallengeManager survives a corrupt persistence file", DailyChallengeManagerSurvivesCorruptFile);
         registry.Add("UI.FloorEventPopupUI rebind does not stack event handlers", FloorEventPopupRebindDoesNotStackHandlers);
+        registry.Add("UI.GameManager floor relic hook messages reach EventBus", FloorRelicHookMessagesReachEventBus);
     }
 
     private static void StatusTickDeathEmitsCanonicalGameOverOnce()
@@ -83,6 +85,43 @@ public sealed class AutoloadRobustnessTests : ITestSuite
         Expect.NotNull(capturedStats.FloorsClearedThemes, "Run stats should carry a non-null cleared-floors collection.");
     }
 
+    private static void SourcedStatusDeathRetainsPlayer()
+    {
+        var context = CreateContext();
+        var source = new StubEntity(
+            "Venom Mage",
+            new Position(6, 6),
+            Faction.Enemy,
+            stats: new Stats { HP = 10, MaxHP = 10, Attack = 1, Defense = 0, Accuracy = 0, Evasion = 0, Speed = 100 });
+        context.World.AddEntity(source);
+        context.GameManager.LoadWorld(context.World);
+
+        var deathEvents = 0;
+        context.Bus.EntityDied += entityId =>
+        {
+            if (entityId == context.Player.Id)
+            {
+                deathEvents++;
+            }
+        };
+
+        context.Player.Stats.HP = 2;
+        StatusEffectProcessor.ApplyEffect(
+            context.Player,
+            StatusEffectType.Poisoned,
+            context.Content,
+            duration: 2,
+            magnitude: 2,
+            sourceEntityId: source.Id);
+
+        context.GameManager.ProcessPlayerAction(new WaitAction(context.Player.Id));
+
+        Expect.Equal(1, deathEvents, "A sourced status death should use the standard EntityDied event path exactly once.");
+        Expect.NotNull(context.World.GetEntity(context.Player.Id), "An attributed status death must keep the player addressable.");
+        Expect.Equal(0, context.Player.Stats.HP, "The retained player should remain definitively dead.");
+        Expect.Equal(GameManager.GameState.GameOver, context.GameManager.CurrentState, "A sourced status death should end the run.");
+    }
+
     private static void DailyChallengeManagerSurvivesCorruptFile()
     {
         var path = Path.Combine(Path.GetTempPath(), $"daily_corrupt_{Guid.NewGuid():N}.json");
@@ -137,6 +176,22 @@ public sealed class AutoloadRobustnessTests : ITestSuite
 
         secondBus.EmitLevelTransition(1, 2);
         Expect.True(popup.MessageText.Contains("floor 2", StringComparison.Ordinal), "Floor transitions should show a floor-change banner.");
+    }
+
+    private static void FloorRelicHookMessagesReachEventBus()
+    {
+        var context = CreateContext();
+        context.GameManager.LoadWorld(context.World);
+        Expect.True(RelicProcessor.AddRelic(context.Player, context.Content, "iron_skin"), "Iron Skin should be available for the integration test.");
+        var messages = new System.Collections.Generic.List<string>();
+        context.Bus.LogMessage += (message, _) => messages.Add(message);
+
+        var method = typeof(GameManager).GetMethod("ProcessRelicHookOnPlayer", BindingFlags.Instance | BindingFlags.NonPublic);
+        Expect.NotNull(method, "GameManager should retain its focused relic hook bridge.");
+        method!.Invoke(context.GameManager, new object[] { "on_floor_enter" });
+
+        Expect.True(messages.Any(message => message.Contains("Iron Skin", StringComparison.Ordinal)), "Floor-hook relic messages should be forwarded through EventBus.");
+        Expect.Equal(5, context.Player.GetComponent<RelicComponent>()!.ShieldCharges, "Forwarding logs must preserve the relic mutation.");
     }
 
     private static int CountSubscribers(EventBus bus, string eventName)

@@ -25,6 +25,9 @@ public sealed class RelicHookTests : ITestSuite
         registry.Add("Simulation.Relic cursed blade applies once and drains each round", CursedBladeAppliesOnceAndDrains);
         registry.Add("Simulation.Relic vampire fang kill heal is surfaced in death resolution", VampireFangKillHealIsSurfaced);
         registry.Add("Simulation.Relic attack action routes damage through relic hooks", AttackActionRoutesRelicHooks);
+        registry.Add("Simulation.Relic kill milestones use resulting kill count", KillMilestonesUseResultingKillCount);
+        registry.Add("Simulation.Relic glass cannon applies only once", GlassCannonAppliesOnlyOnce);
+        registry.Add("Simulation.Relic warlord crest applies only missing floor bonus", WarlordCrestAppliesOnlyMissingBonus);
     }
 
     private static void ThornWrapReflectsDamage()
@@ -258,6 +261,87 @@ public sealed class RelicHookTests : ITestSuite
         }
 
         Expect.True(false, "No seed produced a landed attack within 100 attempts");
+    }
+
+    private static void KillMilestonesUseResultingKillCount()
+    {
+        var boneWorld = CreateWorld();
+        var bonePlayer = CreatePlayerWithRelic(boneWorld, "bone_amulet");
+        bonePlayer.SetComponent(new ProgressionComponent { Kills = 2 });
+        var boneDeath = DeathResolver.ResolveKill(boneWorld, bonePlayer, CreateEnemy(boneWorld, new Position(2, 1), hp: 1));
+
+        Expect.Equal(3, bonePlayer.GetComponent<ProgressionComponent>()!.Kills, "The resolved kill should be visible to on_kill relics");
+        Expect.Equal(25, bonePlayer.Stats.MaxHP, "Bone Amulet should trigger on the resulting third kill");
+        Expect.Equal(25, bonePlayer.Stats.HP, "Bone Amulet should preserve missing HP when raising max HP");
+        Expect.True(boneDeath.RelicMessages!.Any(message => message.Contains("Bone Amulet", StringComparison.Ordinal)), "Bone Amulet milestone should be surfaced");
+
+        var fourthDeath = DeathResolver.ResolveKill(boneWorld, bonePlayer, CreateEnemy(boneWorld, new Position(3, 1), hp: 1));
+        Expect.Equal(4, bonePlayer.GetComponent<ProgressionComponent>()!.Kills, "The next kill should advance normally");
+        Expect.Equal(25, bonePlayer.Stats.MaxHP, "Bone Amulet should not repeat on kill four");
+        Expect.False(fourthDeath.RelicMessages!.Any(message => message.Contains("Bone Amulet", StringComparison.Ordinal)), "Non-milestone kills should not log Bone Amulet");
+
+        var soulWorld = CreateWorld();
+        var soulPlayer = CreatePlayerWithRelic(soulWorld, "soul_collector");
+        soulPlayer.SetComponent(new ProgressionComponent { Kills = 4 });
+        var soulVictim = CreateEnemy(soulWorld, new Position(2, 1), hp: 1);
+        var soulDeath = DeathResolver.ResolveKill(soulWorld, soulPlayer, soulVictim);
+
+        Expect.Equal(5, soulPlayer.GetComponent<ProgressionComponent>()!.Kills, "Soul Collector should observe the resulting fifth kill");
+        Expect.Equal(23, soulPlayer.Stats.MaxHP, "Soul Collector should grant its authored max HP on kill five");
+        Expect.Equal(23, soulPlayer.Stats.HP, "Soul Collector should raise current HP with max HP");
+        Expect.True(soulDeath.RelicMessages!.Any(message => message.Contains("Soul Collector", StringComparison.Ordinal)), "Soul Collector milestone should be surfaced");
+
+        var duplicate = DeathResolver.ResolveKill(soulWorld, soulPlayer, soulVictim);
+        Expect.Equal(0, duplicate.KillsAwarded, "Resolving an already removed victim must remain a no-op");
+        Expect.Equal(5, soulPlayer.GetComponent<ProgressionComponent>()!.Kills, "Duplicate resolution must not repeat milestone progress");
+    }
+
+    private static void GlassCannonAppliesOnlyOnce()
+    {
+        var world = CreateWorld();
+        var player = CreatePlayerWithRelic(world, "glass_cannon");
+        player.Stats.Defense = 5;
+        var first = new RelicHookContext();
+        var second = new RelicHookContext();
+
+        RelicProcessor.ProcessHook("on_floor_enter", player, world, world.ContentDatabase, first);
+        RelicProcessor.ProcessHook("on_floor_enter", player, world, world.ContentDatabase, second);
+
+        Expect.Equal(10, player.Stats.Attack, "Glass Cannon should double attack exactly once");
+        Expect.Equal(2, player.Stats.Defense, "Glass Cannon should halve odd defense using integer division exactly once");
+        Expect.True(player.GetComponent<RelicComponent>()!.AppliedOneTimeRelics.Contains("glass_cannon"), "Glass Cannon application should be persisted by the existing one-time state");
+        Expect.True(first.LogMessages.Any(message => message.Contains("Glass Cannon", StringComparison.Ordinal)), "Initial Glass Cannon application should be logged");
+        Expect.Equal(0, second.LogMessages.Count, "Repeated floor hooks should not log or reapply Glass Cannon");
+    }
+
+    private static void WarlordCrestAppliesOnlyMissingBonus()
+    {
+        var world = CreateWorld();
+        var player = CreatePlayerWithRelic(world, "warlord_crest");
+        var component = player.GetComponent<RelicComponent>()!;
+
+        world.Depth = 2;
+        RelicProcessor.ProcessHook("on_floor_enter", player, world, world.ContentDatabase, new RelicHookContext());
+        Expect.Equal(7, player.Stats.Attack, "Depth two should establish a cumulative +2 Warlord bonus");
+        Expect.Equal(2, component.AppliedStatTotals["warlord_crest"], "Applied total should record the granted bonus");
+
+        RelicProcessor.ProcessHook("on_floor_enter", player, world, world.ContentDatabase, new RelicHookContext());
+        Expect.Equal(7, player.Stats.Attack, "Reentering the same floor must not duplicate Warlord bonus");
+
+        world.Depth = 3;
+        RelicProcessor.ProcessHook("on_floor_enter", player, world, world.ContentDatabase, new RelicHookContext());
+        Expect.Equal(9, player.Stats.Attack, "A deeper floor should add only the missing +2 bonus");
+        Expect.Equal(4, component.AppliedStatTotals["warlord_crest"], "Applied total should advance to the depth target");
+
+        world.Depth = 2;
+        RelicProcessor.ProcessHook("on_floor_enter", player, world, world.ContentDatabase, new RelicHookContext());
+        Expect.Equal(9, player.Stats.Attack, "Ascending must not remove or duplicate the earned Warlord bonus");
+
+        world.Depth = 6;
+        RelicProcessor.ProcessHook("on_floor_enter", player, world, world.ContentDatabase, new RelicHookContext());
+        RelicProcessor.ProcessHook("on_floor_enter", player, world, world.ContentDatabase, new RelicHookContext());
+        Expect.Equal(15, player.Stats.Attack, "Warlord bonus should cap at +10 without repeating at the cap");
+        Expect.Equal(10, component.AppliedStatTotals["warlord_crest"], "Persisted total should honor the +10 cap");
     }
 
     private static int FindSeed(Func<int, bool> predicate)

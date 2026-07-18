@@ -16,6 +16,7 @@ public sealed class TurnSchedulerTests : ITestSuite
         registry.Add("Simulation.TurnScheduler mixed speeds follow expected ratios", MixedSpeedsFollowRatios);
         registry.Add("Simulation.TurnScheduler ignores neutral non-brain NPCs", IgnoresNeutralNonBrainNpcs);
         registry.Add("Simulation.TurnScheduler authored speed modifiers affect initiative", AuthoredSpeedModifiersAffectInitiative);
+        registry.Add("Simulation.TurnScheduler actor selection does not consume skipped turns", ActorSelectionDoesNotConsumeSkippedTurns);
     }
 
     private static void AuthoredSpeedModifiersAffectInitiative()
@@ -63,6 +64,23 @@ public sealed class TurnSchedulerTests : ITestSuite
         var next = scheduler.GetNextActor();
         Expect.NotNull(next, "Scheduler should return the player as the first actor");
         Expect.Equal(player, next!, "Player should act first when energy ties and registration order matches spawn order");
+    }
+
+    private static void ActorSelectionDoesNotConsumeSkippedTurns()
+    {
+        var world = CreateWorld();
+        var actor = new StubEntity("Stunned", new Position(1, 1), Faction.Player, stats: Stats(100));
+        world.Player = actor;
+        world.AddEntity(actor);
+        StatusEffectProcessor.ApplyEffect(actor, StatusEffectType.Stunned, 2);
+
+        var scheduler = new TurnScheduler();
+        scheduler.BeginRound(world);
+        var selected = scheduler.GetNextActor();
+
+        Expect.Equal(actor, selected!, "Scheduler selection should return the ready actor even when its action will be skipped");
+        Expect.Equal(scheduler.EnergyThreshold, scheduler.GetEnergy(actor.Id), "Selecting an actor must not consume hidden energy");
+        Expect.Equal(2, StatusEffectProcessor.GetEffect(actor, StatusEffectType.Stunned)!.RemainingTurns, "Selecting an actor must not tick statuses before GameLoop can aggregate the result");
     }
 
     private static void FasterActorsActMoreOften()

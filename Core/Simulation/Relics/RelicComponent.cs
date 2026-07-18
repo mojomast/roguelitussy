@@ -14,6 +14,8 @@ public sealed class RelicComponent
 
     public HashSet<string> AppliedOneTimeRelics { get; } = new();
 
+    public Dictionary<string, int> AppliedStatTotals { get; } = new(System.StringComparer.Ordinal);
+
     public int DamageBuffPercent { get; set; }
 
     public int DamageBuffExpiresOnTurn { get; set; }

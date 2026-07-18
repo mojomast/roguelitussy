@@ -177,6 +177,8 @@ internal sealed class RelicSaveData
 
     public List<string> AppliedOneTimeRelics { get; set; } = new();
 
+    public Dictionary<string, int> AppliedStatTotals { get; set; } = new(StringComparer.Ordinal);
+
     public int DamageBuffPercent { get; set; }
 
     public int DamageBuffExpiresOnTurn { get; set; }
@@ -417,7 +419,7 @@ internal sealed class PositionSaveData
 
 public static class SaveSerializer
 {
-    public const int CurrentVersion = 16;
+    public const int CurrentVersion = 17;
 
     internal static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -815,6 +817,10 @@ public static class SaveSerializer
                 AppliedOneTimeRelics = relic.AppliedOneTimeRelics
                     .OrderBy(id => id, StringComparer.Ordinal)
                     .ToList(),
+                AppliedStatTotals = relic.AppliedStatTotals
+                    .Where(pair => pair.Value > 0)
+                    .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                    .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal),
                 DamageBuffPercent = relic.DamageBuffPercent,
                 DamageBuffExpiresOnTurn = relic.DamageBuffExpiresOnTurn,
                 LastMerchantDiscountDepth = relic.LastMerchantDiscountDepth,
@@ -1217,6 +1223,11 @@ public static class SaveSerializer
             foreach (var oneTimeRelicId in data.Relic.AppliedOneTimeRelics.Where(id => !string.IsNullOrWhiteSpace(id)))
             {
                 relic.AppliedOneTimeRelics.Add(oneTimeRelicId);
+            }
+
+            foreach (var (relicId, appliedTotal) in data.Relic.AppliedStatTotals ?? new Dictionary<string, int>(StringComparer.Ordinal))
+            {
+                relic.AppliedStatTotals[relicId] = appliedTotal;
             }
 
             entity.SetComponent(relic);

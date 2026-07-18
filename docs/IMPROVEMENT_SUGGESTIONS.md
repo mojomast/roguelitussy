@@ -8,6 +8,8 @@
 
 > Update 2026-07-02 Wave 2: the roguelite presentation/content pass is implemented at the text/UI-event level. Daily challenge title entry, ascension controls/shop-price modifier, synergy and reputation HUD/log feedback, boss phase event emission, floor-clear rewards, critical-hit log callouts, rest-interruption clarity, `blinded`, `chain_lightning`, `soul_collector`, new enemies/items/relics, and save serialization for boss/faction/synergy payloads are live. Remaining polish is real Godot 4.5.2 playthrough validation of timing/feel and richer non-text VFX.
 
+> Update 2026-07-18 relic lifecycle: save version 17 persists cumulative applied relic-stat totals. Bone Amulet/Soul Collector use resulting kill counts, Glass Cannon applies once, Warlord's Crest applies only missing capped depth progress, and floor/rest hook messages reach EventBus. Remaining authored relic mismatches are rest cadence, Shadow Step, Echo Shard, and Merchant Badge cached-floor pricing.
+
 ## How Worker Subagents Should Use This Document
 
 1. Pick a suggestion by ID. Each suggestion is scoped to a focused, implementable change.
@@ -234,7 +236,7 @@
   - `EnemyTemplate` now carries `LootTableId`, `GoldMin`, and `GoldMax` projected from `enemies.json`.
   - `DeathResolver.ResolveKill` rolls the victim's loot table with a deterministic seed and drops items at the corpse position; it also awards gold to the killer's `WalletComponent` when `gold_max > 0`.
   - Loot and gold are derived from the enemy's `TemplateId` at death time so the save format does not need to change; `EnemyComponent` keeps only `TemplateId`.
-  - `GameLoop` now forwards normal-turn status tick logs and dirty positions. Skipped-turn tick output and dedicated status-death combat events remain open.
+  - `GameLoop` forwards normal and skipped-turn status tick logs, expirations, dirty positions, and typed combat/death events through the aggregate outcome.
 - **Acceptance criteria / tests:**
   - `DeathResolver.KillingRatDropsRatLootAndGold` asserts items on the ground and gold in the killer's wallet.
   - `DeathResolver.LootRollIsDeterministicForSameSeed` asserts identical drops for identical seed/depth/position/turn/entity.

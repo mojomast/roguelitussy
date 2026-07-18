@@ -30,6 +30,8 @@
 
 > Wave 1 roguelite systems note (2026-07-02): content-backed synergies, ascension modifiers, daily modifiers, narrative templates, faction definitions, boss phase data, deterministic daily seed helpers, run epitaph generation, faction reputation state, and save version 15 persistence were implemented and covered by focused tests. Save version 16 has since corrected scheduler order-zero persistence and added relic runtime hook state.
 
+> Relic lifecycle follow-up (2026-07-18): save version 17 persists cumulative applied relic-stat totals. Kill milestones now evaluate resulting counts, Glass Cannon and Warlord's Crest no longer stack on repeated floor entry, and direct floor/rest hook messages reach EventBus. Remaining relic semantics are tracked in the live improvement documents.
+
 > Wave 2 roguelite integration note (2026-07-02): requested Wave 2 content expansion and text/UI-event integration are implemented. HUD/combat log now surface synergies, reputation, boss phases, floor clears, momentum/crit callouts, and daily/ascension entry points; runtime support exists for `blinded`, `chain_lightning`, and `soul_collector`; save serialization now writes boss phase, faction reputation, and applied synergy state. Manual Godot runtime playthrough remains needed for exact banner/toast feel.
 
 ## Purpose

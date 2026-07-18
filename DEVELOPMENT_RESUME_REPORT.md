@@ -79,9 +79,11 @@ godot --headless --path . --quit
 - Completed: generation now handles boss-over-safe precedence, safe-floor spawn suppression, deeper spawn scaling, start-room exclusion, traversal-distance exits, deterministic themed traps, locked-door connectivity, and ragged prefabs. Tagged special-room placement is partially integrated.
 - Completed: attack lunges, deferred death fades, critical/miss/heal/pickup popups, shared render colors, robust floor-event rebinding, and canonical once-only game-over events are covered by new tests.
 - Completed: obsolete generic sprites/tiles were removed; authored SVG/import conventions and resource paths are covered by static tests.
-- Verification: editorless stub build and test build pass with zero warnings; the full harness passes 550/550 tests; rendering validation passes 493/493 tests; `git diff --check` passes.
+- Verification: editorless stub build and test build pass with zero warnings; the full harness passes 560/560 tests; rendering validation passes 502/502 tests; `git diff --check` passes.
 - Verification gap: the installed `godot` command is 4.4.1 rather than required 4.5.2 and crashed before import because its .NET host was unavailable, so real Godot import/startup remains unverified.
-- Remaining risks: skipped-turn status output, dedicated DoT death events, player-death consistency, relic milestone/floor-entry ordering, boss-template selection, functional shrine/curse population, lock/key exhaustion, authored enemy sprite-path rendering, and attack/move animation composition.
+- Completed follow-up: skipped turns are suppressed by `GameLoop` rather than hidden scheduler mutation; their status logs, expirations, dirty positions, and typed damage/death events now reach presentation. Attributed and unattributed player deaths share one retention rule.
+- Completed follow-up: save version 17 persists deterministic applied relic-stat totals; v16 Warlord migration preserves aggregate attack and scheduler order zero. Bone Amulet/Soul Collector milestones use resulting kills, Glass Cannon is one-time, Warlord applies only missing capped depth progress, and floor/rest hook messages reach EventBus.
+- Remaining risks: rest/Shadow Step/Echo Shard/Merchant Badge authored relic semantics, boss-template selection, functional shrine/curse population, lock/key exhaustion, authored enemy sprite-path rendering, and attack/move animation composition.
 
 ### Follow-up Status - Wave 1 Persistence
 

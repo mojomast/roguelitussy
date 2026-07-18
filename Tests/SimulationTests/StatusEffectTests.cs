@@ -19,8 +19,8 @@ public sealed class StatusEffectTests : ITestSuite
         registry.Add("Simulation.StatusEffects sourced poison kill awards XP", SourcedPoisonKillAwardsXp);
         registry.Add("Simulation.StatusEffects corroded stacks to authored cap", CorrodedStacksToAuthoredCap);
         registry.Add("Simulation.StatusEffects burning and frozen remove each other", BurningAndFrozenRemoveEachOther);
-        registry.Add("Simulation.StatusEffects stunned actor skips turn", StunnedActorSkipsTurn);
-        registry.Add("Simulation.StatusEffects frozen actor skips turn", FrozenActorSkipsTurn);
+        registry.Add("Simulation.StatusEffects stunned actor selection defers turn consumption", StunnedActorSkipsTurn);
+        registry.Add("Simulation.StatusEffects frozen actor selection defers turn consumption", FrozenActorSkipsTurn);
         registry.Add("Simulation.StatusEffects phased actor moves through walls", PhasedActorMovesThroughWalls);
         registry.Add("Simulation.StatusEffects immune entity takes zero physical damage", ImmuneEntityTakesZeroPhysicalDamage);
         registry.Add("Simulation.StatusEffects authored tick damage changes runtime tick damage", AuthoredTickDamageChangesRuntimeTickDamage);
@@ -195,8 +195,8 @@ public sealed class StatusEffectTests : ITestSuite
         var next = scheduler.GetNextActor();
 
         Expect.NotNull(next, "Scheduler should still find a ready actor");
-        Expect.Equal(normal.Id, next!.Id, "A stunned actor should be skipped in favor of the next ready actor");
-        Expect.True(scheduler.GetEnergy(stunned.Id) < scheduler.EnergyThreshold, "Skipping should consume the stunned actor's energy");
+        Expect.Equal(stunned.Id, next!.Id, "Scheduler should return the stunned actor so GameLoop can aggregate its skipped-turn output");
+        Expect.Equal(scheduler.EnergyThreshold, scheduler.GetEnergy(stunned.Id), "Actor selection should not consume hidden energy");
     }
 
     private static void FrozenActorSkipsTurn()
@@ -220,8 +220,8 @@ public sealed class StatusEffectTests : ITestSuite
         var next = scheduler.GetNextActor();
 
         Expect.NotNull(next, "Scheduler should still find a ready actor");
-        Expect.Equal(normal.Id, next!.Id, "A frozen actor should be skipped in favor of the next ready actor");
-        Expect.True(scheduler.GetEnergy(frozen.Id) < scheduler.EnergyThreshold, "Skipping should consume the frozen actor's energy");
+        Expect.Equal(frozen.Id, next!.Id, "Scheduler should return the frozen actor so GameLoop can aggregate its skipped-turn output");
+        Expect.Equal(scheduler.EnergyThreshold, scheduler.GetEnergy(frozen.Id), "Actor selection should not consume hidden energy");
     }
 
     private static void PhasedActorMovesThroughWalls()

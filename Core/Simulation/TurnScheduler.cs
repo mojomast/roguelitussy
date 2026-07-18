@@ -75,12 +75,6 @@ public sealed class TurnScheduler : ITurnScheduler
                     continue;
                 }
 
-                if (StatusEffectProcessor.HasFlag(actor, "skip_turn"))
-                {
-                    ConsumeEnergy(actorId, 1000);
-                    continue;
-                }
-
                 return actor;
             }
 
@@ -101,7 +95,9 @@ public sealed class TurnScheduler : ITurnScheduler
         if (_currentWorld?.GetEntity(actorId) is { } entity)
         {
             entity.Stats.Energy = actor.Energy;
-            var tickResult = StatusEffectProcessor.Tick(_currentWorld, actorId);
+            var tickResult = _currentWorld.ContentDatabase is { } db
+                ? StatusEffectProcessor.Tick(_currentWorld, actorId, db)
+                : StatusEffectProcessor.Tick(_currentWorld, actorId);
             if (tickResult.Died)
             {
                 _actors.Remove(actorId);

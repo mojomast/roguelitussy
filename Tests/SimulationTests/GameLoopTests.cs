@@ -16,6 +16,8 @@ public sealed class GameLoopTests : ITestSuite
         registry.Add("Simulation.GameLoop aggregates action outcomes", ProcessRoundAggregatesOutcomes);
         registry.Add("Simulation.GameLoop ticks status effects through scheduler", ProcessRoundTicksStatusEffects);
         registry.Add("Simulation.GameLoop surfaces DoT death output in round outcome", ProcessRoundSurfacesDotDeath);
+        registry.Add("Simulation.GameLoop skipped turns suppress actions and surface status output", SkippedTurnsSurfaceStatusOutput);
+        registry.Add("Simulation.GameLoop scheduler ticks use authored status damage", SchedulerTicksUseAuthoredStatusDamage);
     }
 
     private static void ProcessRoundExecutesAllActors()
@@ -109,6 +111,56 @@ public sealed class GameLoopTests : ITestSuite
 
         Expect.True(world.GetEntity(enemy.Id) is null, "Enemy killed by poison should be removed");
         Expect.True(outcome.LogMessages.Any(message => message.Contains("kills", StringComparison.Ordinal)), "DoT death should be logged in the aggregate round outcome");
+        Expect.Equal(1, outcome.CombatEvents.Count, "DoT damage should produce a combat event");
+        Expect.Equal(ActionType.StatusTick, outcome.CombatEvents[0].ActionType, "DoT combat events should identify status ticks");
+        var damage = outcome.CombatEvents[0].DamageResults.Single();
+        Expect.Equal(player.Id, damage.AttackerId, "Sourced DoT damage should retain its source entity");
+        Expect.Equal(enemy.Id, damage.DefenderId, "DoT damage should identify the affected entity");
+        Expect.Equal(DamageType.Poison, damage.DamageType, "Poison ticks should carry poison damage type");
+        Expect.True(damage.IsKill, "The lethal DoT result should be marked as a kill");
+    }
+
+    private static void SkippedTurnsSurfaceStatusOutput()
+    {
+        var world = CreateWorld();
+        var player = CreateActor("Player", new Position(1, 1), Faction.Player);
+        var enemy = CreateActor("Enemy", new Position(3, 3), Faction.Enemy, new Stats { HP = 2, MaxHP = 2, Attack = 3, Defense = 1, Accuracy = 0, Evasion = 0, Speed = 100, Energy = 1000 });
+        world.Player = player;
+        world.AddEntity(player);
+        world.AddEntity(enemy);
+        StatusEffectProcessor.ApplyEffect(enemy, StatusEffectType.Poisoned, 1, sourceEntityId: player.Id);
+        StatusEffectProcessor.ApplyEffect(enemy, StatusEffectType.Stunned, 1);
+
+        var actionRequested = false;
+        var outcome = new GameLoop().ProcessRound(
+            world,
+            new ScriptedScheduler(new[] { enemy.Id }),
+            actor =>
+            {
+                actionRequested = true;
+                return new WaitAction(actor.Id);
+            });
+
+        Expect.False(actionRequested, "A skipped actor must not choose or execute an action");
+        Expect.True(outcome.ExpiredStatusEffects.Contains((enemy.Id, StatusEffectType.Stunned)), "Skipped-turn status expirations should reach the aggregate outcome");
+        Expect.True(outcome.CombatEvents.SelectMany(combatEvent => combatEvent.DamageResults).Any(result => result.IsKill), "Skipped-turn lethal DoT should reach combat events");
+        Expect.True(outcome.DirtyPositions.Contains(enemy.Position), "Skipped-turn death drops should mark their tile dirty");
+    }
+
+    private static void SchedulerTicksUseAuthoredStatusDamage()
+    {
+        var world = CreateWorld();
+        var content = new StubContentDatabase();
+        content.StatusEffects["poisoned"].TickEffects[0].Value = 4;
+        world.ContentDatabase = content;
+        var actor = CreateActor("Player", new Position(1, 1), Faction.Player);
+        world.Player = actor;
+        world.AddEntity(actor);
+        StatusEffectProcessor.ApplyEffect(actor, StatusEffectType.Poisoned, content, 2);
+
+        new GameLoop().ProcessRound(world, new ScriptedScheduler(new[] { actor.Id }), entity => new WaitAction(entity.Id));
+
+        Expect.Equal(6, actor.Stats.HP, "Scheduler-driven ticks should use authored status damage");
     }
 
     private static WorldState CreateWorld(int seed = 123)
@@ -159,7 +211,9 @@ public sealed class GameLoopTests : ITestSuite
             if (_world?.GetEntity(actorId) is { } entity)
             {
                 entity.Stats.Energy -= cost;
-                return StatusEffectProcessor.Tick(_world, actorId);
+                return _world.ContentDatabase is { } db
+                    ? StatusEffectProcessor.Tick(_world, actorId, db)
+                    : StatusEffectProcessor.Tick(_world, actorId);
             }
 
             return null;

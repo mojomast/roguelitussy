@@ -107,6 +107,8 @@ Consumable authoring rules:
 - `item_arrows_bundle` delegates to aimed `arrow_shot`; `potion_mana` delegates to self-targeted `arcane_infusion`; and `scroll_frost_nova` has dedicated art.
 - `relic_item_slot` is a reserved token and must not be emitted by loot tables.
 
+Relic descriptions must match concrete hook behavior. Bone Amulet uses every third resulting enemy kill, Soul Collector grants +3 max/current HP every fifth resulting kill, Glass Cannon is a one-time stat transformation, and Warlord's Crest reconciles toward its depth-derived cumulative attack cap rather than adding the full amount on every floor entry.
+
 ### Enemies
 
 When adding an enemy, define:

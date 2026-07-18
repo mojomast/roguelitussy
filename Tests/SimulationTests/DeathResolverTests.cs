@@ -15,6 +15,7 @@ public sealed class DeathResolverTests : ITestSuite
         registry.Add("Simulation.DeathResolver gold roll respects min max", GoldRollRespectsMinMax);
         registry.Add("Simulation.DeathResolver unattributed death drops loot but no gold", UnattributedDeathDropsLootButNoGold);
         registry.Add("Simulation.DeathResolver kill streak reset clears milestone marker", KillStreakResetClearsMilestoneMarker);
+        registry.Add("Simulation.DeathResolver attributed death keeps player addressable", AttributedDeathKeepsPlayerAddressable);
     }
 
     private static void KillStreakResetClearsMilestoneMarker()
@@ -26,6 +27,22 @@ public sealed class DeathResolverTests : ITestSuite
         Expect.Equal(0, streak.CurrentStreak, "Reset should clear the current streak");
         Expect.Equal(0, streak.BonusXpAwarded, "Reset should clear the milestone marker so future streaks can award XP again");
         Expect.Equal(5, streak.HighestStreak, "Reset should preserve the highest streak");
+    }
+
+    private static void AttributedDeathKeepsPlayerAddressable()
+    {
+        var world = CreateWorld();
+        var player = CreateActor("Player", new Position(1, 1), Faction.Player);
+        var enemy = CreateActor("Enemy", new Position(2, 1), Faction.Enemy);
+        world.Player = player;
+        world.AddEntity(player);
+        world.AddEntity(enemy);
+
+        var death = DeathResolver.ResolveKill(world, enemy, player);
+
+        Expect.False(death.Removed, "Attributed player death should use the same retention policy as environmental death");
+        Expect.Equal(0, player.Stats.HP, "Attributed death should still set player HP to zero");
+        Expect.NotNull(world.GetEntity(player.Id), "The dead player must remain in the world entity index for game-over handling");
     }
 
     private static void KillingRatDropsRatLootAndGold()

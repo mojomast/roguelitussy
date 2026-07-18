@@ -12,6 +12,7 @@ public sealed class IntegrityTests : ITestSuite
     {
         registry.Add("Persistence.Scheduler preserves order-zero actor across adversarial re-registration", PreservesOrderZeroActor);
         registry.Add("Persistence.SaveMigrator upgrades version 15 saves and re-derives ambiguous zero orders", MigratesVersionFifteenSaves);
+        registry.Add("Persistence.SaveMigrator upgrades version 16 Warlord state without replaying bonus", MigratesVersionSixteenWarlordState);
         registry.Add("Persistence.MetaProgression survives corrupt JSON payloads", MetaProgressionSurvivesCorruptJson);
         registry.Add("Persistence.MetaProgression upgrades unversioned files and stamps the schema version", MetaProgressionUpgradesUnversionedFiles);
         registry.Add("Persistence.MetaProgression file load survives corruption on disk", MetaProgressionFileLoadSurvivesCorruption);
@@ -107,6 +108,58 @@ public sealed class IntegrityTests : ITestSuite
         Expect.True(restored.SchedulerOrders.TryGetValue(enemy.Id, out var enemyOrder) && enemyOrder == 1, "Positive legacy orders should be preserved by migration.");
     }
 
+    private static void MigratesVersionSixteenWarlordState()
+    {
+        using var sandbox = IntegritySandbox.Create();
+        var manager = new SaveManager(sandbox.DirectoryPath, sandbox.Clock);
+        var world = CreateWorld(4, 4);
+        world.Depth = 3;
+        world.Player.Stats.Attack = 14;
+        var relic = new RelicComponent();
+        relic.RelicIds.Add("warlord_crest");
+        relic.AppliedStatTotals["warlord_crest"] = 4;
+        world.Player.SetComponent(relic);
+        world.SchedulerOrders[world.Player.Id] = 0;
+        world.SchedulerNextOrder = 1;
+
+        Expect.True(manager.SaveGame(world, SaveSlots.Slot1).GetAwaiter().GetResult(), "Setup save should succeed.");
+        var path = Path.Combine(sandbox.DirectoryPath, SaveSlots.GetFileName(SaveSlots.Slot1));
+        var root = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+        root["version"] = 16;
+        RemoveAppliedStatTotals(root["entities"]!.AsArray());
+        foreach (var floor in root["floors"]!.AsArray())
+        {
+            RemoveAppliedStatTotals(floor!["entities"]!.AsArray());
+        }
+
+        File.WriteAllText(path, root.ToJsonString());
+
+        var restored = manager.LoadGame(SaveSlots.Slot1).GetAwaiter().GetResult();
+        Expect.NotNull(restored, "Version 16 Warlord saves should migrate.");
+        Expect.Equal(14, restored!.Player.Stats.Attack, "Migration must preserve aggregate attack exactly.");
+        var restoredRelic = restored.Player.GetComponent<RelicComponent>()!;
+        Expect.Equal(4, restoredRelic.AppliedStatTotals["warlord_crest"], "Migration should seed the depth-derived Warlord baseline.");
+        Expect.True(restored.SchedulerOrders.TryGetValue(restored.Player.Id, out var schedulerOrder), "Version 16 valid order zero must remain present.");
+        Expect.Equal(0, schedulerOrder, "Version 16 migration must not apply legacy scheduler-zero normalization.");
+
+        RelicProcessor.ProcessHook("on_floor_enter", restored.Player, restored, restored.ContentDatabase, new RelicHookContext());
+        Expect.Equal(14, restored.Player.Stats.Attack, "Reentering the migrated depth must not replay Warlord bonus.");
+        restored.Depth = 4;
+        RelicProcessor.ProcessHook("on_floor_enter", restored.Player, restored, restored.ContentDatabase, new RelicHookContext());
+        Expect.Equal(16, restored.Player.Stats.Attack, "A deeper floor should grant only the missing Warlord delta after migration.");
+    }
+
+    private static void RemoveAppliedStatTotals(JsonArray entities)
+    {
+        foreach (var entity in entities)
+        {
+            if (entity!["relic"] is JsonObject payload)
+            {
+                payload.Remove("appliedStatTotals");
+            }
+        }
+    }
+
     private static void MetaProgressionSurvivesCorruptJson()
     {
         foreach (var payload in new[] { "{ definitely not json", "[1,2,3]", "null", "\"a string\"", "42", "{\"echoesTotal\": }" })
@@ -189,6 +242,8 @@ public sealed class IntegrityTests : ITestSuite
         relic.FirstHitEntityIds.Add(enemyB.Id);
         relic.AppliedOneTimeRelics.Add("cursed_blade");
         relic.AppliedOneTimeRelics.Add("glass_cannon");
+        relic.AppliedStatTotals["warlord_crest"] = 4;
+        relic.AppliedStatTotals["a_relic"] = 2;
         world.Player.SetComponent(relic);
 
         Expect.True(manager.SaveGame(world, SaveSlots.Slot1).GetAwaiter().GetResult(), "Save should persist relic runtime state.");
@@ -208,6 +263,8 @@ public sealed class IntegrityTests : ITestSuite
         Expect.Equal(2, restoredRelic.AppliedOneTimeRelics.Count, "One-time relic tracking should survive round-trip.");
         Expect.True(restoredRelic.AppliedOneTimeRelics.Contains("cursed_blade"), "One-time relic ids should survive round-trip.");
         Expect.True(restoredRelic.AppliedOneTimeRelics.Contains("glass_cannon"), "All one-time relic ids should survive round-trip.");
+        Expect.Equal(4, restoredRelic.AppliedStatTotals["warlord_crest"], "Warlord applied stat total should survive round-trip.");
+        Expect.Equal(2, restoredRelic.AppliedStatTotals["a_relic"], "Generic applied stat totals should survive round-trip.");
     }
 
     private static void DefaultsRelicRuntimeStateForLegacyPayloads()
@@ -230,7 +287,7 @@ public sealed class IntegrityTests : ITestSuite
         {
             if (entity!["relic"] is JsonObject payload)
             {
-                foreach (var property in new[] { "firstHitEntityIds", "appliedOneTimeRelics", "damageBuffPercent", "damageBuffExpiresOnTurn", "lastMerchantDiscountDepth" })
+                foreach (var property in new[] { "firstHitEntityIds", "appliedOneTimeRelics", "appliedStatTotals", "damageBuffPercent", "damageBuffExpiresOnTurn", "lastMerchantDiscountDepth" })
                 {
                     Expect.True(payload.Remove(property), $"Baseline relic payload should contain '{property}'.");
                     stripped++;
@@ -238,7 +295,7 @@ public sealed class IntegrityTests : ITestSuite
             }
         }
 
-        Expect.Equal(5, stripped, "All new relic properties should be stripped from the payload.");
+        Expect.Equal(6, stripped, "All new relic properties should be stripped from the payload.");
         File.WriteAllText(path, root.ToJsonString());
 
         var restored = manager.LoadGame(SaveSlots.Slot1).GetAwaiter().GetResult();
@@ -247,6 +304,7 @@ public sealed class IntegrityTests : ITestSuite
         Expect.Equal(1, restoredRelic.ShieldCharges, "Existing relic fields should still rehydrate.");
         Expect.Equal(0, restoredRelic.FirstHitEntityIds.Count, "Missing first-hit state should default to empty.");
         Expect.Equal(0, restoredRelic.AppliedOneTimeRelics.Count, "Missing one-time relic state should default to empty.");
+        Expect.Equal(0, restoredRelic.AppliedStatTotals.Count, "Missing applied stat totals should default to empty.");
         Expect.Equal(0, restoredRelic.DamageBuffPercent, "Missing damage buff percent should default to zero.");
         Expect.Equal(0, restoredRelic.DamageBuffExpiresOnTurn, "Missing damage buff expiry should default to zero.");
         Expect.Equal(-1, restoredRelic.LastMerchantDiscountDepth, "Missing merchant discount depth should default to -1.");
@@ -303,6 +361,10 @@ public sealed class IntegrityTests : ITestSuite
         {
             ("negative relic shield charges", "relic", "shieldCharges", -1),
             ("blank relic id", "relic", "relicIds", new JsonArray("  ")),
+            ("negative applied relic stat total", "relic", "appliedStatTotals", new JsonObject { ["warlord_crest"] = -1 }),
+            ("blank applied relic stat id", "relic", "appliedStatTotals", new JsonObject { [" "] = 2 }),
+            ("over-cap Warlord stat total", "relic", "appliedStatTotals", new JsonObject { ["warlord_crest"] = 11 }),
+            ("case-colliding applied relic ids", "relic", "appliedStatTotals", new JsonObject { ["warlord_crest"] = 2, ["Warlord_Crest"] = 4 }),
             ("negative wallet gold", "wallet", "gold", -5),
             ("negative progression experience", "progression", "experience", -1),
             ("invalid progression level", "progression", "level", 0),

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -33,8 +34,18 @@ public static class SaveMigrator
             13 => MigrateV13(root),
             14 => MigrateV14(root),
             15 => MigrateV15(root),
+            16 => MigrateV16(root),
             _ => throw new InvalidOperationException($"Unsupported save version {version}.")
         };
+    }
+
+    private static SaveFileData MigrateV16(JsonElement root)
+    {
+        var data = JsonSerializer.Deserialize<SaveFileData>(root.GetRawText(), SaveSerializer.JsonOptions)
+            ?? throw new InvalidOperationException("Unable to deserialize version 16 save data.");
+
+        data.Version = SaveSerializer.CurrentVersion;
+        return FinalizeSingleFloor(data, normalizeLegacySchedulerOrders: false);
     }
 
     private static SaveFileData MigrateV15(JsonElement root)
@@ -332,7 +343,7 @@ public static class SaveMigrator
         return (fallbackX, fallbackY);
     }
 
-    private static SaveFileData FinalizeSingleFloor(SaveFileData data)
+    private static SaveFileData FinalizeSingleFloor(SaveFileData data, bool normalizeLegacySchedulerOrders = true)
     {
         data.Version = SaveSerializer.CurrentVersion;
         if (data.Floors.Count == 0)
@@ -340,10 +351,36 @@ public static class SaveMigrator
             data.Floors.Add(SaveSerializer.CreateFloorFromRoot(data));
         }
 
+        SeedLegacyRelicStatTotals(data);
         var activeFloor = data.Floors.Find(floor => floor.Depth == data.Depth) ?? data.Floors[0];
         SaveSerializer.ApplyActiveFloorAliases(data, activeFloor);
-        NormalizeLegacySchedulerOrders(data);
+        if (normalizeLegacySchedulerOrders)
+        {
+            NormalizeLegacySchedulerOrders(data);
+        }
+
         return data;
+    }
+
+    private static void SeedLegacyRelicStatTotals(SaveFileData data)
+    {
+        foreach (var floor in data.Floors)
+        {
+            foreach (var entity in floor.Entities)
+            {
+                var relic = entity.Relic;
+                if (relic is null || !relic.RelicIds.Contains("warlord_crest", StringComparer.Ordinal))
+                {
+                    continue;
+                }
+
+                relic.AppliedStatTotals ??= new Dictionary<string, int>(StringComparer.Ordinal);
+                if (!relic.AppliedStatTotals.ContainsKey("warlord_crest"))
+                {
+                    relic.AppliedStatTotals["warlord_crest"] = Math.Min(10, Math.Max(0, floor.Depth - 1) * 2);
+                }
+            }
+        }
     }
 
     /// <summary>

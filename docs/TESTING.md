@@ -115,10 +115,11 @@ The repository contains targeted suites for:
 - Wave 1 roguelite systems, including synergy detection, daily seed determinism, ascension modifier lookup, narrative epitaph determinism, expanded content validation, and meta-progression ascension persistence
 - Wave 2 roguelite integration, including requested content IDs/reachability, critical/floor-clear/reputation/synergy event presentation through existing UI surfaces, daily title entry, ascension shop-price wiring, and save serialization for boss phase/faction/synergy payloads
 - architecture smoke coverage
-- save version 16 migration, scheduler order-zero replay, relic hook-state round trips, stricter component validation, and corrupt meta/daily recovery
+- save version 17 migration, v16 scheduler-zero preservation/Warlord baseline migration, relic hook/applied-stat round trips, stricter component validation, and corrupt meta/daily recovery
 - generation boss/safe precedence, deep-floor scaling, locked-room keys, themed traps, start-room exclusion, ragged prefabs, and content-backed depth sweeps
 - AI group aggro/profile corrections, patrol reachability, and occupied-corridor pathfinding
-- canonical status-death game over, relic damage hooks, and DoT round-output propagation
+- canonical sourced/unsourced status-death game over, player retention, skipped-turn action suppression/output propagation, typed DoT combat events, and relic damage hooks
+- exact Bone Amulet/Soul Collector kill milestones, one-time Glass Cannon application, delta-based capped Warlord bonuses, and floor/rest hook log forwarding
 - attack/death animation, critical/miss/heal/pickup feedback, and SVG/import metadata conventions
 
 Asset convention tests expect source PNG/SVG assets and their committed `.import` sidecars to remain paired. They are static checks; asset deletion or import changes still require the real Godot editor import/startup smoke.

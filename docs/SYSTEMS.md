@@ -11,13 +11,13 @@ The turn model is energy-based.
 - Player actions are submitted through `GameManager.ProcessPlayerAction(...)`.
 - Non-player actors fall back to brain-driven decisions when the loop requests an action for them.
 - End-of-round processing now also ticks entity ability cooldowns through `CooldownComponent`.
-- Scheduler energy consumption returns status tick output; `GameLoop` merges normal-action tick logs, expirations, and dirty positions into the round outcome.
+- Scheduler energy consumption returns status tick output; `GameLoop` merges logs, expirations, dirty positions, and `ActionType.StatusTick` combat events into the round outcome for normal and skipped turns.
 - Initiative gain uses content-authored status speed modifiers when content is available.
 - End-of-round relic upkeep, including Cursed Blade drain, runs before cooldown ticking.
 
 Validation failures still consume action energy in the current loop implementation. That behavior is intentional and covered by tests.
 
-Known limitation: when `TurnScheduler.GetNextActor()` consumes a stunned/frozen actor internally, that skipped turn's `StatusTickResult` is not yet merged into the round outcome. Status deaths also do not currently add a dedicated death `CombatEvent`.
+`TurnScheduler.GetNextActor()` only selects actors. `GameLoop` owns stunned/frozen action suppression and energy consumption so no outcome-bearing status mutation is hidden inside actor selection.
 
 ## Actions And Outcomes
 
@@ -100,6 +100,8 @@ Combat is still resolved inside `Core/Simulation/CombatResolver.cs`, but it is n
 - Ability damage and status-chance rolls use the serialized combat RNG stream, so save/load continuation matches uninterrupted simulation for covered ability paths.
 - Harmful area damage/status effects default to enemy-only when `hits_allies` is false and no explicit effect filter is authored; explicit filters and `hits_allies: true` keep their broader behavior.
 - Kills from melee attacks, ability damage, sourced poison/burning status ticks, and trap hazards route through the shared `DeathResolver`, so XP, kill counts, level-up log messages, deterministic loot drops, gold awards, and entity removal stay aligned for those paths. Trap kills are currently unattributed (no XP/kill credit), matching environmental hazard design.
+- Status damage carries source, target, damage type, applied damage, and lethal state through the normal `CombatEvent` path. This drives `DamageDealt`, `EntityDied`, run statistics, and game-over handling consistently.
+- Dead non-player entities are removed. A dead player remains in the world entity index with zero HP regardless of attribution because presentation, run history, and save invariants require the player to remain addressable during game-over handling.
 
 The ability pipeline is shared by item casts and AI casts so the runtime rules stay in one place.
 
@@ -107,7 +109,9 @@ Relics are content-authored passive hooks in `Content/relics.json`. Melee, range
 
 Ranged attacks use equipped `ranged` weapon damage, accuracy, crit chance, and on-hit effects when available. Ability `heal_self` effects resolve after damage, and `enemies` relation filters exclude neutral entities. Synergy passive stat bonuses are removed when requirements cease to be met. Shrine use grants Thieves' Compact reputation.
 
-Known relic follow-ups include exact kill-milestone ordering, repeated floor-entry stat effects, delivery of all hook log messages, and cross-source player-death consistency.
+Kill relic hooks observe the resulting kill count, so Bone Amulet and Soul Collector trigger on exact third/fifth-kill milestones. Glass Cannon uses persisted one-time state, while Warlord's Crest records its cumulative attack contribution and applies only the missing depth-derived delta. Direct floor/rest hook messages are forwarded through `EventBus`; rest hooks retain their current once-per-rest-command cadence.
+
+Remaining relic follow-ups include rest-per-tick semantics, Shadow Step's authored evasion behavior, Echo Shard floor-clear rewards, and Merchant Badge pricing across cached-floor revisits.
 
 Synergies are content-authored build identities in `Content/synergies.json`. `SynergyResolver` derives active and one-piece-away synergies from the player's relics, selected perks, archetype, and item tags, and applies idempotent passive stat bonuses through `SynergyComponent`.
 
@@ -205,12 +209,12 @@ Persistence lives in `Core/Persistence/`.
 
 ### Current Save Version
 
-The current normalized save version is `16`.
+The current normalized save version is `17`.
 
 Notable details:
 
 - Explored and visible map flags are stored as packed bitfields.
-- Legacy payloads through version 15 are migrated on load.
+- Legacy payloads through version 16 are migrated on load.
 - Saves now persist the active floor plus cached inactive floors through a normalized floor list, while retaining active-floor root aliases for compatibility with metadata and existing tooling.
 - New saves include optional content metadata (`contentVersion` and a deterministic content hash) so load flows can warn when the authored JSON set differs from the one that created the save.
 - Multi-floor validation requires unique floor depths, an active floor payload, and exactly one player entity across all saved floors on the active floor.
@@ -223,6 +227,8 @@ Notable details:
 - Save validation checks dimensions, entity IDs, inventory/equipment integrity, persisted component payloads, status effects, payload sizes, and trap entity consistency (an entity with a `TrapComponent` must sit on a `Trap` tile and have a non-empty template id).
 - Version 16 makes per-entity scheduler order nullable, preserving `0` as the valid first registration order. Version 15's ambiguous zero values migrate to `null` and are rederived from registration order.
 - Relic persistence includes first-hit target IDs, one-time applied relic IDs, timed damage-buff state, and the last merchant-discount depth.
+- Version 17 adds deterministic per-relic applied-stat totals so cumulative floor bonuses can reconcile instead of stacking. Version 16 Warlord saves preserve aggregate attack, seed the current depth-derived total as already represented, and retain valid scheduler order zero; pre-existing v16 overstacking cannot be inferred or repaired safely.
+- Applied relic stat totals reject blank/case-colliding IDs, negative values, and Warlord totals above its +10 cap.
 - Validation now covers negative wallet/progression/relic/shrine/kill-streak values while allowing speed-zero static shrines, NPCs, merchants, chests, and traps.
 - Meta progression has an independent schema version 1, normalizes legacy/unversioned data, and falls back to fresh data on malformed files. Daily challenge persistence likewise recovers from corrupt files; both use temporary-file replacement.
 - Lucky Coin consumes persisted combat RNG, and merchant item creation consumes persisted item RNG. These improve continuation determinism but intentionally change outcomes relative to older builds.

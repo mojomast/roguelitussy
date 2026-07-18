@@ -155,7 +155,7 @@ Quick-reference entry points for agents working on this codebase.
 | Progression | `Core/Simulation/ProgressionService.cs` | 7 | XP/level-up helpers |
 | Content load | `Core/Content/ContentLoader.cs` | 122 | `LoadFromDirectory` entry point |
 | Save | `Core/Persistence/SaveManager.cs` | 9 | File I/O and slot management |
-| Serialize | `Core/Persistence/SaveSerializer.cs` | 9 | JSON round-trip, current version 16 (see `SaveSerializer.CurrentVersion`) |
+| Serialize | `Core/Persistence/SaveSerializer.cs` | 9 | JSON round-trip, current version 17 (see `SaveSerializer.CurrentVersion`) |
 
 ### Godot layer entry points
 

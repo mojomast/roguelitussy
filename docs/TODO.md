@@ -36,6 +36,6 @@ This document is a concise planning view for remaining work. `docs/IMPROVEMENT_S
 | P1 | Onboarding hints | Add first-delve message, stairs objective hint, game-over tips, and key-reminder ribbon. | Help/log/HUD copy pass. |
 | P1 | Game feel pass | Hit flashes, attack lunges, death fades, and damage/crit/miss/heal/pickup popups are implemented; continue with camera shake, exact heal payloads, animation/SFX fields, and projectile travel. | Event payload support for all animated outcomes. |
 | P1 | Generation integration gaps | Resolve boss-marked spawns to boss templates, populate shrine/curse rooms, guarantee requested landmarks, and validate enough reachable keys for locks. | Generator-to-GameManager metadata contract. |
-| P1 | Status/death integration gaps | Forward skipped-turn status output and dedicated DoT death events; make player-death and relic milestone ordering consistent. | Scheduler/death outcome contract. |
+| P1 | Remaining relic semantics | Align rest-per-tick healing, Shadow Step evasion, Echo Shard floor-clear rewards, and Merchant Badge cached-floor pricing with authored descriptions. | Focused hook/event contracts and persistence where needed. |
 | P1 | Runtime art mapping | Make enemy rendering honor authored `sprite_path` and add explicit locked-door art. | Content-backed renderer lookup. |
 | P1 | Performance pass | Make world rendering more event-driven, reduce fog iteration, pool tile nodes, and cache radius queries. | Profiling target and rendering tests. |

@@ -153,7 +153,7 @@ This project already has room prefabs, shops, NPCs, and floor-based generation. 
 
 ### Phase 1: Refactor The Current Level-Up Core
 
-Status: implemented for the current melee, ranged, ability-damage, sourced poison/burning status-tick, and trap-hazard kill paths. XP and level-up mutation route through shared simulation-side death/progression handling instead of being exclusive to melee attack code. Trap kills are currently unattributed (no XP/kill credit), matching environmental hazard design; future systems can credit a trap setter by routing through `DeathResolver.ResolveKill` with a source entity. Aggregate round outcomes now surface normal-turn status death logs, and `GameManager` emits the canonical `GameOverWithStats` plus compatibility `GameOver` pair once per run end.
+Status: implemented for the current melee, ranged, ability-damage, sourced poison/burning status-tick, and trap-hazard kill paths. XP and level-up mutation route through shared simulation-side death/progression handling instead of being exclusive to melee attack code. Trap kills are currently unattributed (no XP/kill credit), matching environmental hazard design; future systems can credit a trap setter by routing through `DeathResolver.ResolveKill` with a source entity. Normal and skipped-turn status ticks produce standard combat/death events, and `GameManager` emits the canonical `GameOverWithStats` plus compatibility `GameOver` pair once per run end. The dead player remains addressable at zero HP for final build/history capture.
 
 Move level-up logic out of `AttackAction`.
 
@@ -281,7 +281,7 @@ Meta progression uses its own schema version 1. Unversioned files are normalized
 
 ## Relics And Build History
 
-Relic hooks can retain behavior-critical state across turns and floors, including first-hit targets, one-time applications, shield/low-HP state, timed buffs, and merchant discount depth. Save version 16 persists that runtime state so loading does not replay one-shot effects or lose active relic behavior. Final run snapshots copy the build-facing relic, synergy, perk, and archetype IDs into meta history.
+Relic hooks can retain behavior-critical state across turns and floors, including first-hit targets, one-time applications, shield/low-HP state, timed buffs, merchant discount depth, and cumulative applied stat totals. Save version 16 introduced the general runtime hook state; version 17 adds deterministic applied-stat totals so Warlord's Crest grants only missing depth progress and Glass Cannon remains one-time across save/load. Bone Amulet and Soul Collector evaluate the resulting kill count, triggering on exact third/fifth-kill milestones. Final run snapshots copy the build-facing relic, synergy, perk, and archetype IDs into meta history.
 
 Only after run progression feels good.
 

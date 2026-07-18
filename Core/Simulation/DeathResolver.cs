@@ -27,6 +27,12 @@ public static class DeathResolver
         var droppedItems = RollAndDropLoot(world, victim);
         var goldAwarded = AwardGoldToKiller(world, killer, victim);
 
+        var progression = killer.GetComponent<ProgressionComponent>();
+        if (progression is not null)
+        {
+            progression.Kills++;
+        }
+
         var relicContext = new RelicHookContext
         {
             TargetId = victim.Id,
@@ -39,14 +45,12 @@ public static class DeathResolver
             ReputationService.OnEnemyKilled(killer, enemyComponent.TemplateId, world.ContentDatabase);
         }
 
-        var progression = killer.GetComponent<ProgressionComponent>();
         if (progression is null)
         {
-            world.RemoveEntity(victim.Id);
-            return new DeathResolution(true, 0, new ProgressionService.AwardResult(0, 0, Array.Empty<int>()), droppedItems, goldAwarded, victim.Position, relicContext.LogMessages);
+            var removed = RemoveVictimUnlessPlayer(world, victim);
+            return new DeathResolution(removed, 0, new ProgressionService.AwardResult(0, 0, Array.Empty<int>()), droppedItems, goldAwarded, victim.Position, relicContext.LogMessages);
         }
 
-        progression.Kills++;
         if (killer.GetComponent<KillStreakComponent>() is { } streak)
         {
             streak.CurrentStreak++;
@@ -63,8 +67,8 @@ public static class DeathResolver
             ? new ProgressionService.AwardResult(0, 0, Array.Empty<int>())
             : ProgressionService.AwardExperience(killer, xpValue.Value);
 
-        world.RemoveEntity(victim.Id);
-        return new DeathResolution(true, 1, award, droppedItems, goldAwarded, victim.Position, relicContext.LogMessages);
+        var victimRemoved = RemoveVictimUnlessPlayer(world, victim);
+        return new DeathResolution(victimRemoved, 1, award, droppedItems, goldAwarded, victim.Position, relicContext.LogMessages);
     }
 
     public static DeathResolution ResolveUnattributedDeath(WorldState world, IEntity victim)
@@ -77,15 +81,8 @@ public static class DeathResolver
         victim.Stats.HP = 0;
         var droppedItems = RollAndDropLoot(world, victim);
 
-        // Never remove the player entity here: the presentation layer owns run-over handling
-        // and downstream systems assume the player entity remains addressable.
-        if (world.Player is not null && victim.Id == world.Player.Id)
-        {
-            return new DeathResolution(false, 0, new ProgressionService.AwardResult(0, 0, Array.Empty<int>()), droppedItems, 0, victim.Position);
-        }
-
-        world.RemoveEntity(victim.Id);
-        return new DeathResolution(true, 0, new ProgressionService.AwardResult(0, 0, Array.Empty<int>()), droppedItems, 0, victim.Position);
+        var removed = RemoveVictimUnlessPlayer(world, victim);
+        return new DeathResolution(removed, 0, new ProgressionService.AwardResult(0, 0, Array.Empty<int>()), droppedItems, 0, victim.Position);
     }
 
     public static void AppendProgressionLogMessages(ICollection<string> logMessages, string killerName, DeathResolution resolution)
@@ -99,6 +96,18 @@ public static class DeathResolver
         {
             logMessages.Add($"{killerName} reaches level {level}!");
         }
+    }
+
+    private static bool RemoveVictimUnlessPlayer(WorldState world, IEntity victim)
+    {
+        // Game-over presentation and save invariants require the dead player to remain addressable.
+        if (world.Player is not null && victim.Id == world.Player.Id)
+        {
+            return false;
+        }
+
+        world.RemoveEntity(victim.Id);
+        return true;
     }
 
     public static void AppendLootLogMessages(ICollection<string> logMessages, DeathResolution resolution)

@@ -501,6 +501,33 @@ public static class SaveValidator
                 errors.Add($"Entity '{entity.Name}' has relic one-time state with a blank relic id.");
             }
 
+            if (entity.Relic.AppliedStatTotals is null)
+            {
+                errors.Add($"Entity '{entity.Name}' has null applied relic stat totals.");
+            }
+            else
+            {
+                if (entity.Relic.AppliedStatTotals.Keys.Any(string.IsNullOrWhiteSpace))
+                {
+                    errors.Add($"Entity '{entity.Name}' has applied relic stat totals with a blank relic id.");
+                }
+
+                if (entity.Relic.AppliedStatTotals.Values.Any(value => value < 0))
+                {
+                    errors.Add($"Entity '{entity.Name}' has a negative applied relic stat total.");
+                }
+
+                if (entity.Relic.AppliedStatTotals.TryGetValue("warlord_crest", out var warlordTotal) && warlordTotal > 10)
+                {
+                    errors.Add($"Entity '{entity.Name}' has an invalid Warlord Crest applied bonus {warlordTotal}.");
+                }
+
+                if (entity.Relic.AppliedStatTotals.Keys.Distinct(StringComparer.OrdinalIgnoreCase).Count() != entity.Relic.AppliedStatTotals.Count)
+                {
+                    errors.Add($"Entity '{entity.Name}' has case-colliding applied relic stat ids.");
+                }
+            }
+
             if (entity.Relic.DamageBuffPercent < 0)
             {
                 errors.Add($"Entity '{entity.Name}' has a negative relic damage buff {entity.Relic.DamageBuffPercent}.");

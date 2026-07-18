@@ -2683,7 +2683,7 @@ public partial class GameManager : Node
         var causeOfDeath = _runStats.CauseOfDeath;
         if (lethalPlayerDamage is not null)
         {
-            causeOfDeath = ResolveDamageSourceName(lethalPlayerDamage.AttackerId);
+            causeOfDeath = ResolveDamageCause(lethalPlayerDamage);
         }
 
         var openedChest = outcome.Result == ActionResult.Success && actionType == ActionType.OpenChest ? 1 : 0;
@@ -2737,7 +2737,13 @@ public partial class GameManager : Node
         }
 
         var hpBefore = player.Stats.HP;
-        RelicProcessor.ProcessHook(hook, player, World, Content, new RelicHookContext());
+        var context = new RelicHookContext();
+        RelicProcessor.ProcessHook(hook, player, World, Content, context);
+        foreach (var message in context.LogMessages)
+        {
+            Bus?.EmitLogMessage(message, ResolveOutcomeLogCategory(message, player.Id));
+        }
+
         if (player.Stats.HP != hpBefore)
         {
             Bus?.EmitHPChanged(player.Id, player.Stats.HP, player.Stats.MaxHP);
@@ -2820,6 +2826,26 @@ public partial class GameManager : Node
         }
 
         return string.IsNullOrWhiteSpace(attacker.Name) ? "Unknown" : attacker.Name;
+    }
+
+    private string ResolveDamageCause(DamageResult damage)
+    {
+        var sourceName = ResolveDamageSourceName(damage.AttackerId);
+        if (sourceName != "Unknown")
+        {
+            return sourceName;
+        }
+
+        return damage.DamageType switch
+        {
+            DamageType.Poison => "Poison",
+            DamageType.Fire => "Burning",
+            DamageType.Cold => "Cold",
+            DamageType.Lightning => "Lightning",
+            DamageType.Holy => "Holy damage",
+            DamageType.Dark => "Dark damage",
+            _ => "The dungeon",
+        };
     }
 
     private LogCategory ResolveOutcomeLogCategory(string message, EntityId playerId)
