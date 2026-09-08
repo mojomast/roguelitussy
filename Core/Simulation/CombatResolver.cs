@@ -169,7 +169,7 @@ public sealed class CombatResolver
         return Math.Max(1, rawDamage - reduction);
     }
 
-    public IReadOnlyList<StatusEffectInstance> ProcessOnHitEffects(IEntity defender, ItemTemplate? weapon, EntityId? sourceEntityId = null)
+    public IReadOnlyList<StatusEffectInstance> ProcessOnHitEffects(IEntity defender, ItemTemplate? weapon, EntityId? sourceEntityId = null, IContentDatabase? content = null)
     {
         var applied = new List<StatusEffectInstance>();
         if (weapon?.OnHitEffects is null)
@@ -189,7 +189,15 @@ public sealed class CombatResolver
                 continue;
             }
 
-            StatusEffectProcessor.ApplyEffect(defender, effect.StatusEffect, effect.Duration, sourceEntityId: sourceEntityId);
+            if (content is not null)
+            {
+                StatusEffectProcessor.ApplyEffect(defender, effect.StatusEffect, content, effect.Duration, sourceEntityId: sourceEntityId);
+            }
+            else
+            {
+                StatusEffectProcessor.ApplyEffect(defender, effect.StatusEffect, effect.Duration, sourceEntityId: sourceEntityId);
+            }
+
             var instance = StatusEffectProcessor.GetEffect(defender, effect.StatusEffect);
             if (instance is not null)
             {

@@ -13,6 +13,9 @@ The current game already supports:
 - reopening pending perk choices after loading a run
 - a first-pass Echo-based meta-progression store with upgrade levels and recent run history persisted to `user://meta_progress.json`
 - schema-versioned meta progression with corruption recovery and rich build snapshots
+- once-only floor-clear reward history persisted in version 18 run saves
+
+Loading a run replaces its floor-clear reward history rather than retaining the previous session's history. Legacy versions 1-17 treat saved floors without living hostiles as already rewarded; this avoids duplicate gold but can forfeit an unpaid reward on an empty legacy floor. New runs reset their turn counter, while floor travel carries it forward. Lethal status ticks and reflection deaths cannot be undone by subsequent regeneration or ability self-healing.
 
 That is a workable foundation, but it is still a narrow "kill things, get bigger numbers" model. The next pass should make progression shape playstyle, recovery, and decision-making across a run without collapsing the tension that makes a dungeon crawler work.
 

@@ -36,6 +36,10 @@
 
 ## Purpose
 
+> Enemy wiring follow-up (2026-09-08): boss markers now select depth-eligible boss-tagged templates, ordinary random slots exclude bosses, and authored enemy sprite paths drive runtime bodies through persisted template identity. Historical claims that these paths remain unwired are superseded by the live systems/content docs.
+
+> Audit follow-up (2026-09-08): save version 18 persists floor-clear reward history. Wall-occupying actor restoration, loaded content binding, authored status application, lethal-healing ordering, inventory mouse input gating, and restarted-run turn counters are corrected. See the live tracker and resume report for verification and remaining gaps.
+
 This document is an archived point-in-time improvement spec retained for historical context. It was written for parallel subagents, but current work must use `docs/IMPROVEMENT_SUGGESTIONS.md` and verify every claim against the live repository.
 
 This spec is based on:

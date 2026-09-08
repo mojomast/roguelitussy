@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using Godot;
 using Godotussy;
@@ -22,6 +23,10 @@ public sealed class ToolingTests : ITestSuite
         registry.Add("UI.Tools.Workbench opens from title and gameplay", UIRootOpensWorkbench);
         registry.Add("UI.Tools.Workbench playtests drafts and reloads runtime content", WorkbenchPlaytestsAndReloadsContent);
         registry.Add("UI.Tools.Workbench manages runtime sessions and saves", WorkbenchManagesRuntimeSessionsAndSaves);
+        registry.Add("UI.Tools.Dungeon map exporter writes deterministic PNG", DungeonMapExporterWritesDeterministicPng);
+        registry.Add("UI.Tools.Dungeon map exporter renders high resolution survey", DungeonMapExporterRendersHighResolutionSurvey);
+        registry.Add("UI.Tools.Dungeon map exporter uses repository generation", DungeonMapExporterUsesRepositoryGeneration);
+        registry.Add("UI.Tools.Workbench accepts exact export seed and preserves run", WorkbenchAcceptsExactExportSeedAndPreservesRun);
     }
 
     private static void MapEditorRoundTripsPrefabs()
@@ -302,6 +307,115 @@ public sealed class ToolingTests : ITestSuite
         Expect.True(loaded, "Workbench should be able to load the selected save slot.");
         Expect.Equal(3, context.GameManager.World!.Depth, "Loading from the workshop should restore the saved world depth.");
         Expect.Equal(17, context.GameManager.World.Player.Stats.HP, "Loading from the workshop should restore the saved player state.");
+    }
+
+    private static void DungeonMapExporterWritesDeterministicPng()
+    {
+        var firstDirectory = Path.Combine(Path.GetTempPath(), "roguelitussy-map-export-" + Guid.NewGuid().ToString("N"));
+        var secondDirectory = Path.Combine(Path.GetTempPath(), "roguelitussy-map-export-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var generator = new StubGenerator();
+            var content = new StubContentDatabase();
+            var first = DungeonMapExporter.Export(generator, content, 2468, 7, firstDirectory);
+            var second = DungeonMapExporter.Export(generator, content, 2468, 7, secondDirectory);
+
+            Expect.True(first.Success, first.Message);
+            Expect.True(second.Success, second.Message);
+            Expect.True(File.Exists(first.AbsolutePath), "Exporter should write the requested PNG file.");
+            var firstBytes = File.ReadAllBytes(first.AbsolutePath);
+            var secondBytes = File.ReadAllBytes(second.AbsolutePath);
+            Expect.True(firstBytes.Length > 8, "Exported PNG should contain encoded image data.");
+            Expect.True(firstBytes.Take(8).SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }), "Export should have a valid PNG signature.");
+            Expect.True(firstBytes.SequenceEqual(secondBytes), "The same seed, depth, content, and options should produce identical PNG bytes under the deterministic raster backend.");
+        }
+        finally
+        {
+            DeleteDirectory(firstDirectory);
+            DeleteDirectory(secondDirectory);
+        }
+    }
+
+    private static void DungeonMapExporterRendersHighResolutionSurvey()
+    {
+        var generator = new StubGenerator();
+        var world = new WorldState { ContentDatabase = new StubContentDatabase() };
+        var level = generator.GenerateLevel(world, 1337, 4);
+        var image = DungeonMapExporter.Render(world, level, 1337, 4);
+
+        Expect.Equal(224, image.GetWidth(), "A 10x10 map should include 16-pixel tiles and 32-pixel side margins.");
+        Expect.Equal(384, image.GetHeight(), "Survey output should include map, title, legend, and framing regions.");
+        var mapFloor = image.GetPixel(32 + (2 * DungeonMapExporter.TilePixels) + 8, 32 + 72 + (2 * DungeonMapExporter.TilePixels) + 8);
+        var outerBackground = image.GetPixel(0, 0);
+        Expect.False(mapFloor.Equals(outerBackground), "Map floor should be visually distinct from the survey plate background.");
+    }
+
+    private static void DungeonMapExporterUsesRepositoryGeneration()
+    {
+        var outputDirectory = Path.Combine(Path.GetTempPath(), "roguelitussy-map-export-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var content = ContentLoader.LoadFromRepository(throwOnValidationErrors: false);
+            Expect.True(content.IsValid, "Repository content should load for a real seeded export.");
+            var result = DungeonMapExporter.Export(new DungeonGenerator(), content, 1337, 0, outputDirectory);
+
+            Expect.True(result.Success, result.Message);
+            Expect.Equal(1024, result.Width, "Opening-floor export should render a 60x40 map at 16 pixels per tile plus margins.");
+            Expect.Equal(864, result.Height, "Opening-floor export should include title and legend framing.");
+            Expect.True(new FileInfo(result.AbsolutePath).Length > 1024, "Repository-backed export should contain a nontrivial encoded dungeon image.");
+        }
+        finally
+        {
+            DeleteDirectory(outputDirectory);
+        }
+    }
+
+    private static void WorkbenchAcceptsExactExportSeedAndPreservesRun()
+    {
+        var outputDirectory = Path.Combine(Path.GetTempPath(), "roguelitussy-map-export-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var context = CreateContext();
+            var workbench = new DevToolsWorkbench();
+            workbench.Bind(context.GameManager, context.Bus, context.Content);
+            workbench.Open();
+
+            workbench.HandleKey(Key.Tab);
+            workbench.HandleKey(Key.Tab);
+            workbench.HandleKey(Key.Tab);
+            for (var index = 0; index < 14; index++)
+            {
+                workbench.HandleKey(Key.Down);
+            }
+
+            workbench.HandleKey(Key.Enter);
+            workbench.HandleKey(Key.Two);
+            workbench.HandleKey(Key.Four);
+            workbench.HandleKey(Key.Six);
+            workbench.HandleKey(Key.Eight);
+            workbench.HandleKey(Key.Enter);
+            workbench.HandleKey(Key.Down);
+            workbench.HandleKey(Key.Down);
+            workbench.HandleKey(Key.Enter);
+            workbench.HandleKey(Key.Seven);
+            workbench.HandleKey(Key.Enter);
+
+            var activeWorld = context.GameManager.World;
+            var activePosition = context.Player.Position;
+            var activeDepth = activeWorld!.Depth;
+            var result = workbench.ExportPendingDungeonMap(outputDirectory);
+
+            Expect.True(result.Success, result.Message);
+            Expect.True(workbench.SummaryText.Contains("Seed / export seed: 2468", StringComparison.Ordinal), "Typed seed should be committed to the Commands tab.");
+            Expect.True(workbench.SummaryText.Contains("Floor / export depth: 7", StringComparison.Ordinal), "Typed depth should be committed to the Commands tab.");
+            Expect.True(ReferenceEquals(activeWorld, context.GameManager.World), "Detached export should not replace the active world.");
+            Expect.Equal(activeDepth, context.GameManager.World!.Depth, "Detached export should not travel the active run.");
+            Expect.Equal(activePosition, context.Player.Position, "Detached export should not move the player.");
+        }
+        finally
+        {
+            DeleteDirectory(outputDirectory);
+        }
     }
 
     private static ToolContext CreateContext()

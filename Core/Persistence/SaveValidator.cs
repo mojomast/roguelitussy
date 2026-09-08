@@ -26,6 +26,23 @@ public static class SaveValidator
             errors.Add("PlayerId is required.");
         }
 
+        if (data.RewardedFloorDepths is null)
+        {
+            errors.Add("Rewarded floor depths must not be null.");
+        }
+        else
+        {
+            var knownDepths = data.Floors.Count > 0 ? data.Floors.Select(floor => floor.Depth).ToHashSet() : new HashSet<int> { data.Depth };
+            var rewardedDepths = new HashSet<int>();
+            foreach (var depth in data.RewardedFloorDepths)
+            {
+                if (depth < 0 || !knownDepths.Contains(depth) || !rewardedDepths.Add(depth))
+                {
+                    errors.Add($"Invalid or duplicate rewarded floor depth {depth}.");
+                }
+            }
+        }
+
         if (data.Floors.Count > 0)
         {
             ValidateFloors(data, errors);

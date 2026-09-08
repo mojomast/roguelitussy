@@ -88,7 +88,7 @@ public sealed class AttackAction : IAction
         // Process on-hit effects before kill check
         if (target.Stats.HP > 0 && weapon is not null)
         {
-            var onHitApplied = world.CombatResolver.ProcessOnHitEffects(target, weapon, ActorId);
+            var onHitApplied = world.CombatResolver.ProcessOnHitEffects(target, weapon, ActorId, world.ContentDatabase);
             foreach (var effect in onHitApplied)
             {
                 statusEffectsApplied.Add(effect);

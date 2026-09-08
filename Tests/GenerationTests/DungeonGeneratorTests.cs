@@ -28,6 +28,10 @@ public sealed class DungeonGeneratorTests : ITestSuite
         registry.Add("Generation.Floor theme constrains prefab selection", FloorThemeConstrainsPrefabSelection);
         registry.Add("Generation.Fallback when theme has few matching prefabs", FallbackWhenThemeHasFewMatchingPrefabs);
         registry.Add("Generation.Locked doors block rooms and keys are reachable", LockedDoorsBlockRoomsAndKeysAreReachable);
+        registry.Add("Generation.Initial depth uses authored start room", InitialDepthUsesAuthoredStartRoom);
+        registry.Add("Generation.RoomPlacer avoids prefab repeats while alternatives fit", RoomPlacerAvoidsPrefabRepeats);
+        registry.Add("Generation.RoomPlacer guarantees a seed profile room", RoomPlacerGuaranteesProfileRoom);
+        registry.Add("Generation.CorridorBuilder varies corridor silhouettes", CorridorBuilderVariesCorridorSilhouettes);
     }
 
     private static void SameSeedProducesSameLevel()
@@ -604,6 +608,91 @@ public sealed class DungeonGeneratorTests : ITestSuite
         Expect.True(reachable.Contains(keySpawns[0]), "Key spawn should be reachable from the player start before unlocking.");
         Expect.False(reachable.Contains(new Position(6, 2)), "Locked room should not be reachable before unlocking.");
     }
+
+    private static void InitialDepthUsesAuthoredStartRoom()
+    {
+        var content = ContentLoader.LoadFromRepository(throwOnValidationErrors: false);
+        Expect.True(content.IsValid, "Content should load for initial-depth generation.");
+
+        var world = new WorldState { ContentDatabase = content };
+        var level = new DungeonGenerator().GenerateLevel(world, 24680, 0);
+
+        Expect.Equal("start_room", level.Rooms[0].PrefabId ?? string.Empty, "Depth zero should normalize to the authored first-floor prefab range.");
+        Expect.True(level.Rooms[0].Tags?.Contains("start") == true, "The first room should deliberately use the authored start role.");
+        Expect.Equal(level.Rooms[0].Center.X, level.Rooms[0].X + (level.Rooms[0].Width / 2), "Start room metadata should remain coherent.");
+    }
+
+    private static void RoomPlacerAvoidsPrefabRepeats()
+    {
+        var root = BSPNode.Create(60, 40, new Random(44));
+        var world = new WorldState();
+        world.InitGrid(60, 40);
+        var prefabs = new[]
+        {
+            CreateSimplePrefab("room_a", "prison"),
+            CreateSimplePrefab("room_b", "prison"),
+            CreateSimplePrefab("room_c", "prison"),
+            CreateSimplePrefab("room_d", "prison"),
+        };
+
+        var rooms = RoomPlacer.PlaceRooms(root, world, new Random(19), prefabs, "prison");
+        var firstCycle = rooms.Take(Math.Min(prefabs.Length, rooms.Count)).Select(room => room.Room.PrefabId).ToArray();
+
+        Expect.Equal(firstCycle.Length, firstCycle.Distinct().Count(), "Prefab selection should consume fitting alternatives before repeating a room.");
+    }
+
+    private static void RoomPlacerGuaranteesProfileRoom()
+    {
+        var root = BSPNode.Create(60, 40, new Random(81));
+        var world = new WorldState();
+        world.InitGrid(60, 40);
+        var prefabs = new[]
+        {
+            CreateSimplePrefab("start", "start", "prison"),
+            CreateSimplePrefab("plain_a", "prison"),
+            CreateSimplePrefab("plain_b", "prison"),
+            CreateSimplePrefab("treasure_landmark", "prison", "loot"),
+        };
+
+        var rooms = RoomPlacer.PlaceRooms(root, world, new Random(23), prefabs, "prison", profileTag: "loot");
+
+        Expect.Equal("start", rooms[0].Room.PrefabId ?? string.Empty, "The first leaf should reserve a fitting start room.");
+        Expect.True(rooms.Skip(1).Any(room => room.Room.Tags?.Contains("loot") == true), "A fitting seed-profile room should be guaranteed outside the start room.");
+    }
+
+    private static void CorridorBuilderVariesCorridorSilhouettes()
+    {
+        var signatures = new HashSet<string>();
+        for (var seed = 0; seed < 30; seed++)
+        {
+            var world = new WorldState();
+            world.InitGrid(16, 14);
+            for (var y = 0; y < world.Height; y++)
+            {
+                for (var x = 0; x < world.Width; x++)
+                {
+                    world.SetTile(new Position(x, y), TileType.Wall);
+                }
+            }
+
+            CorridorBuilder.ConnectVaried(world, new Position(2, 2), new Position(12, 10), new Random(seed));
+            signatures.Add(GetWorldSignature(world));
+        }
+
+        Expect.True(signatures.Count >= 3, "Seeded corridors should include both L orientations and at least one dogleg silhouette.");
+    }
+
+    private static RoomPrefab CreateSimplePrefab(string id, params string[] tags) => new(
+        id,
+        new[]
+        {
+            "#######",
+            "#.....#",
+            "+.....+",
+            "#.....#",
+            "#######",
+        },
+        DefinedTags: tags);
 
     private static string GetWorldSignature(WorldState world)
     {

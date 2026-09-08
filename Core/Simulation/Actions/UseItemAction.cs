@@ -124,7 +124,15 @@ public sealed class UseItemAction : IAction
         {
             var duration = ResolveModifier(Template.StatModifiers, "duration", 3);
             var magnitude = ResolveModifier(Template.StatModifiers, "magnitude", 1);
-            StatusEffectProcessor.ApplyEffect(actor, effectType, duration, magnitude);
+            if (world.ContentDatabase is { } content)
+            {
+                StatusEffectProcessor.ApplyEffect(actor, effectType, content, duration, magnitude);
+            }
+            else
+            {
+                StatusEffectProcessor.ApplyEffect(actor, effectType, duration, magnitude);
+            }
+
             var applied = StatusEffectProcessor.GetEffect(actor, effectType);
             if (applied is not null)
             {

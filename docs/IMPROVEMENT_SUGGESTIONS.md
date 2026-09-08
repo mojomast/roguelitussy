@@ -2,7 +2,7 @@
 
 > Generated from a parallel review pass of 16 focused subagents across combat, items, abilities, status effects, AI, progression, identity, UI/UX, inventory, save/load determinism, tools, dungeon generation, onboarding, game feel, performance, and test/CI quality.
 >
-> Last updated: 2026-07-18
+> Last updated: 2026-09-08
 
 > Update 2026-07-02: Wave 1 roguelite foundations are partially implemented outside the original improvement table: content-backed synergies, ascension modifiers, daily modifiers, narrative templates, factions, boss phase state, deterministic daily seed helpers, run epitaph generation, faction reputation state, and save version 15 persistence. Wave 2 presentation/feel/content-expansion tasks remain open unless their existing table row says otherwise.
 
@@ -10,7 +10,20 @@
 
 > Update 2026-07-18 relic lifecycle: save version 17 persists cumulative applied relic-stat totals. Bone Amulet/Soul Collector use resulting kill counts, Glass Cannon applies once, Warlord's Crest applies only missing capped depth progress, and floor/rest hook messages reach EventBus. Remaining authored relic mismatches are rest cadence, Shadow Step, Echo Shard, and Merchant Badge cached-floor pricing.
 
+> Update 2026-07-31 map tooling: the Developer Workshop can export any positive seed and depth 0-999 as a deterministic high-resolution dungeon survey PNG without mutating the active run. The exporter includes themed terrain, room/spawn annotations, title/legend framing, deterministic PNG tests, and exact typed Commands-tab seed/depth entry.
+
 ## How Worker Subagents Should Use This Document
+
+### Audit Checkpoint - 2026-09-08
+
+- Done: save version 18 persists floor-clear reward eligibility, replaces previous-session history on load, and conservatively migrates empty legacy floors as already rewarded.
+- Done: actors saved inside walls after phasing restore on active/cached floors; Core loads bind supplied content so trap/status behavior remains active.
+- Done: abilities, consumables, and melee/ranged on-hit statuses honor authored stacking/refresh rules; regeneration and ability self-healing cannot undo lethal damage.
+- Done: inventory mouse closes/actions refresh the gameplay input gate while aimed-item targeting stays modal; restarted runs start at turn zero.
+- Done (follow-up): random boss markers select boss-tagged templates at the actual depth, ordinary slots exclude bosses, and explicit fixed IDs remain overrides. Enemy rendering consumes authored sprite paths through persisted template identity with safe texture fallbacks.
+- Still open: authored status tick timing/expire hooks, line/cone ability targeting, functional shrine/curse population, remaining relic semantics, lock/key exhaustion, and incremental GameManager extraction. These were not treated as permission for a broad rewrite during the correctness audit.
+
+### Worker Workflow
 
 1. Pick a suggestion by ID. Each suggestion is scoped to a focused, implementable change.
 2. Read the **Target files**, **Why it improves the game**, and **Acceptance criteria** before writing code.
@@ -94,7 +107,7 @@
 | TOL-5 | Add room metadata editing to the Rooms tab | P1 | Tools / Workflow | open |
 | GEN-1 | Implement authored traps and hazard tiles | P0 | Generation | done |
 | GEN-2 | Add themed floor sets via prefab tag filtering | P1 | Generation | done |
-| GEN-3 | Guarantee one landmark special room per floor | P1 | Generation | open |
+| GEN-3 | Guarantee one landmark special room per floor | P1 | Generation | partial |
 | GEN-4 | Implement locked doors and key placement | P1 | Generation | done |
 | GEN-5 | Clean up and expand the prefab library | P1 | Generation | open |
 | ONB-1 | Add a "First Delve" welcome message to combat log | P1 | Onboarding | open |
@@ -1131,6 +1144,7 @@
 ### GEN-3 — Guarantee one landmark special room per floor
 
 - **Priority:** P1
+- **Status:** partial. Generation now reserves one fitting non-start room from a deterministic seed-derived functional profile (`combat`, `loot`, `hazard`, `open`, or `ambush`), records prefab IDs in `RoomData`, and avoids prefab repeats while alternatives fit. The stricter landmark-specific requirement, farthest/side-branch placement, and exactly-one `landmark` content tagging remain open.
 - **Target files:**
   - `Core/Generation/DungeonGenerator.cs`
   - `Core/Generation/RoomPrefab.cs` / `RoomPrefabLibrary.cs`

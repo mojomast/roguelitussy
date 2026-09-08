@@ -116,11 +116,16 @@ The repository contains targeted suites for:
 - Wave 2 roguelite integration, including requested content IDs/reachability, critical/floor-clear/reputation/synergy event presentation through existing UI surfaces, daily title entry, ascension shop-price wiring, and save serialization for boss phase/faction/synergy payloads
 - architecture smoke coverage
 - save version 17 migration, v16 scheduler-zero preservation/Warlord baseline migration, relic hook/applied-stat round trips, stricter component validation, and corrupt meta/daily recovery
-- generation boss/safe precedence, deep-floor scaling, locked-room keys, themed traps, start-room exclusion, ragged prefabs, and content-backed depth sweeps
+- generation boss/safe precedence, deep-floor scaling, locked-room keys, themed traps, authored initial start rooms, seed-profile room reservation, no-repeat prefab pools, varied corridor silhouettes, start-room exclusion, ragged prefabs, and content-backed depth sweeps
+- deterministic dungeon survey export, including PNG signature/byte stability, high-resolution dimensions, exact workshop seed/depth entry, and active-run preservation
 - AI group aggro/profile corrections, patrol reachability, and occupied-corridor pathfinding
 - canonical sourced/unsourced status-death game over, player retention, skipped-turn action suppression/output propagation, typed DoT combat events, and relic damage hooks
 - exact Bone Amulet/Soul Collector kill milestones, one-time Glass Cannon application, delta-based capped Warlord bonuses, and floor/rest hook log forwarding
 - attack/death animation, critical/miss/heal/pickup feedback, and SVG/import metadata conventions
+- audit regressions for wall-occupying actor restoration, Core content binding and trap RNG continuation, authored status application, lethal-healing ordering, mouse inventory input gates, and restart/floor-travel turn counters
+- save version 18 floor-clear reward round trips, fresh/same-manager reloads, cached-floor revisits, malformed reward metadata, and legacy versions 1-17 migration with v17 scheduler/relic preservation
+- authored enemy texture projection and rendering for the full roster, identity-over-name priority, missing import/source fallbacks, content rebinding, and stable visual-node reuse
+- public GameManager boss population at actual depths, ordinary-slot boss exclusion, fixed-template overrides, unknown/empty pools, and deterministic selection across seeds
 
 Asset convention tests expect source PNG/SVG assets and their committed `.import` sidecars to remain paired. They are static checks; asset deletion or import changes still require the real Godot editor import/startup smoke.
 
@@ -132,6 +137,8 @@ Asset convention tests expect source PNG/SVG assets and their committed `.import
 4. Prefer focused tests around one subsystem or regression.
 
 Stub-backed tests may rely on the harness-level reset for shared Godot stub state, but each test should still set up its own required scene/input/resource state explicitly.
+
+The Godot compatibility `Image` stub includes deterministic RGBA raster operations and PNG encoding so exporter tests validate a real PNG structure rather than only a requested path. The normal real-Godot build also compiles `DungeonMapExporter` against Godot 4.5.2 APIs; visual inspection in the playable shell remains useful for palette and annotation quality.
 
 When changing simulation, persistence, generation, or content loading, add or update tests in the same change.
 

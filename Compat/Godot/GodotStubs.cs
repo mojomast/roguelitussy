@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 
 namespace Godot;
@@ -47,10 +48,14 @@ public enum Key
     Three,
     Four,
     Five,
+    Zero,
     Six,
     Seven,
     Eight,
     Nine,
+    Backspace,
+    Delete,
+    Key0 = Zero,
     Key1 = One,
     Key2 = Two,
     Key3 = Three,
@@ -111,6 +116,10 @@ public class Node : GodotObject
     public IReadOnlyList<Node> GetChildren() => _children;
 
     public virtual void _Ready()
+    {
+    }
+
+    public virtual void _ExitTree()
     {
     }
 
@@ -442,9 +451,32 @@ public class Texture2D : GodotObject
 
 public class Image : GodotObject
 {
+    public enum Format
+    {
+        Rgba8,
+    }
+
     public static HashSet<string> MissingImagePaths { get; } = new(StringComparer.Ordinal);
 
+    private Color[] _pixels = Array.Empty<Color>();
+
     public string Path { get; private set; } = string.Empty;
+
+    public int Width { get; private set; }
+
+    public int Height { get; private set; }
+
+    public static Image CreateEmpty(int width, int height, bool useMipmaps, Format format)
+    {
+        _ = useMipmaps;
+        _ = format;
+        return new Image
+        {
+            Width = Math.Max(0, width),
+            Height = Math.Max(0, height),
+            _pixels = new Color[Math.Max(0, width) * Math.Max(0, height)],
+        };
+    }
 
     public static Image? LoadFromFile(string path)
     {
@@ -456,7 +488,140 @@ public class Image : GodotObject
         return new Image { Path = path };
     }
 
-    public bool IsEmpty() => string.IsNullOrWhiteSpace(Path);
+    public bool IsEmpty() => Width <= 0 && Height <= 0 && string.IsNullOrWhiteSpace(Path);
+
+    public int GetWidth() => Width;
+
+    public int GetHeight() => Height;
+
+    public void Fill(Color color)
+    {
+        Array.Fill(_pixels, color);
+    }
+
+    public void FillRect(Rect2I rect, Color color)
+    {
+        var startX = Math.Clamp(rect.Position.X, 0, Width);
+        var startY = Math.Clamp(rect.Position.Y, 0, Height);
+        var endX = Math.Clamp(rect.Position.X + rect.Size.X, 0, Width);
+        var endY = Math.Clamp(rect.Position.Y + rect.Size.Y, 0, Height);
+        for (var y = startY; y < endY; y++)
+        {
+            for (var x = startX; x < endX; x++)
+            {
+                _pixels[(y * Width) + x] = color;
+            }
+        }
+    }
+
+    public void SetPixel(int x, int y, Color color)
+    {
+        if (x >= 0 && x < Width && y >= 0 && y < Height)
+        {
+            _pixels[(y * Width) + x] = color;
+        }
+    }
+
+    public Color GetPixel(int x, int y) => x >= 0 && x < Width && y >= 0 && y < Height
+        ? _pixels[(y * Width) + x]
+        : Colors.Transparent;
+
+    public Error SavePng(string path)
+    {
+        try
+        {
+            var absolutePath = ProjectSettings.GlobalizePath(path);
+            Directory.CreateDirectory(System.IO.Path.GetDirectoryName(absolutePath) ?? Directory.GetCurrentDirectory());
+            using var output = File.Create(absolutePath);
+            output.Write(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 });
+            WriteChunk(output, "IHDR", BuildHeader());
+
+            using var raw = new MemoryStream();
+            for (var y = 0; y < Height; y++)
+            {
+                raw.WriteByte(0);
+                for (var x = 0; x < Width; x++)
+                {
+                    var color = _pixels[(y * Width) + x];
+                    raw.WriteByte(ToByte(color.R));
+                    raw.WriteByte(ToByte(color.G));
+                    raw.WriteByte(ToByte(color.B));
+                    raw.WriteByte(ToByte(color.A));
+                }
+            }
+
+            raw.Position = 0;
+            using var compressed = new MemoryStream();
+            using (var zlib = new ZLibStream(compressed, CompressionLevel.Optimal, leaveOpen: true))
+            {
+                raw.CopyTo(zlib);
+            }
+
+            WriteChunk(output, "IDAT", compressed.ToArray());
+            WriteChunk(output, "IEND", Array.Empty<byte>());
+            Path = path;
+            return Error.Ok;
+        }
+        catch
+        {
+            return Error.Failed;
+        }
+    }
+
+    private byte[] BuildHeader()
+    {
+        var data = new byte[13];
+        WriteBigEndian(data, 0, Width);
+        WriteBigEndian(data, 4, Height);
+        data[8] = 8;
+        data[9] = 6;
+        return data;
+    }
+
+    private static void WriteChunk(Stream output, string type, byte[] data)
+    {
+        var typeBytes = System.Text.Encoding.ASCII.GetBytes(type);
+        WriteBigEndian(output, data.Length);
+        output.Write(typeBytes);
+        output.Write(data);
+        var crcInput = new byte[typeBytes.Length + data.Length];
+        Buffer.BlockCopy(typeBytes, 0, crcInput, 0, typeBytes.Length);
+        Buffer.BlockCopy(data, 0, crcInput, typeBytes.Length, data.Length);
+        WriteBigEndian(output, unchecked((int)ComputeCrc32(crcInput)));
+    }
+
+    private static uint ComputeCrc32(byte[] data)
+    {
+        var crc = 0xffffffffu;
+        foreach (var value in data)
+        {
+            crc ^= value;
+            for (var bit = 0; bit < 8; bit++)
+            {
+                crc = (crc >> 1) ^ (0xedb88320u & (uint)-(int)(crc & 1));
+            }
+        }
+
+        return ~crc;
+    }
+
+    private static byte ToByte(float value) => (byte)Math.Clamp((int)MathF.Round(value * 255f), 0, 255);
+
+    private static void WriteBigEndian(Stream output, int value)
+    {
+        output.WriteByte((byte)(value >> 24));
+        output.WriteByte((byte)(value >> 16));
+        output.WriteByte((byte)(value >> 8));
+        output.WriteByte((byte)value);
+    }
+
+    private static void WriteBigEndian(byte[] output, int offset, int value)
+    {
+        output[offset] = (byte)(value >> 24);
+        output[offset + 1] = (byte)(value >> 16);
+        output[offset + 2] = (byte)(value >> 8);
+        output[offset + 3] = (byte)value;
+    }
 }
 
 public class ImageTexture : Texture2D
@@ -610,10 +775,6 @@ public class EditorPlugin : Node
     {
     }
 
-    public virtual void _ExitTree()
-    {
-    }
-
     protected void AddControlToBottomPanel(Control control, string title)
     {
         if (!_bottomPanelControls.Contains(control))
@@ -638,8 +799,23 @@ public static class ProjectSettings
             return Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), relativePath));
         }
 
+        if (path.StartsWith("user://", StringComparison.Ordinal))
+        {
+            var relativePath = path[7..].Replace('/', Path.DirectorySeparatorChar);
+            return Path.GetFullPath(Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "godotussy",
+                relativePath));
+        }
+
         return Path.GetFullPath(path);
     }
+}
+
+public enum Error
+{
+    Ok = 0,
+    Failed = 1,
 }
 
 public static class FileAccess
@@ -710,6 +886,19 @@ public readonly struct Rect2
     public Vector2 Position { get; }
 
     public Vector2 Size { get; }
+}
+
+public readonly struct Rect2I
+{
+    public Rect2I(int x, int y, int width, int height)
+    {
+        Position = new Vector2I(x, y);
+        Size = new Vector2I(width, height);
+    }
+
+    public Vector2I Position { get; }
+
+    public Vector2I Size { get; }
 }
 
 public readonly struct Color

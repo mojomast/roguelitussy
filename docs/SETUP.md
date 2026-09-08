@@ -64,7 +64,7 @@ The workshop currently supports four runtime tabs:
 - `Rooms` for creating, loading, previewing, editing, validating, saving, and playtesting room prefab drafts
 - `Items` for scaffolding and tuning item templates before saving `items.json`, then dropping the selected runtime item into the current run
 - `Enemies` for scaffolding and tuning enemy templates before saving `enemies.json`, then spawning the selected enemy near the player
-- `Commands` for seeded run control, save/load slot management, heal/reveal runtime helpers, floor travel, player teleport, reloading tool data, reloading runtime content from disk, validating content, and jumping into the debug console
+- `Commands` for seeded run control, save/load slot management, heal/reveal runtime helpers, floor travel, player teleport, high-resolution seeded dungeon-map export, reloading tool/runtime data, validating content, and jumping into the debug console
 
 Core controls inside the workshop:
 
@@ -74,7 +74,11 @@ Core controls inside the workshop:
 - `Enter` applies the selected action
 - `Esc` or `T` closes the workshop
 
+Press `Enter` on the Commands tab's seed or floor row to type an exact integer. Use `Backspace`/`Delete` while editing, `Enter` to commit, and `Escape` to cancel the edit.
+
 If you are iterating on gameplay content, the usual flow is save the draft, reload runtime content from the `Commands` tab, and then use room playtest or the item/enemy runtime actions to verify the result immediately. The same tab now also covers quick seeded restart, save/load slot checks, full-heal recovery, floor jumps, teleporting, and map reveal/reset when you want to keep iteration inside the running app.
+
+For a seeded map plate, set `Seed / export seed` and `Floor / export depth`, then activate `Export dungeon map PNG`. The file is written under `user://map_exports`; the success log includes its native path. Export generation is detached from the current expedition and works with packaged `res://Content` because it uses the already-loaded runtime content database.
 
 ## Editor Plugin
 

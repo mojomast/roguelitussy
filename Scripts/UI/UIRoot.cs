@@ -106,6 +106,8 @@ public partial class UIRoot : CanvasLayer
         HUD.InteractionPromptActivated += OnInteractionPromptActivated;
         CombatLog.Bind(_gameManager, _eventBus);
         Inventory.Bind(_gameManager, _eventBus, _content, Tooltip, TargetingOverlay);
+        Inventory.OpenStateChanged -= RefreshInputGate;
+        Inventory.OpenStateChanged += RefreshInputGate;
         CharacterSheet.Bind(_gameManager, _eventBus, _content);
         LevelUpOverlay.Bind(_gameManager);
         DialogUI.ShopRequested -= OpenShopFromDialog;
@@ -208,6 +210,11 @@ public partial class UIRoot : CanvasLayer
 
         UpdateLevelUpOverlay();
         RefreshInputGate();
+    }
+
+    public override void _ExitTree()
+    {
+        Inventory.OpenStateChanged -= RefreshInputGate;
     }
 
     public override void _UnhandledInput(InputEvent @event)

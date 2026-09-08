@@ -97,7 +97,7 @@ public sealed class RangedAttackAction : IAction
         var statusEffectsApplied = new System.Collections.Generic.List<StatusEffectInstance>();
         if (target.Stats.HP > 0 && weapon is not null)
         {
-            var onHitApplied = world.CombatResolver.ProcessOnHitEffects(target, weapon, ActorId);
+            var onHitApplied = world.CombatResolver.ProcessOnHitEffects(target, weapon, ActorId, world.ContentDatabase);
             foreach (var effect in onHitApplied)
             {
                 statusEffectsApplied.Add(effect);

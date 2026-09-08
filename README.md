@@ -8,6 +8,10 @@ The July 2026 stabilization checkpoint advances saves to version 17, persists be
 
 ## Quick Start
 
+The September 2026 audit advances saves to version 18 and fixes wall-occupying actor restoration, Core load content binding, floor-clear reward persistence, authored status application, lethal-healing ordering, mouse inventory input gating, and new-run turn reset. Migration policy and verification details are in `docs/SYSTEMS.md` and `DEVELOPMENT_RESUME_REPORT.md`.
+
+The follow-up wires authored enemy sprites through saved template identity and restricts random boss markers to eligible boss-tagged enemies at the actual floor depth. Ordinary random slots exclude bosses; explicit template overrides and missing-art fallbacks remain supported.
+
 1. Install .NET 8 SDK.
    If a system package is unavailable, the Microsoft user-local installer works for this repo; set `DOTNET_ROOT=$HOME/.dotnet` and put `$HOME/.dotnet` on `PATH` before running the commands below.
 2. Install Godot 4.5.2 Mono/.NET if you want to open or run the game inside the editor.
@@ -28,13 +32,15 @@ The July 2026 stabilization checkpoint advances saves to version 17, persists be
 
 6. Launch the playable shell and use the built-in developer workshop from the title screen or pause menu if you want to author rooms and content without opening the Godot editor.
 
+   The workshop's `Commands` tab can also export any positive seed and depth as a complete 16-pixel-per-tile PNG under `user://map_exports`, without replacing an active run.
+
 ## What This Project Contains
 
 - A pure C# simulation layer for entities, actions, combat, abilities, inventory, AI, generation, and persistence.
 - Godot-side autoloads and presentation scripts for UI, rendering, and debug/editor tooling.
 - Layered 0x72 world rendering with contextual wall caps, trims, and sprite-backed entity presentation for the current enemy roster.
 - SVG-backed item/status icon source art and content-path validation for authored `res://` visuals.
-- An in-app developer workshop for creating room drafts and scaffolding item/enemy content directly from the runtime shell.
+- An in-app developer workshop for creating room drafts, scaffolding item/enemy content, and exporting deterministic high-resolution dungeon survey PNGs directly from the runtime shell.
 - JSON-driven content for items, enemies, abilities, status effects, loot tables, room prefabs, perks, NPCs, dialogs, relics, floor events, synergies, ascension modifiers, daily modifiers, narrative templates, factions, and meta upgrades.
 - Save/load infrastructure with validation and migration support for progression and identity state.
 - A custom test runner covering simulation, AI, generation, content, persistence, rendering, UI, and integration flows.

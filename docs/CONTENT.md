@@ -137,6 +137,8 @@ Recognized `ai_params` keys are:
 
 Enemy speed values should stay on the engine's current 100-based scale.
 
+The `boss` tag controls random spawn eligibility: boss markers use only boss-tagged templates at the actual depth, while ordinary markers exclude them. A valid fixed spawn template ID remains an explicit override of both depth and marker restrictions. Unknown fixed IDs use the matching random pool, and empty pools produce no enemy rather than a deeper/ordinary fallback.
+
 Boss enemies may declare `boss_phase_data`. Each phase entry includes `phase`, `threshold` as an HP fraction, optional `ability_id`, `stat_boost`, `status_effect`, and `message`. Referenced abilities and statuses must exist; triggered phase state persists in save version 16. The current catalog includes the phased `boss_magma_titan`.
 
 ### Abilities And Status Effects
@@ -146,6 +148,8 @@ When linking abilities or status effects from other content, make sure the refer
 Supported ability targeting types currently in runtime use are `self`, `single`, `tile`, and `aoe_circle`. Supported effect types currently executed by the runtime are `damage`, `apply_status`, `teleport`, and `heal_self`. Targeting is validated by `CastAbilityAction`; keep content targeting definitions precise so direct casts and item-delegated casts behave the same way. For harmful area damage or harmful statuses, `hits_allies: false` defaults unfiltered effects to enemies only, while explicit effect filters and `hits_allies: true` preserve broader targeting.
 
 Status-effect runtime behavior currently includes authored corroded stacking up to three stacks, burning/frozen mutual removal on apply, `blinded` as an accuracy-reducing combat status, `regenerating` healing ticks, and the `flying` avoidance flag. Status effects applied by melee on-hit effects or abilities retain source attribution for delayed poison/burning kill credit and save/load round-trips.
+
+Ability, consumable, and melee/ranged weapon status application all honor authored `stackable`, `max_stacks`, and `refresh_duration` rules. In particular, repeated poison applications do not add stacks when authored non-stackable, and stun/frozen applications do not extend duration when refresh is disabled. Content-free test worlds retain legacy fallbacks.
 
 Daily modifier `effect_type` values are validated against `shop_discount`, `elite_every_floor`, `curse_every_floor`, `speed_score`, `starting_relic`, `boss_hp_boost`, and `double_rewards`. Status tick effects may use `damage` or `heal`; only damage ticks require a valid damage type.
 
@@ -190,9 +194,11 @@ Each room should include `tags` that describe its role and, for procedural floor
 
 When a floor has at least four theme-matching prefabs that fit the BSP leaves, the generator prefers those prefabs; otherwise it falls back to all valid prefabs. Tag rooms with the appropriate theme(s) (`prison`, `crypt`, `magma`) plus functional tags such as `combat`, `loot`, `hazard`, or `boss` so the theme filter can select them.
 
+The run's initial depth (`0`) uses depth-one prefab eligibility. A fitting room tagged `start` is reserved for the first BSP leaf when available. Each generated attempt also derives one floor profile from its seed and reserves a non-start room carrying one of the existing `combat`, `loot`, `hazard`, `open`, or `ambush` tags when a fitting prefab exists. Within fitting theme/role pools, the placer uses every available prefab ID before repeating one. These rules make functional tags affect both coherent depth themes and seed-specific floor character without requiring seed-specific content files.
+
 When a room has `lock_doors_on_enter: true` (typically arenas, vaults, or boss rooms), the generator converts its connecting door tiles into locked doors and attempts to place one `dungeon_key` per locked room in reachable non-locked rooms. The player must pick up a key and use it via `OpenDoorAction` to unlock a door permanently. Candidate exhaustion remains a known generation validation gap.
 
-Functional tags such as `boss`, `shrine`, and `curse` can be requested by floor-event planning and influence placement. Placement is currently best-effort, and shrine/curse spawn semantics are not yet fully projected into generated world entities.
+Functional tags such as `boss`, `shrine`, and `curse` can be requested by floor-event planning and take priority over the seed-derived floor profile. Placement is currently best-effort, and shrine/curse spawn semantics are not yet fully projected into generated world entities.
 
 ## Validation Workflow
 
@@ -208,7 +214,7 @@ Authored item, enemy, trap, and status-effect visual paths are also audited by t
 
 Current item, status, and trap icons are simple limited-palette SVG source files under `Assets/Sprites/items/`, `Assets/Sprites/ui/`, and `Assets/Sprites/objects/`. SVGs must use an explicit transparent 32x32 canvas without XML prologs or opaque backgrounds; status icons use the shared circular badge convention. Commit matching `.svg.import` sidecars. Tests reject missing/orphaned sidecars, duplicate import UIDs, and sidecars that reference the wrong source. Run the Godot headless editor import after changing assets so ignored `.godot/imported` cache files can be regenerated locally.
 
-Enemy `sprite_path` values are validated for existence, but runtime enemy rendering still selects art through `WorldArtCatalog` display-name mappings. Treat authored paths as validated content metadata until that renderer gap is closed.
+Enemy `sprite_path` values are projected into runtime templates and consumed by `EntityRenderer` through the entity's saved `EnemyComponent.TemplateId`. Authored paths take precedence over display-name mappings, including when names change. Missing identity/content, blank paths, or failed imported/source-image loads retain the existing name-based or procedural fallback. Sprite metadata is not duplicated in saves; save version 18 remains unchanged.
 
 ## Godot Tooling And Content
 

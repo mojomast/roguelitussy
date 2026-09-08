@@ -23,6 +23,38 @@ public sealed class ItemAbilityRuntimeTests : ITestSuite
         registry.Add("Simulation.Items UseItemAction out of range returns blocked", UseItemActionOutOfRangeReturnsBlocked);
         registry.Add("Simulation.Items content flags aimed scrolls as requiring target selection", ContentFlagsAimedScrollsAsRequiringTargetSelection);
         registry.Add("Simulation.Items content validation rejects mismatched cast ability target", ContentValidationRejectsMismatchedCastAbilityTarget);
+        registry.Add("Simulation.Items authored statuses honor stacking and refresh", () => ItemStatusRulesFollowContent(true));
+        registry.Add("Simulation.Items content-free statuses preserve legacy rules", () => ItemStatusRulesFollowContent(false));
+    }
+
+    private static void ItemStatusRulesFollowContent(bool withContent)
+    {
+        var world = CreateWorld(LoadContent());
+        if (!withContent)
+        {
+            world.ContentDatabase = null;
+        }
+
+        var actor = CreateActor(new Position(2, 2));
+        world.Player = actor;
+        world.AddEntity(actor);
+        StatusEffectProcessor.ApplyEffect(actor, StatusEffectType.Stunned, 1);
+        foreach (var status in new[] { "poisoned", "stunned" })
+        {
+            var template = new ItemTemplate("test_" + status, "Status Potion", "", ItemCategory.Consumable, EquipSlot.None,
+                new Dictionary<string, int> { ["duration"] = 3 }, "apply_status:" + status, -1, 5, "common");
+            var item = AddItem(actor, template.TemplateId);
+            item.StackCount = 2;
+            var action = new UseItemAction(actor.Id, item.InstanceId, template);
+            Expect.Equal(ActionResult.Success, action.Execute(world).Result, "First potion should succeed");
+            Expect.Equal(ActionResult.Success, action.Execute(world).Result, "Second potion should succeed");
+            Expect.False(actor.GetComponent<InventoryComponent>()!.Contains(item.InstanceId), "Both potions should be consumed");
+        }
+
+        Expect.Equal(withContent ? 1 : 2, StatusEffectProcessor.GetMagnitude(actor, StatusEffectType.Poisoned),
+            "Item-applied poison must follow content stacking rules");
+        Expect.Equal(withContent ? 1 : 3, StatusEffectProcessor.GetEffect(actor, StatusEffectType.Stunned)!.RemainingTurns,
+            "Item-applied stun must follow content refresh rules");
     }
 
     private static void ContentHealthPotionHealsAuthoredAmount()

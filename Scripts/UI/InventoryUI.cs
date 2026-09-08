@@ -70,6 +70,8 @@ public partial class InventoryUI : Control
 
     public int SelectedIndex { get; private set; }
 
+    public event System.Action? OpenStateChanged;
+
     public string SortLabel => CurrentSort.ToString();
 
     public string GridText { get; private set; } = string.Empty;
@@ -172,6 +174,7 @@ public partial class InventoryUI : Control
 
     public void Open()
     {
+        var wasVisible = Visible;
         Visible = true;
         RefreshFromWorld();
         SelectedIndex = 0;
@@ -179,13 +182,22 @@ public partial class InventoryUI : Control
         UpdateDescription();
         UpdateGrid();
         RefreshVisualState();
+        if (!wasVisible)
+        {
+            OpenStateChanged?.Invoke();
+        }
     }
 
     public void Close()
     {
+        var wasVisible = Visible;
         Visible = false;
         HideActiveTooltip();
         RefreshVisualState();
+        if (wasVisible)
+        {
+            OpenStateChanged?.Invoke();
+        }
     }
 
     public void Toggle()

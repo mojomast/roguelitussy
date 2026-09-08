@@ -1,3 +1,4 @@
+using System.Linq;
 using Godotussy;
 using Roguelike.Core;
 using Roguelike.Tests.Stubs;
@@ -27,6 +28,51 @@ public sealed class StatusEffectTests : ITestSuite
         registry.Add("Simulation.StatusEffects data driven speed modifiers replace hardcoded defaults", DataDrivenSpeedModifiersReplaceHardcodedDefaults);
         registry.Add("Simulation.StatusEffects lethal tick attribution is deterministic", LethalTickAttributionIsDeterministic);
         registry.Add("Simulation.StatusEffects unattributed death never removes the player", UnattributedDeathKeepsPlayer);
+        registry.Add("Simulation.StatusEffects authored lethal poison blocks player regeneration", () => LethalTickBlocksRegeneration(true, true));
+        registry.Add("Simulation.StatusEffects authored lethal poison blocks enemy regeneration", () => LethalTickBlocksRegeneration(true, false));
+        registry.Add("Simulation.StatusEffects legacy lethal poison blocks player regeneration", () => LethalTickBlocksRegeneration(false, true));
+        registry.Add("Simulation.StatusEffects legacy lethal poison blocks enemy regeneration", () => LethalTickBlocksRegeneration(false, false));
+    }
+
+    private static void LethalTickBlocksRegeneration(bool withContent, bool playerVictim)
+    {
+        var world = CreateWorld();
+        if (withContent)
+        {
+            world.ContentDatabase = ContentLoader.LoadFromRepository();
+        }
+
+        var source = new StubEntity("Source", new Position(1, 1), playerVictim ? Faction.Enemy : Faction.Player);
+        source.SetComponent(new ProgressionComponent());
+        var victim = new StubEntity("Victim", new Position(2, 1), playerVictim ? Faction.Player : Faction.Enemy,
+            stats: new Stats { HP = 2, MaxHP = 20 });
+        victim.SetComponent(new XpValueComponent { Value = 9 });
+        world.Player = playerVictim ? victim : source;
+        world.AddEntity(source);
+        world.AddEntity(victim);
+        // Reverse tick order: lethal poison, expiring regeneration, then duration bookkeeping.
+        StatusEffectProcessor.ApplyEffect(victim, StatusEffectType.Hasted, 2);
+        StatusEffectProcessor.ApplyEffect(victim, StatusEffectType.Regenerating, 1);
+        StatusEffectProcessor.ApplyEffect(victim, StatusEffectType.Poisoned, 1, sourceEntityId: source.Id);
+
+        var result = withContent
+            ? StatusEffectProcessor.Tick(world, victim.Id, world.ContentDatabase!)
+            : StatusEffectProcessor.Tick(world, victim.Id);
+
+        Expect.True(result.Died, "Later regeneration must not undo lethal poison");
+        Expect.Equal(0, victim.Stats.HP, "Death should leave the victim at zero HP");
+        Expect.Equal(0, result.HealingDone, "Suppressed regeneration must not report healing");
+        Expect.Equal(playerVictim, world.GetEntity(victim.Id) is not null, "Only dead players remain in the world");
+        Expect.Equal(1, source.GetComponent<ProgressionComponent>()!.Kills, "The poison source should receive one kill");
+        Expect.Equal(9, source.GetComponent<ProgressionComponent>()!.Experience, "The poison source should receive XP once");
+        var lethal = result.CombatEvents.SelectMany(evt => evt.DamageResults).Where(damage => damage.IsKill).ToArray();
+        Expect.Equal(1, lethal.Length, "Exactly one damage event should be lethal");
+        Expect.Equal(source.Id, lethal[0].AttackerId, "Lethal damage must retain its source");
+        Expect.True(result.ExpiredEffects.Contains(StatusEffectType.Poisoned), "Poison expiration must still be reported");
+        Expect.True(result.ExpiredEffects.Contains(StatusEffectType.Regenerating), "Skipped healing must still expire");
+        Expect.False(StatusEffectProcessor.HasEffect(victim, StatusEffectType.Regenerating), "Expired regeneration must be removed");
+        Expect.Equal(1, StatusEffectProcessor.GetEffect(victim, StatusEffectType.Hasted)!.RemainingTurns,
+            "Later non-expiring statuses must still decrement duration");
     }
 
     private static void PoisonTicksAndExpires()

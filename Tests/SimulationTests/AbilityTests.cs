@@ -28,6 +28,72 @@ public sealed class AbilityTests : ITestSuite
         registry.Add("Simulation.Ability tile targeted ability validates walkable", TileTargetedAbilityValidatesWalkable);
         registry.Add("Simulation.Ability enemies filter excludes neutral entities", EnemiesFilterExcludesNeutral);
         registry.Add("Simulation.Ability heal_self resolves after damage effects", HealSelfResolvesAfterDamage);
+        registry.Add("Simulation.Ability authored status stacking and refresh rules", () => StatusApplicationUsesContent(true));
+        registry.Add("Simulation.Ability content-free status rules remain unchanged", () => StatusApplicationUsesContent(false));
+        registry.Add("Simulation.Ability life drain cannot revive reflected player death", () => LifeDrainCannotReviveReflectedDeath(true));
+        registry.Add("Simulation.Ability life drain cannot heal removed enemy", () => LifeDrainCannotReviveReflectedDeath(false));
+    }
+
+    private static void StatusApplicationUsesContent(bool withContent)
+    {
+        var world = CreateWorld();
+        if (withContent)
+        {
+            world.ContentDatabase = ContentLoader.LoadFromRepository();
+        }
+
+        var caster = CreateActor("Caster", new Position(1, 1), Faction.Player);
+        var target = CreateActor("Target", new Position(2, 1), Faction.Enemy);
+        world.AddEntity(caster);
+        world.AddEntity(target);
+        StatusEffectProcessor.ApplyEffect(target, StatusEffectType.Stunned, 1);
+        var ability = new AbilityTemplate("test_status", "Test Status", "", new AbilityTargeting("single", 1, 0, false, false, false, null),
+            1000, null, new AbilityEffect[]
+            {
+                new("apply_status", DamageType.Poison, 0, null, 0, "poisoned", 100, 3, null, null, 0, null),
+                new("apply_status", DamageType.Physical, 0, null, 0, "stunned", 100, 3, null, null, 0, null),
+            });
+
+        var action = new CastAbilityAction(caster.Id, ability, target.Position);
+        Expect.Equal(ActionResult.Success, action.Execute(world).Result, "First status cast should succeed");
+        Expect.Equal(ActionResult.Success, action.Execute(world).Result, "Second status cast should succeed");
+        var poison = StatusEffectProcessor.GetEffect(target, StatusEffectType.Poisoned)!;
+        Expect.Equal(withContent ? 1 : 2, poison.Magnitude, "Poison stacking should follow the selected content mode");
+        Expect.True(poison.SourceEntityId == caster.Id, "Status source attribution should be preserved");
+        Expect.Equal(withContent ? 1 : 3, StatusEffectProcessor.GetEffect(target, StatusEffectType.Stunned)!.RemainingTurns,
+            "Authored non-refreshable stun should retain its duration");
+        var tick = withContent
+            ? StatusEffectProcessor.Tick(world, target.Id, world.ContentDatabase!)
+            : StatusEffectProcessor.Tick(world, target.Id);
+        Expect.Equal(withContent ? 2 : 4, tick.DamageTaken, "Poison damage should match its stack count");
+    }
+
+    private static void LifeDrainCannotReviveReflectedDeath(bool playerCaster)
+    {
+        var world = CreateWorld();
+        world.ContentDatabase = ContentLoader.LoadFromRepository();
+        var caster = CreateActor("Caster", new Position(1, 1), playerCaster ? Faction.Player : Faction.Enemy,
+            new Stats { HP = 1, MaxHP = 20, Attack = 4 });
+        var target = CreateActor("Reflector", new Position(2, 1), playerCaster ? Faction.Enemy : Faction.Player,
+            new Stats { HP = 50, MaxHP = 50 });
+        target.SetComponent(new ProgressionComponent());
+        caster.SetComponent(new XpValueComponent { Value = 9 });
+        world.Player = playerCaster ? caster : target;
+        world.AddEntity(caster);
+        world.AddEntity(target);
+        Expect.True(RelicProcessor.AddRelic(target, world.ContentDatabase, "thorn_wrap"), "Reflector should receive Thorn Wrap");
+        Expect.True(world.ContentDatabase.TryGetAbilityTemplate("life_drain", out var ability), "Authored Life Drain should exist");
+
+        var outcome = new CastAbilityAction(caster.Id, ability, target.Position).Execute(world);
+
+        Expect.Equal(ActionResult.Success, outcome.Result, "The initiating cast should succeed");
+        Expect.True(target.Stats.HP < 50, "The initiating hit should still land");
+        Expect.Equal(0, caster.Stats.HP, "Drain must not heal a caster killed by reflection");
+        Expect.Equal(playerCaster, world.GetEntity(caster.Id) is not null, "Only the dead player should remain addressable");
+        Expect.Equal(1, target.GetComponent<ProgressionComponent>()!.Kills, "Reflection should award exactly one kill");
+        Expect.Equal(9, target.GetComponent<ProgressionComponent>()!.Experience, "Reflection should award XP once");
+        Expect.False(outcome.LogMessages.Exists(message => message.Contains("Caster heals", StringComparison.Ordinal)),
+            "A dead caster should not log drain healing");
     }
 
     private static void EnemiesFilterExcludesNeutral()

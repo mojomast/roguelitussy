@@ -232,6 +232,12 @@ public static class StatusEffectProcessor
                     damageResults.Add(CreateTickDamageResult(effect.SourceEntityId, entity.Id, burningDamage, burningApplied, DamageType.Fire));
                     break;
                 case StatusEffectType.Regenerating:
+                    // Lethal damage cannot be undone by later healing in this tick.
+                    if (lethalAssigned)
+                    {
+                        break;
+                    }
+
                     var healed = Math.Min(2 * effect.Magnitude, Math.Max(0, entity.Stats.MaxHP - entity.Stats.HP));
                     healingDone += healed;
                     entity.Stats.HP += healed;
@@ -346,6 +352,11 @@ public static class StatusEffectProcessor
                                 ResolveDamageType(tickEffect.DamageType)));
                             break;
                         case "heal":
+                            if (lethalAssigned)
+                            {
+                                break;
+                            }
+
                             var heal = tickEffect.Value * effect.Magnitude;
                             var healed = Math.Min(heal, Math.Max(0, entity.Stats.MaxHP - entity.Stats.HP));
                             healingDone += healed;

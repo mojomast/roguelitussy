@@ -98,11 +98,21 @@ public static class WorldArtCatalog
         };
     }
 
-    public static Texture2D? GetEntityTexture(IEntity entity)
+    public static Texture2D? GetEntityTexture(IEntity entity, IContentDatabase? content = null)
     {
         if (entity.GetComponent<ChestComponent>() is not null)
         {
             return null;
+        }
+
+        if (entity.Faction == Faction.Enemy
+            && entity.GetComponent<EnemyComponent>() is { } enemy
+            && !string.IsNullOrWhiteSpace(enemy.TemplateId)
+            && content?.TryGetEnemyTemplate(enemy.TemplateId, out var template) == true
+            && !string.IsNullOrWhiteSpace(template.SpritePath)
+            && Load(template.SpritePath) is { } authoredTexture)
+        {
+            return authoredTexture;
         }
 
         return entity.Faction switch

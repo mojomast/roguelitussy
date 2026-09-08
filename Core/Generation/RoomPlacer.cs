@@ -14,23 +14,41 @@ public static class RoomPlacer
         Random rng,
         IReadOnlyList<RoomPrefab> prefabs,
         string? themeTag = null,
-        IReadOnlyList<string>? specialRoomTags = null)
+        IReadOnlyList<string>? specialRoomTags = null,
+        string? profileTag = null)
     {
         var rooms = new List<RoomPlacement>();
         var pendingSpecialTags = specialRoomTags is { Count: > 0 } ? new List<string>(specialRoomTags) : null;
+        var usedPrefabIds = new HashSet<string>(StringComparer.Ordinal);
+        var profilePending = !string.IsNullOrWhiteSpace(profileTag);
 
         foreach (var leaf in root.Leaves())
         {
             RoomPlacement? room = null;
-            if (rooms.Count > 0 && pendingSpecialTags is { Count: > 0 })
+            if (rooms.Count == 0)
             {
-                room = TryCreateSpecialPlacement(leaf, rng, prefabs, pendingSpecialTags);
+                room = TryCreateTaggedPlacement(leaf, rng, prefabs, "start", usedPrefabIds);
+            }
+            else if (pendingSpecialTags is { Count: > 0 })
+            {
+                room = TryCreateSpecialPlacement(leaf, rng, prefabs, pendingSpecialTags, usedPrefabIds);
             }
 
-            room ??= CreatePlacement(leaf, rng, prefabs, themeTag);
+            if (room is null && rooms.Count > 0 && profilePending)
+            {
+                room = TryCreateTaggedPlacement(leaf, rng, prefabs, profileTag!, usedPrefabIds);
+                profilePending = room is null;
+            }
+
+            room ??= CreatePlacement(leaf, rng, prefabs, themeTag, usedPrefabIds);
             Carve(world, room);
             leaf.Room = room;
             rooms.Add(room);
+
+            if (room.Prefab is not null)
+            {
+                usedPrefabIds.Add(room.Prefab.Id);
+            }
         }
 
         return rooms;
@@ -40,7 +58,8 @@ public static class RoomPlacer
         BSPNode leaf,
         Random rng,
         IReadOnlyList<RoomPrefab> prefabs,
-        List<string> pendingSpecialTags)
+        List<string> pendingSpecialTags,
+        HashSet<string> usedPrefabIds)
     {
         var usableWidth = leaf.Width - (LeafPadding * 2);
         var usableHeight = leaf.Height - (LeafPadding * 2);
@@ -62,14 +81,44 @@ public static class RoomPlacer
             if (candidates.Count > 0)
             {
                 pendingSpecialTags.RemoveAt(tagIndex);
-                return BuildPrefabRoom(leaf, candidates[rng.Next(candidates.Count)], rng);
+                return BuildPrefabRoom(leaf, PickPrefab(candidates, usedPrefabIds, rng), rng);
             }
         }
 
         return null;
     }
 
-    private static RoomPlacement CreatePlacement(BSPNode leaf, Random rng, IReadOnlyList<RoomPrefab> prefabs, string? themeTag)
+    private static RoomPlacement? TryCreateTaggedPlacement(
+        BSPNode leaf,
+        Random rng,
+        IReadOnlyList<RoomPrefab> prefabs,
+        string tag,
+        HashSet<string> usedPrefabIds)
+    {
+        var usableWidth = leaf.Width - (LeafPadding * 2);
+        var usableHeight = leaf.Height - (LeafPadding * 2);
+        var candidates = new List<RoomPrefab>();
+        for (var i = 0; i < prefabs.Count; i++)
+        {
+            if (prefabs[i].Tags.Contains(tag)
+                && prefabs[i].FitsWithin(usableWidth, usableHeight)
+                && prefabs[i].HasWalkableTiles)
+            {
+                candidates.Add(prefabs[i]);
+            }
+        }
+
+        return candidates.Count == 0
+            ? null
+            : BuildPrefabRoom(leaf, PickPrefab(candidates, usedPrefabIds, rng), rng);
+    }
+
+    private static RoomPlacement CreatePlacement(
+        BSPNode leaf,
+        Random rng,
+        IReadOnlyList<RoomPrefab> prefabs,
+        string? themeTag,
+        HashSet<string> usedPrefabIds)
     {
         var usableWidth = leaf.Width - (LeafPadding * 2);
         var usableHeight = leaf.Height - (LeafPadding * 2);
@@ -108,10 +157,25 @@ public static class RoomPlacer
                 }
             }
 
-            return BuildPrefabRoom(leaf, candidatePrefabs[rng.Next(candidatePrefabs.Count)], rng);
+            return BuildPrefabRoom(leaf, PickPrefab(candidatePrefabs, usedPrefabIds, rng), rng);
         }
 
         return BuildRectangularRoom(leaf, rng, usableWidth, usableHeight);
+    }
+
+    private static RoomPrefab PickPrefab(List<RoomPrefab> candidates, HashSet<string> usedPrefabIds, Random rng)
+    {
+        var unused = new List<RoomPrefab>();
+        for (var i = 0; i < candidates.Count; i++)
+        {
+            if (!usedPrefabIds.Contains(candidates[i].Id))
+            {
+                unused.Add(candidates[i]);
+            }
+        }
+
+        var pool = unused.Count > 0 ? unused : candidates;
+        return pool[rng.Next(pool.Count)];
     }
 
     private static RoomPlacement BuildPrefabRoom(BSPNode leaf, RoomPrefab prefab, Random rng)
@@ -131,7 +195,7 @@ public static class RoomPlacer
         }
 
         var center = new Position(origin.X + (prefab.Width / 2), origin.Y + (prefab.Height / 2));
-        return new RoomPlacement(new RoomData(origin.X, origin.Y, prefab.Width, prefab.Height, center, prefab.Tags), walkableTiles, origin, prefab);
+        return new RoomPlacement(new RoomData(origin.X, origin.Y, prefab.Width, prefab.Height, center, prefab.Tags, prefab.Id), walkableTiles, origin, prefab);
     }
 
     private static RoomPlacement BuildRectangularRoom(BSPNode leaf, Random rng, int usableWidth, int usableHeight)

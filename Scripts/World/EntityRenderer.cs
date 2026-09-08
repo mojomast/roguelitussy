@@ -19,12 +19,14 @@ public sealed class EntityRenderer
     private Node2D _layer;
     private IWorldState? _world;
     private IContentDatabase? _content;
+    private readonly IContentDatabase? _fallbackContent;
 
     public EntityRenderer(Node2D? layer = null, AnimationController? animationController = null, IContentDatabase? content = null)
     {
         _layer = layer ?? new Node2D { Name = "EntityLayer" };
         _animationController = animationController ?? new AnimationController();
         _content = content;
+        _fallbackContent = content;
     }
 
     public Node2D Layer => _layer;
@@ -41,10 +43,7 @@ public sealed class EntityRenderer
     public void BindWorld(IWorldState world)
     {
         _world = world;
-        if (world is WorldState mutableWorld)
-        {
-            _content = mutableWorld.ContentDatabase;
-        }
+        _content = (world as WorldState)?.ContentDatabase ?? _fallbackContent;
 
         SyncEntities(world.Entities);
     }
@@ -364,7 +363,7 @@ public sealed class EntityRenderer
         return _world.InBounds(position) && _world.IsVisible(position);
     }
 
-    private static Node2D CreateSpriteRoot(IEntity entity)
+    private Node2D CreateSpriteRoot(IEntity entity)
     {
         var spriteRoot = new Node2D
         {
@@ -378,7 +377,7 @@ public sealed class EntityRenderer
         return spriteRoot;
     }
 
-    private static void ApplyAppearance(IEntity entity, Node2D spriteRoot)
+    private void ApplyAppearance(IEntity entity, Node2D spriteRoot)
     {
         EnsureBodyVisual(entity, spriteRoot);
 
@@ -428,9 +427,9 @@ public sealed class EntityRenderer
         RemoveChild(spriteRoot, "VariantDetail");
     }
 
-    private static void EnsureBodyVisual(IEntity entity, Node2D spriteRoot)
+    private void EnsureBodyVisual(IEntity entity, Node2D spriteRoot)
     {
-        var texture = WorldArtCatalog.GetEntityTexture(entity);
+        var texture = WorldArtCatalog.GetEntityTexture(entity, _content);
         if (texture is not null)
         {
             RemoveChild(spriteRoot, "Body", typeof(ColorRect));

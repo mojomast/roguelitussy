@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using Godot;
@@ -9,6 +10,13 @@ namespace Godotussy;
 
 public partial class DevToolsWorkbench : Control
 {
+    private enum CommandEditField
+    {
+        None,
+        Seed,
+        Depth,
+    }
+
     public enum WorkshopMode
     {
         Rooms,
@@ -58,6 +66,8 @@ public partial class DevToolsWorkbench : Control
     private string _bodyText = string.Empty;
     private string _optionsText = string.Empty;
     private IReadOnlyList<string> _currentOptions = Array.Empty<string>();
+    private CommandEditField _editingCommandField;
+    private string _commandEditBuffer = string.Empty;
 
     public DevToolsWorkbench()
     {
@@ -123,6 +133,11 @@ public partial class DevToolsWorkbench : Control
         if (!Visible)
         {
             return false;
+        }
+
+        if (_editingCommandField != CommandEditField.None)
+        {
+            return HandleCommandNumberEditKey(key);
         }
 
         switch (key)
@@ -222,8 +237,29 @@ public partial class DevToolsWorkbench : Control
 
     public void SetPendingFloorDepth(int depth)
     {
-        _pendingFloorDepth = Math.Max(0, depth);
+        _pendingFloorDepth = Math.Clamp(depth, 0, DungeonMapExporter.MaximumDepth);
         Refresh();
+    }
+
+    public DungeonMapExportResult ExportPendingDungeonMap(string? outputDirectory = null)
+    {
+        if (_gameManager?.Generator is null || _content is null)
+        {
+            var unavailable = new DungeonMapExportResult(false, string.Empty, string.Empty, 0, 0, "Map export unavailable: generator or runtime content is not initialized.");
+            _statusText = unavailable.Message;
+            Refresh();
+            return unavailable;
+        }
+
+        var result = DungeonMapExporter.Export(_gameManager.Generator, _content, _pendingSeed, _pendingFloorDepth, outputDirectory);
+        _statusText = result.Message;
+        if (result.Success)
+        {
+            _eventBus?.EmitLogMessage($"Dungeon map exported to {result.AbsolutePath}");
+        }
+
+        Refresh();
+        return result;
     }
 
     public void SetPendingTeleportTarget(int x, int y)
@@ -550,7 +586,7 @@ public partial class DevToolsWorkbench : Control
             WorkshopMode.Rooms => 13,
             WorkshopMode.Items => 13,
             WorkshopMode.Enemies => 15,
-            _ => 18,
+            _ => 19,
         };
     }
 
@@ -842,12 +878,21 @@ public partial class DevToolsWorkbench : Control
                 _statusText = totalErrors == 0 ? "All visible tooling validations passed." : $"Validation reported {totalErrors} issue(s).";
                 break;
             case 11:
+                ExportPendingDungeonMap();
+                return;
+            case 12:
                 DebugConsoleRequested?.Invoke();
                 _statusText = "Debug console opened.";
                 break;
-            case 12:
+            case 13:
                 Close();
                 break;
+            case 14:
+                BeginCommandNumberEdit(CommandEditField.Seed);
+                return;
+            case 16:
+                BeginCommandNumberEdit(CommandEditField.Depth);
+                return;
         }
     }
 
@@ -855,29 +900,147 @@ public partial class DevToolsWorkbench : Control
     {
         switch (_selectedIndex)
         {
-            case 13:
+            case 14:
                 _pendingSeed = Math.Max(1, _pendingSeed + delta);
                 _statusText = $"Pending seed set to {_pendingSeed}.";
                 break;
-            case 14:
+            case 15:
                 _selectedSaveSlot = WrapSaveSlot(_selectedSaveSlot + delta);
                 _statusText = $"Selected save slot {_selectedSaveSlot}.";
                 break;
-            case 15:
-                _pendingFloorDepth = Math.Max(0, _pendingFloorDepth + delta);
+            case 16:
+                _pendingFloorDepth = Math.Clamp(_pendingFloorDepth + delta, 0, DungeonMapExporter.MaximumDepth);
                 _statusText = $"Pending floor set to {_pendingFloorDepth}.";
                 break;
-            case 16:
+            case 17:
                 _pendingTeleportX = Math.Max(0, _pendingTeleportX + delta);
                 ClampPendingTeleportTarget();
                 _statusText = $"Teleport X set to {_pendingTeleportX}.";
                 break;
-            case 17:
+            case 18:
                 _pendingTeleportY = Math.Max(0, _pendingTeleportY + delta);
                 ClampPendingTeleportTarget();
                 _statusText = $"Teleport Y set to {_pendingTeleportY}.";
                 break;
         }
+    }
+
+    private void BeginCommandNumberEdit(CommandEditField field)
+    {
+        _editingCommandField = field;
+        _commandEditBuffer = string.Empty;
+        _statusText = field == CommandEditField.Seed
+            ? "Type a positive seed, then press Enter to save or Esc to cancel."
+            : $"Type a depth from 0 to {DungeonMapExporter.MaximumDepth}, then press Enter to save or Esc to cancel.";
+        Refresh();
+    }
+
+    private bool HandleCommandNumberEditKey(Key key)
+    {
+        if (key is Key.Enter or Key.KpEnter)
+        {
+            CommitCommandNumberEdit();
+            return true;
+        }
+
+        if (key == Key.Escape)
+        {
+            var fieldName = _editingCommandField == CommandEditField.Seed ? "Seed" : "Depth";
+            _editingCommandField = CommandEditField.None;
+            _commandEditBuffer = string.Empty;
+            _statusText = $"{fieldName} edit canceled.";
+            Refresh();
+            return true;
+        }
+
+        var keyName = key.ToString();
+        if (keyName == "Backspace")
+        {
+            if (_commandEditBuffer.Length > 0)
+            {
+                _commandEditBuffer = _commandEditBuffer[..^1];
+                Refresh();
+            }
+
+            return true;
+        }
+
+        if (keyName == "Delete")
+        {
+            _commandEditBuffer = string.Empty;
+            Refresh();
+            return true;
+        }
+
+        var digit = TryGetCommandDigit(keyName);
+        if (digit is not null && _commandEditBuffer.Length < 10)
+        {
+            _commandEditBuffer += digit.Value;
+            Refresh();
+        }
+
+        return true;
+    }
+
+    private void CommitCommandNumberEdit()
+    {
+        if (!int.TryParse(_commandEditBuffer, NumberStyles.None, CultureInfo.InvariantCulture, out var value))
+        {
+            _statusText = "Enter a valid whole number.";
+            Refresh();
+            return;
+        }
+
+        if (_editingCommandField == CommandEditField.Seed)
+        {
+            if (value <= 0)
+            {
+                _statusText = "Seed must be a positive whole number.";
+                Refresh();
+                return;
+            }
+
+            _pendingSeed = value;
+            _statusText = $"Seed set to {_pendingSeed}.";
+        }
+        else
+        {
+            if (value < 0 || value > DungeonMapExporter.MaximumDepth)
+            {
+                _statusText = $"Depth must be between 0 and {DungeonMapExporter.MaximumDepth}.";
+                Refresh();
+                return;
+            }
+
+            _pendingFloorDepth = value;
+            _statusText = $"Export depth set to {_pendingFloorDepth}.";
+        }
+
+        _editingCommandField = CommandEditField.None;
+        _commandEditBuffer = string.Empty;
+        Refresh();
+    }
+
+    private string GetCommandFieldText(CommandEditField field, int value) => _editingCommandField == field
+        ? _commandEditBuffer + "_"
+        : value.ToString(CultureInfo.InvariantCulture);
+
+    private static char? TryGetCommandDigit(string keyName)
+    {
+        return keyName switch
+        {
+            "Zero" or "Key0" or "Kp0" or "Num0" => '0',
+            "One" or "Key1" or "Kp1" or "Num1" => '1',
+            "Two" or "Key2" or "Kp2" or "Num2" => '2',
+            "Three" or "Key3" or "Kp3" or "Num3" => '3',
+            "Four" or "Key4" or "Kp4" or "Num4" => '4',
+            "Five" or "Key5" or "Kp5" or "Num5" => '5',
+            "Six" or "Key6" or "Kp6" or "Num6" => '6',
+            "Seven" or "Key7" or "Kp7" or "Num7" => '7',
+            "Eight" or "Key8" or "Kp8" or "Num8" => '8',
+            "Nine" or "Key9" or "Kp9" or "Num9" => '9',
+            _ => null,
+        };
     }
 
     private void EnsureVisuals()
@@ -1046,11 +1209,12 @@ public partial class DevToolsWorkbench : Control
                 "Reload tool data",
                 "Reload runtime content from disk",
                 "Validate room + content documents",
+                "Export dungeon map PNG",
                 "Open debug console",
                 "Close workshop",
-                $"Seed: {_pendingSeed}",
+                $"Seed / export seed: {GetCommandFieldText(CommandEditField.Seed, _pendingSeed)}",
                 $"Save slot: {_selectedSaveSlot}",
-                $"Floor target: {_pendingFloorDepth}",
+                $"Floor / export depth: {GetCommandFieldText(CommandEditField.Depth, _pendingFloorDepth)}",
                 $"Teleport X: {_pendingTeleportX}",
                 $"Teleport Y: {_pendingTeleportY}",
             },
@@ -1185,8 +1349,11 @@ public partial class DevToolsWorkbench : Control
             slotMetadata is null
                 ? $"Slot {_selectedSaveSlot}: empty"
                 : $"Slot {_selectedSaveSlot}: {slotMetadata.PlayerName}, floor {slotMetadata.Depth}, turn {slotMetadata.TurnNumber}",
-            $"Targets: floor {_pendingFloorDepth}, teleport {_pendingTeleportX},{_pendingTeleportY}",
-            "Use this tab to manage runs, saves, travel, visibility, and deeper debug handoffs.",
+            $"Targets: seed {_pendingSeed}, floor {_pendingFloorDepth}, teleport {_pendingTeleportX},{_pendingTeleportY}",
+            $"Map exports: {DungeonMapExporter.DefaultExportDirectory}",
+            "Export creates a complete high-resolution map without changing the active run.",
+            "Press Enter on seed or floor to type an exact value.",
+            "Use this tab to manage runs, saves, travel, visibility, exports, and deeper debug handoffs.",
             "Console commands:",
             string.Join("\n", WrapText(string.Join(", ", commands), 64)));
     }

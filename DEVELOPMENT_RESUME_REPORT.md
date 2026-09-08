@@ -10,6 +10,47 @@ Development should resume by stabilizing correctness and verification before add
 
 ## Verification Status
 
+### Enemy Wiring Follow-up - 2026-09-08
+
+- Completed: `GameManager.ResolveEnemyTemplate` now filters the actual-depth pool by the generated boss marker. Boss slots select only boss-tagged templates; ordinary slots exclude bosses. Explicit valid template IDs remain overrides, invalid IDs fall through, and unavailable matching pools skip the spawn instead of borrowing deeper/ordinary templates.
+- Completed: `EnemyTemplate.SpritePath` preserves authored metadata from `ContentLoader`; `EntityRenderer`/`WorldArtCatalog` resolve textures using the existing persisted `EnemyComponent.TemplateId`. Bound-world content takes precedence over injected content, and rebinds do not retain stale world content. Name/procedural fallbacks, source-image loading, texture caching, and player/neutral/chest visuals are preserved.
+- Coverage: 15 new registered regressions in `Tests/UITests/BossSpawnSelectionTests.cs` and `Tests/UITests/AuthoredEnemyVisualTests.cs`. They exercise public population APIs across depths/seeds, override/empty-pool rules, every authored enemy sprite, missing art, rebinding, and stable visual nodes.
+- Verification: initial UI baseline 173/173; final UI slice 188/188; full harness 613/613; rendering-validation profile 545/545. Stub build, full/rendering runs, and real Godot 4.5.2 API build use warnings-as-errors and pass. Formatting and `git diff --check` pass.
+- Scope: no new authored content, asset edits, save-shape changes, or generation/tool implementation edits. Save version remains 18. New population results intentionally differ from older builds; cached/saved enemies retain their identities. Existing valid fixed-template overrides remain supported even outside normal depth/marker eligibility.
+- Verification gap: real Godot import/startup and visual playtesting remain unverified; the installed executable is 4.4.1 rather than required 4.5.2. API/stub checks do not establish final in-game appearance or boss encounter balance.
+- Remaining work: status timing/expiration hooks, line/cone targeting, shrine/curse population, lock/key exhaustion, remaining relic semantics, explicit locked-door art, and incremental GameManager extraction. The line/cone scout confirmed no current authored users; implementing those shapes needs an explicit geometry contract rather than silently guessing width/arc behavior.
+
+### Current Audit Checkpoint - 2026-09-08
+
+This checkpoint supersedes the historical toolchain limitations below. The audit used parallel read-only scouting of simulation, persistence/determinism, and Godot/UI wiring, followed by isolated implementation batches and an independent integration review. Pre-existing generation, PNG export, tooling, and documentation edits were preserved; this is a bounded correctness audit, not a claim that every backlog feature is complete.
+
+Confirmed and fixed:
+
+- Save/load could fail for actors inside walls after phasing. `WorldState.RestoreEntity` now restores placement without spawn-time walkability checks while preserving bounds and blocking-collision checks. Active/cached floors and expired phasing have regression coverage.
+- Core load APIs discarded the supplied content binding, silently disabling traps. `SaveSerializer` binds every restored floor; tests compare trap damage, state, logs, events, and RNG continuation without manual repair.
+- Floor-clear reward history was lost across restart/load and leaked between saves. Version 18 snapshots persist sorted rewarded depths, validate them, and replace facade history on load. Tests cover fresh managers, earlier saves, and cached-floor revisits.
+- Abilities, consumables, and weapon on-hit effects bypassed authored status stacking/refresh rules. All now use content-backed application with legacy behavior retained for content-free worlds.
+- Life Drain could heal a caster already killed by reflection. Self-healing now requires a living, registered caster.
+- Regeneration could undo lethal poison/status damage before death handling. Both status tick paths block post-lethal healing while preserving expiration, attribution, and death bookkeeping.
+- Mouse inventory actions/close controls could leave keyboard gameplay disabled. Inventory state notifications now refresh the root input gate; targeting remains modal. The compatibility stub exposes the real Node `_ExitTree` lifecycle hook for cleanup tests.
+- Restarting a run inherited the previous world's turn counter. New runs reset to zero before publication; ordinary floor travel still preserves turns.
+
+Verification (using `$HOME/.dotnet/dotnet`, since `dotnet` is not on the default PATH):
+
+- Baseline full harness: 568/568 passed.
+- Final full harness: 598/598 passed, including 30 new registered regressions.
+- Rendering-validation profile with warnings-as-errors: 530/530 passed.
+- Stub project build and explicit test build with warnings-as-errors: zero warnings/errors.
+- Real Godot 4.5.2 API build (`-p:UseGodotStubs=false -p:RoguelitussyWarningsAsErrors=true`): zero warnings/errors.
+- `dotnet format --verify-no-changes godotussy.sln --no-restore` and `git diff --check`: passed.
+- Real editor import/startup and manual mouse-dispatch playtesting were not run: the installed executable reports Godot 4.4.1 Mono rather than required 4.5.2. API compilation and stub tests do not replace that runtime check.
+
+Migration tradeoff: versions 1-17 infer that floors without living hostiles have already paid their reward. Legacy saves do not record whether an empty floor was unpaid, so this deliberately forfeits that ambiguous reward instead of duplicating gold. Version 17 scheduler/relic payloads are preserved without older normalization.
+
+Remaining work: authored tick timing/expiration hooks, line/cone targeting, special-room entity population and boss-template selection, lock/key exhaustion, remaining relic semantics, authored enemy sprite-path rendering, and incremental extraction from the oversized GameManager. These remain tracked in `docs/IMPROVEMENT_SUGGESTIONS.md`; no broad rewrite or new content was attempted.
+
+### Historical Verification
+
 - Repository cloned to `/home/mojo/projects/roguelitussy`.
 - Working tree was clean immediately after clone.
 - `dotnet --info` failed in this environment: `dotnet: command not found`.
@@ -84,6 +125,22 @@ godot --headless --path . --quit
 - Completed follow-up: skipped turns are suppressed by `GameLoop` rather than hidden scheduler mutation; their status logs, expirations, dirty positions, and typed damage/death events now reach presentation. Attributed and unattributed player deaths share one retention rule.
 - Completed follow-up: save version 17 persists deterministic applied relic-stat totals; v16 Warlord migration preserves aggregate attack and scheduler order zero. Bone Amulet/Soul Collector milestones use resulting kills, Glass Cannon is one-time, Warlord applies only missing capped depth progress, and floor/rest hook messages reach EventBus.
 - Remaining risks: rest/Shadow Step/Echo Shard/Merchant Badge authored relic semantics, boss-template selection, functional shrine/curse population, lock/key exhaustion, authored enemy sprite-path rendering, and attack/move animation composition.
+
+### Follow-up Status - 2026-07-31 Seeded Dungeon Variety
+
+- Completed: initial depth zero now uses authored depth-one prefabs and deliberately reserves the authored start room when it fits.
+- Completed: each generation attempt derives a deterministic functional profile (`combat`, `loot`, `hazard`, `open`, or `ambush`) and reserves one fitting non-start room for that profile after higher-priority boss/shrine/curse requests.
+- Completed: fitting prefab pools avoid repeats until available alternatives are exhausted; transient `RoomData.PrefabId` metadata makes room selection testable and diagnosable.
+- Completed: BSP stitching deterministically mixes traditional L corridors with midpoint doglegs, and layout/population random streams are independently derived from the attempt seed.
+- Verification: editorless stub build, test-project build, and all 37 filtered generation tests pass with zero warnings/failures.
+- Remaining generation risks: true farthest/side-branch landmarks, special-room entity population, lock/key exhaustion, and richer theme-specific presentation remain open.
+
+### Follow-up Status - 2026-07-31 Dungeon Survey Export
+
+- Completed: the Developer Workshop Commands tab accepts exact typed seed/depth values and exports complete deterministic dungeon survey PNGs under `user://map_exports`.
+- Completed: `DungeonMapExporter` renders detached content-backed generation at 16 pixels per tile with themed terrain, stable wear, room corners, locks/stairs/hazards, planned spawn markers, title, frame, and bitmap legend without viewport/FOV/session coupling.
+- Completed: the compatibility `Image` surface now supports RGBA raster drawing and deterministic valid PNG encoding for editorless tests; the exporter also compiles against the real Godot 4.5.2 API.
+- Verification: focused tooling tests cover PNG validity/byte determinism, output dimensions, typed seed/depth input, and active-run preservation.
 
 ### Follow-up Status - Wave 1 Persistence
 

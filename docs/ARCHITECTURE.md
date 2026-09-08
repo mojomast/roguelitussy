@@ -155,7 +155,7 @@ Quick-reference entry points for agents working on this codebase.
 | Progression | `Core/Simulation/ProgressionService.cs` | 7 | XP/level-up helpers |
 | Content load | `Core/Content/ContentLoader.cs` | 122 | `LoadFromDirectory` entry point |
 | Save | `Core/Persistence/SaveManager.cs` | 9 | File I/O and slot management |
-| Serialize | `Core/Persistence/SaveSerializer.cs` | 9 | JSON round-trip, current version 17 (see `SaveSerializer.CurrentVersion`) |
+| Serialize | `Core/Persistence/SaveSerializer.cs` | 9 | JSON round-trip, current version 18 (see `SaveSerializer.CurrentVersion`) |
 
 ### Godot layer entry points
 
@@ -171,6 +171,8 @@ Quick-reference entry points for agents working on this codebase.
 | Entity sprites | `Scripts/World/EntityRenderer.cs` | — | Procedural sprites from catalogs |
 | Catalogs | `Scripts/World/WorldArtCatalog.cs` | 16 | Builds `res://Assets/...` paths |
 | Shared colors | `Scripts/World/RenderPalette.cs` | — | Central world, entity, targeting, and popup colors |
+
+Enemy rendering resolves authored `EnemyTemplate.SpritePath` through saved template identity; `WorldArtCatalog` name mappings remain fallback-only for missing metadata/art.
 
 ### Data flow cheat sheet
 
@@ -197,5 +199,4 @@ Content:
 - `aoe_line` and `aoe_cone` ability targeting validate but are not resolved at runtime.
 - `GameManager` directly mutates `WorldState` for map reveal, teleport, and floor travel.
 - `GameManager.cs` is still oversized; remaining extraction work is tracked as non-blocking architecture backlog and should not delay UI polish that only consumes the existing facade API.
-- Enemy rendering still uses `WorldArtCatalog` name mappings rather than authored `EnemyTemplate.SpritePath` values.
 - Floor-event tags influence room placement, but shrine/curse entities and event metadata are not yet fully propagated into world population.

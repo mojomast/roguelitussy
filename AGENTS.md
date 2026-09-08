@@ -223,7 +223,7 @@ UIRoot / WorldView  <--  EventBus  <--  GameManager.ProcessPlayerAction
 
 ### Persistence
 
-- `SaveManager` / `SaveSerializer` / `SaveMigrator` implement JSON save/load (current version 17).
+- `SaveManager` / `SaveSerializer` / `SaveMigrator` implement JSON save/load (current version 18).
 - Saves include: map tiles, explored/visible flags, entities + components, ground items, open doors, RNG states, multi-floor cache.
 - `GameManager.SaveToSlot` / `LoadFromSlot` are the Godot-facing entry points.
 - RNG states restored: `CombatRandomState` and `ItemRandomState`.

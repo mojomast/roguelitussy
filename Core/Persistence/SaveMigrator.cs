@@ -15,7 +15,7 @@ public static class SaveMigrator
         var root = document.RootElement;
         var version = ReadVersion(root);
 
-        return version switch
+        var data = version switch
         {
             1 => MigrateV1(root),
             2 => MigrateV2(root),
@@ -35,8 +35,27 @@ public static class SaveMigrator
             14 => MigrateV14(root),
             15 => MigrateV15(root),
             16 => MigrateV16(root),
+            17 => JsonSerializer.Deserialize<SaveFileData>(json, SaveSerializer.JsonOptions)
+                ?? throw new InvalidOperationException("Unable to deserialize version 17 save data."),
             _ => throw new InvalidOperationException($"Unsupported save version {version}.")
         };
+
+        if (version < 18)
+        {
+            // Legacy saves cannot distinguish an unpaid empty floor from a claimed one.
+            // Prefer avoiding duplicate rewards, without normalizing v17 relic/scheduler state.
+            var player = data.Entities.FirstOrDefault(entity => string.Equals(entity.Id, data.PlayerId, StringComparison.OrdinalIgnoreCase));
+            var playerFaction = player?.Faction ?? (int)Faction.Player;
+            var floors = data.Floors.Count > 0 ? data.Floors : new List<FloorSaveData> { SaveSerializer.CreateFloorFromRoot(data) };
+            data.RewardedFloorDepths = floors
+                .Where(floor => !floor.Entities.Any(entity => entity.Stats.HP > 0
+                    && entity.Faction != playerFaction && entity.Faction != (int)Faction.Neutral
+                    && !string.Equals(entity.Id, data.PlayerId, StringComparison.OrdinalIgnoreCase)))
+                .Select(floor => floor.Depth).OrderBy(depth => depth).ToList();
+            data.Version = SaveSerializer.CurrentVersion;
+        }
+
+        return data;
     }
 
     private static SaveFileData MigrateV16(JsonElement root)

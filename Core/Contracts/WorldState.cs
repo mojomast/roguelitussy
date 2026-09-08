@@ -141,7 +141,12 @@ public sealed class WorldState : IWorldState
         return _entityByPosition.TryGetValue(pos, out var entity) && entity.BlocksSight;
     }
 
-    public void AddEntity(IEntity entity)
+    public void AddEntity(IEntity entity) => RegisterEntity(entity, requireWalkableTile: true);
+
+    // Saved actors can occupy walls after phasing, even after the effect expires.
+    internal void RestoreEntity(IEntity entity) => RegisterEntity(entity, requireWalkableTile: false);
+
+    private void RegisterEntity(IEntity entity, bool requireWalkableTile)
     {
         if (_entityById.ContainsKey(entity.Id))
         {
@@ -153,7 +158,7 @@ public sealed class WorldState : IWorldState
             throw new ArgumentOutOfRangeException(nameof(entity), $"Entity position {entity.Position} is out of bounds.");
         }
 
-        if (!IsTileWalkable(entity.Position))
+        if (requireWalkableTile && !IsTileWalkable(entity.Position))
         {
             throw new InvalidOperationException($"Tile {entity.Position} is not walkable.");
         }

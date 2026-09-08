@@ -23,7 +23,32 @@ public static class CorridorBuilder
 
         var leftPoint = leftRoom.GetConnectionPointTowards(rightRoom.Room.Center);
         var rightPoint = rightRoom.GetConnectionPointTowards(leftRoom.Room.Center);
-        Connect(world, leftPoint, rightPoint, rng);
+        ConnectVaried(world, leftPoint, rightPoint, rng);
+    }
+
+    public static void ConnectVaried(WorldState world, Position from, Position to, Random rng)
+    {
+        if (from.X == to.X || from.Y == to.Y || rng.Next(3) < 2)
+        {
+            Connect(world, from, to, rng);
+            return;
+        }
+
+        // A midpoint dogleg keeps some corridors from sharing the same L silhouette.
+        if (rng.Next(2) == 0)
+        {
+            var middleX = Math.Min(from.X, to.X) + (Math.Abs(to.X - from.X) / 2);
+            CarveHorizontal(world, from.X, middleX, from.Y);
+            CarveVertical(world, from.Y, to.Y, middleX);
+            CarveHorizontal(world, middleX, to.X, to.Y);
+        }
+        else
+        {
+            var middleY = Math.Min(from.Y, to.Y) + (Math.Abs(to.Y - from.Y) / 2);
+            CarveVertical(world, from.Y, middleY, from.X);
+            CarveHorizontal(world, from.X, to.X, middleY);
+            CarveVertical(world, middleY, to.Y, to.X);
+        }
     }
 
     public static void Connect(WorldState world, Position from, Position to, Random rng)

@@ -485,6 +485,8 @@ public partial class GameManager : Node
             savedOptions.AppearanceId);
 
         Seed = snapshot.Seed;
+        _clearedFloors.Clear();
+        _clearedFloors.UnionWith(snapshot.RewardedFloorDepths);
         _cachedFloors.Clear();
         _floorEntrances.Clear();
         foreach (var pair in snapshot.Floors)
@@ -565,7 +567,7 @@ public partial class GameManager : Node
             EquippedItemTemplateIds = new List<string>(options.EquippedItemTemplateIds),
         };
 
-        return new SaveRunSnapshot(Seed, CurrentFloor, World, floors, characterOptions);
+        return new SaveRunSnapshot(Seed, CurrentFloor, World, floors, characterOptions, _clearedFloors);
     }
 
     private void SyncSchedulerStateToWorld(WorldState world)
@@ -702,6 +704,7 @@ public partial class GameManager : Node
         {
             var generatedFloor = CreateGeneratedWorld(seed, CurrentFloor);
             var world = generatedFloor.World;
+            world.TurnNumber = 0;
             _floorEntrances[CurrentFloor] = generatedFloor.Entrances;
 
             var player = CreatePlayer(generatedFloor.Entrances.StairsUp, new Random(MixSeed(seed, CurrentFloor) ^ 17));
@@ -1494,7 +1497,7 @@ public partial class GameManager : Node
             ?? level.EnemySpawns.Select(position => new EnemySpawnData(position)).ToArray();
         foreach (var spawn in enemySpawns)
         {
-            var template = ResolveEnemyTemplate(enemies, spawn, rng, world.Depth);
+            var template = ResolveEnemyTemplate(enemies, spawn, rng);
             if (template is null)
             {
                 continue;
@@ -1860,22 +1863,18 @@ public partial class GameManager : Node
         };
     }
 
-    private EnemyTemplate? ResolveEnemyTemplate(IReadOnlyList<EnemyTemplate> templates, EnemySpawnData spawn, Random rng, int depth)
+    private EnemyTemplate? ResolveEnemyTemplate(IReadOnlyList<EnemyTemplate> templates, EnemySpawnData spawn, Random rng)
     {
         if (Content is not null && !string.IsNullOrWhiteSpace(spawn.TemplateId) && Content.TryGetEnemyTemplate(spawn.TemplateId, out var fixedTemplate))
         {
             return fixedTemplate;
         }
 
-        var candidates = spawn.IsBoss && Content is not null
-            ? Content.GetAvailableEnemies(depth + 2)
-            : templates;
-        if (candidates.Count == 0)
-        {
-            candidates = templates;
-        }
+        var candidates = templates
+            .Where(template => (template.Tags?.Contains("boss", StringComparer.OrdinalIgnoreCase) == true) == spawn.IsBoss)
+            .ToArray();
 
-        return candidates.Count == 0 ? null : SelectEnemyTemplate(candidates, rng);
+        return candidates.Length == 0 ? null : SelectEnemyTemplate(candidates, rng);
     }
 
     private EnemyTemplate SelectEnemyTemplate(IReadOnlyList<EnemyTemplate> templates, Random rng)

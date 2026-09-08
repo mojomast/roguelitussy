@@ -20,11 +20,20 @@
 | Hit flash game feel | Implemented | Damage events apply a short bright/white defender flash that remains visible across refreshes and restores to white after the timed window. | Camera shake, projectile travel, and richer SFX/VFX remain separate polish items. |
 | Combat animation and popups | Implemented | Attacks lunge, deaths fade before cleanup, and normal/critical/miss/heal/pickup popups use distinct styles. | Exact point-of-heal payloads and attack/move composition remain follow-ups. |
 | Canonical run end | Implemented | Combat and non-combat deaths emit one `GameOverWithStats` event plus one compatibility `GameOver`, including final build metadata. | Expand non-combat cause attribution. |
-| Special-room generation | Partial | Floor events request tagged boss/shrine/curse rooms and boss floors receive a fallback marked spawn. | Populate shrine/curse semantics and guarantee boss-template selection. |
+| Special-room generation | Partial | Floor events request tagged boss/shrine/curse rooms; boss markers select eligible boss-tagged templates and ordinary slots exclude bosses. | Populate shrine/curse semantics and guarantee landmark placement. |
+| Seeded dungeon survey export | Implemented | Developer Workshop exports a deterministic, themed, high-resolution full-floor PNG for an exact seed/depth without changing the active run. | Optional SVG and configurable overlay/scale presets can be added later. |
 | Character creation preview clarity | Implemented | Training copy shows exact effects; starter kits show content names/descriptions, `Equipped:` / `Pack:` grouping, stack counts, aimed-scroll targeting notes, and a main-menu `Tab` tooltip. | None required for current behavior. |
 | Overlay close/hotkey consistency | Implemented | `F` is the sole normal-gameplay interact key, UI-4 modal overlays close with `Escape`, floor summary treats `Escape` as continue, and inventory/level-up hints advertise their active hotkeys without footer overlap. | None required for current behavior. |
 
 The current keybind source of truth is `docs/KEYBINDS.md`.
+
+## Seeded Dungeon Survey Export
+
+**Status:** Implemented
+
+The Developer Workshop Commands tab accepts exact typed seed and floor values and exports `user://map_exports/dungeon_seed_<seed>_depth_<depth>.png`. The procedural plate uses 16-pixel tiles, theme-specific prison/crypt/magma palettes, stable decorative hashing, room corner annotations, terrain/door/stair/hazard treatments, planned spawn markers, and a bitmap-font title and legend. Exporting builds a detached world and leaves the active expedition unchanged.
+
+**Files modified:** `Scripts/Tools/DungeonMapExporter.cs`, `Scripts/Tools/DevToolsWorkbench.cs`, `Compat/Godot/GodotStubs.cs`, `Tests/UITests/ToolingTests.cs`.
 
 ## Death Screen
 

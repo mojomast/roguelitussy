@@ -12,7 +12,7 @@ The runtime path is the default recommendation when you just want to build conte
 `Scripts/Tools/DevToolsWorkbench.cs` is wired into `Scripts/UI/UIRoot.cs` and is available from:
 
 - the title screen via `Dev Tools`
-- the pause menu via `Dev Tools`
+- the pause menu via `Developer Workshop`
 - gameplay via `T`
 
 When opened from the title flow, the workshop temporarily dismisses the main menu and restores it on close so the workshop remains the only active full-screen overlay.
@@ -22,7 +22,7 @@ The workshop is a menu-driven runtime shell around the lower-level tool backends
 - `Rooms` uses `Scripts/Tools/MapEditor.cs` to create, load, preview, validate, save, and immediately playtest room prefab drafts
 - `Items` uses `Scripts/Tools/ItemEditor.cs` to scaffold and tune item templates before saving `items.json`, and can drop the selected runtime item into the current run
 - `Enemies` uses `Scripts/Tools/ItemEditor.cs` to scaffold and tune enemy templates before saving `enemies.json`, and can spawn the selected enemy near the player for iteration
-- `Commands` starts seeded expeditions, saves and loads slots, heals, reveals, travels floors, teleports the player, reloads tool/runtime data, validates content, and hands off to the debug console when freeform commands are more efficient
+- `Commands` starts seeded expeditions, saves and loads slots, heals, reveals, travels floors, teleports the player, exports deterministic dungeon maps, reloads tool/runtime data, validates content, and hands off to the debug console when freeform commands are more efficient
 
 On smaller viewports the workshop now windows long summary and action lists instead of letting text spill past the visible cards. The currently selected action stays in view while the body, options, status, and control hints are shortened to the space available.
 
@@ -34,6 +34,8 @@ Workshop controls:
 - `Enter` applies the selected action
 - `Esc` or `T` closes the workshop
 
+Press `Enter` on `Seed / export seed` or `Floor / export depth` to type an exact value. Digits append, `Backspace` removes one digit, `Delete` clears the field, `Enter` commits, and `Escape` cancels the edit without closing the workshop.
+
 Use this workflow when you want to extend the content foundation without touching Godot editor panels.
 
 The intended fast loop is:
@@ -43,6 +45,17 @@ The intended fast loop is:
 3. Use `Reload runtime content from disk` when you want the active game session to pick up the new content definitions.
 4. Use room playtest or the item/enemy spawn actions to validate behavior immediately in the running game.
 5. Use the `Commands` tab when you need to start a fresh seeded run, save/load a slot, heal quickly, reveal the map, jump floors, or teleport within the active run without dropping to console commands.
+
+### Dungeon Map Export
+
+1. Open the workshop and switch to `Commands` with `Tab`.
+2. Select `Seed / export seed`, press `Enter`, type a positive integer, then press `Enter` again.
+3. Select `Floor / export depth`, press `Enter`, type a value from `0` to `999`, then confirm.
+4. Select `Export dungeon map PNG` and press `Enter`.
+
+Exports are written to `user://map_exports/dungeon_seed_<seed>_depth_<depth>.png`. The workshop reports the resource path and the combat log receives the native absolute path. Re-exporting the same seed/depth intentionally replaces that file.
+
+The PNG is a deterministic 16-pixel-per-tile survey plate with a seed-selected title, prison/crypt/magma palette, framed full-floor topology, room corner marks, doors and locks, stairs, hazards, planned enemy/boss/item/chest/NPC/key markers, and an embedded bitmap legend. It renders from a temporary content-backed `WorldState`; it does not capture the viewport, reveal fog, move the player, travel floors, consume run RNG, or replace the active world.
 
 ## Godot Editor Plugin
 

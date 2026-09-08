@@ -105,6 +105,8 @@ Combat is still resolved inside `Core/Simulation/CombatResolver.cs`, but it is n
 
 The ability pipeline is shared by item casts and AI casts so the runtime rules stay in one place.
 
+Ability casts, consumables, and melee/ranged weapon on-hit effects use authored status stacking and duration-refresh rules when content is attached. Content-free simulation keeps its legacy rules. Once status damage is lethal, later regeneration in that tick cannot revive the victim; expiration bookkeeping and death attribution still complete. Ability self-healing likewise cannot revive a caster killed by reflected damage.
+
 Relics are content-authored passive hooks in `Content/relics.json`. Melee, ranged, ability, status, and trap damage now use `RelicProcessor` for applicable outgoing and incoming hooks. Runtime support includes first-hit tracking, timed damage buffs, shields, damage reduction/negation, reflection, one lethal save, floor-entry effects, merchant discounts, kill/rest effects, and Cursed Blade upkeep. `GameManager.ProcessRelicChoice(...)` claims a selected relic, `EventBus.RelicsChanged` refreshes the HUD relic tray, and `RelicChoiceOverlay` presents the three-choice modal emitted by `EventBus.RelicChoiceReady`.
 
 Ranged attacks use equipped `ranged` weapon damage, accuracy, crit chance, and on-hit effects when available. Ability `heal_self` effects resolve after damage, and `enemies` relation filters exclude neutral entities. Synergy passive stat bonuses are removed when requirements cease to be met. Shrine use grants Thieves' Compact reputation.
@@ -123,6 +125,8 @@ Critical hits now use a clearer 1.5x damage multiplier. If the attacker's accura
 
 When the last living hostile enemy on a floor dies, GameManager emits `FloorCleared(depth)`, awards `10 + depth * 5` gold once for that floor, and logs a floor-clear callout.
 
+Rewarded floor depths are part of the version 18 run snapshot. Loading replaces the previous session's reward history, preventing both duplicate payouts and suppressed rewards after restoring an earlier save. A new run starts at turn zero; ordinary floor travel preserves the run turn counter.
+
 ## Generation
 
 Dungeon generation lives in `Core/Generation/`.
@@ -132,17 +136,28 @@ The current flow in `DungeonGenerator` is:
 1. Derive a repeatable attempt seed from the world seed, floor depth, and retry index.
 2. Initialize the map as walls.
 3. Build a BSP tree.
-4. Place rooms (prefab `^` tiles become `TileType.Trap`).
-5. Stitch rooms with corridors.
-6. Collect trap spawn details from `^` tiles and explicit `type: "trap"` spawn points.
-7. Place stairs, enemies, and items (trap positions are excluded from spawn rolls).
-8. Validate the generated level with `LevelValidator`, including trap reachability.
+4. Select a seed-derived floor profile (`combat`, `loot`, `hazard`, `open`, or `ambush`).
+5. Place rooms, reserving a fitting authored start room and one non-start profile room when available (prefab `^` tiles become `TileType.Trap`).
+6. Stitch rooms with seeded L-shaped and midpoint-dogleg corridors.
+7. Collect trap spawn details from `^` tiles and explicit `type: "trap"` spawn points.
+8. Place stairs, enemies, and items (trap positions are excluded from spawn rolls).
+9. Validate the generated level with `LevelValidator`, including trap reachability.
+
+Depth zero is normalized to authored depth one for prefab eligibility, so a new run can use the repository's first-floor rooms instead of silently falling back to the built-in prefab library. Fitting prefab IDs are consumed without repetition until the available pool is exhausted, reducing duplicate-room clusters. Layout and population use independently derived RNG stages, so room/corridor decisions are isolated from later spawn-placement random calls while remaining reproducible from seed and depth. `RoomData.PrefabId` records transient generation diagnostics and is not persisted as authoritative gameplay state.
 
 Traps are walkable but hazardous stationary features. Authored trap definitions live in `Content/traps.json`; each room `trap_id` must reference a known trap. `LevelData` exposes `TrapSpawnDetails` so `GameManager.PopulateWorld` can instantiate trap entities.
 
 Floor-event planning lives in `Core/Generation/FloorEventResolver.cs`. Boss floors take precedence at depths divisible by both 3 and 5; other fifth floors are safe, and standard floors can request shrine or curse rooms. Safe floors suppress enemy spawn output. Requested special-room tags are preferred during BSP placement, boss floors receive a fallback boss-marked spawn, deep-floor spawn caps scale with map area, random enemies avoid the start room, and exits use carved traversal distance. Bare trap tiles receive deterministic theme-specific trap IDs. Connectivity validation can treat locked doors as passable while still treating water as non-traversable, and ragged prefab rows read as walls.
 
-Special-room integration remains partial. A boss-marked spawn is not yet guaranteed to resolve to a boss-tagged enemy template in `GameManager`, shrine/curse event metadata is not carried into `LevelData`, requested rooms are best-effort, and key placement can still under-provision a floor when key candidates are exhausted.
+Enemy population honors the generated boss marker: random boss slots select only `boss`-tagged templates eligible at the actual floor depth, and ordinary random slots exclude boss templates. The existing weighted selection and stable candidate ordering remain in use. Valid explicit template IDs override depth and marker restrictions; unknown IDs fall through to the matching random pool. An empty matching pool skips the spawn rather than borrowing deeper or ordinary enemies. This intentionally changes newly generated population relative to earlier builds; cached/saved enemies keep their identities.
+
+Special-room integration remains partial. Shrine/curse event metadata is not carried into `LevelData`, requested rooms are best-effort, and key placement can still under-provision a floor when key candidates are exhausted.
+
+### Dungeon Survey Export
+
+`Scripts/Tools/DungeonMapExporter.cs` creates a temporary content-backed `WorldState`, runs the configured `IGenerator` for an explicit seed/depth, and rasterizes the resulting tile grid plus `LevelData` room/spawn metadata directly into a Godot `Image`. It saves a complete PNG under `user://map_exports` through the Developer Workshop Commands tab. No viewport, camera, fog, active-world entity, scheduler, floor cache, or gameplay RNG state participates in the export.
+
+The export uses fixed integer geometry, a bundled 5x7 bitmap alphabet, sorted room/marker ordering, and a stable visual hash. This keeps visual composition deterministic and avoids platform font/render-backend drift. Depth selects a prison, crypt, or magma palette; seed selects decorative wear and the survey title. Planned spawn overlays identify the generated floor blueprint rather than a mutated in-progress floor.
 
 ## Rendering And UI Flow
 
@@ -165,6 +180,7 @@ The rendering layer is event-driven.
 Current presentation-specific behavior worth knowing:
 
 - `WorldArtCatalog` now resolves world and entity art from the imported CC0 0x72 tileset subset under `Assets/Tilesets/0x72/` and `Assets/Sprites/0x72/`.
+- Enemy bodies prefer the authored `EnemyTemplate.SpritePath`, looked up through `EnemyComponent.TemplateId`. The renderer uses bound-world content, or injected content when the world has none, and clears stale world bindings on rebind. Existing cached texture loading supports source-image fallback when imports are unavailable; missing metadata or unloadable art retains name-based/procedural fallbacks. Player, neutral, and chest visuals are unchanged.
 - `WorldView` hides the legacy tilemap visuals and scales the imported 16x16 art up to the runtime 40x40 cell size.
 - `WorldView` only mirrors fog/FOV state from the active world; `GameManager`/`WorldState` own authoritative visibility and exploration mutation.
 - `AnimationController` now advances short eased move animations over multiple `_Process(...)` frames instead of snapping movement immediately. `WorldView` clears transient popups/flashes on full world rebinds and floor changes so damage numbers cannot leak between redraws.
@@ -181,6 +197,7 @@ Current presentation-specific behavior worth knowing:
 - `MainMenu`, `PauseMenu`, `HelpOverlay`, and `CharacterSheet` now use clearer run/build/tool hierarchy, sectioned body text, and shared dungeon-console chrome so modal screens read as deliberate game surfaces instead of generic panels. Menu actions use fitted labels and bounded regions so long titles, summaries, and footer hints do not overlap the selectable options.
 - `InventoryUI` remains text-driven for low-risk stub testing, but uses stable category glyphs, non-color rarity abbreviations such as `[R]`, rarity-colored item tokens, gold selected-slot framing, explicit equipped markers, full stack counts, contextual footers, stack/charge details, and multiline equipment comparisons for faster scanning. The bottom-right equipment tooltip is taller and uses smaller rich text so comparison lines remain visible. Tooltip and combat-log item pickup markup use the same centralized rarity helpers with BBCode-safe bracket markers.
 - Aimed scrolls (`scroll_fireball`, `scroll_blink`) are flagged `RequiresTargetSelection`; selecting one enters `TargetingOverlay` mode where directional keys move the cursor, Enter confirms, and Escape cancels. `WorldView` mirrors the cursor and AoE preview from EventBus events without mutating world state.
+- Inventory open/close transitions notify `UIRoot` to refresh its input gate, including mouse use/equip/drop and close controls. Closing inventory to aim an item keeps gameplay blocked until targeting finishes or is cancelled.
 - `Minimap` remains a non-modal gameplay overlay toggled by `M`/`Tab`. It uses a darker framed map treatment with subdued explored/visible tile colors, gold player/stair cues, visible enemy/NPC/item/chest markers, distinct trap and door colors, and a compact in-panel legend for the marker/color set.
 - Long text-driven UI surfaces now window or clamp overflow: inventory pages beyond its visible grid, inventory header/detail/footer text is fitted on compact panels, shop and dialog option lists keep the selected row visible with ellipses, tooltips and menu bodies cap long content, and fitted labels shrink within their bounds instead of rendering over neighboring controls.
 - Status effects are now visible in the HUD and on entity sprites. `EventBus.StatusEffectApplied` and `StatusEffectRemoved` drive immediate refreshes. `EntityRenderer` adds a `StatusOverlay` child per entity, populating it with `Sprite2D` icons looked up from `status_effects.json` `icon_path` and tinted with `color_tint`. `HUD` renders the same icons in a horizontal status badge row with remaining-turn labels.
@@ -209,12 +226,12 @@ Persistence lives in `Core/Persistence/`.
 
 ### Current Save Version
 
-The current normalized save version is `17`.
+The current normalized save version is `18`.
 
 Notable details:
 
 - Explored and visible map flags are stored as packed bitfields.
-- Legacy payloads through version 16 are migrated on load.
+- Legacy payloads through version 17 are migrated on load.
 - Saves now persist the active floor plus cached inactive floors through a normalized floor list, while retaining active-floor root aliases for compatibility with metadata and existing tooling.
 - New saves include optional content metadata (`contentVersion` and a deterministic content hash) so load flows can warn when the authored JSON set differs from the one that created the save.
 - Multi-floor validation requires unique floor depths, an active floor payload, and exactly one player entity across all saved floors on the active floor.
@@ -232,6 +249,9 @@ Notable details:
 - Validation now covers negative wallet/progression/relic/shrine/kill-streak values while allowing speed-zero static shrines, NPCs, merchants, chests, and traps.
 - Meta progression has an independent schema version 1, normalizes legacy/unversioned data, and falls back to fresh data on malformed files. Daily challenge persistence likewise recovers from corrupt files; both use temporary-file replacement.
 - Lucky Coin consumes persisted combat RNG, and merchant item creation consumes persisted item RNG. These improve continuation determinism but intentionally change outcomes relative to older builds.
+- Version 18 persists sorted rewarded floor depths and rejects null, negative, duplicate, or unknown-depth reward metadata. Versions 1-17 infer that saved floors without living hostiles have already paid their reward. Old saves cannot distinguish an unpaid empty floor from an already rewarded one; migration intentionally skips any such unpaid reward rather than duplicating gold. Version 17 migration preserves scheduler and relic state without replaying older normalization.
+- Rehydration binds the supplied content database to every restored floor, so direct Core load callers retain authored trap and status behavior without facade repair.
+- Saved entity placement is restored independently of spawn-time walkability. Phased actors inside walls, including actors whose phasing expired there, retain exact positions and occupancy indexes on active and cached floors. Bounds and blocking-collision checks remain enforced, and ordinary spawning still rejects walls.
 
 ### Traps
 

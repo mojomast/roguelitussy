@@ -33,10 +33,21 @@ This page reflects the current repository wiring in `InputHandler` and the activ
 |---|---|---|
 | Deploy / confirm selected action | `Enter`, `KpEnter` | Starts a run when Start Expedition is selected, or activates the selected menu action. |
 | Move selection | Arrow keys, `WASD` | Moves through character creation and system options. |
-| Adjust highlighted field | Left/Right, `+`, `-` | Cycles name, archetype, origin, trait, identity options, training points, and seed where applicable. |
+| Adjust highlighted field | Left/Right, `+`, `-` | Cycles name, archetype, origin, trait, identity options, and training points where applicable. Seed uses typed entry. |
 | Starter Kit tooltip | `Tab` | Toggles the starter-kit tooltip with Equipped/Pack explanations, content-backed item names/descriptions, stack counts, and targeting notes. |
 | Help | `H` | Opens main-menu help. |
 | Dev tools | `T` | Opens the development tools workbench. |
+
+## Developer Workshop
+
+| Action | Keys | Notes |
+|---|---|---|
+| Switch tab | `Tab` | Cycle Rooms, Items, Enemies, and Commands. |
+| Select row | Up/Down, `W`/`S` | Move through fields and actions. |
+| Adjust value | Left/Right, `A`/`D`, `+`/`-` | Fine-adjust the selected value. |
+| Apply/edit | `Enter`, `KpEnter` | Runs an action; seed and export-depth rows enter exact numeric editing. |
+| Edit number | Digits, `Backspace`, `Delete`, `Enter`, `Escape` | Type, erase, clear, commit, or cancel seed/depth input. |
+| Close | `Escape`, `T` | Escape cancels numeric editing first; otherwise closes the workshop. |
 
 ## Examine Mode
 

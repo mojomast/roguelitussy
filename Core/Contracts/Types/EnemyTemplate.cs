@@ -16,7 +16,8 @@ public sealed record EnemyTemplate(
     int XpValue,
     AIParameters AIParameters,
     IReadOnlyList<string>? Tags = null,
-    IReadOnlyList<BossPhaseTemplate>? BossPhases = null);
+    IReadOnlyList<BossPhaseTemplate>? BossPhases = null,
+    string SpritePath = "");
 
 public sealed record BossPhaseTemplate(
     int Phase,

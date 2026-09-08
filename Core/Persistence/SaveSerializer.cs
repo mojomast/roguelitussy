@@ -48,6 +48,8 @@ internal sealed class SaveFileData
 
     public List<FloorSaveData> Floors { get; set; } = new();
 
+    public List<int> RewardedFloorDepths { get; set; } = new();
+
     public CharacterOptionsSaveData CharacterOptions { get; set; } = new();
 }
 
@@ -419,7 +421,7 @@ internal sealed class PositionSaveData
 
 public static class SaveSerializer
 {
-    public const int CurrentVersion = 17;
+    public const int CurrentVersion = 18;
 
     internal static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -477,6 +479,7 @@ public static class SaveSerializer
             PlayerId = snapshot.ActiveWorld.Player.Id.Value.ToString("N"),
             Floors = floors,
             CharacterOptions = snapshot.CharacterOptions,
+            RewardedFloorDepths = snapshot.RewardedFloorDepths.OrderBy(depth => depth).ToList(),
         };
 
         ApplyActiveFloorAliases(data, activeFloor);
@@ -525,12 +528,12 @@ public static class SaveSerializer
             ? active
             : throw new InvalidDataException("Active floor missing from save data.");
 
-        return new SaveRunSnapshot(data.Seed, data.Depth, activeWorld, floors, data.CharacterOptions ?? new CharacterOptionsSaveData());
+        return new SaveRunSnapshot(data.Seed, data.Depth, activeWorld, floors, data.CharacterOptions ?? new CharacterOptionsSaveData(), data.RewardedFloorDepths);
     }
 
     private static WorldState ToWorldState(SaveFileData data, FloorSaveData floor, bool requirePlayer, IContentDatabase? content = null)
     {
-        var world = new WorldState();
+        var world = new WorldState { ContentDatabase = content };
         world.InitGrid(floor.Width, floor.Height);
         world.RehydrateRandomStates(data.Seed, floor.CombatRandomState, floor.ItemRandomState);
 
@@ -571,7 +574,7 @@ public static class SaveSerializer
 
         foreach (var entityData in floor.Entities)
         {
-            world.AddEntity(ToEntity(entityData, content));
+            world.RestoreEntity(ToEntity(entityData, content));
         }
 
         foreach (var entityData in floor.Entities)

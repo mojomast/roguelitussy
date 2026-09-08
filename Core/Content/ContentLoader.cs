@@ -802,7 +802,8 @@ public sealed class ContentLoader : IContentDatabase
             enemy.Tags.Count > 0
                 ? enemy.Tags.Distinct(StringComparer.Ordinal).OrderBy(tag => tag, StringComparer.Ordinal).ToArray()
                 : null,
-            bossPhases);
+            bossPhases,
+            enemy.SpritePath);
     }
 
     private static AIParameters BuildAIParameters(Dictionary<string, JsonElement> aiParams)

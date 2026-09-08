@@ -164,7 +164,15 @@ public sealed class CastAbilityAction : IAction
                             continue;
                         }
 
-                        StatusEffectProcessor.ApplyEffect(target, statusType, effect.StatusDuration, sourceEntityId: ActorId);
+                        if (world.ContentDatabase is { } content)
+                        {
+                            StatusEffectProcessor.ApplyEffect(target, statusType, content, effect.StatusDuration, sourceEntityId: ActorId);
+                        }
+                        else
+                        {
+                            StatusEffectProcessor.ApplyEffect(target, statusType, effect.StatusDuration, sourceEntityId: ActorId);
+                        }
+
                         var applied = StatusEffectProcessor.GetEffect(target, statusType);
                         if (applied is not null)
                         {
@@ -194,7 +202,7 @@ public sealed class CastAbilityAction : IAction
 
         foreach (var effect in Ability.Effects)
         {
-            if (effect.Type != "heal_self")
+            if (effect.Type != "heal_self" || !actor.IsAlive || world.GetEntity(ActorId) is null)
             {
                 continue;
             }

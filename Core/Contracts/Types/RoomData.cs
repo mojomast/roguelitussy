@@ -6,4 +6,5 @@ public sealed record RoomData(
     int Width,
     int Height,
     Position Center,
-    IReadOnlyList<string>? Tags = null);
+    IReadOnlyList<string>? Tags = null,
+    string? PrefabId = null);

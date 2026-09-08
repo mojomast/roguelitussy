@@ -18,6 +18,9 @@ public sealed class SaveManagerTests : ITestSuite
         registry.Add("Persistence.SaveManager round-trips multi-floor run state", RoundTripRestoresMultiFloorRunState);
         registry.Add("Persistence.SaveManager round-trips multi-floor trap state", RoundTripRestoresMultiFloorTrapState);
         registry.Add("Persistence.SaveManager trap still triggers after save/load round-trip", TrapStillTriggersAfterSaveLoadRoundTrip);
+        registry.Add("Persistence.SaveManager restores phased actors in walls on all floors", () => RoundTripRestoresActorsInWalls(expirePhasing: false));
+        registry.Add("Persistence.SaveManager restores actors in walls after phasing expires", () => RoundTripRestoresActorsInWalls(expirePhasing: true));
+        registry.Add("Persistence.WorldState spawning still rejects wall tiles", SpawningRejectsWallTiles);
         registry.Add("Persistence.SaveManager round-trips character options", RoundTripRestoresCharacterOptions);
         registry.Add("Persistence.SaveValidator rejects v8 saves missing active floor", RejectsMissingActiveFloor);
         registry.Add("Persistence.SaveValidator rejects v8 saves with duplicate player across floors", RejectsDuplicatePlayerAcrossFloors);
@@ -178,12 +181,90 @@ public sealed class SaveManagerTests : ITestSuite
         Expect.True(manager.SaveRun(new SaveRunSnapshot(active.Seed, active.Depth, active, floors), SaveSlots.Slot1).GetAwaiter().GetResult(),
             "SaveManager should persist a multi-floor run snapshot with traps");
 
-        var restored = manager.LoadRun(SaveSlots.Slot1).GetAwaiter().GetResult();
+        var content = new StubContentDatabase();
+        var restored = manager.LoadRun(SaveSlots.Slot1, content).GetAwaiter().GetResult();
         Expect.NotNull(restored, "SaveManager should load the saved run snapshot with traps");
         Expect.True(restored!.Floors.TryGetValue(active.Depth, out var restoredActive), "Loaded run should include the active floor");
         Expect.True(restored.Floors.TryGetValue(cached.Depth, out var restoredCached), "Loaded run should include cached inactive floors");
         Expect.Equal(TrapSignature(active), TrapSignature(restoredActive!), "Active floor trap state should survive round-trip");
         Expect.Equal(TrapSignature(cached), TrapSignature(restoredCached!), "Cached floor trap state should survive round-trip");
+        foreach (var floor in restored.Floors.Values)
+        {
+            Expect.True(ReferenceEquals(content, floor.ContentDatabase), "Every restored floor should bind the supplied content database");
+        }
+    }
+
+    private static void RoundTripRestoresActorsInWalls(bool expirePhasing)
+    {
+        using var sandbox = SaveSandbox.Create();
+        var manager = new SaveManager(sandbox.DirectoryPath, sandbox.Clock);
+        var active = CreateWorld();
+        active.Depth = 2;
+        var cached = CreateWorld();
+        cached.Depth = 1;
+        cached.RemoveEntity(cached.Player.Id);
+        var cachedActor = cached.Entities.Single(entity => entity.Faction == Faction.Enemy);
+        var actors = new[] { (World: active, Actor: active.Player), (World: cached, Actor: cachedActor) };
+        var delta = new Position(0, 1);
+        foreach (var (world, actor) in actors)
+        {
+            world.SetTile(actor.Position + delta, TileType.Wall);
+            StatusEffectProcessor.ApplyEffect(actor, StatusEffectType.Phased, expirePhasing ? 1 : 4, 1);
+            Expect.Equal(ActionResult.Success, new MoveAction(actor.Id, delta).Execute(world).Result, "Phasing should allow normal gameplay to enter the wall");
+            if (expirePhasing)
+            {
+                StatusEffectProcessor.Tick(world, actor.Id);
+            }
+
+            Expect.Equal(!expirePhasing, StatusEffectProcessor.HasFlag(actor, "phase_through_walls"), "Fixture should have the intended phasing state");
+        }
+
+        var floors = new Dictionary<int, WorldState> { [active.Depth] = active, [cached.Depth] = cached };
+        Expect.True(manager.SaveRun(new SaveRunSnapshot(active.Seed, active.Depth, active, floors), SaveSlots.Slot1).GetAwaiter().GetResult(), "Actors in walls should be saveable");
+        var restored = manager.LoadRun(SaveSlots.Slot1).GetAwaiter().GetResult();
+        Expect.NotNull(restored, "Actors in walls on either floor must not prevent loading the run");
+        foreach (var (world, actor) in actors)
+        {
+            var loadedWorld = restored!.Floors[world.Depth];
+            Expect.Equal(WorldSignatureWithoutPlayer(world), WorldSignatureWithoutPlayer(loadedWorld), "Restoration must preserve tiles, entities, and status durations exactly");
+            var loadedActor = loadedWorld.GetEntity(actor.Id)!;
+            var wallPosition = actor.Position;
+            Expect.Equal(wallPosition, loadedActor.Position, "Restoration must not relocate actors");
+            Expect.Equal(TileType.Wall, loadedWorld.GetTile(wallPosition), "Restoration must not carve the wall");
+            Expect.True(ReferenceEquals(loadedActor, loadedWorld.GetEntityAt(wallPosition)), "Restoration should rebuild the blocking occupancy index");
+            Expect.Equal(!expirePhasing, StatusEffectProcessor.HasFlag(loadedActor, "phase_through_walls"), "Restoration should preserve expired or active phasing");
+
+            var exitDelta = new Position(0, -1);
+            var expected = new MoveAction(actor.Id, exitDelta).Execute(world);
+            var actual = new MoveAction(actor.Id, exitDelta).Execute(loadedWorld);
+            Expect.Equal(ActionResult.Success, actual.Result, "Restored actor should be able to leave the wall");
+            Expect.Equal(expected.Result, actual.Result, "Exit movement should match uninterrupted play");
+            Expect.Equal(WorldSignatureWithoutPlayer(world), WorldSignatureWithoutPlayer(loadedWorld), "Continuation should match uninterrupted play");
+            Expect.True(loadedWorld.GetEntityAt(wallPosition) is null, "Leaving the wall should clear its occupancy entry");
+            Expect.True(ReferenceEquals(loadedActor, loadedWorld.GetEntityAt(loadedActor.Position)), "Leaving the wall should index the new position");
+        }
+    }
+
+    private static void SpawningRejectsWallTiles()
+    {
+        var world = CreateWorld();
+        var position = new Position(2, 3);
+        world.SetTile(position, TileType.Wall);
+        var actor = new Entity("Phased spawn", position, new Stats { HP = 10, MaxHP = 10, Speed = 100 }, Faction.Enemy);
+        StatusEffectProcessor.ApplyEffect(actor, StatusEffectType.Phased, 4, 1);
+        var rejected = false;
+        try
+        {
+            world.AddEntity(actor);
+        }
+        catch (InvalidOperationException)
+        {
+            rejected = true;
+        }
+
+        Expect.True(rejected, "Ordinary spawning must reject walls even for phased actors");
+        Expect.True(world.GetEntity(actor.Id) is null, "Rejected spawn must not enter the ID index");
+        Expect.True(world.GetEntityAt(position) is null, "Rejected spawn must not enter the occupancy index");
     }
 
     private static void TrapStillTriggersAfterSaveLoadRoundTrip()
@@ -191,6 +272,8 @@ public sealed class SaveManagerTests : ITestSuite
         using var sandbox = SaveSandbox.Create();
         var manager = new SaveManager(sandbox.DirectoryPath, sandbox.Clock);
         var world = new WorldState();
+        var content = new StubContentDatabase();
+        world.ContentDatabase = content;
         world.InitGrid(5, 5);
         world.Seed = 1234;
         for (var y = 0; y < world.Height; y++)
@@ -229,20 +312,33 @@ public sealed class SaveManagerTests : ITestSuite
         world.AddEntity(player);
 
         Expect.True(manager.SaveGame(world, SaveSlots.Slot1).GetAwaiter().GetResult(), "Save should persist trap state");
-        var loaded = manager.LoadGame(SaveSlots.Slot1).GetAwaiter().GetResult();
+        var loaded = manager.LoadGame(SaveSlots.Slot1, content).GetAwaiter().GetResult();
         Expect.NotNull(loaded, "Saved world with trap should load again");
-        loaded!.ContentDatabase = new StubContentDatabase();
+        Expect.True(ReferenceEquals(content, loaded!.ContentDatabase), "LoadGame should bind content without caller repair");
+        Expect.Equal(world.CombatRandomState, loaded.CombatRandomState, "Loading should preserve combat RNG before the trap triggers");
+        Expect.Equal(world.ItemRandomState, loaded.ItemRandomState, "Loading should preserve item RNG before the trap triggers");
 
         var loadedPlayer = loaded.Player;
         var loadedTrap = loaded.GetEntity(trap.Id)!;
         var startHp = loadedPlayer.Stats.HP;
 
+        var rngBefore = world.CombatRandomState;
+        var expected = new MoveAction(player.Id, new Position(0, 1)).Execute(world);
         var outcome = new MoveAction(loadedPlayer.Id, new Position(0, 1)).Execute(loaded);
         Expect.Equal(ActionResult.Success, outcome.Result, "Move onto trap tile should succeed after load");
         Expect.Equal(new Position(2, 2), loadedPlayer.Position, "Player should end on trap tile after load");
         Expect.True(loadedPlayer.Stats.HP < startHp, "Trap should damage player after save/load round-trip");
         Expect.False(loadedTrap.GetComponent<TrapComponent>()!.IsArmed, "Trap should be disarmed after triggering post-load");
         Expect.True(loadedTrap.GetComponent<TrapComponent>()!.IsRevealed, "Trap should be revealed after triggering post-load");
+        Expect.Equal(player.Stats.HP, loadedPlayer.Stats.HP, "Trap damage should match uninterrupted play");
+        Expect.NotEqual(rngBefore, world.CombatRandomState, "Variable trap damage should consume combat RNG");
+        Expect.Equal(world.CombatRandomState, loaded.CombatRandomState, "Trap RNG consumption should match uninterrupted play");
+        Expect.Equal(world.ItemRandomState, loaded.ItemRandomState, "Trap continuation should preserve item RNG");
+        Expect.Equal(TrapSignature(world), TrapSignature(loaded), "Trap trigger count and flags should match uninterrupted play");
+        Expect.Equal(string.Join("|", expected.LogMessages), string.Join("|", outcome.LogMessages), "Trap logs should match uninterrupted play");
+        Expect.Equal(expected.CombatEvents.Count, outcome.CombatEvents.Count, "Trap combat event count should match uninterrupted play");
+        Expect.True(expected.CombatEvents.Count > 0, "Trap should emit a combat event");
+        Expect.True(expected.CombatEvents.SelectMany(combat => combat.DamageResults).SequenceEqual(outcome.CombatEvents.SelectMany(combat => combat.DamageResults)), "Trap damage events should match uninterrupted play");
     }
 
     private static void RoundTripRestoresCharacterOptions()

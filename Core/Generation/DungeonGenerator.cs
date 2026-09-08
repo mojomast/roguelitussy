@@ -17,6 +17,7 @@ public sealed class DungeonGenerator : IGenerator
     private static readonly string[] CryptTrapIds = { "trap_poison_gas", "trap_teleport" };
     private static readonly string[] MagmaTrapIds = { "spike_trap", "trap_gold_drain" };
     private static readonly string[] DefaultTrapIds = { "spike_trap", "trap_alarm" };
+    private static readonly string[] FloorProfileTags = { "combat", "loot", "hazard", "open", "ambush" };
 
     private sealed record FixedEntityCollections(
         List<EnemySpawnData> EnemySpawns,
@@ -62,7 +63,8 @@ public sealed class DungeonGenerator : IGenerator
         FloorEventPlan floorPlan)
     {
         var attemptSeed = MixSeed(seed, depth, attempt);
-        var rng = new Random(attemptSeed);
+        var layoutRng = new Random(MixStageSeed(attemptSeed, 0x1f123bb5));
+        var placementRng = new Random(MixStageSeed(attemptSeed, 0x5f356495));
         var mapSize = GetMapSize(depth);
         var mapArea = mapSize.Width * mapSize.Height;
         var skipEnemySpawns = floorPlan.FloorType == FloorType.SafeFloor;
@@ -74,11 +76,12 @@ public sealed class DungeonGenerator : IGenerator
 
         InitializeWorld(world, mapSize.Width, mapSize.Height, seed, depth);
 
-        var tree = BSPNode.Create(mapSize.Width, mapSize.Height, rng);
+        var tree = BSPNode.Create(mapSize.Width, mapSize.Height, layoutRng);
         var themeTag = ResolveThemeForDepth(depth);
         var useTheme = !string.IsNullOrWhiteSpace(themeTag) && HasEnoughThemeMatches(prefabs, themeTag, tree);
-        var rooms = RoomPlacer.PlaceRooms(tree, world, rng, prefabs, useTheme ? themeTag : null, specialRoomTags);
-        CorridorBuilder.Stitch(tree, world, rng);
+        var profileTag = ResolveFloorProfile(attemptSeed, prefabs, tree, specialRoomTags);
+        var rooms = RoomPlacer.PlaceRooms(tree, world, layoutRng, prefabs, useTheme ? themeTag : null, specialRoomTags, profileTag);
+        CorridorBuilder.Stitch(tree, world, layoutRng);
         DoorSanitizer.Normalize(world);
 
         if (rooms.Count < 4)
@@ -96,12 +99,12 @@ public sealed class DungeonGenerator : IGenerator
         var occupied = new HashSet<Position>();
         var playerSpawn = TryGetExplicitSpawn(startRoom, occupied, out var explicitPlayerSpawn, "player")
             ? explicitPlayerSpawn
-            : PlaceStairs(world, startRoom, TileType.StairsUp, rng, occupied);
+            : PlaceStairs(world, startRoom, TileType.StairsUp, placementRng, occupied);
         world.SetTile(playerSpawn, TileType.StairsUp);
 
         var stairsDown = TryGetExplicitSpawn(exitRoom, occupied, out var explicitExitSpawn, "stairs_down")
             ? explicitExitSpawn
-            : PlaceStairs(world, exitRoom, TileType.StairsDown, rng, occupied);
+            : PlaceStairs(world, exitRoom, TileType.StairsDown, placementRng, occupied);
         world.SetTile(stairsDown, TileType.StairsDown);
 
         var fixedEntities = CollectFixedEntitySpawns(world.ContentDatabase, rooms, occupied);
@@ -111,16 +114,16 @@ public sealed class DungeonGenerator : IGenerator
             : CollectEnemySpawnDetails(rooms, occupied, fixedEntities.EnemySpawns, "enemy", "enemy_boss");
         var forcedItemSpawns = CollectItemSpawnDetails(rooms, occupied, fixedEntities.ItemSpawns, "item");
         var trapSpawnDetails = CollectTrapSpawnDetails(rooms, occupied, themeTag, attemptSeed);
-        var (lockedDoors, keySpawns) = PlaceLockedDoorsAndKeys(world, rooms, playerSpawn, rng, occupied);
+        var (lockedDoors, keySpawns) = PlaceLockedDoorsAndKeys(world, rooms, playerSpawn, placementRng, occupied);
         var enemySpawnDetails = skipEnemySpawns
             ? new List<EnemySpawnData>()
-            : PlaceEnemySpawns(rooms, startRoom, depth, mapArea, rng, occupied, forcedEnemySpawns);
-        var itemSpawnDetails = PlaceItemSpawns(rooms, depth, mapArea, rng, occupied, forcedItemSpawns);
+            : PlaceEnemySpawns(rooms, startRoom, depth, mapArea, placementRng, occupied, forcedEnemySpawns);
+        var itemSpawnDetails = PlaceItemSpawns(rooms, depth, mapArea, placementRng, occupied, forcedItemSpawns);
 
         if (floorPlan.HasSpecialRoom(SpecialRoomType.BossRoom) && !enemySpawnDetails.Any(spawn => spawn.IsBoss))
         {
             // Boss floors always get a boss guarding the exit even when no boss prefab fits.
-            var bossPosition = PickAvailableTile(rooms, exitRoom, rng, occupied);
+            var bossPosition = PickAvailableTile(rooms, exitRoom, placementRng, occupied);
             occupied.Add(bossPosition);
             enemySpawnDetails.Add(new EnemySpawnData(bossPosition, IsBoss: true));
         }
@@ -199,7 +202,7 @@ public sealed class DungeonGenerator : IGenerator
 
         for (var i = 0; i < prefabs.Count; i++)
         {
-            if (!prefabs[i].Tags.Contains(themeTag))
+            if (!prefabs[i].Tags.Contains(themeTag) || !prefabs[i].HasWalkableTiles)
             {
                 continue;
             }
@@ -225,6 +228,62 @@ public sealed class DungeonGenerator : IGenerator
             var floor = depth <= 0 ? 1 : depth;
             return seed ^ (floor * 7919) ^ (attempt * 104729);
         }
+    }
+
+    private static int MixStageSeed(int seed, int salt)
+    {
+        unchecked
+        {
+            var mixed = seed ^ salt;
+            mixed ^= mixed << 13;
+            mixed ^= (int)((uint)mixed >> 17);
+            mixed ^= mixed << 5;
+            return mixed;
+        }
+    }
+
+    private static string? ResolveFloorProfile(
+        int seed,
+        IReadOnlyList<RoomPrefab> prefabs,
+        BSPNode tree,
+        IReadOnlyList<string> specialRoomTags)
+    {
+        var leaves = tree.Leaves().Skip(1).ToArray();
+        if (leaves.Length == 0)
+        {
+            return null;
+        }
+
+        var startIndex = (int)((uint)seed % (uint)FloorProfileTags.Length);
+        for (var offset = 0; offset < FloorProfileTags.Length; offset++)
+        {
+            var tag = FloorProfileTags[(startIndex + offset) % FloorProfileTags.Length];
+            if (specialRoomTags.Contains(tag))
+            {
+                continue;
+            }
+
+            for (var prefabIndex = 0; prefabIndex < prefabs.Count; prefabIndex++)
+            {
+                var prefab = prefabs[prefabIndex];
+                if (!prefab.HasWalkableTiles || !prefab.Tags.Contains(tag))
+                {
+                    continue;
+                }
+
+                for (var leafIndex = 0; leafIndex < leaves.Length; leafIndex++)
+                {
+                    if (prefab.FitsWithin(
+                        leaves[leafIndex].Width - (RoomPlacer.LeafPadding * 2),
+                        leaves[leafIndex].Height - (RoomPlacer.LeafPadding * 2)))
+                    {
+                        return tag;
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 
     private static RoomPlacement SelectExitRoom(WorldState world, RoomPlacement startRoom, IReadOnlyList<RoomPlacement> rooms)
@@ -615,9 +674,10 @@ public sealed class DungeonGenerator : IGenerator
             return RoomPrefabLibrary.GetDefaultPrefabs();
         }
 
+        var effectiveDepth = Math.Max(1, depth);
         var prefabs = loader.RoomPrefabs.Values
             .OrderBy(room => room.Id, StringComparer.Ordinal)
-            .Where(room => depth >= room.MinDepth && (room.MaxDepth < 0 || depth <= room.MaxDepth))
+            .Where(room => effectiveDepth >= room.MinDepth && (room.MaxDepth < 0 || effectiveDepth <= room.MaxDepth))
             .Where(room => room.Layout.Count > 0)
             .Select(room => new RoomPrefab(
                 room.Id,
