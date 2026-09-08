@@ -122,21 +122,21 @@ internal static class PlayerVisualCatalog
             return archetype switch
             {
                 "vanguard" => "vanguard_knight",
-                "mystic" => genderId == "feminine" ? "mystic_wizard" : "mystic_apprentice",
+                "arcanist" or "mystic" => genderId == "feminine" ? "mystic_wizard" : "mystic_apprentice",
                 _ => genderId == "feminine" ? "skirmisher_ranger" : "skirmisher_quickblade",
             };
         }
 
         if (raceId == "orc")
         {
-            return archetype == "mystic" ? "orc_shaman" : "orc_raider";
+            return archetype is "arcanist" or "mystic" ? "orc_shaman" : "orc_raider";
         }
 
         return archetype switch
         {
             "vanguard" => genderId == "feminine" ? "vanguard_knight" : "vanguard_stalwart",
-            "skirmisher" => genderId == "feminine" ? "skirmisher_ranger" : "skirmisher_quickblade",
-            "mystic" => genderId == "feminine" ? "mystic_wizard" : "mystic_apprentice",
+            "ranger" or "trickster" or "skirmisher" => genderId == "feminine" ? "skirmisher_ranger" : "skirmisher_quickblade",
+            "arcanist" or "mystic" => genderId == "feminine" ? "mystic_wizard" : "mystic_apprentice",
             _ => "mystic_apprentice",
         };
     }
@@ -148,10 +148,10 @@ internal static class PlayerVisualCatalog
         {
             "vanguard" when raceId == "dwarf" => "Stoneguard portrait",
             "vanguard" => "Knight portrait",
-            "skirmisher" when raceId == "orc" => "Raider portrait",
-            "skirmisher" => "Ranger portrait",
-            "mystic" when raceId == "orc" => "Shaman portrait",
-            "mystic" => "Mystic portrait",
+            "ranger" or "trickster" or "skirmisher" when raceId == "orc" => "Raider portrait",
+            "ranger" or "trickster" or "skirmisher" => "Ranger portrait",
+            "arcanist" or "mystic" when raceId == "orc" => "Shaman portrait",
+            "arcanist" or "mystic" => "Mystic portrait",
             _ => "Adventurer portrait",
         };
     }

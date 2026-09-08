@@ -21,3 +21,13 @@ public sealed record NpcSpawnData(
 public sealed record TrapSpawnData(
     Position Position,
     string? TrapId = null);
+
+public sealed record ShrineSpawnData(
+    Position Position,
+    string EventId);
+
+public sealed record LandmarkSpawnData(
+    Position Position,
+    SpecialRoomType Type,
+    string EventId,
+    bool IsFallback = false);

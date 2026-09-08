@@ -7,6 +7,8 @@ public sealed record MerchantOfferTemplate(
     int Price,
     int Quantity);
 
+public sealed record NpcServiceTemplate(string Id, int Cost, int HealAmount);
+
 public sealed record NpcTemplate(
     string TemplateId,
     string DisplayName,
@@ -20,7 +22,8 @@ public sealed record NpcTemplate(
     string AppearanceId,
     string ArchetypeId,
     string FactionId = "merchants_guild",
-    IReadOnlyList<MerchantOfferTemplate>? MerchantOffers = null)
+    IReadOnlyList<MerchantOfferTemplate>? MerchantOffers = null,
+    IReadOnlyList<NpcServiceTemplate>? Services = null)
 {
     public bool IsMerchant => MerchantOffers is { Count: > 0 };
 }

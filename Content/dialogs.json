@@ -5,78 +5,97 @@
     {
       "id": "merchant_intro",
       "start_node": "start",
-      "start_nodes": [
-        "start",
-        "start_supplies",
-        "start_warning"
-      ],
+      "start_nodes": ["start", "start_supplies", "start_warning"],
       "nodes": [
         {
           "id": "start",
-          "text": "I trade in things that keep you alive: medicine, steel, and one spare shield when luck goes bad.",
+          "text": "I trade in things that keep you alive: medicine, steel, and a spare shield. Stories do not stop bleeding. Bandages do.",
           "options": [
-            {
-              "text": "Show me what you have.",
-              "action": "shop"
-            },
-            {
-              "text": "What should I prioritize?",
-              "next": "advice"
-            },
-            {
-              "text": "I will be moving on.",
-              "action": "close"
-            }
+            { "text": "Show me your stock.", "action": "shop" },
+            { "text": "Dress my wounds.", "action": "service:field_dressing", "condition": { "type": "injured" } },
+            { "text": "Help me prepare.", "next": "advice" },
+            { "text": "Does the Guild know me?", "next": "guild", "condition": { "type": "reputation_at_least", "faction_id": "merchants_guild", "value": 30 } },
+            { "text": "Why work down here?", "next": "history" },
+            { "text": "I will be moving on.", "action": "close" }
           ]
         },
         {
           "id": "start_supplies",
-          "text": "Fresh bandages, questionable scrolls, and boots that have seen fewer corpses than most. Pick what solves your next problem.",
+          "text": "Fresh bandages, questionable scrolls, and boots with their soles still attached. Tell me what your last fight cost you.",
           "options": [
-            {
-              "text": "Show me what you have.",
-              "action": "shop"
-            },
-            {
-              "text": "What should I prioritize?",
-              "next": "advice"
-            },
-            {
-              "text": "I will be moving on.",
-              "action": "close"
-            }
+            { "text": "Show me your stock.", "action": "shop" },
+            { "text": "Dress my wounds.", "action": "service:field_dressing", "condition": { "type": "injured" } },
+            { "text": "Help me prepare.", "next": "advice" },
+            { "text": "Tell me about yourself.", "next": "history" },
+            { "text": "I will be moving on.", "action": "close" }
           ]
         },
         {
           "id": "start_warning",
-          "text": "Do not wait until you are bleeding to shop. The dungeon charges interest, and it collects in teeth.",
+          "text": "Do not wait until you are bleeding to shop. The dungeon charges interest, and it collects in teeth. My rates are posted.",
           "options": [
-            {
-              "text": "Show me what you have.",
-              "action": "shop"
-            },
-            {
-              "text": "What should I prioritize?",
-              "next": "advice"
-            },
-            {
-              "text": "I will be moving on.",
-              "action": "close"
-            }
+            { "text": "Show me your stock.", "action": "shop" },
+            { "text": "Dress my wounds.", "action": "service:field_dressing", "condition": { "type": "injured" } },
+            { "text": "Help me prepare.", "next": "advice" },
+            { "text": "Tell me about yourself.", "next": "history" },
+            { "text": "I will be moving on.", "action": "close" }
           ]
         },
         {
           "id": "advice",
-          "text": "Buy for the floor you are on. Mobility and recovery solve more runs than greedy upgrades you cannot afford to carry.",
+          "text": "Buy for the trouble you cannot yet answer. Recovery buys another attempt; mobility buys a way out. Neither helps if you wait too long.",
           "options": [
-            {
-              "text": "Back to your stock.",
-              "action": "shop"
-            },
-            {
-              "text": "Understood.",
-              "action": "close"
-            }
+            { "text": "I have no health potion.", "next": "recovery", "condition": { "type": "missing_item", "item_id": "potion_health" } },
+            { "text": "Mobility or stronger equipment?", "next": "equipment" },
+            { "text": "What can your bandages do?", "next": "treatment" },
+            { "text": "Back to your stock.", "action": "shop" },
+            { "text": "Back to our conversation.", "next": "start" },
+            { "text": "Understood. Goodbye.", "action": "close" }
+          ]
+        },
+        {
+          "id": "recovery",
+          "text": "Then leave room in your budget for one. I can dress wounds here, but I cannot follow you into a bad corridor. Take recovery with you.",
+          "options": [
+            { "text": "Show me your stock.", "action": "shop" },
+            { "text": "Back to preparation.", "next": "advice" },
+            { "text": "Goodbye.", "action": "close" }
+          ]
+        },
+        {
+          "id": "equipment",
+          "text": "If you cannot escape, consider a blink scroll. If ordinary blows wear you down, compare armor. An expensive sword is not an answer to every question.",
+          "options": [
+            { "text": "Show me your stock.", "action": "shop" },
+            { "text": "Back to preparation.", "next": "advice" },
+            { "text": "Goodbye.", "action": "close" }
+          ]
+        },
+        {
+          "id": "treatment",
+          "text": "Field dressing repairs wounds, not poison or curses. Payment covers the dressing even for a small cut. It takes a turn; enemies will not politely wait.",
+          "options": [
+            { "text": "Dress my wounds.", "action": "service:field_dressing", "condition": { "type": "injured" } },
+            { "text": "Back to preparation.", "next": "advice" },
+            { "text": "Not now. Goodbye.", "action": "close" }
+          ]
+        },
+        {
+          "id": "guild",
+          "text": "Your name travels with the supply ledger. The Guild remembers a reliable customer. I still charge for my work; respect is not a replacement for stock.",
+          "options": [
+            { "text": "Show me your stock.", "action": "shop" },
+            { "text": "Back to our conversation.", "next": "start" },
+            { "text": "Goodbye.", "action": "close" }
+          ]
+        },
+        {
+          "id": "history",
+          "text": "I used to count victories. Now I count people who come back wearing the boots I sold them. Sen keeps the stories. I keep the spare laces.",
+          "options": [
+            { "text": "Help me prepare.", "next": "advice" },
+            { "text": "Back to our conversation.", "next": "start" },
+            { "text": "Goodbye, Vale.", "action": "close" }
           ]
         }
       ]
@@ -84,62 +103,229 @@
     {
       "id": "chronicler_intro",
       "start_node": "start",
-      "start_nodes": [
-        "start",
-        "start_memory",
-        "start_warning"
-      ],
+      "start_nodes": ["start", "start_memory", "start_warning"],
       "nodes": [
         {
           "id": "start",
-          "text": "Every floor teaches the same lesson: carry fewer things, but know exactly why each one is in your pack.",
+          "text": "Every floor teaches the same lesson: carry fewer things, but know why each is in your pack. May I review your expedition? No charge for an honest assessment.",
           "options": [
-            {
-              "text": "Explain.",
-              "next": "pack_logic"
-            },
-            {
-              "text": "I have heard enough.",
-              "action": "close"
-            }
+            { "text": "Review my expedition.", "action": "report" },
+            { "text": "Explain your packing rule.", "next": "pack_logic" },
+            { "text": "What does the Order say of me?", "next": "order", "condition": { "type": "reputation_at_least", "faction_id": "warriors_order", "value": 20 } },
+            { "text": "Why record these journeys?", "next": "history" },
+            { "text": "I have heard enough.", "action": "close" }
           ]
         },
         {
           "id": "start_memory",
-          "text": "I have recorded four deaths on this floor alone. Three were greed, one was a door opened too quickly.",
+          "text": "My records are full of small decisions that became final ones. An unopened potion. One more doorway. Let us examine the decisions still ahead of you.",
           "options": [
-            {
-              "text": "Explain.",
-              "next": "pack_logic"
-            },
-            {
-              "text": "I have heard enough.",
-              "action": "close"
-            }
+            { "text": "Review my expedition.", "action": "report" },
+            { "text": "Explain your packing rule.", "next": "pack_logic" },
+            { "text": "Why record these journeys?", "next": "history" },
+            { "text": "I have heard enough.", "action": "close" }
           ]
         },
         {
           "id": "start_warning",
-          "text": "The survivors all did one thing well: they left themselves an answer for when the plan failed.",
+          "text": "The survivors left themselves an answer for when their plan failed. I cannot tell you what hides behind the next wall. I can help you prepare for being wrong.",
           "options": [
-            {
-              "text": "Explain.",
-              "next": "pack_logic"
-            },
-            {
-              "text": "I have heard enough.",
-              "action": "close"
-            }
+            { "text": "Review my expedition.", "action": "report" },
+            { "text": "Explain your packing rule.", "next": "pack_logic" },
+            { "text": "Why record these journeys?", "next": "history" },
+            { "text": "I have heard enough.", "action": "close" }
           ]
         },
         {
           "id": "pack_logic",
-          "text": "A clean bag means faster decisions. Sell dead weight, keep one emergency heal, and compare gear by the stat it changes for your build.",
+          "text": "A clean bag means faster decisions. Sell dead weight, keep an emergency heal, and compare gear by the problem it solves. Vale can help with the buying and selling.",
           "options": [
-            {
-              "text": "That helps.",
-              "action": "close"
-            }
+            { "text": "I have no health potion.", "next": "recovery", "condition": { "type": "missing_item", "item_id": "potion_health" } },
+            { "text": "I am already wounded.", "next": "wounds", "condition": { "type": "injured" } },
+            { "text": "Review my expedition.", "action": "report" },
+            { "text": "Back to our conversation.", "next": "start" },
+            { "text": "That helps. Goodbye.", "action": "close" }
+          ]
+        },
+        {
+          "id": "recovery",
+          "text": "Then your next mistake has fewer possible endings. Find recovery before seeking another fight. Knowledge cannot close a wound.",
+          "options": [
+            { "text": "Back to preparation.", "next": "pack_logic" },
+            { "text": "Goodbye.", "action": "close" }
+          ]
+        },
+        {
+          "id": "wounds",
+          "text": "Do not mistake surviving a fight for being ready for another. Vale offers field dressing when you can find him. Treatment takes time, so mind nearby enemies.",
+          "options": [
+            { "text": "Review my expedition.", "action": "report" },
+            { "text": "Back to preparation.", "next": "pack_logic" },
+            { "text": "Goodbye.", "action": "close" }
+          ]
+        },
+        {
+          "id": "order",
+          "text": "The Order has noticed your work. I would rather record your return than add another impressive kill count to an epitaph. Let recognition sharpen your care, not your appetite.",
+          "options": [
+            { "text": "Review my expedition.", "action": "report" },
+            { "text": "Back to our conversation.", "next": "start" },
+            { "text": "Goodbye.", "action": "close" }
+          ]
+        },
+        {
+          "id": "history",
+          "text": "Because a name is more than the thing that killed its owner. Vale saves the boots. I save the reasons someone put them on. I hope you can tell me yours on the way back.",
+          "options": [
+            { "text": "Help me prepare for that return.", "next": "pack_logic" },
+            { "text": "Back to our conversation.", "next": "start" },
+            { "text": "Goodbye, Sen.", "action": "close" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ilex_intro",
+      "start_node": "start",
+      "start_nodes": ["start", "start_stitches"],
+      "nodes": [
+        {
+          "id": "start",
+          "text": "Sit where I can see the wound. I am Ilex. The Order counts victories; I count people who can still climb the stairs.",
+          "options": [
+            { "text": "Dress my wounds.", "action": "service:field_dressing", "condition": { "type": "injured" } },
+            { "text": "What treatment can you offer?", "next": "triage" },
+            { "text": "What should I know about the crypts?", "next": "crypts" },
+            { "text": "Why stay among the dead?", "next": "motives" },
+            { "text": "I should go.", "action": "close" }
+          ]
+        },
+        {
+          "id": "start_stitches",
+          "text": "Clean cloth goes on that side. Bloodied cloth goes in the bucket. Brave speeches can wait until I have finished counting your stitches.",
+          "options": [
+            { "text": "Dress my wounds.", "action": "service:field_dressing", "condition": { "type": "injured" } },
+            { "text": "What treatment can you offer?", "next": "triage" },
+            { "text": "Tell me about the crypts.", "next": "crypts" },
+            { "text": "Why do you do this?", "next": "motives" },
+            { "text": "I should go.", "action": "close" }
+          ]
+        },
+        {
+          "id": "triage",
+          "text": "Field dressing restores health, not lost judgment. It cannot cure poison or curses. Even a small wound costs a full dressing, and treatment takes a turn. Check your surroundings first.",
+          "options": [
+            { "text": "Dress my wounds.", "action": "service:field_dressing", "condition": { "type": "injured" } },
+            { "text": "I have no health potion.", "next": "supplies", "condition": { "type": "missing_item", "item_id": "potion_health" } },
+            { "text": "Back to our conversation.", "next": "start" },
+            { "text": "Not now. Goodbye.", "action": "close" }
+          ]
+        },
+        {
+          "id": "crypts",
+          "text": "Stone makes every passage sound occupied. Trust what you can see, examine unfamiliar ground, and leave a retreat behind you. A quiet doorway is not a promise of safety.",
+          "options": [
+            { "text": "What if I am already hurt?", "next": "triage", "condition": { "type": "injured" } },
+            { "text": "Why stay here yourself?", "next": "motives" },
+            { "text": "Back to our conversation.", "next": "start" },
+            { "text": "I will be careful. Goodbye.", "action": "close" }
+          ]
+        },
+        {
+          "id": "motives",
+          "text": "My sister carried wounded strangers out of these halls. I cannot carry everyone, so I learned to help them walk. The fee buys the next roll of cloth, not absolution.",
+          "options": [
+            { "text": "Let us discuss treatment.", "next": "triage" },
+            { "text": "Back to our conversation.", "next": "start" },
+            { "text": "Thank you, Ilex. Goodbye.", "action": "close" }
+          ]
+        },
+        {
+          "id": "supplies",
+          "text": "I keep dressings, not a shop. Find a potion or something to eat before the next fight. My work stays here; a recovery item goes with you.",
+          "options": [
+            { "text": "Back to treatment.", "next": "triage" },
+            { "text": "Back to our conversation.", "next": "start" },
+            { "text": "I will look for supplies. Goodbye.", "action": "close" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "orin_intro",
+      "start_node": "start",
+      "start_nodes": ["start", "start_ledger"],
+      "nodes": [
+        {
+          "id": "start",
+          "text": "Orin. Broker, not blacksmith. The forges below have enough fire and too few exits. I sell things that help you reach one.",
+          "options": [
+            { "text": "Show me your stock.", "action": "shop" },
+            { "text": "Dress my wounds.", "action": "service:field_dressing", "condition": { "type": "injured" } },
+            { "text": "Tell me about the forge route.", "next": "route" },
+            { "text": "What hazards should I prepare for?", "next": "hazards" },
+            { "text": "Why bring supplies this far?", "next": "motives" },
+            { "text": "I will move on.", "action": "close" }
+          ]
+        },
+        {
+          "id": "start_ledger",
+          "text": "The ink dries before I finish a price down here. Read the label anyway. A scroll you understand is worth more than three you are afraid to use.",
+          "options": [
+            { "text": "Show me your stock.", "action": "shop" },
+            { "text": "Dress my wounds.", "action": "service:field_dressing", "condition": { "type": "injured" } },
+            { "text": "Tell me about the forge route.", "next": "route" },
+            { "text": "Help me prepare for the hazards.", "next": "hazards" },
+            { "text": "Why keep this trade?", "next": "motives" },
+            { "text": "I will move on.", "action": "close" }
+          ]
+        },
+        {
+          "id": "route",
+          "text": "The old forge route is a trade, not a marked road. Find the stairs yourself and remember the passages you can retreat through. I sell equipment, not a map of unseen rooms.",
+          "options": [
+            { "text": "Which supplies help me retreat?", "next": "retreat" },
+            { "text": "What about the hazards?", "next": "hazards" },
+            { "text": "Back to our conversation.", "next": "start" },
+            { "text": "Goodbye.", "action": "close" }
+          ]
+        },
+        {
+          "id": "hazards",
+          "text": "Do not confuse heavy armor with protection from every danger. Examine unfamiliar ground and read an item's effects before trusting it. I carry recovery and escape tools, not immunity to the forge.",
+          "options": [
+            { "text": "I have no health potion.", "next": "recovery", "condition": { "type": "missing_item", "item_id": "potion_health" } },
+            { "text": "Explain the escape tools.", "next": "retreat" },
+            { "text": "Show me your stock.", "action": "shop" },
+            { "text": "Back to our conversation.", "next": "start" },
+            { "text": "Goodbye.", "action": "close" }
+          ]
+        },
+        {
+          "id": "retreat",
+          "text": "Blink and phase scrolls offer different ways out; check their targeting and duration. Haste helps you move quickly. None chooses a safe destination for you. Decide before the corridor fills.",
+          "options": [
+            { "text": "Show me your stock.", "action": "shop" },
+            { "text": "Back to the route.", "next": "route" },
+            { "text": "Goodbye.", "action": "close" }
+          ]
+        },
+        {
+          "id": "recovery",
+          "text": "Then consider medicine before another weapon. I also carry rations for smaller wounds. I can dress injuries here, but what you buy is what you will have when the fighting starts.",
+          "options": [
+            { "text": "Show me your stock.", "action": "shop" },
+            { "text": "Back to the hazards.", "next": "hazards" },
+            { "text": "Goodbye.", "action": "close" }
+          ]
+        },
+        {
+          "id": "motives",
+          "text": "I once supplied the forge crews. The furnaces still glow, but the crews stopped coming home. Keeping this route open means someone can still leave carrying more than ashes.",
+          "options": [
+            { "text": "Show me your stock.", "action": "shop" },
+            { "text": "Back to our conversation.", "next": "start" },
+            { "text": "Keep the route open, Orin. Goodbye.", "action": "close" }
           ]
         }
       ]

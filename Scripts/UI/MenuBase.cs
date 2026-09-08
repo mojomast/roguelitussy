@@ -297,6 +297,8 @@ public abstract partial class MenuBase : Control
         {
             Name = "Label",
             BbcodeEnabled = true,
+            FitContent = false,
+            ScrollActive = true,
             Modulate = UiStyle.Parchment(),
         };
         _optionsLabel = new Label
@@ -309,6 +311,11 @@ public abstract partial class MenuBase : Control
             Name = "FooterLabel",
             Modulate = UiStyle.MutedText(),
         };
+
+        UiStyle.ConfigureSingleLineLabel(_titleLabel, 18);
+        UiStyle.ConfigureSingleLineLabel(_footerLabel);
+        UiStyle.ConfigureSingleLineLabel(_optionsLabel);
+        _label.AddThemeFontSizeOverride("normal_font_size", 14);
 
         _bodyCard.AddChild(_label);
         _optionsCard.AddChild(_optionsLabel);
@@ -347,7 +354,7 @@ public abstract partial class MenuBase : Control
 
         _panel.Size = panelSize;
         _panel.Position = OverlayLayoutHelper.CenterInViewport(viewportSize, panelSize);
-        _panel.Modulate = UiStyle.GoldTrim();
+        _panel.SelfModulate = UiStyle.GoldTrim();
         _backdrop.Position = Vector2.Zero;
         _backdrop.Size = panelSize;
         _headerBand.Position = Vector2.Zero;
@@ -428,6 +435,30 @@ public abstract partial class MenuBase : Control
         _titleLabel.Visible = Visible && !string.IsNullOrWhiteSpace(_visibleTitleText);
         _footerLabel.Visible = Visible && !string.IsNullOrWhiteSpace(_visibleFooterText);
         OnVisualStateRefreshed(_panel, _label, viewportSize, panelSize);
+        // Derived menus can change the card geometry. Window the actual rows only now.
+        _firstVisibleOption = Math.Min(_firstVisibleOption, SelectedIndex);
+        while (_firstVisibleOption < SelectedIndex
+            && Enumerable.Range(_firstVisibleOption, SelectedIndex - _firstVisibleOption + 1)
+                .Sum(index => 26f) > _optionsLabel.Size.Y)
+        {
+            _firstVisibleOption++;
+        }
+        _visibleOptionCount = 0;
+        var remainingHeight = _optionsLabel.Size.Y;
+        for (var index = _firstVisibleOption; index < _options.Count; index++)
+        {
+            const float height = 26f;
+            if (height > remainingHeight)
+            {
+                break;
+            }
+            remainingHeight -= height;
+            _visibleOptionCount++;
+        }
+        _visibleOptionsText = BuildVisibleOptionsText(_firstVisibleOption, _visibleOptionCount);
+        _optionsLabel.Text = _visibleOptionsText;
+        MenuText = string.Join("\n\n", new[] { _visibleTitleText, _visibleBodyText, _visibleOptionsText }
+            .Where(text => !string.IsNullOrWhiteSpace(text)));
         RebuildOptionRows(_optionsCard, _optionsLabel.Position, _optionsLabel.Size);
         _optionsLabel.Visible = false;
     }
@@ -455,7 +486,7 @@ public abstract partial class MenuBase : Control
         for (var index = _firstVisibleOption; index < lastVisible; index++)
         {
             var section = IsSectionHeader(index);
-            var rowHeight = section ? 18f : 22f;
+            const float rowHeight = 26f;
             if (y + rowHeight > position.Y + size.Y + 0.1f)
             {
                 break;
@@ -481,8 +512,9 @@ public abstract partial class MenuBase : Control
                 : new UiMouseLabel { InputSubmitted = input => OnOptionRowInput(rowIndex, input) };
             textLabel.Name = "RowLabel";
             textLabel.Position = new Vector2(section ? 0f : 8f, 2f);
-            textLabel.Size = new Vector2(Math.Max(0f, size.X - 8f), rowHeight);
-            textLabel.Text = FitLabelText(section ? _options[index] : (index == SelectedIndex ? $"▶ {_options[index]}" : $"  {_options[index]}"), textLabel.Size.X);
+            UiStyle.ConfigureSingleLineLabel(textLabel, section ? 13 : 14);
+            textLabel.Size = new Vector2(Math.Max(0f, size.X - 8f), rowHeight - 4f);
+            textLabel.Text = section ? _options[index] : (index == SelectedIndex ? $"▶ {_options[index]}" : $"  {_options[index]}");
             textLabel.Modulate = section ? UiStyle.FaintText() : index == SelectedIndex ? UiStyle.BrightGold() : UiStyle.Parchment();
             row.AddChild(background);
             row.AddChild(accent);

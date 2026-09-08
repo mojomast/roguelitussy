@@ -39,6 +39,7 @@ public static class DeathResolver
             EnemyTag = victim.GetComponent<EnemyComponent>()?.TemplateId,
         };
         RelicProcessor.ProcessHook("on_kill", killer, world, world.ContentDatabase, relicContext);
+        SynergyResolver.ProcessEnemyKill(killer, victim, world.ContentDatabase, relicContext.LogMessages);
 
         if (victim.GetComponent<EnemyComponent>() is { } enemyComponent)
         {

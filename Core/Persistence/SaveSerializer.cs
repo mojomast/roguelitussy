@@ -324,6 +324,10 @@ internal sealed class ProgressionSaveData
     public int Kills { get; set; }
 
     public List<string> SelectedPerkIds { get; set; } = new();
+
+    public List<List<string>> PendingPerkDrafts { get; set; } = new();
+
+    public bool PerkDraftsGenerated { get; set; }
 }
 
 internal sealed class IdentitySaveData
@@ -734,6 +738,8 @@ public static class SaveSerializer
                 UnspentPerkChoices = progression.UnspentPerkChoices,
                 Kills = progression.Kills,
                 SelectedPerkIds = progression.SelectedPerkIds.ToList(),
+                PendingPerkDrafts = progression.PendingPerkDrafts.Select(draft => draft.ToList()).ToList(),
+                PerkDraftsGenerated = progression.PerkDraftsGenerated,
             },
             Identity = identity is null ? null : new IdentitySaveData
             {
@@ -1077,6 +1083,17 @@ public static class SaveSerializer
             {
                 progression.SelectedPerkIds.Add(perkId);
             }
+
+            foreach (var draft in data.Progression.PendingPerkDrafts)
+            {
+                progression.PendingPerkDrafts.Add(draft
+                    .Where(id => !string.IsNullOrWhiteSpace(id))
+                    .Distinct(StringComparer.Ordinal)
+                    .Take(3)
+                    .ToList());
+            }
+
+            progression.PerkDraftsGenerated = data.Progression.PerkDraftsGenerated;
 
             entity.SetComponent(progression);
         }

@@ -46,6 +46,11 @@ public sealed class RangedAttackAction : IAction
             return ActionResult.Invalid;
         }
 
+        if (FindEquippedRangedWeapon(inventory, world) is null)
+        {
+            return ActionResult.Invalid;
+        }
+
         if (world is WorldState state)
         {
             if (!state.IsVisible(target.Position) || !HasLineOfSight(state, actor.Position, target.Position))
@@ -121,16 +126,16 @@ public sealed class RangedAttackAction : IAction
         return outcome;
     }
 
-    private static ItemTemplate? FindEquippedRangedWeapon(InventoryComponent inventory, WorldState world)
+    internal static ItemTemplate? FindEquippedRangedWeapon(InventoryComponent inventory, IWorldState world)
     {
-        if (world.ContentDatabase is null)
+        if (world is not WorldState state || state.ContentDatabase is not { } content)
         {
             return null;
         }
 
         var equipped = inventory.GetEquipped(EquipSlot.MainHand);
         if (equipped is null
-            || !world.ContentDatabase.TryGetItemTemplate(equipped.Item.TemplateId, out var template)
+            || !content.TryGetItemTemplate(equipped.Item.TemplateId, out var template)
             || template is null
             || template.Category != ItemCategory.Weapon)
         {

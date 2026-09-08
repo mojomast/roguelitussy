@@ -113,8 +113,22 @@ public sealed class DungeonGenerator : IGenerator
             ? new List<EnemySpawnData>()
             : CollectEnemySpawnDetails(rooms, occupied, fixedEntities.EnemySpawns, "enemy", "enemy_boss");
         var forcedItemSpawns = CollectItemSpawnDetails(rooms, occupied, fixedEntities.ItemSpawns, "item");
+        var shrineSpawns = CollectShrineSpawnDetails(rooms, floorPlan, occupied);
+        var landmarkSpawns = CreateLandmarkDetails(
+            rooms,
+            startRoom,
+            floorPlan,
+            shrineSpawns,
+            chestSpawnDetails,
+            placementRng,
+            occupied);
         var trapSpawnDetails = CollectTrapSpawnDetails(rooms, occupied, themeTag, attemptSeed);
         var (lockedDoors, keySpawns) = PlaceLockedDoorsAndKeys(world, rooms, playerSpawn, placementRng, occupied);
+        if (floorPlan.FloorType == FloorType.SafeFloor)
+        {
+            AddSafeFloorRecoveryCache(rooms, startRoom, placementRng, occupied, forcedItemSpawns, chestSpawnDetails);
+        }
+
         var enemySpawnDetails = skipEnemySpawns
             ? new List<EnemySpawnData>()
             : PlaceEnemySpawns(rooms, startRoom, depth, mapArea, placementRng, occupied, forcedEnemySpawns);
@@ -147,7 +161,10 @@ public sealed class DungeonGenerator : IGenerator
             fixedEntities.NpcSpawns,
             trapSpawnDetails,
             lockedDoors,
-            keySpawns);
+            keySpawns,
+            floorPlan.FloorType,
+            shrineSpawns,
+            landmarkSpawns);
         return LevelValidator.Validate(world, level).Count == 0 ? level : null;
     }
 
@@ -485,6 +502,25 @@ public sealed class DungeonGenerator : IGenerator
         return spawns;
     }
 
+    private static void AddSafeFloorRecoveryCache(
+        IReadOnlyList<RoomPlacement> rooms,
+        RoomPlacement startRoom,
+        Random rng,
+        HashSet<Position> occupied,
+        ICollection<ItemSpawnData> itemSpawns,
+        ICollection<ChestSpawnData> chestSpawns)
+    {
+        // Reserve recovery in the start room before generic item placement, falling back only
+        // when its authored geometry has no two free floor tiles.
+        var potionPosition = PickAvailableTile(rooms, startRoom, rng, occupied);
+        occupied.Add(potionPosition);
+        itemSpawns.Add(new ItemSpawnData(potionPosition, "potion_health"));
+
+        var chestPosition = PickAvailableTile(rooms, startRoom, rng, occupied);
+        occupied.Add(chestPosition);
+        chestSpawns.Add(new ChestSpawnData(chestPosition, "safe_floor_merchant_stock"));
+    }
+
     private static Position PickAvailableTile(
         IReadOnlyList<RoomPlacement> rooms,
         RoomPlacement preferredRoom,
@@ -523,7 +559,6 @@ public sealed class DungeonGenerator : IGenerator
     {
         var lockedDoors = new List<Position>();
         var lockableRooms = new HashSet<RoomPlacement>();
-        var roomsWithLockedDoors = new HashSet<RoomPlacement>();
 
         foreach (var room in rooms)
         {
@@ -572,10 +607,6 @@ public sealed class DungeonGenerator : IGenerator
                 {
                     world.SetTile(position, TileType.LockedDoor);
                     lockedDoors.Add(position);
-                    foreach (var room in lockingRooms)
-                    {
-                        roomsWithLockedDoors.Add(room);
-                    }
                 }
             }
         }
@@ -598,27 +629,23 @@ public sealed class DungeonGenerator : IGenerator
             }
         }
 
-        // Place one key per locked room so every sealed interior stays openable.
-        var keysNeeded = roomsWithLockedDoors.Count;
+        // A key is consumed per door, not per room. Reduce the lock set before
+        // committing it when the reachable part of the floor cannot supply enough keys.
+        var keysNeeded = Math.Min(lockedDoors.Count, keyCandidates.Count);
+        for (var i = lockedDoors.Count - 1; i >= keysNeeded; i--)
+        {
+            world.SetTile(lockedDoors[i], TileType.Door);
+            lockedDoors.RemoveAt(i);
+        }
+
         var keySpawns = new List<Position>(keysNeeded);
-        for (var i = 0; i < keysNeeded && keyCandidates.Count > 0; i++)
+        for (var i = 0; i < keysNeeded; i++)
         {
             var candidateIndex = rng.Next(keyCandidates.Count);
             var keyPosition = keyCandidates[candidateIndex];
             keyCandidates.RemoveAt(candidateIndex);
             occupied.Add(keyPosition);
             keySpawns.Add(keyPosition);
-        }
-
-        if (keySpawns.Count == 0 && lockedDoors.Count > 0)
-        {
-            // No reachable spot for any key: unlock everything rather than sealing rooms forever.
-            foreach (var door in lockedDoors)
-            {
-                world.SetTile(door, TileType.Door);
-            }
-
-            lockedDoors.Clear();
         }
 
         return (lockedDoors, keySpawns);
@@ -781,16 +808,102 @@ public sealed class DungeonGenerator : IGenerator
 
         foreach (var room in rooms)
         {
-            foreach (var placement in room.GetSpawnPlacements("chest"))
+            foreach (var placement in room.GetSpawnPlacements("chest", "curse_chest"))
             {
                 if (occupied.Add(placement.Position))
                 {
-                    spawns.Add(new ChestSpawnData(placement.Position, placement.SpawnPoint.ReferenceId));
+                    var lootTableId = string.Equals(placement.SpawnPoint.Type, "curse_chest", StringComparison.OrdinalIgnoreCase)
+                        ? "curse_room_chest_loot"
+                        : placement.SpawnPoint.ReferenceId;
+                    spawns.Add(new ChestSpawnData(placement.Position, lootTableId));
                 }
             }
         }
 
         return spawns;
+    }
+
+    private static List<ShrineSpawnData> CollectShrineSpawnDetails(
+        IReadOnlyList<RoomPlacement> rooms,
+        FloorEventPlan floorPlan,
+        HashSet<Position> occupied)
+    {
+        var spawns = new List<ShrineSpawnData>();
+        foreach (var request in floorPlan.SpecialRooms)
+        {
+            if (request.Type != SpecialRoomType.ShrineRoom)
+            {
+                continue;
+            }
+
+            foreach (var room in rooms)
+            {
+                if (room.Prefab?.Tags.Contains(request.PrefabTag) != true)
+                {
+                    continue;
+                }
+
+                foreach (var placement in room.GetSpawnPlacements("shrine"))
+                {
+                    if (occupied.Add(placement.Position))
+                    {
+                        spawns.Add(new ShrineSpawnData(placement.Position, request.EventId));
+                    }
+                }
+
+                break;
+            }
+        }
+
+        return spawns;
+    }
+
+    private static List<LandmarkSpawnData> CreateLandmarkDetails(
+        IReadOnlyList<RoomPlacement> rooms,
+        RoomPlacement startRoom,
+        FloorEventPlan floorPlan,
+        IList<ShrineSpawnData> shrineSpawns,
+        IList<ChestSpawnData> chestSpawns,
+        Random rng,
+        HashSet<Position> occupied)
+    {
+        var landmarks = new List<LandmarkSpawnData>();
+        foreach (var request in floorPlan.SpecialRooms)
+        {
+            if (request.Type == SpecialRoomType.ShrineRoom)
+            {
+                var shrine = shrineSpawns.FirstOrDefault(spawn => spawn.EventId == request.EventId);
+                if (shrine is not null)
+                {
+                    landmarks.Add(new LandmarkSpawnData(shrine.Position, request.Type, request.EventId));
+                    continue;
+                }
+            }
+            else if (request.Type == SpecialRoomType.CurseRoom
+                && chestSpawns.Any(spawn => spawn.LootTableId == "curse_room_chest_loot"))
+            {
+                var chest = chestSpawns.First(spawn => spawn.LootTableId == "curse_room_chest_loot");
+                landmarks.Add(new LandmarkSpawnData(chest.Position, request.Type, request.EventId));
+                continue;
+            }
+
+            // Requested special rooms are best-effort prefab placements. Keep the
+            // reward contract reliable when a suitable leaf was unavailable.
+            var fallbackPosition = PickAvailableTile(rooms, startRoom, rng, occupied);
+            occupied.Add(fallbackPosition);
+            if (request.Type == SpecialRoomType.ShrineRoom)
+            {
+                shrineSpawns.Add(new ShrineSpawnData(fallbackPosition, request.EventId));
+            }
+            else if (request.Type == SpecialRoomType.CurseRoom)
+            {
+                chestSpawns.Add(new ChestSpawnData(fallbackPosition, "curse_room_chest_loot"));
+            }
+
+            landmarks.Add(new LandmarkSpawnData(fallbackPosition, request.Type, request.EventId, IsFallback: true));
+        }
+
+        return landmarks;
     }
 
     private static List<TrapSpawnData> CollectTrapSpawnDetails(

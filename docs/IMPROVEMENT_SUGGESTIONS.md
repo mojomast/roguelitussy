@@ -12,6 +12,8 @@
 
 > Update 2026-07-31 map tooling: the Developer Workshop can export any positive seed and depth 0-999 as a deterministic high-resolution dungeon survey PNG without mutating the active run. The exporter includes themed terrain, room/spawn annotations, title/legend framing, deterministic PNG tests, and exact typed Commands-tab seed/depth entry.
 
+> Replayability checkpoint - 2026-09-08: deterministic three-option perk drafts persist with a legacy fallback; heal-on-kill and flat damage-bonus synergies are live while `echo_bonus` is unsupported; landmark metadata/fallbacks and lock/key solvability validation are live; ranged weapon input enforces range/LOS; the nine-floor run reaches canonical `Victory` with boss/act feedback and idempotent first-clear unlock; daily retries persist attempts/best scores and Thursday speed scoring is live; Friendly Merchants' Guild reputation discounts purchases; `WaitAction` recovers 1 HP unless dangerous statuses are active; first-delve, stairs, death lessons, and Retry Seed/New Build actions are live. Verification: strict 734/734, rendering 663/663, real Godot 4.5.2 API build clean, format and diff checks pass.
+
 ## How Worker Subagents Should Use This Document
 
 ### Audit Checkpoint - 2026-09-08
@@ -21,9 +23,41 @@
 - Done: abilities, consumables, and melee/ranged on-hit statuses honor authored stacking/refresh rules; regeneration and ability self-healing cannot undo lethal damage.
 - Done: inventory mouse closes/actions refresh the gameplay input gate while aimed-item targeting stays modal; restarted runs start at turn zero.
 - Done (follow-up): random boss markers select boss-tagged templates at the actual depth, ordinary slots exclude bosses, and explicit fixed IDs remain overrides. Enemy rendering consumes authored sprite paths through persisted template identity with safe texture fallbacks.
-- Still open: authored status tick timing/expire hooks, line/cone ability targeting, functional shrine/curse population, remaining relic semantics, lock/key exhaustion, and incremental GameManager extraction. These were not treated as permission for a broad rewrite during the correctness audit.
+- Still open: authored status tick timing/expire hooks, line/cone ability targeting, requested-landmark guarantees, remaining relic semantics, lock/key exhaustion, and incremental GameManager extraction. These were not treated as permission for a broad rewrite during the correctness audit.
+
+### Replayability Checkpoint - 2026-09-08
+
+- Done: deterministic three-option perk drafts persist through save/load, with a legacy full-list fallback and explicit draft wording in the UI.
+- Done: heal-on-kill and flat damage-bonus synergies have real runtime effects. `echo_bonus` remains unsupported.
+- Done: landmark metadata/fallbacks, lock/key solvability validation, ranged weapon range/LOS input, nine-floor completion, canonical `Victory`, boss/act feedback, idempotent first-clear unlock, retryable daily state, Thursday speed scoring, friendly Merchants' Guild discounts, corrected Orin dialogue, 1 HP safe waiting, and onboarding/game-over retry actions.
+- Open: unsupported daily/ascension modifiers, line/cone targeting, requested landmark depth semantics where still applicable, class/resource polish, remaining relic semantics, visual shutdown leaks, and other existing architecture/performance follow-ups.
 
 ### Worker Workflow
+
+### NPC, Flow, And Visual Checkpoint - 2026-09-08
+
+- Done: conditional conversation options, validated service authorization, paid field dressing, Sen's expedition review, and distinct depth-gated Ilex/Orin conversations and services.
+- Done: explicit arrow-friendly diagonal prefix plus direct navigation/numpad diagonals; no enemy-stat or kiting-role changes.
+- Done: prison/crypt/magma terrain palettes and depth-salted wear preserve existing tile geometry; locked doors now have closed-door art and a lock cue.
+- Done: real font/layout containment, opaque dialog/shop surfaces, selected-row windowing, non-overlapping inventory/title preview sections, correct status badge minimum sizes, and panel-only tint.
+- Done: real Godot 4.5.2 + Xvfb viewport captures and optional label-bound assertions. See `docs/VISUAL_VALIDATION.md` for the reproducible workflow and verified asset sources.
+- Open: narrative quest memory, broader NPC service families, actual replacement biome packs, status lifecycle hooks, line/cone targeting, and shutdown CanvasItem/ObjectDB leak investigation. Current terrain palettes do not claim to import the paid Sewers extension.
+
+### Run Pacing Checkpoint - 2026-09-08
+
+- Done: placed shrine rooms propagate their event identity into runtime, cursed chests use authored reward tables, and safe floors guarantee a recovery potion plus sanctuary cache.
+- Done: shrine HP sacrifices resolve real stat/perk/relic rewards. Relic offers are deterministic, guarded against arbitrary claims, and re-emitted after save/load while unclaimed.
+- Done: depth 11+ ordinary encounters retain existing melee, ambush, fire, support, and ranged roles; boss eligibility remains strict. Orin has higher-cost deep-floor emergency care.
+- Open: requested-landmark guarantee, lock/key solvability, base safe-rest behavior, meaningful late loot quality tiers, synergy bonus completeness, perk draft/reward curation, merchant transaction/Core-action cleanup, and declared MP semantics. The next class/race pass should not mask these economy/progression gaps with permanent starting-stat inflation.
+
+### Identity And Item Art Checkpoint - 2026-09-08
+
+- Done: archetype starter stat/item duplication is removed for new runs, and preview math uses the same core archetype source. Existing saved builds are preserved without destructive reconciliation.
+- Done: class techniques and race heritage techniques are player-accessible through the owned-slot ability palette. Human/Elf/Dwarf/Orc now mean War Cry/Phase Shift/Ground Slam/Heavy Slam rather than a visual label alone.
+- Done: authored item SVGs render in inventory and visible ground piles; player bodies preserve source 0x72 colors; Ranger/Arcanist portrait mapping uses live archetype IDs.
+- Open: actual equipment-on-character art, wider legally sourced portrait coverage, player native-ability ownership validation in Core (scroll/AI compatibility first), ranged-weapon input path, true Trickster streak cadence, and MP semantics. The free CC0 Dungeon Tileset II Extended pack is a candidate for future item/environment art but has not been downloaded or imported.
+
+### Worker Steps
 
 1. Pick a suggestion by ID. Each suggestion is scoped to a focused, implementable change.
 2. Read the **Target files**, **Why it improves the game**, and **Acceptance criteria** before writing code.
@@ -51,7 +85,7 @@
 | ID | Title | Priority | Topic | Status |
 |---|---|---|---|---|
 | COM-1 | Implement authored status-effect control flags | P0 | Combat | done |
-| COM-2 | Make ranged weapons actually ranged | P1 | Combat | open |
+| COM-2 | Make ranged weapons actually ranged | P1 | Combat | done |
 | COM-3 | Add weapon archetype properties (cleave/reach) | P1 | Combat | open |
 | COM-4 | Soften armor scaling to avoid early invulnerability | P1 | Combat | open |
 | COM-5 | Turn critical hits into sparkle moments | P1 | Combat | open |
@@ -76,12 +110,12 @@
 | AI-4 | Make support enemies seek allies and avoid friendly fire | P1 | AI / Encounters | done |
 | AI-5 | Add group aggro propagation | P1 | AI / Encounters | done |
 | PRG-1 | Flatten the early XP curve | P1 | Progression | open |
-| PRG-2 | Make perks build-shaping, not just stat bundles | P1 | Progression | open |
-| PRG-3 | Draft three perks per level-up instead of the full list | P1 | Progression | open |
+| PRG-2 | Make perks build-shaping, not just stat bundles | P1 | Progression | done |
+| PRG-3 | Draft three perks per level-up instead of the full list | P1 | Progression | done |
 | PRG-4 | Weight the draft by archetype tags | P2 | Progression | open |
 | PRG-5 | Auto-apply archetype growth on level-up | P1 | Progression | open |
 | CHR-1 | Restore `CharacterOptions` when loading a saved run | P0 | Character / Identity | done |
-| CHR-2 | Make race mechanically meaningful with minor bonuses | P1 | Character / Identity | open |
+| CHR-2 | Make race mechanically meaningful with minor bonuses | P1 | Character / Identity | done |
 | CHR-3 | Give each archetype a signature starting ability | P1 | Character / Identity | done |
 | CHR-4 | Improve creation preview clarity | P1 | Character / Identity | done |
 | CHR-5 | Add a "Randomize Build" option | P2 | Character / Identity | open |
@@ -110,11 +144,11 @@
 | GEN-3 | Guarantee one landmark special room per floor | P1 | Generation | partial |
 | GEN-4 | Implement locked doors and key placement | P1 | Generation | done |
 | GEN-5 | Clean up and expand the prefab library | P1 | Generation | open |
-| ONB-1 | Add a "First Delve" welcome message to combat log | P1 | Onboarding | open |
-| ONB-2 | Show an objective hint when down-stairs become visible | P1 | Onboarding | open |
-| ONB-3 | Improve game-over screen with death-specific learning tips | P1 | Onboarding | open |
+| ONB-1 | Add a "First Delve" welcome message to combat log | P1 | Onboarding | done |
+| ONB-2 | Show an objective hint when down-stairs become visible | P1 | Onboarding | done |
+| ONB-3 | Improve game-over screen with death-specific learning tips | P1 | Onboarding | done |
 | ONB-4 | Surface starter-kit item effects in main menu preview | P1 | Onboarding | done |
-| ONB-5 | Add a temporary key-reminder ribbon to HUD | P1 | Onboarding | open |
+| ONB-5 | Add a temporary key-reminder ribbon to HUD | P1 | Onboarding | done |
 | GFX-1 | Make hit flashes readable and layered | P1 | Game Feel | done |
 | GFX-2 | Add lightweight camera shake on impactful hits | P1 | Game Feel | open |
 | GFX-3 | Polish damage popups (color/scale/crit/miss/heal) | P1 | Game Feel | done |
@@ -159,6 +193,7 @@
 ### COM-2 — Make ranged weapons actually ranged
 
 - **Priority:** P1
+- **Status:** done. Player directional input submits ranged weapon attacks when an equipped weapon has range; `AttackAction` validates range and line of sight, while non-ranged weapons remain adjacent-only.
 - **Target files:**
   - `Content/items.json`
   - `Core/Contracts/Types/ItemTemplate.cs`
@@ -599,6 +634,7 @@
 ### PRG-2 — Make perks build-shaping, not just stat bundles
 
 - **Priority:** P1
+- **Status:** done for the authored live effects. Heal-on-kill and flat damage-bonus synergies have runtime behavior; `echo_bonus` remains unsupported.
 - **Target files:**
   - `Content/perks.json`
   - `Core/Contracts/Types/PerkTemplate.cs`
@@ -618,6 +654,7 @@
 ### PRG-3 — Draft three perks per level-up instead of the full list
 
 - **Priority:** P1
+- **Status:** done. Draft IDs are deterministic, persisted until selected, and legacy saves use a full-list fallback; the UI labels the limited set as draft options.
 - **Target files:**
   - `Core/Simulation/ProgressionComponent.cs`
   - `Core/Simulation/ProgressionService.cs`
@@ -1144,7 +1181,7 @@
 ### GEN-3 — Guarantee one landmark special room per floor
 
 - **Priority:** P1
-- **Status:** partial. Generation now reserves one fitting non-start room from a deterministic seed-derived functional profile (`combat`, `loot`, `hazard`, `open`, or `ambush`), records prefab IDs in `RoomData`, and avoids prefab repeats while alternatives fit. The stricter landmark-specific requirement, farthest/side-branch placement, and exactly-one `landmark` content tagging remain open.
+- **Status:** partial. Landmark identity metadata and deterministic fallback behavior are reliable, and fitting non-start rooms avoid repeats while alternatives fit. Requested landmark depth semantics, strict farthest/side-branch placement, and an exactly-one authored `landmark` guarantee remain open where content constraints still require them.
 - **Target files:**
   - `Core/Generation/DungeonGenerator.cs`
   - `Core/Generation/RoomPrefab.cs` / `RoomPrefabLibrary.cs`
@@ -1201,6 +1238,7 @@
 ### ONB-1 — Add a "First Delve" welcome message to combat log
 
 - **Priority:** P1
+- **Status:** done. New runs explain the first objective and core controls without repeating the message on save/load.
 - **Target files:**
   - `Scripts/Autoloads/GameManager.cs`
   - `Scripts/UI/CombatLog.cs`
@@ -1215,6 +1253,7 @@
 ### ONB-2 — Show an objective hint when down-stairs become visible
 
 - **Priority:** P1
+- **Status:** done. The stairs reminder is emitted once per floor when the relevant stairs become visible.
 - **Target files:**
   - `Core/Contracts/WorldState.cs`
   - `Scripts/Autoloads/GameManager.cs`
@@ -1230,6 +1269,7 @@
 ### ONB-3 — Improve game-over screen with death-specific learning tips
 
 - **Priority:** P1
+- **Status:** done. Death lessons are selected from the run's cause/context and the screen offers `Retry Seed` and `New Build` actions.
 - **Target files:**
   - `Scripts/UI/GameOverScreen.cs`
   - `Scripts/UI/UIRoot.cs`
@@ -1261,6 +1301,7 @@
 ### ONB-5 — Add a temporary key-reminder ribbon to HUD
 
 - **Priority:** P1
+- **Status:** done. First-delve guidance and contextual stairs/key reminders are surfaced in the live HUD/log flow.
 - **Target files:**
   - `Scripts/UI/HUD.cs`
 - **Why it improves the game:** New players forget `H` for Help and `I` for Inventory.

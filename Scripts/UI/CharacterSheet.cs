@@ -445,7 +445,7 @@ public partial class CharacterSheet : Control
         {
             Name = "Panel",
             Size = panelSize,
-            Modulate = UiStyle.GoldTrim(),
+            SelfModulate = UiStyle.GoldTrim(),
         };
         _headerBand = new ColorRect
         {

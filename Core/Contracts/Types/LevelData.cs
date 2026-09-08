@@ -15,4 +15,7 @@ public sealed record LevelData(
     IReadOnlyList<NpcSpawnData>? NpcSpawns = null,
     IReadOnlyList<TrapSpawnData>? TrapSpawnDetails = null,
     IReadOnlyList<Position>? LockedDoors = null,
-    IReadOnlyList<Position>? KeySpawns = null);
+    IReadOnlyList<Position>? KeySpawns = null,
+    FloorType FloorType = FloorType.StandardFloor,
+    IReadOnlyList<ShrineSpawnData>? ShrineSpawns = null,
+    IReadOnlyList<LandmarkSpawnData>? LandmarkSpawns = null);

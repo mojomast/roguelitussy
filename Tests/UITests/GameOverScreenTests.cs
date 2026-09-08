@@ -15,6 +15,8 @@ public sealed class GameOverScreenTests : ITestSuite
         registry.Add("UI.GameOverScreen no kills flavor", NoKillsFlavor);
         registry.Add("UI.GameOverScreen omits empty best item", OmitsEmptyBestItem);
         registry.Add("UI.GameOverScreen enter requests new run once", EnterRequestsNewRunOnce);
+        registry.Add("UI.GameOverScreen distinguishes retry seed from new build", DistinguishesRetryFromNewBuild);
+        registry.Add("UI.GameOverScreen selects deterministic death lessons", SelectsDeterministicDeathLessons);
         registry.Add("UI.GameOverScreen escape requests main menu once", EscapeRequestsMainMenuOnce);
     }
 
@@ -111,6 +113,34 @@ public sealed class GameOverScreenTests : ITestSuite
         screen.HandleKey(Key.Escape);
 
         Expect.Equal(1, count, "Escape should request exactly one main-menu transition.");
+    }
+
+    private static void DistinguishesRetryFromNewBuild()
+    {
+        var screen = new GameOverScreen();
+        var retryCount = 0;
+        var newBuildCount = 0;
+        screen.RetryRequested += () => retryCount++;
+        screen.NewBuildRequested += () => newBuildCount++;
+        screen.Open(SampleStats());
+
+        Expect.True(screen.MenuText.Contains("Retry Seed"), "The primary action should name deterministic seed retry.");
+        Expect.True(screen.MenuText.Contains("New Build"), "The secondary action should name a fresh build.");
+        screen.HandleKey(Key.Down);
+        screen.HandleKey(Key.Enter);
+
+        Expect.Equal(0, retryCount, "New Build must not route through the retry event.");
+        Expect.Equal(1, newBuildCount, "New Build should expose one dedicated UI request.");
+    }
+
+    private static void SelectsDeterministicDeathLessons()
+    {
+        Expect.True(GameOverScreen.SelectDeathLesson(SampleStats() with { CauseOfDeath = "Poison" }).Contains("Cure poison"),
+            "Poison deaths should teach an actionable counter.");
+        Expect.True(GameOverScreen.SelectDeathLesson(SampleStats(damageTaken: 100) with { CauseOfDeath = "Goblin Archer" }).Contains("disengage"),
+            "High-damage deaths should teach retreat timing.");
+        Expect.Equal(GameOverScreen.SelectDeathLesson(SampleStats()), GameOverScreen.SelectDeathLesson(SampleStats()),
+            "The same run facts must always produce the same lesson.");
     }
 
     private static T? FindChild<T>(Node node, string name) where T : Node

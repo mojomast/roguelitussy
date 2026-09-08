@@ -9,6 +9,9 @@ public partial class InputHandler : Node
     private GameManager? _gameManager;
     private bool _inputEnabled = true;
     private bool _runPrefixActive;
+    private bool _diagonalPrefixActive;
+    private Position _diagonalDirection;
+    private IWorldState? _inputWorld;
 
     public event System.Action? InventoryRequested;
 
@@ -30,12 +33,16 @@ public partial class InputHandler : Node
 
     public event System.Action? CombatLogFilterCycleRequested;
 
+    public event System.Action? AbilitiesRequested;
+
     public bool IsRunPrefixActive => _runPrefixActive;
 
     public void Bind(GameManager? gameManager, EventBus? eventBus)
     {
         _gameManager = gameManager;
         _eventBus = eventBus;
+        _inputWorld = gameManager?.World;
+        ClearPrefixes();
     }
 
     public void SetInputEnabled(bool enabled)
@@ -43,18 +50,25 @@ public partial class InputHandler : Node
         _inputEnabled = enabled;
         if (!enabled)
         {
-            _runPrefixActive = false;
+            ClearPrefixes();
         }
     }
 
     public bool HandleKey(Key key)
     {
+        var world = _gameManager?.World;
+        if (!ReferenceEquals(_inputWorld, world))
+        {
+            ClearPrefixes();
+            _inputWorld = world;
+        }
+
         if (!_inputEnabled || _gameManager?.CurrentState != GameManager.GameState.Playing)
         {
+            ClearPrefixes();
             return false;
         }
 
-        var world = _gameManager.World;
         if (world is null)
         {
             return false;
@@ -66,6 +80,32 @@ public partial class InputHandler : Node
         }
 
         var playerId = world.Player.Id;
+        if (_diagonalPrefixActive)
+        {
+            if (key == Key.V || key == Key.Escape)
+            {
+                ClearPrefixes();
+                _eventBus?.EmitLogMessage("Diagonal cancelled.", LogCategory.System);
+                return true;
+            }
+
+            if (TryGetDirection(key, out var direction))
+            {
+                if (_diagonalDirection == Position.Zero || (_diagonalDirection.X == 0) == (direction.X == 0))
+                {
+                    _diagonalDirection = direction;
+                    _eventBus?.EmitLogMessage("Diagonal: choose a perpendicular arrow/WASD direction; V or Escape cancels.", LogCategory.System);
+                    return true;
+                }
+
+                var delta = _diagonalDirection + direction;
+                ClearPrefixes();
+                return HandleDirectionalInput(world, playerId, delta);
+            }
+
+            ClearPrefixes();
+        }
+
         if (_runPrefixActive)
         {
             if (TryGetDirection(key, out var runDelta))
@@ -92,14 +132,19 @@ public partial class InputHandler : Node
 
         return key switch
         {
-            Key.Up or Key.W => HandleDirectionalInput(world, playerId, new Position(0, -1)),
-            Key.Down or Key.S => HandleDirectionalInput(world, playerId, new Position(0, 1)),
-            Key.Left or Key.A => HandleDirectionalInput(world, playerId, new Position(-1, 0)),
-            Key.Right or Key.D => HandleDirectionalInput(world, playerId, new Position(1, 0)),
+            Key.Up or Key.W or Key.Kp8 => HandleDirectionalInput(world, playerId, new Position(0, -1)),
+            Key.Down or Key.S or Key.Kp2 => HandleDirectionalInput(world, playerId, new Position(0, 1)),
+            Key.Left or Key.A or Key.Kp4 => HandleDirectionalInput(world, playerId, new Position(-1, 0)),
+            Key.Right or Key.D or Key.Kp6 => HandleDirectionalInput(world, playerId, new Position(1, 0)),
+            Key.Home or Key.Kp7 => HandleDirectionalInput(world, playerId, new Position(-1, -1)),
+            Key.Pageup or Key.Kp9 => HandleDirectionalInput(world, playerId, new Position(1, -1)),
+            Key.End or Key.Kp1 => HandleDirectionalInput(world, playerId, new Position(-1, 1)),
+            Key.Pagedown or Key.Kp3 => HandleDirectionalInput(world, playerId, new Position(1, 1)),
+            Key.V => EnterDiagonalPrefix(),
             Key.R => EnterRunPrefix(),
             Key.O => AutoExplore(),
             Key.Z => RestUntilHealed(),
-            Key.Space or Key.Period => Submit(UIActionFactory.CreateWaitAction(world, playerId)),
+            Key.Space or Key.Period or Key.Kp5 => Submit(UIActionFactory.CreateWaitAction(world, playerId)),
             Key.G => Submit(UIActionFactory.CreatePickupAction(world, _gameManager?.Content, playerId, _gameManager?.AutoEquipUpgradesEnabled == true)),
             Key.Enter or Key.KpEnter => Submit(UIActionFactory.CreateStairsAction(world, playerId)),
             Key.Key1 => HandleQuickUse(world, playerId, 0),
@@ -108,6 +153,7 @@ public partial class InputHandler : Node
             Key.Key4 => HandleQuickUse(world, playerId, 3),
             Key.Key5 => HandleQuickUse(world, playerId, 4),
             Key.I => Raise(InventoryRequested),
+            Key.B => Raise(AbilitiesRequested),
             Key.C => Raise(CharacterSheetRequested),
             Key.H => Raise(HelpRequested),
             Key.L => Raise(CombatLogFilterCycleRequested),
@@ -119,6 +165,21 @@ public partial class InputHandler : Node
             Key.U => Raise(MinimapLegendToggleRequested),
             _ => false,
         };
+    }
+
+    private void ClearPrefixes()
+    {
+        _runPrefixActive = false;
+        _diagonalPrefixActive = false;
+        _diagonalDirection = Position.Zero;
+    }
+
+    private bool EnterDiagonalPrefix()
+    {
+        _diagonalPrefixActive = true;
+        _diagonalDirection = Position.Zero;
+        _eventBus?.EmitLogMessage("Diagonal: choose two perpendicular arrows/WASD (e.g. Up then Right). V or Escape cancels; choosing spends no turn.", LogCategory.System);
+        return true;
     }
 
     private bool EnterRunPrefix()

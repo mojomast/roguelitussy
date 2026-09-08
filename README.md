@@ -12,6 +12,16 @@ The September 2026 audit advances saves to version 18 and fixes wall-occupying a
 
 The follow-up wires authored enemy sprites through saved template identity and restricts random boss markers to eligible boss-tagged enemies at the actual floor depth. Ordinary random slots exclude bosses; explicit template overrides and missing-art fallbacks remain supported.
 
+The gameplay/presentation pass adds conditional NPC conversations, paid field dressing, expedition reviews, crypt medic Ilex and deep outfitter Orin, deliberate diagonal controls (`V` then two perpendicular arrows, or navigation/numpad diagonals), and depth-based terrain palettes without changing tile geometry. Real Godot screenshot/label-bound validation is documented in [docs/VISUAL_VALIDATION.md](docs/VISUAL_VALIDATION.md).
+
+The pacing follow-up activates authored shrine/curse room rewards, deterministic relic offers, safe-floor recovery caches, deeper role-diverse ordinary encounters, and Orin's emergency care. These changes use existing content and deterministic state rather than adding a broad untested content tier.
+
+The identity/art follow-up gives every class a usable native technique and every existing race a heritage technique through the `B` ability palette, fixes new-run class-package duplication, and brings authored item icons into inventory and visible dungeon piles. The 0x72 portrait palette now stays intact in the world; screenshot validation includes abilities and items.
+
+The replayability follow-up completes the live run contract: deterministic three-option perk drafts persist through save/load with a legacy full-list fallback, and the level-up UI labels drafts clearly. Heal-on-kill and flat damage-bonus synergies now affect play; `echo_bonus` remains unsupported. Landmark metadata/fallbacks and lock/key solvability validation are reliable, ranged weapon input enforces range and line of sight, and runs use a nine-floor contract with boss/act feedback and canonical `Victory` completion. First-clear ascension unlocks are idempotent, with only the currently implemented Ascension effects active. Daily challenges are retryable with persisted attempts and best scores; Thursday supplies the authored speed-score modifier, while other daily modifiers remain unsupported/upcoming. Friendly Merchants' Guild reputation discounts purchases, and Orin's dialogue is corrected.
+
+The same pass adds 1 HP `WaitAction` recovery with dangerous-status suppression, first-delve/stairs/death guidance, and `Retry Seed`/`New Build` game-over actions. Latest verification is 734/734 in the full strict suite, 663/663 in rendering validation, a real Godot 4.5.2 API build with zero warnings/errors, and passing format/diff checks.
+
 1. Install .NET 8 SDK.
    If a system package is unavailable, the Microsoft user-local installer works for this repo; set `DOTNET_ROOT=$HOME/.dotnet` and put `$HOME/.dotnet` on `PATH` before running the commands below.
 2. Install Godot 4.5.2 Mono/.NET if you want to open or run the game inside the editor.
@@ -33,6 +43,12 @@ The follow-up wires authored enemy sprites through saved template identity and r
 6. Launch the playable shell and use the built-in developer workshop from the title screen or pause menu if you want to author rooms and content without opening the Godot editor.
 
    The workshop's `Commands` tab can also export any positive seed and depth as a complete 16-pixel-per-tile PNG under `user://map_exports`, without replacing an active run.
+
+## Windows Export Packages
+
+The Windows workflow publishes both `roguelitussy-windows.zip` (the ordinary extracted game folder) and `Roguelitussy-single.exe` (the one user-facing launcher). The launcher extracts the embedded-PCK Godot C# payload into a deterministic per-version temporary directory, runs the game there, forwards its arguments, and cleans up afterward where possible.
+
+This is not a native engine binary with the managed runtime merged into it: stock Godot Mono exports cannot merge that runtime into the native executable. Deltarune is a native-style single binary; this approach provides a comparable one-file user experience without rewriting the Godot game.
 
 ## What This Project Contains
 

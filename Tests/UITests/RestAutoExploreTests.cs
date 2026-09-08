@@ -28,7 +28,8 @@ public sealed class RestAutoExploreTests : ITestSuite
 
         root._UnhandledInput(KeyEvent(Key.Z));
 
-        Expect.Equal(64, turnsStarted(), "Z should rest by processing normal wait turns until the safety cap when no passive healing exists.");
+        Expect.Equal(10, turnsStarted(), "Z should rest by processing 1-HP recovery waits until the player reaches full HP.");
+        Expect.Equal(context.Player.Stats.MaxHP, context.Player.Stats.HP, "Z should stop resting at full HP.");
         Expect.Equal(new Position(3, 2), context.Player.Position, "Rest should wait in place.");
     }
 

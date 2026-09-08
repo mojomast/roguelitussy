@@ -12,13 +12,15 @@ public partial class GameOverScreen : MenuBase
 
     public event System.Action? RetryRequested;
 
+    public event System.Action? NewBuildRequested;
+
     public event System.Action? MainMenuRequested;
 
     public GameOverScreen()
     {
         Name = "GameOverScreen";
         Title = "YOU DIED";
-        ConfigureOptions("New Run", "Main Menu");
+        ConfigureOptions("Retry Seed", "New Build", "Main Menu");
         Visible = false;
     }
 
@@ -67,6 +69,7 @@ public partial class GameOverScreen : MenuBase
         var echoBreakdown = BuildEchoBreakdown(muted, gold, parchment);
         var history = BuildRunHistory(muted, parchment, gold);
         var epitaph = ResolveEpitaph();
+        var lesson = SelectDeathLesson(_stats);
 
         return $"[color={danger}][b]✝ {ItemRarityPresentation.EscapeBBCode(_stats.CharacterName).ToUpperInvariant()} HAS FALLEN[/b][/color]   [color={muted}][lb]SEED:{_stats.Seed}[rb][/color]\n" +
             $"[color={gold}][i]{ItemRarityPresentation.EscapeBBCode(epitaph)}[/i][/color]\n" +
@@ -79,6 +82,7 @@ public partial class GameOverScreen : MenuBase
             $"[color={muted}]🎒 Items found[/color]        [color={gold}]{_stats.ItemsFound:N0}[/color]\n" +
             $"[color={muted}]💰 Gold collected[/color]    [color={gold}]{_stats.GoldCollected:N0}[/color]\n" +
             $"[color={muted}]💔 Damage taken[/color]      [color={gold}]{_stats.DamageTaken:N0}[/color]\n" +
+            $"[color={danger}]Lesson:[/color] [color={parchment}]{ItemRarityPresentation.EscapeBBCode(lesson)}[/color]\n" +
             echoBreakdown +
             history +
             $"────────────────────────────────────────\n" +
@@ -110,7 +114,7 @@ public partial class GameOverScreen : MenuBase
 
     protected override string BuildFooterText()
     {
-        return "[ENTER] New Run              [ESC] Main Menu              [C] Copy Run";
+        return "[ENTER] Retry Seed              [ESC] Main Menu              [C] Copy Run";
     }
 
     protected override bool HandleCustomKey(Key key)
@@ -146,6 +150,10 @@ public partial class GameOverScreen : MenuBase
                 break;
             case 1:
                 Close();
+                NewBuildRequested?.Invoke();
+                break;
+            case 2:
+                Close();
                 MainMenuRequested?.Invoke();
                 break;
         }
@@ -174,6 +182,43 @@ public partial class GameOverScreen : MenuBase
         }
 
         return "The dungeon swallows another delver.";
+    }
+
+    public static string SelectDeathLesson(RunStats stats)
+    {
+        var cause = stats.CauseOfDeath ?? string.Empty;
+        if (cause.Contains("poison", System.StringComparison.OrdinalIgnoreCase))
+        {
+            return "Cure poison early; damage-over-time keeps ticking between your turns.";
+        }
+
+        if (cause.Contains("burn", System.StringComparison.OrdinalIgnoreCase)
+            || cause.Contains("fire", System.StringComparison.OrdinalIgnoreCase))
+        {
+            return "Break line of fire or use a fire counter before taking another turn.";
+        }
+
+        if (cause.Contains("trap", System.StringComparison.OrdinalIgnoreCase))
+        {
+            return "Probe suspicious tiles and keep a cure or escape route ready.";
+        }
+
+        if (stats.DamageTaken > 0 && stats.EnemiesKilled == 0)
+        {
+            return "Do not trade turns in the open; retreat, recover, and use your starter kit.";
+        }
+
+        if (stats.FloorReached <= 1)
+        {
+            return "Spend your first turns finding the stairs and learning which fights to avoid.";
+        }
+
+        if (stats.DamageTaken > stats.EnemiesKilled * 8)
+        {
+            return "When damage spikes, disengage sooner and return after healing or upgrading gear.";
+        }
+
+        return "Check your HP before every fight, and save a consumable for the exit route.";
     }
 
     private string ResolveEpitaph()

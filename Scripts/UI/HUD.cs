@@ -107,7 +107,11 @@ public partial class HUD : Control
 
     public string HotbarText { get; private set; } = "Hotbar: empty";
 
+    public string AbilityPromptText { get; private set; } = string.Empty;
+
     public string MinimapText { get; private set; } = "Map hidden";
+
+    public string ObjectiveText { get; private set; } = "Objective: reach the stairs";
 
     public string InteractionPromptText { get; private set; } = string.Empty;
 
@@ -259,8 +263,14 @@ public partial class HUD : Control
         {
             builder.AppendLine(HotbarText);
         }
+        if (!string.IsNullOrWhiteSpace(AbilityPromptText))
+        {
+            builder.AppendLine(AbilityPromptText);
+        }
 
         builder.Append(MinimapText);
+        builder.Append("  |  ");
+        builder.Append(ObjectiveText);
         if (!string.IsNullOrWhiteSpace(InteractionPromptText))
         {
             builder.AppendLine();
@@ -448,6 +458,7 @@ public partial class HUD : Control
             BossHealthText = string.Empty;
             KillStreakText = string.Empty;
             HotbarText = "Hotbar: empty";
+            AbilityPromptText = string.Empty;
             MinimapText = MinimapVisible ? "Minimap: 0 explored, 0 visible" : "Minimap hidden";
             HPColor = Colors.White;
             SetHPBarTarget(0d, 1d, animate: false);
@@ -475,6 +486,7 @@ public partial class HUD : Control
             BossHealthText = string.Empty;
             KillStreakText = string.Empty;
             HotbarText = "Hotbar: empty";
+            AbilityPromptText = string.Empty;
             MinimapText = MinimapVisible
                 ? $"Minimap: 0 explored, 0 visible"
                 : "Minimap hidden";
@@ -513,6 +525,7 @@ public partial class HUD : Control
         }
         StatsText = BuildStatsText(player, progression);
         HotbarText = BuildHotbarText(world, player.Id, _gameManager?.Content);
+        AbilityPromptText = player.GetComponent<AbilitiesComponent>()?.Slots.Count > 0 ? "[B] Abilities" : string.Empty;
 
         var effects = StatusEffectProcessor.GetEffects(player);
         StatusEffectsText = effects.Count == 0
@@ -714,7 +727,7 @@ public partial class HUD : Control
         {
             Name = "Panel",
             Position = new Vector2(8f, 8f),
-            Modulate = UiStyle.GoldTrim(),
+            SelfModulate = UiStyle.GoldTrim(),
         };
         AddChild(_panel);
 
@@ -763,6 +776,7 @@ public partial class HUD : Control
             },
         };
 
+        UiStyle.ConfigureSingleLineLabel(_interactionPromptLabel);
         CreateStatPills();
 
         _panel.AddChild(_hpLabel);
@@ -814,7 +828,7 @@ public partial class HUD : Control
             return;
         }
 
-        _bottomStatusPanel = new Panel { Name = "BottomStatusPanel", Modulate = UiStyle.GoldTrim(), ZIndex = 9 };
+        _bottomStatusPanel = new Panel { Name = "BottomStatusPanel", SelfModulate = UiStyle.GoldTrim(), ZIndex = 9 };
         _bottomStatusBackground = new ColorRect { Name = "BottomStatusBackground", Color = UiStyle.PanelBlack(0.88f) };
         _bottomHPLabel = CreateLabel("BottomHPLabel", Vector2.Zero, Vector2.Zero);
         _bottomHPBarBackground = new ColorRect { Name = "BottomHPBarBackground", Color = UiStyle.PanelBlack() };
@@ -846,6 +860,7 @@ public partial class HUD : Control
         {
             var background = new ColorRect { Name = $"StatPillBackground_{i}", Color = UiStyle.SlotBackground() };
             var label = new Label { Name = $"StatPillLabel_{i}", Modulate = UiStyle.Parchment() };
+            UiStyle.ConfigureSingleLineLabel(label);
             _statPillBackgrounds.Add(background);
             _statPillLabels.Add(label);
             _panel.AddChild(background);
@@ -885,6 +900,7 @@ public partial class HUD : Control
                     Texture = iconTexture,
                     Modulate = ParseTint(definition.ColorTint),
                     CustomMinimumSize = new Vector2(18f, 18f),
+                    ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
                     StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
                 };
                 _statusIconsContainer.AddChild(icon);
@@ -896,6 +912,7 @@ public partial class HUD : Control
                 Text = effect.RemainingTurns.ToString(),
                 Modulate = UiStyle.Parchment(),
             };
+            turnLabel.AddThemeFontSizeOverride("font_size", 14);
             _statusIconsContainer.AddChild(turnLabel);
         }
     }
@@ -1010,9 +1027,9 @@ public partial class HUD : Control
         _killStreakLabel.Text = FitLabelText(KillStreakText, _killStreakLabel.Size.X);
         _killStreakLabel.Visible = !string.IsNullOrWhiteSpace(KillStreakText);
         _killStreakLabel.Modulate = UiStyle.WarningOrange();
-        _hotbarLabel.Text = FitLabelText(HotbarText, _hotbarLabel.Size.X);
+        _hotbarLabel.Text = FitLabelText(string.Join("  ", new[] { HotbarText, AbilityPromptText }.Where(text => !string.IsNullOrWhiteSpace(text))), _hotbarLabel.Size.X);
         _hotbarLabel.Modulate = UiStyle.BrightGold();
-        _mapLabel.Text = FitLabelText(MinimapText, _mapLabel.Size.X);
+        _mapLabel.Text = FitLabelText($"{MinimapText}  |  {ObjectiveText}", _mapLabel.Size.X);
         _mapLabel.Modulate = UiStyle.FaintText();
         UpdateBottomStatusVisuals();
         UpdateInteractionPromptVisual();
@@ -1024,7 +1041,7 @@ public partial class HUD : Control
 
         if (_hpLabel is not null)
         {
-            _hpLabel.Text = HPText;
+            _hpLabel.Text = "HP";
             _hpLabel.Modulate = HPColor;
         }
 
@@ -1142,33 +1159,36 @@ public partial class HUD : Control
         }
 
         var viewportWidth = ResolveViewportWidth();
+        Size = new Vector2(viewportWidth, ResolveViewportHeight());
+        // Compact play keeps HP/XP in the bottom bar; the character sheet holds full stats.
+        _panel.Visible = Size.Y >= 600f;
         var width = System.Math.Min(440f, System.Math.Max(0f, viewportWidth - 24f));
         var contentWidth = System.Math.Max(0f, width - 24f);
         _panel.Position = new Vector2(8f, 8f);
-        _panel.Size = new Vector2(width, 254f);
-        _panel.Modulate = UiStyle.GoldTrim();
+        _panel.Size = new Vector2(width, 282f);
+        _panel.SelfModulate = UiStyle.GoldTrim();
         LayoutPanelChrome(_panel.Size);
 
-        SetControlBounds(_hpLabel, 12f, 10f, 28f, 16f);
-        SetControlBounds(_hpValueLabel, 170f, 10f, 70f, 16f);
-        SetControlBounds(_energyLabel, 12f, 32f, 28f, 16f);
-        SetControlBounds(_energyValueLabel, 170f, 32f, 70f, 16f);
-        SetControlBounds(_headerLabel, 12f, 56f, contentWidth, 18f);
-        SetControlBounds(_progressLabel, 12f, 76f, contentWidth, 18f);
-        SetControlBounds(_statsLabel, 12f, 96f, contentWidth, 18f);
-        LayoutStatPills(12f, 96f, contentWidth);
-        SetControlBounds(_effectsLabel, 12f, 116f, contentWidth, 18f);
-        SetControlBounds(_relicLabel, 12f, 134f, contentWidth, 18f);
-        SetControlBounds(_bossLabel, 12f, 152f, contentWidth, 18f);
-        SetControlBounds(_killStreakLabel, 12f, 170f, contentWidth, 18f);
-        SetControlBounds(_hotbarLabel, 12f, 188f, contentWidth, 18f);
+        SetControlBounds(_hpLabel, 12f, 8f, 28f, 22f);
+        SetControlBounds(_hpValueLabel, 170f, 8f, contentWidth - 158f, 22f);
+        SetControlBounds(_energyLabel, 12f, 30f, 28f, 22f);
+        SetControlBounds(_energyValueLabel, 170f, 30f, contentWidth - 158f, 22f);
+        SetControlBounds(_headerLabel, 12f, 56f, contentWidth, 22f);
+        SetControlBounds(_progressLabel, 12f, 78f, contentWidth, 22f);
+        SetControlBounds(_statsLabel, 12f, 100f, contentWidth, 22f);
+        LayoutStatPills(12f, 100f, contentWidth);
+        SetControlBounds(_effectsLabel, 12f, 122f, contentWidth, 22f);
+        SetControlBounds(_relicLabel, 12f, 144f, contentWidth, 22f);
+        SetControlBounds(_bossLabel, 12f, 166f, contentWidth, 22f);
+        SetControlBounds(_killStreakLabel, 12f, 188f, contentWidth, 22f);
+        SetControlBounds(_hotbarLabel, 12f, 210f, contentWidth, 22f);
         if (_statusIconsContainer is not null)
         {
-            _statusIconsContainer.Position = new Vector2(12f, 208f);
+            _statusIconsContainer.Position = new Vector2(12f, 234f);
             _statusIconsContainer.Size = new Vector2(contentWidth, 22f);
         }
 
-        SetControlBounds(_mapLabel, 12f, 232f, contentWidth, 18f);
+        SetControlBounds(_mapLabel, 12f, 258f, contentWidth, 22f);
         LayoutBottomStatusPanel(viewportWidth, ResolveViewportHeight());
         LayoutActionFeedback();
         LayoutInteractionPrompt();
@@ -1219,8 +1239,8 @@ public partial class HUD : Control
         var labelWidth = System.Math.Min(132f, System.Math.Max(104f, _bottomStatusPanel.Size.X * 0.24f));
         var barX = labelWidth + 10f;
         var barWidth = System.Math.Max(80f, _bottomStatusPanel.Size.X - barX - 12f);
-        SetControlBounds(_bottomHPLabel, 10f, 5f, labelWidth, 16f);
-        SetControlBounds(_bottomXPLabel, 10f, 27f, labelWidth, 16f);
+        SetControlBounds(_bottomHPLabel, 10f, 3f, labelWidth - 2f, 22f);
+        SetControlBounds(_bottomXPLabel, 10f, 25f, labelWidth - 2f, 22f);
         LayoutBottomBar(_bottomHPBarBackground, _bottomHPBarGhostFill, HPBarGhostValue, HPBarMaxValue, UiStyle.BloodRed(0.38f), barX, 9f, barWidth);
         LayoutBottomBar(_bottomHPBarBackground, _bottomHPBarFill, HPBarDisplayedValue, HPBarMaxValue, HPBarFillColor, barX, 9f, barWidth);
         LayoutBottomBar(_bottomXPBarBackground, _bottomXPBarFill, XPBarValue, XPBarMaxValue, UiStyle.BrightGold(), barX, 31f, barWidth);
@@ -1330,10 +1350,10 @@ public partial class HUD : Control
         {
             var px = x + (i * (pillWidth + 3f));
             _statPillBackgrounds[i].Position = new Vector2(px, y);
-            _statPillBackgrounds[i].Size = new Vector2(pillWidth, 18f);
+            _statPillBackgrounds[i].Size = new Vector2(pillWidth, 22f);
             _statPillBackgrounds[i].Color = UiStyle.SlotBackground();
             _statPillLabels[i].Position = new Vector2(px + 4f, y + 1f);
-            _statPillLabels[i].Size = new Vector2(System.Math.Max(0f, pillWidth - 8f), 16f);
+            _statPillLabels[i].Size = new Vector2(System.Math.Max(0f, pillWidth - 8f), 20f);
         }
     }
 
@@ -1502,11 +1522,13 @@ public partial class HUD : Control
 
     private static Label CreateLabel(string name, Vector2 position, Vector2 size)
     {
-        return new Label
+        var label = new Label
         {
             Name = name,
             Position = position,
             Size = size,
         };
+        UiStyle.ConfigureSingleLineLabel(label);
+        return label;
     }
 }

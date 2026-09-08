@@ -8,7 +8,6 @@ namespace Godotussy;
 public partial class MainMenu : MenuBase
 {
     private const float PreviewPadding = 20f;
-    private const float PreviewFrameMinimumHeight = 144f;
 
     private enum MenuAction
     {
@@ -50,10 +49,7 @@ public partial class MainMenu : MenuBase
         string DisplayName,
         string ArchetypeId,
         string Summary,
-        string SignatureMechanic,
-        StatBonus Bonus,
-        IReadOnlyList<string> StartingItems,
-        IReadOnlyList<string> EquippedItems);
+        string SignatureMechanic);
 
     private sealed record OriginOption(
         string DisplayName,
@@ -87,34 +83,22 @@ public partial class MainMenu : MenuBase
             "Vanguard",
             "vanguard",
             "A tough delver who starts armed and ready for the front line.",
-            "Shield Bash: control space and endure punishment.",
-            new StatBonus(10, 0, 2, -5, -2, -10, -1, 0),
-            new[] { "potion_health", "potion_health", "item_shield_basic" },
-            new[] { "item_shield_basic" }),
+            "Shield Bash: control space and endure punishment."),
         new(
             "Ranger",
             "ranger",
             "A mobile marksman with accurate ranged pressure.",
-            "Ranged Shot: spend arrows to strike from safety.",
-            new StatBonus(-5, 2, -1, 15, 8, 10, 2, 0),
-            new[] { "potion_health", "item_arrows_bundle" },
-            System.Array.Empty<string>()),
+            "Ranged Shot: spend arrows to strike from safety."),
         new(
             "Trickster",
             "trickster",
             "A slippery killer who snowballs chained takedowns.",
-            "Kill Streak: bonus pressure after repeated kills.",
-            new StatBonus(-10, 1, -2, 5, 12, 20, 1, 0),
-            new[] { "potion_health", "item_smoke_bomb" },
-            System.Array.Empty<string>()),
+            "Kill Streak: bonus pressure after repeated kills."),
         new(
             "Arcanist",
             "arcanist",
             "A fragile caster who starts with scrolls and arcane abilities.",
-            "Arcane Charges: native spells backed by scroll burst.",
-            new StatBonus(-12, -2, -2, 10, 2, 0, 1, 0),
-            new[] { "scroll_fireball", "scroll_frost_nova", "potion_mana" },
-            System.Array.Empty<string>()),
+            "Arcane Charges: native spells backed by scroll burst."),
     };
 
     private static readonly OriginOption[] Origins =
@@ -198,9 +182,7 @@ public partial class MainMenu : MenuBase
     private TextureRect? _previewBody;
     private ColorRect? _previewAccentBand;
     private Label? _previewSigil;
-    private Label? _previewDetail;
-    private Label? _previewKitLabel;
-    private Label? _previewStatsLabel;
+    private RichTextLabel? _previewDetails;
     private Label? _previewTitle;
     private Label? _previewSubtitle;
     private Label? _previewVariantId;
@@ -283,6 +265,7 @@ public partial class MainMenu : MenuBase
             $"Candidate: {NameOptions[_nameIndex]}  Seed: {PendingSeed}",
             $"Build: {FormatArchetypeName(archetype)} / {origin.DisplayName} / {trait.DisplayName}",
             $"Identity: {RaceOptions[_raceIndex]} / {GenderOptions[_genderIndex]} / {AppearanceOptions[_appearanceIndex]}",
+            $"Heritage: {FormatHeritageTechnique(RaceOptions[_raceIndex])}",
             $"Training: VIT {_vitalityPoints}  POW {_powerPoints}  GRD {_guardPoints}  FIN {_finessePoints}",
             $"Points Remaining: {RemainingPoints}",
             $"Signature: {archetype.SignatureMechanic}",
@@ -333,7 +316,7 @@ public partial class MainMenu : MenuBase
     {
         foreach (var archetype in Archetypes)
         {
-            foreach (var itemId in archetype.StartingItems.Concat(archetype.EquippedItems))
+            foreach (var itemId in ArchetypeDefinitions.Get(archetype.ArchetypeId).StartingItemIds)
             {
                 yield return itemId;
             }
@@ -366,6 +349,7 @@ public partial class MainMenu : MenuBase
             $"Candidate  {NameOptions[_nameIndex]}",
             $"Loadout    {FormatArchetypeName(archetype)} / {origin.DisplayName} / {trait.DisplayName}",
             $"Identity   {RaceOptions[_raceIndex]} / {GenderOptions[_genderIndex]} / {AppearanceOptions[_appearanceIndex]}",
+            $"Heritage   {FormatHeritageTechnique(RaceOptions[_raceIndex])}",
             $"Training   VIT {_vitalityPoints}  POW {_powerPoints}  GRD {_guardPoints}  FIN {_finessePoints}",
             $"Reserve    {RemainingPoints} point(s) left  Seed {PendingSeed}",
             BuildDailySummaryLine(),
@@ -375,19 +359,20 @@ public partial class MainMenu : MenuBase
     public string BuildStarterKitPreviewText()
     {
         var archetype = Archetypes[_archetypeIndex];
+        var definition = ArchetypeDefinitions.Get(archetype.ArchetypeId);
         var origin = Origins[_originIndex];
         var trait = Traits[_traitIndex];
         var allItems = new List<string>();
-        allItems.AddRange(archetype.StartingItems);
+        allItems.AddRange(definition.StartingItemIds);
         allItems.AddRange(origin.StartingItems);
         allItems.AddRange(trait.StartingItems);
-        var pack = SubtractItemCounts(allItems, archetype.EquippedItems);
+        var pack = SubtractItemCounts(allItems, definition.StartingEquippedItemIds);
 
         return string.Join(
             "\n",
             "READY KIT",
             "Equipped:",
-            FormatStarterItemLines(archetype.EquippedItems),
+            FormatStarterItemLines(definition.StartingEquippedItemIds),
             "Pack:",
             FormatStarterItemLines(pack));
     }
@@ -544,15 +529,16 @@ public partial class MainMenu : MenuBase
     private (int hp, int atk, int def, int acc, int eva, int spd, int vr) ComputeProjectedStats()
     {
         var archetype = Archetypes[_archetypeIndex];
+        var definition = ArchetypeDefinitions.Get(archetype.ArchetypeId);
         var origin = Origins[_originIndex];
         var trait = Traits[_traitIndex];
-        var hp = BaseMaxHp + archetype.Bonus.MaxHp + origin.Bonus.MaxHp + trait.Bonus.MaxHp + (_vitalityPoints * 3);
-        var atk = BaseAttack + archetype.Bonus.Attack + origin.Bonus.Attack + trait.Bonus.Attack + _powerPoints;
-        var def = BaseDefense + archetype.Bonus.Defense + origin.Bonus.Defense + trait.Bonus.Defense + _guardPoints;
-        var acc = BaseAccuracy + archetype.Bonus.Accuracy + origin.Bonus.Accuracy + trait.Bonus.Accuracy + _finessePoints;
-        var eva = BaseEvasion + archetype.Bonus.Evasion + origin.Bonus.Evasion + trait.Bonus.Evasion + _finessePoints;
-        var spd = BaseSpeed + archetype.Bonus.Speed + origin.Bonus.Speed + trait.Bonus.Speed;
-        var vr = BaseViewRadius + archetype.Bonus.ViewRadius + origin.Bonus.ViewRadius + trait.Bonus.ViewRadius;
+        var hp = definition.BaseStats.MaxHP + origin.Bonus.MaxHp + trait.Bonus.MaxHp + (_vitalityPoints * 3);
+        var atk = definition.BaseStats.Attack + origin.Bonus.Attack + trait.Bonus.Attack + _powerPoints;
+        var def = definition.BaseStats.Defense + origin.Bonus.Defense + trait.Bonus.Defense + _guardPoints;
+        var acc = definition.BaseStats.Accuracy + origin.Bonus.Accuracy + trait.Bonus.Accuracy + _finessePoints;
+        var eva = definition.BaseStats.Evasion + origin.Bonus.Evasion + trait.Bonus.Evasion + _finessePoints;
+        var spd = definition.BaseStats.Speed + origin.Bonus.Speed + trait.Bonus.Speed;
+        var vr = definition.BaseStats.ViewRadius + origin.Bonus.ViewRadius + trait.Bonus.ViewRadius;
         return (hp, atk, def, acc, eva, spd, vr);
     }
 
@@ -621,7 +607,7 @@ public partial class MainMenu : MenuBase
             System.Math.Max(0f, BodyCard.Size.X - 36f),
             System.Math.Max(0f, BodyCard.Size.Y - 32f));
         label.Clear();
-        label.AppendText(ClampTextLines(WrapPreviewText(BuildHeroSummary(), label.Size.X), 8));
+        label.AppendText(BuildHeroSummary());
         label.Modulate = UiStyle.Parchment();
 
         OptionsCard.Color = UiStyle.CathedralBlack(0.99f);
@@ -1014,16 +1000,24 @@ public partial class MainMenu : MenuBase
     {
         var date = DailySeedGenerator.GetTodaysDateString();
         var seed = DailySeedGenerator.GetTodaysSeed();
-        var completed = _dailyChallenge?.TodayCompleted == true ? " COMPLETE" : string.Empty;
-        return $"Daily Challenge: {date} #{seed:X8}{completed}";
+        var modifier = _dailyChallenge?.TodaysModifier ?? DailySeedGenerator.GetModifierForDate(System.DateTime.UtcNow);
+        var support = modifier.IsSupported ? "ACTIVE" : "UPCOMING";
+        return $"Daily Challenge: {date} #{seed:X8} {modifier.DisplayName} [{support}]";
     }
 
-    private string BuildDailySummaryLine()
+    public string BuildDailySummaryLine()
     {
         var seed = DailySeedGenerator.GetTodaysSeed();
         var best = _dailyChallenge?.TodayBestScore ?? 0;
-        var status = _dailyChallenge?.TodayCompleted == true ? "complete" : "open";
-        return $"Daily     {DailySeedGenerator.GetTodaysDateString()}  Seed #{seed:X8}  Best {best} ({status})";
+        var attempts = _dailyChallenge?.TodayAttemptCount ?? 0;
+        var modifier = _dailyChallenge?.TodaysModifier ?? DailySeedGenerator.GetModifierForDate(System.DateTime.UtcNow);
+        var support = modifier.IsSupported ? "active" : "unsupported";
+        return string.Join(
+            "\n",
+            $"Daily     {DailySeedGenerator.GetTodaysDateString()}  Seed #{seed:X8}",
+            $"Modifier  {modifier.DisplayName} ({support})",
+            $"          {modifier.Description}",
+            $"Attempts  {attempts}  Best floor {(_dailyChallenge?.TodayBestFloor ?? 0)}  Best score {best}");
     }
 
     private void StartDailyChallenge()
@@ -1031,12 +1025,6 @@ public partial class MainMenu : MenuBase
         if (_gameManager is null)
         {
             UpdateStatus("Daily unavailable: GameManager autoload missing.");
-            return;
-        }
-
-        if (_dailyChallenge?.TodayCompleted == true)
-        {
-            UpdateStatus("Today's daily challenge is already completed.");
             return;
         }
 
@@ -1240,6 +1228,7 @@ public partial class MainMenu : MenuBase
         _previewBody = new TextureRect
         {
             Name = "PreviewBody",
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
             Texture = PlayerVisualCatalog.GetBaseTexture(ResolveCurrentProfile()),
         };
@@ -1251,18 +1240,15 @@ public partial class MainMenu : MenuBase
         {
             Name = "PreviewSigil",
         };
-        _previewDetail = new Label
+        _previewDetails = new RichTextLabel
         {
-            Name = "PreviewDetail",
+            Name = "PreviewDetails",
+            FitContent = false,
+            ScrollActive = true,
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+            Modulate = UiStyle.Parchment(),
         };
-        _previewKitLabel = new Label
-        {
-            Name = "PreviewKitLabel",
-        };
-        _previewStatsLabel = new Label
-        {
-            Name = "PreviewStatsLabel",
-        };
+        _previewDetails.AddThemeFontSizeOverride("normal_font_size", 14);
         _previewTitle = new Label
         {
             Name = "PreviewTitle",
@@ -1280,12 +1266,14 @@ public partial class MainMenu : MenuBase
         _previewPanel.AddChild(_previewBody);
         _previewPanel.AddChild(_previewAccentBand);
         _previewPanel.AddChild(_previewSigil);
-        _previewPanel.AddChild(_previewDetail);
-        _previewPanel.AddChild(_previewKitLabel);
-        _previewPanel.AddChild(_previewStatsLabel);
+        _previewPanel.AddChild(_previewDetails);
         _previewPanel.AddChild(_previewTitle);
         _previewPanel.AddChild(_previewSubtitle);
         _previewPanel.AddChild(_previewVariantId);
+        UiStyle.ConfigureSingleLineLabel(_previewSigil);
+        UiStyle.ConfigureSingleLineLabel(_previewTitle);
+        UiStyle.ConfigureSingleLineLabel(_previewSubtitle);
+        UiStyle.ConfigureSingleLineLabel(_previewVariantId);
         panel.AddChild(_previewPanel);
     }
 
@@ -1295,9 +1283,7 @@ public partial class MainMenu : MenuBase
             || _previewBody is null
             || _previewAccentBand is null
             || _previewSigil is null
-            || _previewDetail is null
-            || _previewKitLabel is null
-            || _previewStatsLabel is null
+            || _previewDetails is null
             || _previewTitle is null
             || _previewSubtitle is null
             || _previewVariantId is null)
@@ -1306,36 +1292,30 @@ public partial class MainMenu : MenuBase
         }
 
         var inset = 16f;
-        var frameWidth = System.Math.Max(90f, previewSize.X - (inset * 2f));
-        var frameHeight = System.Math.Clamp(previewSize.Y * 0.32f, PreviewFrameMinimumHeight, 180f);
-        var titleTop = inset + frameHeight + 26f;
+        var frameWidth = System.Math.Max(0f, previewSize.X - (inset * 2f));
+        var frameHeight = previewSize.Y < 300f ? 0f : System.Math.Min(144f, previewSize.Y * 0.25f);
+        var titleTop = frameHeight == 0f ? inset : inset + frameHeight + 20f;
         var kitTop = titleTop + 52f;
-        var remaining = System.Math.Max(90f, previewSize.Y - kitTop - inset);
-        var kitHeight = remaining * 0.30f;
-        var statsHeight = remaining * 0.30f;
-        var pathHeight = remaining * 0.18f;
-        var variantTop = kitTop + kitHeight + statsHeight + pathHeight + 20f;
+        var variantTop = previewSize.Y - inset - 22f;
 
         _previewFrame.Position = new Vector2(inset, inset);
         _previewFrame.Size = new Vector2(frameWidth, frameHeight);
+        _previewFrame.Visible = frameHeight > 0f;
 
         _previewBody.Position = new Vector2(inset + 10f, inset + 10f);
-        _previewBody.Size = new Vector2(System.Math.Max(60f, frameWidth - 20f), System.Math.Max(80f, frameHeight - 20f));
+        _previewBody.Size = new Vector2(System.Math.Max(0f, frameWidth - 20f), System.Math.Max(0f, frameHeight - 20f));
+        _previewBody.Visible = frameHeight > 0f;
 
         _previewAccentBand.Position = new Vector2(inset, inset + frameHeight + 8f);
         _previewAccentBand.Size = new Vector2(frameWidth, 8f);
+        _previewAccentBand.Visible = frameHeight > 0f;
 
         _previewSigil.Position = new Vector2(inset + 8f, 10f);
         _previewSigil.Size = new Vector2(32f, 24f);
+        _previewSigil.Visible = frameHeight > 0f;
 
-        _previewKitLabel.Position = new Vector2(inset, kitTop);
-        _previewKitLabel.Size = new Vector2(frameWidth, System.Math.Max(36f, kitHeight - 4f));
-
-        _previewStatsLabel.Position = new Vector2(inset, kitTop + kitHeight + 8f);
-        _previewStatsLabel.Size = new Vector2(frameWidth, System.Math.Max(36f, statsHeight - 4f));
-
-        _previewDetail.Position = new Vector2(inset, kitTop + kitHeight + statsHeight + 16f);
-        _previewDetail.Size = new Vector2(frameWidth, System.Math.Max(28f, pathHeight));
+        _previewDetails.Position = new Vector2(inset, kitTop);
+        _previewDetails.Size = new Vector2(frameWidth, System.Math.Max(0f, variantTop - kitTop - 8f));
 
         _previewTitle.Position = new Vector2(inset, titleTop);
         _previewTitle.Size = new Vector2(frameWidth, 24f);
@@ -1343,8 +1323,8 @@ public partial class MainMenu : MenuBase
         _previewSubtitle.Position = new Vector2(inset, titleTop + 24f);
         _previewSubtitle.Size = new Vector2(frameWidth, 24f);
 
-        _previewVariantId.Position = new Vector2(inset, System.Math.Min(variantTop, previewSize.Y - inset - 34f));
-        _previewVariantId.Size = new Vector2(frameWidth, System.Math.Max(32f, previewSize.Y - _previewVariantId.Position.Y - inset));
+        _previewVariantId.Position = new Vector2(inset, variantTop);
+        _previewVariantId.Size = new Vector2(frameWidth, 22f);
     }
 
     private void RefreshPreviewContent()
@@ -1367,22 +1347,10 @@ public partial class MainMenu : MenuBase
             _previewSigil.Modulate = profile.AccentTint;
         }
 
-        if (_previewKitLabel is not null)
+        if (_previewDetails is not null)
         {
-            _previewKitLabel.Text = ClampTextLines(WrapPreviewText(BuildStarterKitPreviewText(), _previewKitLabel.Size.X), ResolveLineCapacity(_previewKitLabel.Size.Y));
-            _previewKitLabel.Modulate = UiStyle.Parchment();
-        }
-
-        if (_previewStatsLabel is not null)
-        {
-            _previewStatsLabel.Text = ClampTextLines(BuildPreviewStatsText(), ResolveLineCapacity(_previewStatsLabel.Size.Y));
-            _previewStatsLabel.Modulate = UiStyle.Parchment();
-        }
-
-        if (_previewDetail is not null)
-        {
-            _previewDetail.Text = ClampTextLines(WrapPreviewText(BuildPreviewPathText(), _previewDetail.Size.X), ResolveLineCapacity(_previewDetail.Size.Y));
-            _previewDetail.Modulate = UiStyle.MutedText();
+            _previewDetails.Clear();
+            _previewDetails.AppendText(string.Join("\n\n", BuildStarterKitPreviewText(), BuildPreviewStatsText(), BuildPreviewPathText()));
         }
 
         if (_previewTitle is not null)
@@ -1399,7 +1367,7 @@ public partial class MainMenu : MenuBase
 
         if (_previewVariantId is not null)
         {
-            _previewVariantId.Text = ClampTextLines($"Variant ID\n{profile.VariantId}", ResolveLineCapacity(_previewVariantId.Size.Y));
+            _previewVariantId.Text = profile.VariantId;
             _previewVariantId.Modulate = UiStyle.MutedText();
         }
     }
@@ -1433,7 +1401,6 @@ public partial class MainMenu : MenuBase
         var origin = Origins[_originIndex];
         var trait = Traits[_traitIndex];
         var items = new List<string>();
-        items.AddRange(archetype.StartingItems);
         items.AddRange(origin.StartingItems);
         items.AddRange(trait.StartingItems);
 
@@ -1442,22 +1409,28 @@ public partial class MainMenu : MenuBase
             archetype.ArchetypeId,
             origin.DisplayName,
             trait.DisplayName,
-            archetype.Bonus.MaxHp + origin.Bonus.MaxHp + trait.Bonus.MaxHp + (_vitalityPoints * 3),
-            archetype.Bonus.Attack + origin.Bonus.Attack + trait.Bonus.Attack + _powerPoints,
-            archetype.Bonus.Defense + origin.Bonus.Defense + trait.Bonus.Defense + _guardPoints,
-            archetype.Bonus.Accuracy + origin.Bonus.Accuracy + trait.Bonus.Accuracy + _finessePoints,
-            archetype.Bonus.Evasion + origin.Bonus.Evasion + trait.Bonus.Evasion + _finessePoints,
-            archetype.Bonus.Speed + origin.Bonus.Speed + trait.Bonus.Speed,
-            archetype.Bonus.ViewRadius + origin.Bonus.ViewRadius + trait.Bonus.ViewRadius,
-            archetype.Bonus.InventoryCapacity + origin.Bonus.InventoryCapacity + trait.Bonus.InventoryCapacity,
+            origin.Bonus.MaxHp + trait.Bonus.MaxHp + (_vitalityPoints * 3),
+            origin.Bonus.Attack + trait.Bonus.Attack + _powerPoints,
+            origin.Bonus.Defense + trait.Bonus.Defense + _guardPoints,
+            origin.Bonus.Accuracy + trait.Bonus.Accuracy + _finessePoints,
+            origin.Bonus.Evasion + trait.Bonus.Evasion + _finessePoints,
+            origin.Bonus.Speed + trait.Bonus.Speed,
+            origin.Bonus.ViewRadius + trait.Bonus.ViewRadius,
+            origin.Bonus.InventoryCapacity + trait.Bonus.InventoryCapacity,
             items,
-            archetype.EquippedItems,
+            System.Array.Empty<string>(),
             RaceOptions[_raceIndex].ToLowerInvariant(),
             GenderOptions[_genderIndex].ToLowerInvariant(),
             AppearanceOptions[_appearanceIndex].ToLowerInvariant());
     }
 
     private int RemainingPoints => AllocationBudget - (_vitalityPoints + _powerPoints + _guardPoints + _finessePoints);
+
+    private static string FormatHeritageTechnique(string raceName)
+    {
+        var abilityId = RaceDefinitions.Get(raceName).HeritageAbilityId;
+        return string.Join(" ", abilityId.Split('_').Select(part => char.ToUpperInvariant(part[0]) + part[1..]));
+    }
 
     private bool IsArchetypeUnlocked(ArchetypeOption archetype)
     {

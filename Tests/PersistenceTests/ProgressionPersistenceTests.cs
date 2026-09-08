@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using System.Linq;
 using Roguelike.Core;
 using Roguelike.Tests.TestFramework;
 
@@ -31,6 +32,8 @@ public sealed class ProgressionPersistenceTests : ITestSuite
             Kills = 12,
         });
         player.GetComponent<ProgressionComponent>()!.SelectedPerkIds.Add("battle_instinct");
+        player.GetComponent<ProgressionComponent>()!.PerkDraftsGenerated = true;
+        player.GetComponent<ProgressionComponent>()!.PendingPerkDrafts.Add(new() { "iron_will", "quartermasters_eye", "ghost_step" });
 
         Expect.True(manager.SaveGame(world, SaveSlots.Slot1).GetAwaiter().GetResult(), "Save should succeed for progression round-trip");
 
@@ -47,6 +50,8 @@ public sealed class ProgressionPersistenceTests : ITestSuite
         Expect.Equal(1, progression.UnspentPerkChoices, "UnspentPerkChoices should survive round-trip");
         Expect.Equal(12, progression.Kills, "Kills should survive round-trip");
         Expect.True(progression.SelectedPerkIds.Contains("battle_instinct"), "Selected perk ids should survive round-trip");
+        Expect.True(progression.PerkDraftsGenerated, "Draft generation state should survive round-trip");
+        Expect.True(new[] { "iron_will", "quartermasters_eye", "ghost_step" }.SequenceEqual(progression.PendingPerkDrafts[0]), "Pending perk draft should survive round-trip");
     }
 
     private static void V3SavesMigrateWithoutProgression()

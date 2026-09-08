@@ -18,7 +18,7 @@ public partial class WorldView : Node2D
     public const int TileSize = 40;
     private const int EntityLayerZIndex = 20;
     private const float SourceArtTileSize = 16f;
-    private static readonly Color BoundaryTrimColor = RenderPalette.BoundaryTrim;
+    private Color BoundaryTrimColor => RenderPalette.ForDepth(_world?.Depth ?? 0).Trim;
     private static readonly Color BoundaryShadowColor = RenderPalette.BoundaryShadow;
     private const float BoundaryThickness = 3f;
     private const float BoundaryShadowThickness = 2f;
@@ -32,6 +32,7 @@ public partial class WorldView : Node2D
     private TileMapLayer _objectLayer = new() { Name = "TileMapLayer_Objects" };
     private TileMapLayer _fogLayer = new() { Name = "TileMapLayer_Fog" };
     private Node2D _tileArtLayer = new() { Name = "TileArtLayer" };
+    private Node2D _groundItemLayer = new() { Name = "GroundItemLayer", ZIndex = 10 };
     private Node2D _entityLayer = new() { Name = "EntityLayer", ZIndex = EntityLayerZIndex };
     private Node2D _wallCoverLayer = new() { Name = "WallCoverLayer", ZIndex = 40 };
     private Camera2D _camera = new() { Name = "Camera2D" };
@@ -74,6 +75,8 @@ public partial class WorldView : Node2D
 
     public Node2D TileArtLayerNode => _tileArtLayer;
 
+    public Node2D GroundItemLayerNode => _groundItemLayer;
+
     public Node2D WallCoverLayerNode => _wallCoverLayer;
 
     public Camera2D Camera => _camera;
@@ -93,12 +96,14 @@ public partial class WorldView : Node2D
         _objectLayer = GetNode<TileMapLayer>("TileMapLayer_Objects");
         _fogLayer = GetNode<TileMapLayer>("TileMapLayer_Fog");
         _tileArtLayer = GetNodeOrNull<Node2D>("TileArtLayer") ?? _tileArtLayer;
+        _groundItemLayer = GetNodeOrNull<Node2D>("GroundItemLayer") ?? _groundItemLayer;
         _entityLayer = GetNode<Node2D>("EntityLayer");
         _wallCoverLayer = GetNodeOrNull<Node2D>("WallCoverLayer") ?? _wallCoverLayer;
         _camera = GetNode<Camera2D>("Camera2D");
         EnsureAuxiliaryLayers();
 
         _entityLayer.ZIndex = EntityLayerZIndex;
+        _groundItemLayer.ZIndex = 10;
         _wallCoverLayer.ZIndex = 40;
 
         _entityRenderer.BindLayer(_entityLayer);
@@ -150,6 +155,7 @@ public partial class WorldView : Node2D
             _eventBus.StatusEffectApplied -= OnStatusEffectApplied;
             _eventBus.StatusEffectRemoved -= OnStatusEffectRemoved;
             _eventBus.ItemPickedUp -= OnItemPickedUp;
+            _eventBus.ItemDropped -= OnItemDropped;
             _eventBus.Healed -= OnHealed;
         }
 
@@ -174,6 +180,7 @@ public partial class WorldView : Node2D
         _eventBus.StatusEffectApplied += OnStatusEffectApplied;
         _eventBus.StatusEffectRemoved += OnStatusEffectRemoved;
         _eventBus.ItemPickedUp += OnItemPickedUp;
+        _eventBus.ItemDropped += OnItemDropped;
         _eventBus.Healed += OnHealed;
     }
 
@@ -214,6 +221,7 @@ public partial class WorldView : Node2D
         _entityRenderer.BindWorld(world);
         SnapshotEntities();
         SyncVisibilityFromWorld();
+        SyncGroundItems();
     }
 
     private void ClearTransientEffects()
@@ -291,6 +299,7 @@ public partial class WorldView : Node2D
                 _wallLayer.SetCell(cellPosition, 0, new Vector2I(1, 0));
                 break;
             case TileType.Door:
+            case TileType.LockedDoor:
                 _floorLayer.SetCell(cellPosition, 0, new Vector2I(0, 0));
                 if (isDoorOpen)
                 {
@@ -354,6 +363,7 @@ public partial class WorldView : Node2D
 
     private void RenderTileArt(Position position, TileType tileType)
     {
+        var theme = RenderPalette.ForDepth(_world?.Depth ?? 0);
         var textures = WorldArtCatalog.GetTileArtLayers(_world, position, tileType);
         var isDoorOpen = tileType == TileType.Door && _world is WorldState world && world.IsDoorOpen(position);
         var marker = WorldArtCatalog.GetTileMarker(tileType, isDoorOpen);
@@ -373,6 +383,9 @@ public partial class WorldView : Node2D
                     Position = new Vector2(TileSize * 0.5f, TileSize * 0.5f),
                     Scale = ResolveTextureScale(),
                     Texture = textures[i],
+                    Modulate = tileType == TileType.Wall ? theme.WallTint
+                        : textures[i].ResourcePath.Contains("Floor_", System.StringComparison.Ordinal) ? theme.FloorTint
+                        : Colors.White,
                     ZIndex = i,
                 };
                 container.AddChild(sprite);
@@ -399,6 +412,11 @@ public partial class WorldView : Node2D
                 Size = new Vector2(TileSize - 8f, TileSize - 12f),
                 Text = marker,
             };
+            if (tileType == TileType.LockedDoor)
+            {
+                markerLabel.AddThemeFontSizeOverride("font_size", 10);
+                markerLabel.ZIndex = 5;
+            }
             container.AddChild(markerLabel);
             _tileMarkers[position] = marker;
         }
@@ -424,13 +442,13 @@ public partial class WorldView : Node2D
         return new Vector2(scale, scale);
     }
 
-    private static Color ResolveTileColor(TileType tileType)
+    private Color ResolveTileColor(TileType tileType)
     {
         return tileType switch
         {
-            TileType.Floor => RenderPalette.TileFloor,
-            TileType.Wall => RenderPalette.TileWall,
-            TileType.Door => RenderPalette.TileDoor,
+            TileType.Floor or TileType.Trap => RenderPalette.ForDepth(_world?.Depth ?? 0).FloorFallback,
+            TileType.Wall => RenderPalette.ForDepth(_world?.Depth ?? 0).WallFallback,
+            TileType.Door or TileType.LockedDoor => RenderPalette.TileDoor,
             TileType.StairsDown => RenderPalette.TileStairsDown,
             TileType.StairsUp => RenderPalette.TileStairsUp,
             TileType.Water => RenderPalette.TileWater,
@@ -484,6 +502,7 @@ public partial class WorldView : Node2D
         RefreshVisibilitySetsFromWorld();
         UpdateFogLayer();
         _entityRenderer.UpdateVisibility(_visibleTiles);
+        SyncGroundItems();
         AnimateEntityMovesFromSnapshot();
         _entityRenderer.SyncEntities(_world.Entities);
         _entityRenderer.ReconcileEntityPositions(_world.Entities);
@@ -548,6 +567,7 @@ public partial class WorldView : Node2D
         UpdateFogLayer();
         _entityRenderer.ReconcileEntityPositions(_world.Entities);
         _entityRenderer.UpdateVisibility(_visibleTiles);
+        SyncGroundItems();
 
         if (_world.Player is not null)
         {
@@ -583,7 +603,7 @@ public partial class WorldView : Node2D
         }
     }
 
-    private static void AppendBoundaryTrim(Node2D container, WorldArtCatalog.TileBoundaryMask boundaryMask)
+    private void AppendBoundaryTrim(Node2D container, WorldArtCatalog.TileBoundaryMask boundaryMask)
     {
         if (!boundaryMask.HasAny)
         {
@@ -639,6 +659,7 @@ public partial class WorldView : Node2D
                         Position = new Vector2(TileSize * 0.5f, ResolveScaledTextureHeight(stripHeight) * 0.5f),
                         Scale = ResolveTextureScale(),
                         Texture = CreateFrontWallStripTexture(frontTexture),
+                        Modulate = RenderPalette.ForDepth(_world?.Depth ?? 0).WallTint,
                         ZIndex = 0,
                     });
 
@@ -678,7 +699,7 @@ public partial class WorldView : Node2D
                 Name = "NorthCoverFace",
                 Position = new Vector2(0f, BoundaryThickness),
                 Size = new Vector2(TileSize, FrontWallCoverDepth),
-                Color = RenderPalette.WallCoverFace,
+                Color = RenderPalette.ForDepth(_world?.Depth ?? 0).Face,
                 ZIndex = 40,
             });
 
@@ -747,7 +768,7 @@ public partial class WorldView : Node2D
             return false;
         }
 
-        return _world.GetTile(south) is TileType.Floor or TileType.Door or TileType.StairsDown or TileType.StairsUp or TileType.Water;
+        return _world.GetTile(south) is TileType.Floor or TileType.Door or TileType.LockedDoor or TileType.StairsDown or TileType.StairsUp or TileType.Water;
     }
 
     private bool HasFrontWallOccluderAbove(Position position)
@@ -814,6 +835,11 @@ public partial class WorldView : Node2D
             AddChild(_tileArtLayer);
         }
 
+        if (_groundItemLayer.GetParent() is null)
+        {
+            AddChild(_groundItemLayer);
+        }
+
         if (_wallCoverLayer.GetParent() is null)
         {
             AddChild(_wallCoverLayer);
@@ -825,6 +851,7 @@ public partial class WorldView : Node2D
         }
 
         _entityLayer.ZIndex = EntityLayerZIndex;
+        _groundItemLayer.ZIndex = 10;
         _wallCoverLayer.ZIndex = 40;
         _targetingLayer.ZIndex = 100;
     }
@@ -901,6 +928,7 @@ public partial class WorldView : Node2D
 
     private void OnItemPickedUp(EntityId entityId, ItemInstance item)
     {
+        SyncGroundItems();
         var position = _world?.GetEntity(entityId)?.Position
             ?? _entityRenderer.GetLastKnownPosition(entityId)
             ?? Roguelike.Core.Position.Invalid;
@@ -914,6 +942,88 @@ public partial class WorldView : Node2D
             ToCanvasPosition(position),
             ResolveItemDisplayName(item),
             RenderPalette.PickupPopup);
+    }
+
+    private void OnItemDropped(EntityId entityId, ItemInstance item, Position position)
+    {
+        SyncGroundItems();
+    }
+
+    private void SyncGroundItems()
+    {
+        ClearGroundItems();
+        if (_world is not WorldState world)
+        {
+            return;
+        }
+
+        var content = world.ContentDatabase;
+        foreach (var (position, items) in world.GetGroundItems())
+        {
+            if (items.Count == 0 || !world.IsVisible(position))
+            {
+                continue;
+            }
+
+            var root = new Node2D
+            {
+                Name = $"GroundItem_{position.X}_{position.Y}",
+                Position = ToCanvasPosition(position),
+                ZIndex = 10,
+            };
+            var texture = ItemVisualCatalog.GetTexture(items[0], content);
+            if (texture is not null)
+            {
+                root.AddChild(new Sprite2D
+                {
+                    Name = "ItemIcon",
+                    Texture = texture,
+                    Scale = new Vector2(0.6875f, 0.6875f),
+                });
+            }
+            else
+            {
+                root.AddChild(new Label
+                {
+                    Name = "FallbackGlyph",
+                    Position = new Vector2(-4f, -8f),
+                    Text = ResolveGroundItemFallbackGlyph(items[0], content),
+                    Modulate = RenderPalette.PickupPopup,
+                });
+            }
+
+            if (items.Count > 1)
+            {
+                root.AddChild(new Label
+                {
+                    Name = "PileCount",
+                    Position = new Vector2(7f, 4f),
+                    Text = $"+{items.Count - 1}",
+                    Modulate = Colors.White,
+                });
+            }
+
+            _groundItemLayer.AddChild(root);
+        }
+    }
+
+    private static string ResolveGroundItemFallbackGlyph(ItemInstance item, IContentDatabase? content)
+    {
+        if (content?.TryGetItemTemplate(item.TemplateId, out var template) == true)
+        {
+            return template.Category == ItemCategory.Key ? "*" : "o";
+        }
+
+        return "o";
+    }
+
+    private void ClearGroundItems()
+    {
+        foreach (var child in _groundItemLayer.GetChildren().ToArray())
+        {
+            _groundItemLayer.RemoveChild(child);
+            child.QueueFree();
+        }
     }
 
     private string ResolveItemDisplayName(ItemInstance item)

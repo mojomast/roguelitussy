@@ -10,7 +10,7 @@ public sealed class EntityVisualTests : ITestSuite
 {
     public void Register(TestRegistry registry)
     {
-        registry.Add("UI.EntityRenderer applies identity-driven player sprite tint without world overlays", EntityRendererAppliesIdentityDrivenPlayerSpriteTintWithoutWorldOverlays);
+        registry.Add("UI.EntityRenderer preserves authored player portrait colors without world overlays", EntityRendererPreservesAuthoredPlayerPortraitColorsWithoutWorldOverlays);
         registry.Add("UI.EntityRenderer refreshes player sprite variant when identity changes", EntityRendererRefreshesPlayerSpriteVariant);
         registry.Add("UI.EntityRenderer uses different 0x72 portraits for different builds", EntityRendererUsesDifferent0x72Portraits);
         registry.Add("UI.EntityRenderer resolves default vanguard portrait from variant", EntityRendererResolvesDefaultVanguardPortraitFromVariant);
@@ -21,7 +21,7 @@ public sealed class EntityVisualTests : ITestSuite
         registry.Add("UI.EntityRenderer gives chests dedicated non-humanoid visuals", EntityRendererGivesChestsDedicatedVisuals);
     }
 
-    private static void EntityRendererAppliesIdentityDrivenPlayerSpriteTintWithoutWorldOverlays()
+    private static void EntityRendererPreservesAuthoredPlayerPortraitColorsWithoutWorldOverlays()
     {
         var renderer = new EntityRenderer(new Node2D(), new AnimationController());
         var player = new StubEntity("Player", new Position(1, 1), Faction.Player);
@@ -41,7 +41,7 @@ public sealed class EntityVisualTests : ITestSuite
         var body = FindChild<Sprite2D>(spriteRoot!, "Body");
 
         Expect.NotNull(body, "Player renderer should keep the base body sprite.");
-        Expect.Equal(0.90f, body!.Modulate.G, "Elf variants should tint the body sprite with the elf palette.");
+        Expect.Equal(Colors.White, body!.Modulate, "Player portraits should preserve their authored body colors.");
         Expect.True(FindChild<ColorRect>(spriteRoot!, "AccentBand") is null,
             "Gameplay sprites should not add a world-space accent band that reads like a clipping artifact.");
         Expect.True(FindChild<Label>(spriteRoot!, "VariantSigil") is null,
@@ -67,7 +67,6 @@ public sealed class EntityVisualTests : ITestSuite
         var spriteRoot = renderer.GetSprite(player.Id)!;
         var initialBody = FindChild<Sprite2D>(spriteRoot, "Body")!;
         var initialTexture = (Texture2D)initialBody.Texture!;
-        var initialModulate = initialBody.Modulate;
 
         player.SetComponent(new IdentityComponent
         {
@@ -81,12 +80,11 @@ public sealed class EntityVisualTests : ITestSuite
 
         var updatedBody = FindChild<Sprite2D>(spriteRoot, "Body")!;
         var updatedTexture = (Texture2D)updatedBody.Texture!;
-        var updatedModulate = updatedBody.Modulate;
 
         Expect.False(GetTextureSourcePath(initialTexture) == GetTextureSourcePath(updatedTexture),
             "Updating the identity component should refresh the base portrait selection.");
-        Expect.True(initialModulate.R != updatedModulate.R || initialModulate.G != updatedModulate.G || initialModulate.B != updatedModulate.B,
-            "Updating the identity component should refresh the body tint even without extra world overlays.");
+        Expect.Equal(Colors.White, updatedBody.Modulate,
+            "Updating identity should retain authored body colors without applying a race tint.");
     }
 
     private static void EntityRendererUsesDifferent0x72Portraits()

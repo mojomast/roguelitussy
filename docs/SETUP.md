@@ -15,6 +15,12 @@ If .NET is not installed system-wide, a user-local SDK install under `$HOME/.dot
 
 On Linux, Godot 4.5.2 Mono can also be installed user-locally by downloading the official `Godot_v4.5.2-stable_mono_linux_x86_64.zip`, extracting it under `$HOME/.local`, and linking the executable as `$HOME/.local/bin/godot`. Prepend `$HOME/.local/bin` to `PATH` before running headless Godot checks.
 
+## Windows Export Packages
+
+The Windows export workflow creates two artifacts: `roguelitussy-windows.zip` is the normal folder package containing the embedded-PCK `Roguelitussy.exe` and its required C# data/runtime directory, while `Roguelitussy-single.exe` is the one user-facing launcher. The launcher embeds that folder ZIP, extracts it to a deterministic per-version temporary directory, runs `Roguelitussy.exe` with forwarded arguments, and removes the temporary files after exit where possible.
+
+The launcher is not a merged native Godot executable. Stock Mono exports cannot merge the managed runtime into the native engine executable, so the launcher performs the extraction internally. Deltarune is a native-style single binary; this packaging approach avoids rewriting this Godot C# project.
+
 ## First-Time Repository Setup
 
 1. Clone the repository.
@@ -159,6 +165,8 @@ This profile removes persistence implementation files from the main project and 
 `Compat/Godot/GodotStubs.cs` provides compile-time stand-ins for the Godot types used by the C# scripts. This allows the solution and tests to build in a standard .NET environment while keeping the pure simulation layer isolated from engine dependencies.
 
 ## Common Setup Pitfalls
+
+For actual UI/terrain inspection without a desktop session, use Godot 4.5.2 Mono under `xvfb-run` with the compatibility renderer and `Scenes/Tests/VisualCapture.tscn`. This produces PNGs and real label-bound reports rather than stub approximations. See [VISUAL_VALIDATION.md](VISUAL_VALIDATION.md) for build commands, isolated user data, and resolution-matrix captures.
 
 - Do not leave temporary `.cs` files in the repository root. The SDK project includes them automatically and they can break the build.
 - Use Godot 4.5.2 Mono/.NET when opening the project. The SDK and project feature flag are pinned to the 4.5 line.

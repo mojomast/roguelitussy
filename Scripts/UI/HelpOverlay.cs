@@ -21,13 +21,14 @@ public partial class HelpOverlay : MenuBase
         _bodyText = string.Join(
             "\n",
             "START MENU / FOUNDRY",
+            "FIRST RUN: choose an archetype, keep your seed, and reach the stairs. You can retry a seed after death or start a new build.",
             "Up/Down or W/S: move between entries.",
             "Left/Right or +/-: adjust the highlighted creation field.",
             "Enter: confirm or cycle the highlighted entry.  H: toggle help.",
             "",
             "BUILD AND IDENTITY",
             "Name: cosmetic identity for the run.  Seed: deterministic world generation.",
-            "Archetype: starting combat style and loadout.  Origin: small secondary bonus.",
+            "Archetype: starting combat style and loadout. Race grants one heritage technique. Origin: small secondary bonus.",
             "Trait: passive perk or bonus.  Training: spend 4 points across VIT/POW/GRD/FIN.",
             "Training effects: VIT +3 Max HP, POW +1 Attack, GRD +1 Defense, FIN +1 Accuracy and +1 Evasion.",
             "Stat Preview: updates live as you change selections.",
@@ -44,8 +45,12 @@ public partial class HelpOverlay : MenuBase
         _bodyText = string.Join(
             "\n",
             "FIELD CONTROLS",
+            "FIRST RUN: reach the stairs, use consumables before danger, and retreat instead of trading low-HP hits.",
             "Move: Arrows or W/A/S/D.  Wait: Space or .  Pick up: G.  Interact/talk: F.",
+            "Diagonal: V, then Up, then Right = NE (arrows/WASD). V/Esc cancels; only the completed step spends a turn.",
+            "Numpad 1-9 moves in eight directions; 5 waits. Home/PgUp/End/PgDn: NW/NE/SW/SE.",
             "Stairs: Enter.  Inventory: I.  Character sheet: C.  Pause: Esc.  Help: H.",
+            "Abilities: B opens your owned techniques.  1-4 selects; self techniques cast immediately, aimed techniques use arrows then Enter. B/Esc closes with no turn.",
             "Minimap: M or Tab.  Dev tools: T.  Debug overlay: Q.  Debug console: `.",
             "",
             "CHARACTER GROWTH",
@@ -56,7 +61,7 @@ public partial class HelpOverlay : MenuBase
             "Arrows move selection.  Enter/U/E uses, equips, or unequips.  D drops one from a stack.",
             "A toggles auto-equip upgrades.  Tab cycles sort and category grouping.",
             "Rarity is shown by color and text.  Equipment comparison appears automatically for gear.",
-            "Aimed scrolls explain when targeting is required instead of silently consuming input.",
+            "Aim: I, select an aimed item, U/Enter; arrows aim, Enter confirms, Esc cancels without using it.",
             "Shops use the same value and weight data.  In dialog or shops: F talks, Tab swaps buy/sell, Enter confirms.",
             "",
             "DEVELOPER WORKSHOP",
@@ -117,7 +122,7 @@ public partial class HelpOverlay : MenuBase
 
     protected override void OnVisualStateRefreshed(Panel panel, RichTextLabel label, Vector2 viewportSize, Vector2 panelSize)
     {
-        panel.Modulate = UiStyle.GoldTrim();
+        panel.SelfModulate = UiStyle.GoldTrim();
         if (Backdrop is not null)
         {
             Backdrop.Color = UiStyle.PanelBlack(0.96f);

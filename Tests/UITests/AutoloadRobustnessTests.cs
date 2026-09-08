@@ -19,6 +19,8 @@ public sealed class AutoloadRobustnessTests : ITestSuite
         registry.Add("UI.GameManager sourced status death emits entity death and retains player", SourcedStatusDeathRetainsPlayer);
         registry.Add("UI.GameManager game-over stats capture relics, archetype, synergies, and perks", GameOverStatsCaptureRunBuild);
         registry.Add("UI.DailyChallengeManager survives a corrupt persistence file", DailyChallengeManagerSurvivesCorruptFile);
+        registry.Add("UI.DailyChallengeManager retains retry attempts and best result", DailyChallengeManagerRetainsRetryableBestResult);
+        registry.Add("UI.MainMenu shows daily modifier details and retry status", MainMenuShowsDailyModifierDetails);
         registry.Add("UI.FloorEventPopupUI rebind does not stack event handlers", FloorEventPopupRebindDoesNotStackHandlers);
         registry.Add("UI.GameManager floor relic hook messages reach EventBus", FloorRelicHookMessagesReachEventBus);
     }
@@ -150,6 +152,42 @@ public sealed class AutoloadRobustnessTests : ITestSuite
             TryDelete(path);
             TryDelete(path + ".tmp");
         }
+    }
+
+    private static void DailyChallengeManagerRetainsRetryableBestResult()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"daily_retry_{Guid.NewGuid():N}.json");
+        try
+        {
+            var manager = new DailyChallengeManager();
+            var seed = DailySeedGenerator.GetTodaysSeed();
+            manager.RecordDailyAttempt(new RunStats("Rook", 2, 400, 3, 10, 0, 0, seed, "death", string.Empty, 0));
+            manager.RecordDailyAttempt(new RunStats("Rook", 5, 100, 1, 0, 0, 0, seed, "death", string.Empty, 0));
+            manager.SaveToFile(path);
+
+            var reloaded = new DailyChallengeManager();
+            reloaded.LoadFromFile(path);
+            Expect.Equal(2, reloaded.TodayAttemptCount, "Daily deaths should remain retryable and count each attempt.");
+            Expect.Equal(5, reloaded.TodayBestFloor, "Daily persistence should retain the best floor across attempts.");
+            Expect.True(reloaded.TodayBestScore > 0, "Daily persistence should retain the best score across attempts.");
+            Expect.False(reloaded.TodayCompleted, "A death must not permanently complete the daily challenge.");
+        }
+        finally
+        {
+            TryDelete(path);
+            TryDelete(path + ".tmp");
+        }
+    }
+
+    private static void MainMenuShowsDailyModifierDetails()
+    {
+        var menu = new MainMenu();
+        var summary = menu.BuildDailySummaryLine();
+        var modifier = DailySeedGenerator.GetModifierForDate(DateTime.UtcNow);
+
+        Expect.True(summary.Contains(modifier.DisplayName, StringComparison.Ordinal), "The daily menu summary should show the modifier name.");
+        Expect.True(summary.Contains(modifier.Description, StringComparison.Ordinal), "The daily menu summary should show the modifier description.");
+        Expect.True(summary.Contains("Attempts", StringComparison.Ordinal), "The daily menu summary should show retry status.");
     }
 
     private static void FloorEventPopupRebindDoesNotStackHandlers()

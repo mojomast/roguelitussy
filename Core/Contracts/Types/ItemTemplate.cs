@@ -26,4 +26,5 @@ public sealed record ItemTemplate(
     int Value = 0,
     double Weight = 0.0,
     bool RequiresTargetSelection = false,
-    IReadOnlyList<string>? Tags = null);
+    IReadOnlyList<string>? Tags = null,
+    string SpritePath = "");

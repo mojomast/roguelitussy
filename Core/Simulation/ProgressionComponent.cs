@@ -13,6 +13,10 @@ public sealed class ProgressionComponent
 
     public List<string> SelectedPerkIds { get; } = new();
 
+    // A queue is used so multiple level-ups cannot replace an unanswered offer.
+    public List<List<string>> PendingPerkDrafts { get; } = new();
+    public bool PerkDraftsGenerated { get; set; }
+
     public static int CalculateXpThreshold(int level)
     {
         return 50 * level * (level + 1) / 2;

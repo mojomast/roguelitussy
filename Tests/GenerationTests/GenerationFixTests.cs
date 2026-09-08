@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Roguelike.Core;
@@ -10,6 +11,7 @@ public sealed class GenerationFixTests : ITestSuite
     public void Register(TestRegistry registry)
     {
         registry.Add("Generation.LevelValidator treats locked doors as traversable for connectivity", LockedRoomsPassValidation);
+        registry.Add("Generation.LevelValidator terminates without key or door candidates", EmptyKeySolvabilityTerminates);
         registry.Add("Generation.LevelValidator excludes water from traversable tiles", WaterIsNotTraversable);
         registry.Add("Generation.FloorEventResolver boss floors win over safe floors", BossFloorsWinOverSafeFloors);
         registry.Add("Generation.Safe floors skip enemy spawns", SafeFloorsSkipEnemySpawns);
@@ -23,6 +25,7 @@ public sealed class GenerationFixTests : ITestSuite
         registry.Add("Generation.Ragged prefab layouts read as walls instead of throwing", RaggedPrefabRowsAreSafe);
         registry.Add("Generation.Boss floor generation is deterministic", BossFloorGenerationIsDeterministic);
         registry.Add("Generation.Content prefabs generate cleanly at lock-room depths", ContentDepthsGenerateCleanly);
+        registry.Add("Generation.Generated locks remain solvable across seeds and depths", GeneratedLocksRemainSolvable);
     }
 
     private static void LockedRoomsPassValidation()
@@ -85,6 +88,44 @@ public sealed class GenerationFixTests : ITestSuite
         Expect.False(LevelValidator.IsTraversable(TileType.Water), "Water is not walkable in the simulation, so it should not count for connectivity.");
         Expect.True(LevelValidator.IsTraversable(TileType.Trap), "Trap tiles remain traversable.");
         Expect.True(LevelValidator.IsTraversable(TileType.Door), "Doors remain traversable.");
+    }
+
+    private static void EmptyKeySolvabilityTerminates()
+    {
+        var world = new WorldState();
+        world.InitGrid(6, 6);
+        for (var y = 0; y < world.Height; y++)
+        {
+            for (var x = 0; x < world.Width; x++)
+            {
+                world.SetTile(new Position(x, y), TileType.Floor);
+            }
+        }
+
+        world.SetTile(new Position(1, 1), TileType.StairsUp);
+        world.SetTile(new Position(4, 4), TileType.StairsDown);
+        var level = new LevelData(
+            new Position(1, 1),
+            new Position(4, 4),
+            new List<Position>(),
+            new List<Position>(),
+            new List<RoomData>
+            {
+                new(0, 0, 1, 1, new Position(0, 0)),
+                new(1, 0, 1, 1, new Position(1, 0)),
+                new(2, 0, 1, 1, new Position(2, 0)),
+                new(3, 0, 1, 1, new Position(3, 0)),
+            });
+
+        var errors = LevelValidator.Validate(world, level);
+        Expect.Equal(0, errors.Count, "A level without locked doors or keys should validate without looping.");
+
+        world.SetTile(new Position(2, 1), TileType.LockedDoor);
+        var missingKeyErrors = LevelValidator.Validate(
+            world,
+            level with { LockedDoors = new[] { new Position(2, 1) } });
+        Expect.True(missingKeyErrors.Any(error => error.Contains("opened with reachable key spawns", System.StringComparison.Ordinal)),
+            "A locked door without a matching key should fail solvability validation rather than being treated as opened.");
     }
 
     private static void BossFloorsWinOverSafeFloors()
@@ -348,6 +389,94 @@ public sealed class GenerationFixTests : ITestSuite
                 }
             }
         }
+    }
+
+    private static void GeneratedLocksRemainSolvable()
+    {
+        var content = ContentLoader.LoadFromRepository(throwOnValidationErrors: false);
+        Expect.True(content.IsValid, "Content should load for lock solvability sweeps.");
+        var generator = new DungeonGenerator();
+
+        foreach (var depth in Enumerable.Range(2, 11))
+        {
+            foreach (var seed in Enumerable.Range(0, 48))
+            {
+                var world = new WorldState { ContentDatabase = content };
+                var level = generator.GenerateLevel(world, seed, depth);
+                var lockedDoors = level.LockedDoors ?? Array.Empty<Position>();
+                var keySpawns = level.KeySpawns ?? Array.Empty<Position>();
+
+                Expect.True(keySpawns.Count >= lockedDoors.Count, $"Depth {depth} seed {seed} must provide one consumable key per locked door.");
+                Expect.Equal(0, generator.ValidateLevel(world, level).Count, $"Depth {depth} seed {seed} must validate after legal key consumption.");
+                Expect.True(LegalKeyTraversalReachesObjectives(world, level), $"Depth {depth} seed {seed} objectives must remain reachable after consuming keys.");
+            }
+        }
+    }
+
+    private static bool LegalKeyTraversalReachesObjectives(WorldState world, LevelData level)
+    {
+        var lockedDoors = new HashSet<Position>(level.LockedDoors ?? Array.Empty<Position>());
+        var keys = new HashSet<Position>(level.KeySpawns ?? Array.Empty<Position>());
+        var consumedKeys = new HashSet<Position>();
+        var unlockedDoors = new HashSet<Position>();
+        var reachable = FloodFillWithUnlockedDoors(world, level.PlayerSpawn, unlockedDoors);
+
+        while (true)
+        {
+            var key = keys
+                .Where(position => reachable.Contains(position) && !consumedKeys.Contains(position))
+                .OrderBy(position => position.Y)
+                .ThenBy(position => position.X)
+                .Select(position => (Position?)position)
+                .FirstOrDefault();
+            var door = lockedDoors
+                .Where(position => !unlockedDoors.Contains(position)
+                    && Position.AllDirections.Any(delta => reachable.Contains(position + delta)))
+                .OrderBy(position => position.Y)
+                .ThenBy(position => position.X)
+                .Select(position => (Position?)position)
+                .FirstOrDefault();
+            if (!key.HasValue || !door.HasValue)
+            {
+                break;
+            }
+
+            consumedKeys.Add(key.Value);
+            unlockedDoors.Add(door.Value);
+            reachable = FloodFillWithUnlockedDoors(world, level.PlayerSpawn, unlockedDoors);
+        }
+
+        return lockedDoors.SetEquals(unlockedDoors) && reachable.Contains(level.StairsDown);
+    }
+
+    private static HashSet<Position> FloodFillWithUnlockedDoors(WorldState world, Position start, ISet<Position> unlockedDoors)
+    {
+        var reachable = new HashSet<Position> { start };
+        var queue = new Queue<Position>();
+        queue.Enqueue(start);
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            foreach (var delta in Position.Cardinals)
+            {
+                var next = current + delta;
+                if (!world.InBounds(next) || reachable.Contains(next))
+                {
+                    continue;
+                }
+
+                var tile = world.GetTile(next);
+                if (!LevelValidator.IsTraversable(tile) && !(tile == TileType.LockedDoor && unlockedDoors.Contains(next)))
+                {
+                    continue;
+                }
+
+                reachable.Add(next);
+                queue.Enqueue(next);
+            }
+        }
+
+        return reachable;
     }
 
     private static RoomPlacement BuildRoom(int x, int y, RoomPrefab? prefab = null)

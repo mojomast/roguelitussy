@@ -12,6 +12,7 @@ public partial class GameManager : Node
     private readonly Dictionary<int, WorldState> _cachedFloors = new();
     private readonly Dictionary<int, FloorEntrances> _floorEntrances = new();
     private const int StartingGold = 120;
+    public const int FinalRunDepth = 9;
     private const int MaxRunSteps = 64;
     private const int MaxRestTurns = 64;
     private const int MaxAutoExploreSteps = 128;
@@ -20,7 +21,22 @@ public partial class GameManager : Node
     private int _floorStartTurnNumber;
     private bool _readyInitialized;
     private bool _runEndedEmitted;
+    private bool _runCompleted;
+    private bool _finalBossEncountered;
+    private int _runAscensionLevel;
+    private bool _onboardingGuidanceEmitted;
+    private bool _onboardingStairsReminderEnabled;
     private readonly HashSet<int> _clearedFloors = new();
+
+    private static readonly string[] FirstDelveGuidance =
+    {
+        "Tip: Move with the arrow keys or bump into enemies to attack.",
+        "Tip: Press G to pick up an item.",
+        "Tip: Press F to interact with nearby objects and characters.",
+        "Objective: reach the stairs, then descend to continue.",
+    };
+
+    private const string StairsDownGuidance = "Stairs found: press Enter to descend.";
 
     private sealed record FloorEntrances(Position StairsUp, Position StairsDown);
 
@@ -31,9 +47,9 @@ public partial class GameManager : Node
             "Vanguard",
             "Survivor",
             "Iron Will",
+            8,
             0,
-            0,
-            0,
+            2,
             0,
             0,
             0,
@@ -78,7 +94,7 @@ public partial class GameManager : Node
             InventoryCapacityBonus = inventoryCapacityBonus;
             StartingItemTemplateIds = new List<string>(startingItemTemplateIds ?? Array.Empty<string>());
             EquippedItemTemplateIds = new List<string>(equippedItemTemplateIds ?? Array.Empty<string>());
-            RaceId = string.IsNullOrWhiteSpace(raceId) ? "human" : raceId;
+            RaceId = RaceDefinitions.NormalizeId(raceId);
             GenderId = string.IsNullOrWhiteSpace(genderId) ? "neutral" : genderId;
             AppearanceId = string.IsNullOrWhiteSpace(appearanceId) ? "default" : appearanceId;
         }
@@ -351,6 +367,30 @@ public partial class GameManager : Node
         if (player is null)
         {
             message = "No active player is available.";
+            Bus?.EmitLogMessage(message, LogCategory.Warning);
+            return false;
+        }
+
+        if (!player.IsAlive)
+        {
+            message = "A fallen adventurer cannot claim a shrine relic.";
+            Bus?.EmitLogMessage(message, LogCategory.Warning);
+            return false;
+        }
+
+        var shrine = FindPendingRelicShrine(player.Id);
+        if (shrine is null)
+        {
+            message = "No pending shrine relic choice is available.";
+            Bus?.EmitLogMessage(message, LogCategory.Warning);
+            return false;
+        }
+
+        var choices = CreateRelicChoices(shrine.Position);
+        if (!choices.Any(choice => string.Equals(choice.RelicId, relicId, StringComparison.OrdinalIgnoreCase)))
+        {
+            message = $"Relic '{relicId}' is not offered by this shrine.";
+            Bus?.EmitLogMessage(message, LogCategory.Warning);
             return false;
         }
 
@@ -364,6 +404,7 @@ public partial class GameManager : Node
         var relics = GetPlayerRelics();
         var claimedName = relics.FirstOrDefault(relic => string.Equals(relic.RelicId, relicId, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? relicId;
         message = $"Claimed relic: {claimedName}.";
+        ClearPendingShrineReward(shrine.GetComponent<ShrineComponent>()!);
         ApplyAndEmitSynergyChanges(player);
         Bus?.EmitLogMessage(message, LogCategory.Loot);
         Bus?.EmitRelicsChanged(player.Id, relics);
@@ -397,6 +438,30 @@ public partial class GameManager : Node
             .OrderBy(relic => relic.RelicId, StringComparer.Ordinal)
             .Take(Math.Max(1, count))
             .ToArray();
+    }
+
+    public IReadOnlyList<RelicTemplate> CreateRelicChoices(Position shrinePosition, int count = 3)
+    {
+        IReadOnlyCollection<string> owned = World?.Player?.GetComponent<RelicComponent>()?.RelicIds ?? (IReadOnlyCollection<string>)Array.Empty<string>();
+        var ownedSet = new HashSet<string>(owned, StringComparer.OrdinalIgnoreCase);
+        var pool = RelicProcessor.GetKnownRelics(Content)
+            .Where(relic => !ownedSet.Contains(relic.RelicId))
+            .OrderBy(relic => relic.RelicId, StringComparer.Ordinal)
+            .ToArray();
+        if (pool.Length == 0)
+        {
+            return Array.Empty<RelicTemplate>();
+        }
+
+        var offerCount = Math.Min(Math.Max(1, count), pool.Length);
+        var start = DeterministicRelicOfferStart(World?.Seed ?? 0, World?.Depth ?? 0, shrinePosition, pool.Length);
+        var choices = new RelicTemplate[offerCount];
+        for (var index = 0; index < offerCount; index++)
+        {
+            choices[index] = pool[(start + index) % pool.Length];
+        }
+
+        return choices;
     }
 
     public void SetRuntimeContent(IContentDatabase content)
@@ -487,6 +552,9 @@ public partial class GameManager : Node
         Seed = snapshot.Seed;
         _clearedFloors.Clear();
         _clearedFloors.UnionWith(snapshot.RewardedFloorDepths);
+        _runCompleted = false;
+        _onboardingStairsReminderEnabled = false;
+        _runAscensionLevel = ResolveMetaProgressionManager()?.AscensionLevel ?? 0;
         _cachedFloors.Clear();
         _floorEntrances.Clear();
         foreach (var pair in snapshot.Floors)
@@ -672,6 +740,8 @@ public partial class GameManager : Node
         CurrentFloor = world.Depth;
         Scheduler = new TurnScheduler();
         _runEndedEmitted = false;
+        _runCompleted = false;
+        _runAscensionLevel = 0;
         LoadWorld(world);
         ResetFloorStats(CurrentFloor);
 
@@ -688,6 +758,10 @@ public partial class GameManager : Node
         CurrentFloor = 0;
         _runStats = CreateFreshRunStats(seed);
         _runEndedEmitted = false;
+        _runCompleted = false;
+        _onboardingGuidanceEmitted = false;
+        _onboardingStairsReminderEnabled = false;
+        _runAscensionLevel = ResolveMetaProgressionManager()?.AscensionLevel ?? 0;
         ResetFloorStats(CurrentFloor);
         _clearedFloors.Clear();
         _cachedFloors.Clear();
@@ -712,6 +786,7 @@ public partial class GameManager : Node
             LoadWorld(world);
             ResetFloorStats(CurrentFloor);
             Bus?.EmitLogMessage($"Starting new game with seed {seed}.", LogCategory.System);
+            EmitFirstDelveGuidance();
         }
         catch (Exception ex)
         {
@@ -737,6 +812,8 @@ public partial class GameManager : Node
         CurrentState = GameState.Playing;
         Scheduler?.AttachWorld(world);
         RegisterWorldEntities(world);
+        _finalBossEncountered = world.Depth == FinalRunDepth && HasBossEntity(world);
+        EnsurePlayerHeritageAbility(world.Player);
         if (Scheduler is not null)
         {
             Scheduler.NextOrder = world.SchedulerNextOrder;
@@ -746,6 +823,46 @@ public partial class GameManager : Node
         Bus?.EmitFloorChanged(CurrentFloor);
         EmitFloorEventHooks(world);
         EmitWorldSnapshot(world);
+        ReemitPendingShrineRelicChoice(world);
+    }
+
+    private void EmitFirstDelveGuidance()
+    {
+        if (_onboardingGuidanceEmitted)
+        {
+            return;
+        }
+
+        _onboardingGuidanceEmitted = true;
+        foreach (var message in FirstDelveGuidance)
+        {
+            Bus?.EmitLogMessage(message, LogCategory.System);
+        }
+
+        _onboardingStairsReminderEnabled = true;
+        EmitStairsDownGuidanceIfVisible(World);
+    }
+
+    private void EmitStairsDownGuidanceIfVisible(WorldState? world)
+    {
+        if (!_onboardingStairsReminderEnabled || world is null || world.Player is null)
+        {
+            return;
+        }
+
+        for (var y = 0; y < world.Height; y++)
+        {
+            for (var x = 0; x < world.Width; x++)
+            {
+                var position = new Position(x, y);
+                if (world.GetTile(position) == TileType.StairsDown && world.IsVisible(position))
+                {
+                    _onboardingStairsReminderEnabled = false;
+                    Bus?.EmitLogMessage(StairsDownGuidance, LogCategory.System);
+                    return;
+                }
+            }
+        }
     }
 
     public InteractionContext? GetInteractionContext()
@@ -1021,6 +1138,14 @@ public partial class GameManager : Node
             ProcessEnemyResponses(playerId, outcome);
         }
 
+        IReadOnlyList<RelicTemplate>? pendingRelicChoices = null;
+        if (outcome.Result == ActionResult.Success
+            && action is InteractShrineAction shrineAction
+            && action.ActorId == playerId)
+        {
+            pendingRelicChoices = ResolveShrineReward(shrineAction);
+        }
+
         foreach (var combatEvent in outcome.CombatEvents)
         {
             foreach (var damage in combatEvent.DamageResults)
@@ -1139,6 +1264,10 @@ public partial class GameManager : Node
         }
 
         Bus?.EmitTurnCompleted();
+        if (pendingRelicChoices is not null)
+        {
+            Bus?.EmitRelicChoiceReady(pendingRelicChoices);
+        }
         return outcome;
     }
 
@@ -1460,6 +1589,16 @@ public partial class GameManager : Node
         var boss = world.Entities.FirstOrDefault(entity =>
             entity.GetComponent<EnemyComponent>() is { } enemy
             && enemy.TemplateId.StartsWith("boss_", StringComparison.OrdinalIgnoreCase));
+        if (world.Depth is 1 or 4 or 7)
+        {
+            Bus?.EmitLogMessage($"Act {((world.Depth - 1) / 3) + 1} begins.", LogCategory.System);
+        }
+
+        if (boss is not null)
+        {
+            Bus?.EmitLogMessage($"Act {((world.Depth - 1) / 3) + 1} boss: {boss.Name}.", LogCategory.Critical);
+        }
+
         if (boss is not null || (world.Depth > 0 && world.Depth % 3 == 0 && world.Depth % 5 != 0))
         {
             Bus?.EmitBossRoomEntered(boss?.Id ?? EntityId.Invalid);
@@ -1536,6 +1675,25 @@ public partial class GameManager : Node
             }
 
             world.AddEntity(CreateChestEntity(chestPosition, world.Depth, rng, spawn.LootTableId));
+        }
+
+        foreach (var spawn in level.ShrineSpawns ?? Array.Empty<ShrineSpawnData>())
+        {
+            if (!Content.TryGetFloorEvent(spawn.EventId, out var floorEvent)
+                || !string.Equals(floorEvent.Type, "shrine", StringComparison.OrdinalIgnoreCase)
+                || !IsSupportedShrineType(floorEvent.ShrineType))
+            {
+                Bus?.EmitLogMessage($"Skipping invalid shrine event '{spawn.EventId}'.", LogCategory.Warning);
+                continue;
+            }
+
+            if (!TryResolveSpawnPosition(world, spawn.Position, requireEmptyTile: true, avoidStairs: true, out var shrinePosition))
+            {
+                Bus?.EmitLogMessage($"Skipping shrine event '{spawn.EventId}' because no valid position is available.", LogCategory.Warning);
+                continue;
+            }
+
+            world.AddEntity(CreateShrineEntity(shrinePosition, floorEvent, rng));
         }
 
         SpawnAuthoredNpcs(world, level.NpcSpawns ?? Array.Empty<NpcSpawnData>(), rng);
@@ -1643,12 +1801,56 @@ public partial class GameManager : Node
         enemy.SetComponent(new CooldownComponent());
     }
 
+    private static void EnsurePlayerHeritageAbility(IEntity player)
+    {
+        var identity = player.GetComponent<IdentityComponent>();
+        var race = RaceDefinitions.Get(identity?.RaceId);
+        if (identity is not null)
+        {
+            identity.RaceId = race.Id;
+        }
+
+        EnsureIntrinsicAbilities(player, Array.Empty<string>(), race.Id);
+    }
+
+    private static void EnsureIntrinsicAbilities(IEntity player, IReadOnlyList<string> classAbilityIds, string raceId)
+    {
+        var heritageAbilityId = RaceDefinitions.Get(raceId).HeritageAbilityId;
+        var abilities = player.GetComponent<AbilitiesComponent>();
+        if (abilities is null)
+        {
+            abilities = new AbilitiesComponent();
+            player.SetComponent(abilities);
+        }
+
+        foreach (var abilityId in classAbilityIds.Append(heritageAbilityId))
+        {
+            if (abilities.Slots.Any(slot => string.Equals(slot.AbilityId, abilityId, StringComparison.Ordinal)))
+            {
+                continue;
+            }
+
+            abilities.Slots.Add(new EnemyAbilitySlot { AbilityId = abilityId, Cooldown = 0, Priority = 100 });
+        }
+
+        if (player.GetComponent<CooldownComponent>() is null)
+        {
+            player.SetComponent(new CooldownComponent());
+        }
+    }
+
     private Entity CreateEnemyEntity(EnemyTemplate template, Position spawn, Random rng)
     {
+        var stats = template.BaseStats.Clone();
+        if (Content is not null)
+        {
+            AscensionModifiers.ApplyEnemyStats(stats, _runAscensionLevel, Content);
+        }
+
         var enemy = new Entity(
             template.DisplayName,
             spawn,
-            template.BaseStats.Clone(),
+            stats,
             template.Faction,
             id: EntityId.NewSeeded(rng));
         enemy.SetComponent<IBrain>(BrainFactory.Create(template));
@@ -1663,6 +1865,13 @@ public partial class GameManager : Node
         var character = CharacterOptions;
         var archetype = ArchetypeDefinitions.Get(character.Archetype);
         var stats = archetype.CreateStats();
+
+        if (Content is not null)
+        {
+            var hpPenalty = AscensionModifiers.ResolveStartingHpPenalty(_runAscensionLevel, Content);
+            stats.MaxHP = Math.Max(1, stats.MaxHP - hpPenalty);
+            stats.HP = stats.MaxHP;
+        }
 
         stats.MaxHP += character.BonusMaxHp;
         stats.HP = stats.MaxHP;
@@ -1730,17 +1939,7 @@ public partial class GameManager : Node
             player.SetComponent(new KillStreakComponent());
         }
 
-        if (archetype.StartingAbilityIds.Length > 0)
-        {
-            var abilities = new AbilitiesComponent();
-            foreach (var abilityId in archetype.StartingAbilityIds)
-            {
-                abilities.Slots.Add(new EnemyAbilitySlot { AbilityId = abilityId, Cooldown = 0, Priority = 100 });
-            }
-
-            player.SetComponent(abilities);
-            player.SetComponent(new CooldownComponent());
-        }
+        EnsureIntrinsicAbilities(player, archetype.StartingAbilityIds, character.RaceId);
         player.SetComponent(new IdentityComponent
         {
             RaceId = character.RaceId,
@@ -1752,11 +1951,11 @@ public partial class GameManager : Node
                 character.AppearanceId,
                 archetype.Id),
         });
-        EquipStartingLoadout(player, inventory, character);
+        EquipStartingLoadout(player, inventory, character, archetype);
         return player;
     }
 
-    private void EquipStartingLoadout(IEntity player, InventoryComponent inventory, CharacterCreationOptions character)
+    private void EquipStartingLoadout(IEntity player, InventoryComponent inventory, CharacterCreationOptions character, ArchetypeDefinition archetype)
     {
         var content = Content;
         if (content is null)
@@ -1764,7 +1963,7 @@ public partial class GameManager : Node
             return;
         }
 
-        foreach (var templateId in character.EquippedItemTemplateIds)
+        foreach (var templateId in archetype.StartingEquippedItemIds.Concat(character.EquippedItemTemplateIds))
         {
             if (!content.TryGetItemTemplate(templateId, out var template) || template.Slot == EquipSlot.None)
             {
@@ -1966,6 +2165,117 @@ public partial class GameManager : Node
         unchecked
         {
             return seed ^ (depth * 7919) ^ 0x5f3759df;
+        }
+    }
+
+    private IReadOnlyList<RelicTemplate>? ResolveShrineReward(InteractShrineAction action)
+    {
+        var shrine = World?.GetEntity(action.ShrineId);
+        var shrineComponent = shrine?.GetComponent<ShrineComponent>();
+        var player = World?.GetEntity(action.ActorId);
+        if (shrine is null || shrineComponent is null || player is null
+            || !shrineComponent.RewardChoicePending || shrineComponent.PendingActorId != action.ActorId)
+        {
+            return null;
+        }
+
+        if (!player.IsAlive)
+        {
+            ClearPendingShrineReward(shrineComponent);
+            Bus?.EmitLogMessage("The shrine's unanswered reward fades with its fallen petitioner.", LogCategory.System);
+            return null;
+        }
+
+        switch (shrineComponent.PendingRewardType)
+        {
+            case "stat":
+                if (player.GetComponent<ProgressionComponent>() is { } statProgression)
+                {
+                    statProgression.UnspentStatPoints++;
+                    ClearPendingShrineReward(shrineComponent);
+                    Bus?.EmitLogMessage("The shrine grants one stat point.", LogCategory.PlayerAction);
+                }
+
+                return null;
+            case "perk":
+                if (player.GetComponent<ProgressionComponent>() is { } perkProgression)
+                {
+                    perkProgression.UnspentPerkChoices++;
+                    ClearPendingShrineReward(shrineComponent);
+                    Bus?.EmitLogMessage("The shrine grants one perk choice.", LogCategory.PlayerAction);
+                }
+
+                return null;
+            case "relic":
+                var choices = CreateRelicChoices(shrine.Position);
+                if (choices.Count > 0)
+                {
+                    return choices;
+                }
+
+                ClearPendingShrineReward(shrineComponent);
+                Bus?.EmitLogMessage("The shrine has no unclaimed relics to offer.", LogCategory.Warning);
+                return null;
+            default:
+                ClearPendingShrineReward(shrineComponent);
+                Bus?.EmitLogMessage("The shrine's reward could not be resolved.", LogCategory.Warning);
+                return null;
+        }
+    }
+
+    private IEntity? FindPendingRelicShrine(EntityId actorId)
+    {
+        return World?.Entities.FirstOrDefault(entity =>
+            entity.GetComponent<ShrineComponent>() is { } shrine
+            && shrine.RewardChoicePending
+            && string.Equals(shrine.PendingRewardType, "relic", StringComparison.Ordinal)
+            && shrine.PendingActorId == actorId);
+    }
+
+    private void ReemitPendingShrineRelicChoice(WorldState world)
+    {
+        var player = world.Player;
+        var shrine = player is null ? null : FindPendingRelicShrine(player.Id);
+        if (shrine is null)
+        {
+            return;
+        }
+
+        var choices = CreateRelicChoices(shrine.Position);
+        if (choices.Count > 0)
+        {
+            Bus?.EmitRelicChoiceReady(choices);
+            return;
+        }
+
+        ClearPendingShrineReward(shrine.GetComponent<ShrineComponent>()!);
+        Bus?.EmitLogMessage("The shrine has no unclaimed relics to offer.", LogCategory.Warning);
+    }
+
+    private static void ClearPendingShrineReward(ShrineComponent shrine)
+    {
+        shrine.RewardChoicePending = false;
+        shrine.PendingRewardType = string.Empty;
+        shrine.PendingActorId = EntityId.Invalid;
+    }
+
+    private static bool IsSupportedShrineType(string shrineType) =>
+        string.Equals(shrineType, "stat", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(shrineType, "perk", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(shrineType, "relic", StringComparison.OrdinalIgnoreCase);
+
+    private static int DeterministicRelicOfferStart(int seed, int depth, Position position, int poolCount)
+    {
+        unchecked
+        {
+            uint value = (uint)seed;
+            value ^= (uint)depth * 0x9e3779b9u;
+            value ^= (uint)position.X * 0x85ebca6bu;
+            value ^= (uint)position.Y * 0xc2b2ae35u;
+            value ^= value >> 16;
+            value *= 0x7feb352du;
+            value ^= value >> 15;
+            return (int)(value % (uint)poolCount);
         }
     }
 
@@ -2526,6 +2836,7 @@ public partial class GameManager : Node
 
         world.SetVisible(player.Position, true);
         Bus?.EmitFovRecalculated();
+        EmitStairsDownGuidanceIfVisible(world);
     }
 
     private void EmitStateDelta(
@@ -3175,6 +3486,38 @@ public partial class GameManager : Node
 
         Bus.EmitFloorCleared(CurrentFloor);
         Bus.EmitLogMessage($"Floor Cleared! +{bonusGold} gold.", LogCategory.Critical);
+
+        if (CurrentFloor == FinalRunDepth && _finalBossEncountered)
+        {
+            CompleteSuccessfulRun();
+        }
+    }
+
+    private void CompleteSuccessfulRun()
+    {
+        if (_runCompleted || World?.Player is null)
+        {
+            return;
+        }
+
+        _runCompleted = true;
+        ResolveMetaProgressionManager()?.CompleteRun();
+        CurrentState = GameState.GameOver;
+        _runStats = _runStats with
+        {
+            FloorReached = CurrentFloor,
+            TotalTurns = World.TurnNumber,
+            CauseOfDeath = "Victory",
+        };
+        Bus?.EmitLogMessage("Final boss defeated. Run complete!", LogCategory.Critical);
+        EmitRunEnded();
+    }
+
+    private static bool HasBossEntity(WorldState world)
+    {
+        return world.Entities.Any(entity =>
+            entity.GetComponent<EnemyComponent>() is { } enemy
+            && enemy.TemplateId.StartsWith("boss_", StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool HasLivingHostileEnemy(WorldState world, IEntity player)
@@ -3261,6 +3604,24 @@ public partial class GameManager : Node
         });
 
         return chest;
+    }
+
+    private static Entity CreateShrineEntity(Position spawn, FloorEventDefinition floorEvent, Random rng)
+    {
+        var shrine = new Entity(
+            "Shrine",
+            spawn,
+            new Stats { HP = 1, MaxHP = 1, Attack = 0, Accuracy = 0, Defense = 0, Evasion = 0, Speed = 0, ViewRadius = 0 },
+            Faction.Neutral,
+            blocksMovement: false,
+            blocksSight: false,
+            id: EntityId.NewSeeded(rng));
+        shrine.SetComponent(new ShrineComponent
+        {
+            ShrineType = floorEvent.ShrineType,
+            HPCost = floorEvent.HpCost,
+        });
+        return shrine;
     }
 
     private string ResolveChestLootTableId(int depth, string? explicitLootTableId = null)
@@ -3693,9 +4054,13 @@ public partial class GameManager : Node
 
     private int ResolveMerchantBuyPrice(IEntity player, int basePrice)
     {
-        var discountPercent = ProgressionService.ResolveShopDiscountPercent(player, Content);
+        var discountPercent = Math.Clamp(
+            ProgressionService.ResolveShopDiscountPercent(player, Content)
+            + ReputationService.ResolveMerchantDiscountPercent(player, Content),
+            0,
+            90);
         var discounted = basePrice * Math.Max(0, 100 - discountPercent) / 100;
-        var ascensionLevel = ResolveMetaProgressionManager()?.AscensionLevel ?? 0;
+        var ascensionLevel = _runAscensionLevel;
         var multiplier = 1f;
         if (Content is not null && ascensionLevel > 0)
         {

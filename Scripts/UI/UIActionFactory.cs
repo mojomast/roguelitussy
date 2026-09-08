@@ -70,6 +70,31 @@ public static class UIActionFactory
             return new OpenDoorAction(actorId, target);
         }
 
+        var inventory = actor.GetComponent<InventoryComponent>();
+        if (world is WorldState rangedWorld
+            && inventory is not null
+            && RangedAttackAction.FindEquippedRangedWeapon(inventory, rangedWorld) is not null)
+        {
+            for (var distance = RangedAttackAction.MinimumRange; distance <= RangedAttackAction.MaximumRange; distance++)
+            {
+                var rangedTarget = actor.Position + new Position(delta.X * distance, delta.Y * distance);
+                var rangedOccupant = world.GetEntityAt(rangedTarget);
+                if (rangedOccupant is null)
+                {
+                    continue;
+                }
+
+                if (rangedOccupant.IsAlive
+                    && rangedOccupant.Faction != actor.Faction
+                    && rangedOccupant.Faction != Faction.Neutral)
+                {
+                    return new RangedAttackAction(actorId, rangedOccupant.Id);
+                }
+
+                break;
+            }
+        }
+
         return new MoveAction(actorId, delta);
     }
 

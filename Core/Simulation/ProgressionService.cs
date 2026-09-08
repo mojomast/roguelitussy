@@ -23,6 +23,7 @@ public static class ProgressionService
             progression.Level++;
             progression.UnspentStatPoints += 2;
             progression.UnspentPerkChoices += 1;
+            progression.PerkDraftsGenerated = true;
             progression.ExperienceToNextLevel = ProgressionComponent.CalculateXpThreshold(progression.Level);
 
             entity.Stats.MaxHP += 3;
@@ -68,13 +69,50 @@ public static class ProgressionService
             return Array.Empty<PerkTemplate>();
         }
 
-        return content.PerkTemplates.Values
+        var available = content.PerkTemplates.Values
             .Where(perk => perk.UnlockLevel <= progression.Level
                 && !progression.SelectedPerkIds.Contains(perk.TemplateId, StringComparer.Ordinal)
                 && IsPerkAvailableToArchetype(entity, perk))
             .OrderBy(perk => perk.UnlockLevel)
             .ThenBy(perk => perk.DisplayName, StringComparer.Ordinal)
             .ToArray();
+
+        if (!progression.PerkDraftsGenerated)
+        {
+            return available;
+        }
+
+        EnsurePerkDrafts(entity, progression, available);
+        if (progression.PendingPerkDrafts.Count == 0)
+        {
+            return Array.Empty<PerkTemplate>();
+        }
+
+        var draftIds = progression.PendingPerkDrafts[0];
+        return draftIds
+            .Select(id => content.PerkTemplates.TryGetValue(id, out var perk) ? perk : null)
+            .Where(perk => perk is not null)
+            .Cast<PerkTemplate>()
+            .ToArray();
+    }
+
+    public static void GeneratePerkDrafts(IEntity entity, IContentDatabase? content)
+    {
+        var progression = entity.GetComponent<ProgressionComponent>();
+        if (progression is null || content is null)
+        {
+            return;
+        }
+
+        progression.PerkDraftsGenerated = true;
+        var available = content.PerkTemplates.Values
+            .Where(perk => perk.UnlockLevel <= progression.Level
+                && !progression.SelectedPerkIds.Contains(perk.TemplateId, StringComparer.Ordinal)
+                && IsPerkAvailableToArchetype(entity, perk))
+            .OrderBy(perk => perk.UnlockLevel)
+            .ThenBy(perk => perk.DisplayName, StringComparer.Ordinal)
+            .ToArray();
+        EnsurePerkDrafts(entity, progression, available);
     }
 
     public static bool TrySelectPerk(IEntity entity, IContentDatabase? content, string perkId, out string message)
@@ -96,6 +134,24 @@ public static class ProgressionService
         {
             message = $"Unknown perk '{perkId}'.";
             return false;
+        }
+
+        if (progression.PerkDraftsGenerated)
+        {
+            EnsurePerkDrafts(entity, progression, content.PerkTemplates.Values
+                .Where(candidate => candidate.UnlockLevel <= progression.Level
+                    && !progression.SelectedPerkIds.Contains(candidate.TemplateId, StringComparer.Ordinal)
+                    && IsPerkAvailableToArchetype(entity, candidate))
+                .OrderBy(candidate => candidate.UnlockLevel)
+                .ThenBy(candidate => candidate.DisplayName, StringComparer.Ordinal)
+                .ToArray());
+
+            if (progression.PendingPerkDrafts.Count == 0
+                || !progression.PendingPerkDrafts[0].Contains(perkId, StringComparer.Ordinal))
+            {
+                message = $"Perk '{perk.DisplayName}' is not in the current draft.";
+                return false;
+            }
         }
 
         if (progression.SelectedPerkIds.Contains(perkId, StringComparer.Ordinal))
@@ -121,11 +177,6 @@ public static class ProgressionService
             switch (effect.Type)
             {
                 case "perk_gate":
-                case "floor_undying":
-                case "ranged_pierce":
-                case "streak_threshold_minus1":
-                case "ability_damage_bonus_pct":
-                case "spell_echo_pct":
                     break;
                 case "stat_bonus":
                     if (!TryApplyStatBonus(entity, effect.Stat, effect.Value))
@@ -145,8 +196,62 @@ public static class ProgressionService
 
         progression.SelectedPerkIds.Add(perk.TemplateId);
         progression.UnspentPerkChoices--;
+        if (progression.PerkDraftsGenerated && progression.PendingPerkDrafts.Count > 0)
+        {
+            progression.PendingPerkDrafts.RemoveAt(0);
+        }
         message = $"Learned perk {perk.DisplayName}.";
         return true;
+    }
+
+    private static void EnsurePerkDrafts(IEntity entity, ProgressionComponent progression, IReadOnlyList<PerkTemplate> available)
+    {
+        var targetCount = Math.Max(0, progression.UnspentPerkChoices);
+        var reserved = new HashSet<string>(progression.SelectedPerkIds, StringComparer.Ordinal);
+        foreach (var draft in progression.PendingPerkDrafts)
+        {
+            foreach (var id in draft)
+            {
+                reserved.Add(id);
+            }
+        }
+
+        while (progression.PendingPerkDrafts.Count < targetCount)
+        {
+            var candidates = available.Where(perk => !reserved.Contains(perk.TemplateId)).ToArray();
+            var draft = new List<string>();
+            if (candidates.Length > 0)
+            {
+                var start = StableIndex(entity, progression.PendingPerkDrafts.Count, candidates.Length);
+                for (var offset = 0; offset < candidates.Length && draft.Count < 3; offset++)
+                {
+                    var perk = candidates[(start + offset) % candidates.Length];
+                    draft.Add(perk.TemplateId);
+                    reserved.Add(perk.TemplateId);
+                }
+            }
+
+            progression.PendingPerkDrafts.Add(draft);
+            if (draft.Count == 0)
+            {
+                break;
+            }
+        }
+    }
+
+    private static int StableIndex(IEntity entity, int draftIndex, int length)
+    {
+        unchecked
+        {
+            var hash = 2166136261u;
+            foreach (var character in entity.Id.Value.ToString("N"))
+            {
+                hash = (hash ^ character) * 16777619u;
+            }
+
+            hash = (hash ^ (uint)draftIndex) * 16777619u;
+            return (int)(hash % (uint)length);
+        }
     }
 
     public static int ResolveShopDiscountPercent(IEntity entity, IContentDatabase? content)

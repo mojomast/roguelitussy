@@ -22,7 +22,6 @@ public partial class InventoryUI : Control
     private GameManager? _gameManager;
     private IContentDatabase? _content;
     private Tooltip? _tooltip;
-    private Tooltip? _activeTooltip;
     private TargetingOverlay? _targetingOverlay;
     private Panel? _panel;
     private ColorRect? _panelBackground;
@@ -47,7 +46,7 @@ public partial class InventoryUI : Control
     private const float PanelPadding = 18f;
     private const float OuterMargin = 24f;
     private const float HeaderHeight = 28f;
-    private const float FooterHeight = 42f;
+    private const float FooterHeight = 52f;
     private const float SlotSize = 52f;
     private const float SlotGap = 8f;
     private const int MaxGridLineChars = 50;
@@ -60,12 +59,23 @@ public partial class InventoryUI : Control
         public ColorRect BorderBottom { get; init; } = null!;
         public ColorRect BorderLeft { get; init; } = null!;
         public ColorRect BorderRight { get; init; } = null!;
+        public TextureRect ItemIcon { get; init; } = null!;
         public Label Glyph { get; init; } = null!;
         public ColorRect StackBadge { get; init; } = null!;
         public Label StackLabel { get; init; } = null!;
         public Label RarityLabel { get; init; } = null!;
         public ColorRect EquippedBadge { get; init; } = null!;
         public Label EquippedLabel { get; init; } = null!;
+    }
+
+    private sealed partial class SlotItemIcon : TextureRect
+    {
+        public System.Action<InputEvent>? InputSubmitted { get; init; }
+
+        public override void _GuiInput(InputEvent @event)
+        {
+            InputSubmitted?.Invoke(@event);
+        }
     }
 
     public int SelectedIndex { get; private set; }
@@ -507,12 +517,10 @@ public partial class InventoryUI : Control
             lines.Add(ResolvePrimaryActionHint(template, item));
             lines.Add(item.StackCount > 1 ? "D: drop one from stack" : "D: drop item");
 
-            var fittedLines = FitLines(lines, MaxDescriptionLineChars);
-            DescriptionText = string.Join("\n", fittedLines);
-            DescriptionMarkup = BuildDescriptionMarkup(template, item, fittedLines);
-            var tooltipComparison = (template.Slot != EquipSlot.None && !IsEquipped(item))
-                ? string.Join("\n", BuildEquipmentComparisonLines(template)) : null;
-            ShowActiveTooltip(template, item, tooltipComparison);
+            DescriptionText = string.Join("\n", lines);
+            DescriptionMarkup = BuildDescriptionMarkup(template, item, lines);
+            // The scrolling detail pane already contains the full comparison.
+            HideActiveTooltip();
             RefreshVisualState();
             return;
         }
@@ -523,36 +531,9 @@ public partial class InventoryUI : Control
         RefreshVisualState();
     }
 
-    private void ShowActiveTooltip(ItemTemplate template, ItemInstance item, string? comparisonText)
-    {
-        _activeTooltip?.Hide();
-        _activeTooltip = ResolveTooltip();
-        var tooltipPosition = _activeTooltip.ResolveBottomRightPosition(GetViewportRect().Size);
-        _activeTooltip.ShowItemTooltip(template, item, tooltipPosition, comparisonText, IsEquipped(item), ResolveEquippedSlot(item));
-    }
-
-    private Tooltip ResolveTooltip()
-    {
-        if (_tooltip is not null)
-        {
-            return _tooltip;
-        }
-
-        if (_activeTooltip is not null)
-        {
-            return _activeTooltip;
-        }
-
-        _activeTooltip = new Tooltip { ZIndex = ZIndex + 5 };
-        AddChild(_activeTooltip);
-        _activeTooltip._Ready();
-        return _activeTooltip;
-    }
-
     private void HideActiveTooltip()
     {
-        _activeTooltip?.Hide();
-        _activeTooltip = null;
+        _tooltip?.Hide();
     }
 
     private Vector2 ResolveSelectedSlotTooltipPosition()
@@ -870,8 +851,15 @@ public partial class InventoryUI : Control
             Name = "DescriptionLabel",
             Position = new Vector2(PanelPadding, PanelPadding),
             BbcodeEnabled = true,
+            FitContent = false,
+            ScrollActive = true,
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
             Modulate = UiStyle.Parchment(),
         };
+        _descriptionLabel.AddThemeFontSizeOverride("normal_font_size", 14);
+        UiStyle.ConfigureSingleLineLabel(_headerTitleLabel);
+        UiStyle.ConfigureSingleLineLabel(_headerStatsLabel);
+        UiStyle.ConfigureSingleLineLabel(_sortLabel);
         _panel.AddChild(_panelBackground);
         _panel.AddChild(_panelBorderTop);
         _panel.AddChild(_panelBorderBottom);
@@ -885,6 +873,10 @@ public partial class InventoryUI : Control
         for (var i = 0; i < Columns * Rows; i++)
         {
             var slot = CreateSlotVisual(i);
+            UiStyle.ConfigureSingleLineLabel(slot.Glyph);
+            UiStyle.ConfigureSingleLineLabel(slot.RarityLabel, 12);
+            UiStyle.ConfigureSingleLineLabel(slot.StackLabel, 12);
+            UiStyle.ConfigureSingleLineLabel(slot.EquippedLabel, 12);
             _slotVisuals.Add(slot);
             _panel.AddChild(slot.Background);
             _panel.AddChild(slot.BorderTop);
@@ -908,13 +900,23 @@ public partial class InventoryUI : Control
     private SlotVisual CreateSlotVisual(int index)
     {
         void BindSlot(InputEvent input) => OnSlotInputSubmitted(index, input);
+        var background = new UiMouseColorRect { Name = $"Slot{index}_Background", Color = UiStyle.SlotBackground(), InputSubmitted = BindSlot };
+        var itemIcon = new SlotItemIcon
+        {
+            Name = "ItemIcon",
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+            InputSubmitted = BindSlot,
+        };
+        background.AddChild(itemIcon);
         return new SlotVisual
         {
-            Background = new UiMouseColorRect { Name = $"Slot{index}_Background", Color = UiStyle.SlotBackground(), InputSubmitted = BindSlot },
+            Background = background,
             BorderTop = new UiMouseColorRect { Name = $"Slot{index}_BorderTop", Color = UiStyle.BorderSubtle(), InputSubmitted = BindSlot },
             BorderBottom = new UiMouseColorRect { Name = $"Slot{index}_BorderBottom", Color = UiStyle.BorderSubtle(), InputSubmitted = BindSlot },
             BorderLeft = new UiMouseColorRect { Name = $"Slot{index}_BorderLeft", Color = UiStyle.BorderSubtle(), InputSubmitted = BindSlot },
             BorderRight = new UiMouseColorRect { Name = $"Slot{index}_BorderRight", Color = UiStyle.BorderSubtle(), InputSubmitted = BindSlot },
+            ItemIcon = itemIcon,
             Glyph = new UiMouseLabel { Name = $"Slot{index}_Glyph", Modulate = UiStyle.Parchment(), InputSubmitted = BindSlot },
             RarityLabel = new UiMouseLabel { Name = $"Slot{index}_Rarity", Modulate = UiStyle.FaintText(), InputSubmitted = BindSlot },
             StackBadge = new UiMouseColorRect { Name = $"Slot{index}_StackBadge", Color = UiStyle.BrightGold(), InputSubmitted = BindSlot },
@@ -944,6 +946,7 @@ public partial class InventoryUI : Control
         {
             var action = hint.Action;
             var label = new UiMouseLabel { Name = $"FooterHint_{_footerHintLabels.Count}", Text = hint.Label, Modulate = UiStyle.MutedText(), InputSubmitted = input => OnFooterInput(action, input) };
+            UiStyle.ConfigureSingleLineLabel(label);
             _footerHintLabels.Add(label);
             _panel.AddChild(label);
             if (_footerHintLabels.Count < hints.Length)
@@ -966,7 +969,6 @@ public partial class InventoryUI : Control
 
         var viewportSize = ResolveViewportSize();
         var panelSize = ResolvePanelSize(viewportSize);
-        var contentHeight = Math.Max(0f, panelSize.Y - (PanelPadding * 2f));
         var availableWidth = Math.Max(0f, panelSize.X - (PanelPadding * 2f));
         var gutter = Math.Min(20f, Math.Max(12f, availableWidth * 0.04f));
         var gridWidth = Math.Min(420f, Math.Max(160f, (availableWidth - gutter) * 0.46f));
@@ -979,11 +981,11 @@ public partial class InventoryUI : Control
         LayoutPanelChrome(panelSize);
         LayoutHeader(panelSize, inventoryCapacity: _gameManager?.World?.Player?.GetComponent<InventoryComponent>()?.Capacity ?? 0);
         LayoutFooter(panelSize);
-        LayoutSlots(PanelPadding, PanelPadding + HeaderHeight + 16f);
         _gridLabel.Position = new Vector2(PanelPadding, PanelPadding + HeaderHeight + 16f);
         _gridLabel.Size = new Vector2(gridWidth, System.Math.Max(0f, panelSize.Y - _gridLabel.Position.Y - PanelPadding - FooterHeight - 8f));
-        _descriptionLabel.Position = new Vector2(descriptionX, PanelPadding);
-        _descriptionLabel.Size = new Vector2(descriptionWidth, Math.Max(0f, contentHeight - FooterHeight - 8f));
+        LayoutSlots(_gridLabel.Position.X, _gridLabel.Position.Y, _gridLabel.Size);
+        _descriptionLabel.Position = new Vector2(descriptionX, _gridLabel.Position.Y);
+        _descriptionLabel.Size = new Vector2(descriptionWidth, _gridLabel.Size.Y);
         _panel.Visible = Visible;
         _gridLabel.Visible = false;
         _descriptionLabel.Visible = Visible;
@@ -1023,14 +1025,14 @@ public partial class InventoryUI : Control
         _headerBar.Position = new Vector2(PanelPadding, PanelPadding);
         _headerBar.Size = new Vector2(panelSize.X - (PanelPadding * 2f), HeaderHeight);
         _headerTitleLabel.Position = _headerBar.Position + new Vector2(10f, 5f);
-        _headerTitleLabel.Size = new Vector2(110f, HeaderHeight);
+        _headerTitleLabel.Size = new Vector2(110f, HeaderHeight - 6f);
         _headerStatsLabel.Position = _headerBar.Position + new Vector2(126f, 6f);
         var sortWidth = System.Math.Min(140f, System.Math.Max(80f, _headerBar.Size.X * 0.25f));
         var statsRight = _headerBar.Position.X + _headerBar.Size.X - sortWidth - 12f;
-        _headerStatsLabel.Size = new Vector2(System.Math.Max(40f, statsRight - _headerStatsLabel.Position.X), HeaderHeight);
+        _headerStatsLabel.Size = new Vector2(System.Math.Max(0f, statsRight - _headerStatsLabel.Position.X), HeaderHeight - 6f);
         _headerStatsLabel.Text = FitLabelText($"{_items.Count}/{inventoryCapacity} stacks  ▪  {ResolveTotalCarriedItems()} items  ▪  Wt: {ResolveTotalWeight():0.0}  ▪  Val: {ResolveTotalValue()}  ▪  Gold: {ResolveGold()}", _headerStatsLabel.Size.X);
         _sortLabel.Position = new Vector2(_headerBar.Position.X + _headerBar.Size.X - sortWidth - 8f, _headerBar.Position.Y + 6f);
-        _sortLabel.Size = new Vector2(sortWidth, HeaderHeight);
+        _sortLabel.Size = new Vector2(sortWidth, HeaderHeight - 6f);
         _sortLabel.Text = FitLabelText($"[Tab] Sort: {CurrentSort}", _sortLabel.Size.X);
     }
 
@@ -1054,8 +1056,7 @@ public partial class InventoryUI : Control
             var column = compact ? i % columns : i;
             var row = compact ? i / columns : 0;
             label.Position = new Vector2(_footerBar.Position.X + 10f + (column * labelWidth), _footerBar.Position.Y + 3f + (row * rowHeight));
-            label.Size = new Vector2(System.Math.Max(0f, labelWidth - 6f), rowHeight);
-            label.Text = FitLabelText(label.Text, label.Size.X);
+            label.Size = new Vector2(System.Math.Max(0f, labelWidth - 6f), rowHeight - 6f);
             if (i < _footerDividers.Count)
             {
                 var divider = _footerDividers[i];
@@ -1066,64 +1067,72 @@ public partial class InventoryUI : Control
         }
     }
 
-    private void LayoutSlots(float left, float top)
+    private void LayoutSlots(float left, float top, Vector2 available)
     {
+        var slotSize = System.Math.Max(0f, System.Math.Min(SlotSize,
+            System.Math.Min((available.X - (Columns - 1) * SlotGap) / Columns,
+                (available.Y - (Rows - 1) * SlotGap) / Rows)));
         for (var i = 0; i < _slotVisuals.Count; i++)
         {
             var slotIndex = _firstVisibleIndex + i;
             var row = i / Columns;
             var column = i % Columns;
-            var position = new Vector2(left + (column * (SlotSize + SlotGap)), top + (row * (SlotSize + SlotGap)));
+            var position = new Vector2(left + (column * (slotSize + SlotGap)), top + (row * (slotSize + SlotGap)));
             var item = slotIndex < _items.Count ? _items[slotIndex] : null;
             var selected = slotIndex == SelectedIndex;
-            UpdateSlotVisual(_slotVisuals[i], position, item, selected);
+            UpdateSlotVisual(_slotVisuals[i], position, item, selected, slotSize);
         }
     }
 
-    private void UpdateSlotVisual(SlotVisual slot, Vector2 position, ItemInstance? item, bool selected)
+    private void UpdateSlotVisual(SlotVisual slot, Vector2 position, ItemInstance? item, bool selected, float slotSize)
     {
         var occupied = item is not null;
         var equipped = item is not null && IsEquipped(item);
         var borderColor = selected ? UiStyle.BrightGold() : equipped ? UiStyle.ActiveGreen() : UiStyle.BorderSubtle();
         var borderSize = selected || equipped ? 2f : 1f;
         slot.Background.Position = position;
-        slot.Background.Size = new Vector2(SlotSize, SlotSize);
+        slot.Background.Size = new Vector2(slotSize, slotSize);
         slot.Background.Color = selected ? UiStyle.SlotSelected() : UiStyle.SlotBackground();
         slot.BorderTop.Position = position;
-        slot.BorderTop.Size = new Vector2(SlotSize, borderSize);
-        slot.BorderBottom.Position = new Vector2(position.X, position.Y + SlotSize - borderSize);
-        slot.BorderBottom.Size = new Vector2(SlotSize, borderSize);
+        slot.BorderTop.Size = new Vector2(slotSize, borderSize);
+        slot.BorderBottom.Position = new Vector2(position.X, position.Y + slotSize - borderSize);
+        slot.BorderBottom.Size = new Vector2(slotSize, borderSize);
         slot.BorderLeft.Position = position;
-        slot.BorderLeft.Size = new Vector2(borderSize, SlotSize);
-        slot.BorderRight.Position = new Vector2(position.X + SlotSize - borderSize, position.Y);
-        slot.BorderRight.Size = new Vector2(borderSize, SlotSize);
+        slot.BorderLeft.Size = new Vector2(borderSize, slotSize);
+        slot.BorderRight.Position = new Vector2(position.X + slotSize - borderSize, position.Y);
+        slot.BorderRight.Size = new Vector2(borderSize, slotSize);
         slot.BorderTop.Color = slot.BorderBottom.Color = slot.BorderLeft.Color = slot.BorderRight.Color = borderColor;
-        slot.Glyph.Position = position + new Vector2(18f, 13f);
-        slot.Glyph.Size = new Vector2(24f, 24f);
+        slot.ItemIcon.Position = new Vector2(5f, 7f);
+        slot.ItemIcon.Size = new Vector2(System.Math.Max(0f, slotSize - 10f), System.Math.Max(0f, slotSize - 14f));
+        slot.ItemIcon.Texture = occupied ? ItemVisualCatalog.GetTexture(item!, _content) : null;
+        slot.ItemIcon.Visible = slot.ItemIcon.Texture is not null;
+        slot.Glyph.Position = position + new Vector2((slotSize - 20f) / 2f, (slotSize - 20f) / 2f);
+        slot.Glyph.Size = new Vector2(20f, 20f);
         slot.Glyph.Text = occupied ? ResolveSlotGlyph(item!) : string.Empty;
+        slot.Glyph.Visible = occupied && slot.ItemIcon.Texture is null;
         slot.Glyph.Modulate = occupied && _content is not null && _content.TryGetItemTemplate(item!.TemplateId, out var template)
             ? ItemRarityPresentation.ResolveColor(template.Rarity)
             : UiStyle.Parchment();
         slot.RarityLabel.Visible = occupied;
         slot.RarityLabel.Position = position + new Vector2(3f, 2f);
-        slot.RarityLabel.Size = new Vector2(30f, 14f);
+        slot.RarityLabel.Size = new Vector2(30f, 18f);
         slot.RarityLabel.Text = occupied && _content is not null && _content.TryGetItemTemplate(item!.TemplateId, out var rarityTemplate)
             ? ItemRarityPresentation.ResolveBracketedAbbreviation(rarityTemplate.Rarity)
             : string.Empty;
         slot.RarityLabel.Modulate = UiStyle.FaintText();
         slot.StackBadge.Visible = occupied && item!.StackCount > 1;
-        slot.StackBadge.Position = position + new Vector2(SlotSize - 18f, SlotSize - 16f);
-        slot.StackBadge.Size = new Vector2(16f, 14f);
+        slot.StackBadge.Position = position + new Vector2(slotSize - 24f, slotSize - 20f);
+        slot.StackBadge.Size = new Vector2(22f, 18f);
         slot.StackLabel.Visible = slot.StackBadge.Visible;
         slot.StackLabel.Position = slot.StackBadge.Position + new Vector2(2f, 0f);
-        slot.StackLabel.Size = slot.StackBadge.Size;
+        slot.StackLabel.Size = new Vector2(18f, 18f);
         slot.StackLabel.Text = occupied ? item!.StackCount.ToString() : string.Empty;
         slot.EquippedBadge.Visible = equipped;
-        slot.EquippedBadge.Position = position + new Vector2(2f, SlotSize - 15f);
-        slot.EquippedBadge.Size = new Vector2(13f, 13f);
+        slot.EquippedBadge.Position = position + new Vector2(2f, slotSize - 20f);
+        slot.EquippedBadge.Size = new Vector2(16f, 18f);
         slot.EquippedLabel.Visible = equipped;
-        slot.EquippedLabel.Position = slot.EquippedBadge.Position + new Vector2(3f, -1f);
-        slot.EquippedLabel.Size = slot.EquippedBadge.Size;
+        slot.EquippedLabel.Position = slot.EquippedBadge.Position + new Vector2(2f, 0f);
+        slot.EquippedLabel.Size = new Vector2(12f, 18f);
     }
 
     private Vector2 ResolvePanelSize(Vector2 viewportSize)

@@ -122,6 +122,11 @@ public partial class MetaProgressionManager : Node
 
     public void CompleteRun()
     {
+        if (_data.HasCompletedFirstClear)
+        {
+            return;
+        }
+
         _data.HasCompletedFirstClear = true;
         Save();
     }

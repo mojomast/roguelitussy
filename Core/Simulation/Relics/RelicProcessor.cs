@@ -79,7 +79,7 @@ public static class RelicProcessor
     public static int ProcessOutgoingDamage(WorldState world, IEntity attacker, IEntity target, int damage, ICollection<string>? logMessages = null)
     {
         var component = attacker.GetComponent<RelicComponent>();
-        if (component is null || component.RelicIds.Count == 0 || damage <= 0)
+        if (damage <= 0)
         {
             return damage;
         }
@@ -91,10 +91,15 @@ public static class RelicProcessor
             ModifiedValue = damage,
             EnemyTag = target.GetComponent<EnemyComponent>()?.TemplateId,
         };
-        ProcessHook("on_hit", attacker, world, world.ContentDatabase, ctx);
+        if (component is not null && component.RelicIds.Count > 0)
+        {
+            ProcessHook("on_hit", attacker, world, world.ContentDatabase, ctx);
+        }
+
+        ctx.ModifiedValue = SynergyResolver.ProcessOutgoingDamage(attacker, world.ContentDatabase, ctx.ModifiedValue, ctx.LogMessages);
         var result = Math.Max(0, ctx.ModifiedValue);
 
-        if (component.DamageBuffPercent > 0)
+        if (component is not null && component.DamageBuffPercent > 0)
         {
             if (world.TurnNumber <= component.DamageBuffExpiresOnTurn)
             {

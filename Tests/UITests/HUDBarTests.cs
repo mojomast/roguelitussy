@@ -223,8 +223,16 @@ public sealed class HUDBarTests : ITestSuite
             Expect.NotNull(bottomHp, "Bottom HP label should exist.");
             Expect.NotNull(bottomXp, "Bottom XP label should exist.");
             Expect.NotNull(bottomHpBar, "Bottom HP bar should exist.");
+            foreach (var label in panel.Children.OfType<Label>().Where(label => label.Visible))
+            {
+                Expect.True(label.ClipText, $"{label.Name} must constrain its text minimum width.");
+                Expect.Equal(TextServer.OverrunBehavior.TrimEllipsis, label.TextOverrunBehavior, "HUD overflow must use engine ellipsis.");
+                Expect.Equal(14, label.GetThemeFontSize("font_size"), "HUD rows should use the explicit readable font size.");
+                Expect.True(label.Position.Y + label.Size.Y <= panel.Size.Y, "HUD text must fit vertically inside its panel.");
+            }
             Expect.True(bottomHp!.Position.X + bottomHp.Size.X <= bottomHpBar!.Position.X + 0.1f, "Bottom HP text should end before the HP bar begins.");
             Expect.True(bottomXp!.Text.Length <= 18, "Bottom XP text should use a compact label that fits beside the bar.");
+            Expect.True(hud.Snapshot().Contains("Objective: reach the stairs"), "HUD should expose the concise first objective.");
         });
     }
 

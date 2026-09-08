@@ -4,6 +4,13 @@ namespace Godotussy;
 
 public static class UiStyle
 {
+    public static void ConfigureSingleLineLabel(Label label, int fontSize = 14)
+    {
+        label.ClipText = true;
+        label.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
+        label.AddThemeFontSizeOverride("font_size", fontSize);
+    }
+
     public static Color DeepBlack(float alpha = 1f)
         => new(0.04f, 0.03f, 0.03f, alpha);
 

@@ -133,7 +133,7 @@ public partial class QuickSlotHotbar : Control
                 Name = $"QuickSlot_{i + 1}",
                 Position = new Vector2(i * 108f, 0f),
                 Size = new Vector2(102f, 48f),
-                Modulate = UiStyle.GoldTrim(),
+                SelfModulate = UiStyle.GoldTrim(),
             };
 
             var background = new ColorRect
@@ -152,6 +152,7 @@ public partial class QuickSlotHotbar : Control
                 Text = _slotTexts[i],
                 Modulate = UiStyle.MutedText(),
             };
+            UiStyle.ConfigureSingleLineLabel(label);
 
             panel.AddChild(background);
             panel.AddChild(label);

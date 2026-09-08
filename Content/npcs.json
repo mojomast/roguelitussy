@@ -15,6 +15,9 @@
       "appearance_id": "weathered",
       "archetype_id": "vanguard",
       "faction_id": "merchants_guild",
+      "services": [
+        { "id": "field_dressing", "cost": 12, "heal_amount": 15 }
+      ],
       "stock": [
         {
           "item_id": "potion_health",
@@ -87,6 +90,52 @@
       "archetype_id": "mystic",
       "faction_id": "warriors_order",
       "stock": []
+    },
+    {
+      "id": "sister_ilex",
+      "name": "Sister Ilex",
+      "description": "A crypt field medic who counts clean dressings rather than slain monsters.",
+      "role": "advisor",
+      "min_depth": 3,
+      "max_depth": 6,
+      "dialogue_id": "ilex_intro",
+      "race_id": "dwarf",
+      "gender_id": "feminine",
+      "appearance_id": "weathered",
+      "archetype_id": "vanguard",
+      "faction_id": "warriors_order",
+      "services": [
+        { "id": "field_dressing", "cost": 18, "heal_amount": 25 }
+      ],
+      "stock": []
+    },
+    {
+      "id": "cinder_broker_orin",
+      "name": "Cinder Broker Orin",
+      "description": "An ash-scarred outfitter carrying escape tools along the old forge routes.",
+      "role": "shopkeeper",
+      "min_depth": 7,
+      "max_depth": 99,
+      "dialogue_id": "orin_intro",
+      "race_id": "orc",
+      "gender_id": "masculine",
+      "appearance_id": "scarred",
+      "archetype_id": "skirmisher",
+      "faction_id": "merchants_guild",
+      "services": [
+        { "id": "field_dressing", "cost": 22, "heal_amount": 30 }
+      ],
+      "stock": [
+        { "item_id": "potion_health", "price": 32, "quantity": 8 },
+        { "item_id": "item_iron_rations", "price": 24, "quantity": 4 },
+        { "item_id": "potion_haste", "price": 44, "quantity": 3 },
+        { "item_id": "scroll_blink", "price": 72, "quantity": 3 },
+        { "item_id": "scroll_phase", "price": 80, "quantity": 2 },
+        { "item_id": "scroll_frost_nova", "price": 92, "quantity": 2 },
+        { "item_id": "scroll_chain_lightning", "price": 112, "quantity": 1 },
+        { "item_id": "armor_plate", "price": 160, "quantity": 1 },
+        { "item_id": "ring_warding", "price": 120, "quantity": 1 }
+      ]
     }
   ]
 }

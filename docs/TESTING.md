@@ -29,6 +29,15 @@ An empty filter runs all tests. A nonmatching filter executes zero tests, prints
 
 The harness prints the current test count at runtime; avoid hardcoding exact counts in docs unless they are generated from the harness output.
 
+## Latest Verification - 2026-09-08
+
+- Full strict suite: 734/734 passed.
+- Rendering validation: 663/663 passed.
+- Real Godot 4.5.2 API build: zero warnings/errors.
+- `dotnet format --verify-no-changes` and `git diff --check`: passed.
+
+The replayability coverage includes save/load-stable perk drafts, synergy trigger behavior, landmark/key validation, nine-floor completion and first-clear unlock idempotence, ranged weapon range/LOS input, retryable daily state and Thursday speed scoring, merchant reputation discounts, dangerous-status wait suppression, and onboarding/game-over actions.
+
 Build the editorless Godot stub profile before a larger change set:
 
 ```powershell
@@ -143,6 +152,14 @@ The Godot compatibility `Image` stub includes deterministic RGBA raster operatio
 When changing simulation, persistence, generation, or content loading, add or update tests in the same change.
 
 ## Testing Guidance By Change Type
+
+The NPC/flow pass adds content, simulation, persistence, and UI suites for conditional branching, filtered numbering, service authorization/payment/healing, derived expedition reports, four depth-gated NPCs, and deterministic population. Diagonal-input tests prove that a prefix plus perpendicular directions produces one existing action without a preparatory movement turn. UI tests cover configured text bounds, selected-row existence, status texture minimums, modal HUD suppression, panel-only tint, and compact log/status separation. Terrain tests preserve geometry/layering and RNG while checking depth palettes and locked-door presentation.
+
+The run-pacing pass adds generation/reward coverage for shrine event identity, cursed chest tables, safe-floor recovery caches, boss guarantees, deterministic landmark metadata, populated shrine entities, all shrine reward paths, guarded relic claims, save/load offer stability, sanctuary-cache population, late-pool role diversity, and depth-band recovery access. Content tests reject accidental regression to a four-template late pool or a missing Orin emergency service.
+
+The identity/art pass verifies archetype package/preview alignment, legacy save preservation, race normalization and heritage-slot reconciliation, cooldown persistence, owned-only ability palette routing, targeted cancellation, 0x72 portrait mappings, authored item-path projection, source-image fallback, inventory slot icons/badges, visible-only ground piles, pile cleanup, and player body palette preservation.
+
+Run `Scenes/Tests/VisualCapture.tscn` in real Godot to catch font minimum sizes, inherited tint, and draw-order issues the stubs cannot simulate. Use `--assert-layout` for actual label containment, and visually review sibling panels as well. The fixture, commands, source-pack research, and known shutdown-leak limitation are documented in [VISUAL_VALIDATION.md](VISUAL_VALIDATION.md).
 
 - Simulation/action changes: add simulation or integration tests.
 - Save-format or migration changes: add persistence serialization and migration coverage.

@@ -1,5 +1,21 @@
 # Keybinds
 
+## Diagonal Movement And Combat
+
+- `V`, then two perpendicular arrows or WASD directions: one diagonal move/attack. Example: `V`, `Up`, `Right` attacks or moves northeast without spending a preparatory turn.
+- `V` or `Escape`: cancel a pending diagonal; another command clears it before opening its screen.
+- `Home`, `Page Up`, `End`, `Page Down`: northwest, northeast, southwest, southeast.
+- Numpad `1`-`9`: eight-direction movement; `5` waits. Number-row `1`-`5` remain quick-use slots.
+- `R` then a cardinal direction still runs; diagonal shortcuts do not start diagonal autoplay.
+- `F` beside an NPC opens conversation. Arrows/number-row choices and `Enter` navigate branches; `Escape`/`F` leaves. Field dressing clearly shows gold, healing cap, and turn cost before confirmation.
+
+## Techniques
+
+- `B`: open the owned-technique palette during normal gameplay.
+- `1`-`4`: select a listed technique; `Enter` selects the highlighted technique; `B`/`Escape` closes.
+- Self techniques execute through a normal turn. Aimed techniques reuse the targeting cursor: arrows/WASD move, `Enter` confirms, `Escape` cancels without consuming an action.
+- The palette lists only the player’s class and heritage ability slots. Item scrolls remain inventory/quick-use items and are not injected into this list.
+
 This page reflects the current repository wiring in `InputHandler` and the active UI panels. Older references to `Shift`+direction for running and `R` for rest are stale: running is `R` then a direction, and rest-until-healed is `Z`.
 
 ## Normal Gameplay

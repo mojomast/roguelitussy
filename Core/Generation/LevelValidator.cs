@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Roguelike.Core;
 
@@ -46,6 +47,8 @@ public static class LevelValidator
         {
             errors.Add("Stairs down is not reachable from player spawn.");
         }
+
+        ValidateKeySolvability(world, data, errors);
 
         for (var i = 0; i < data.EnemySpawns.Count; i++)
         {
@@ -115,6 +118,101 @@ public static class LevelValidator
         }
 
         return errors;
+    }
+
+    private static void ValidateKeySolvability(IWorldState world, LevelData data, ICollection<string> errors)
+    {
+        var lockedDoors = new HashSet<Position>(data.LockedDoors ?? System.Array.Empty<Position>());
+        var keys = new HashSet<Position>(data.KeySpawns ?? System.Array.Empty<Position>());
+        var consumedKeys = new HashSet<Position>();
+        var unlockedDoors = new HashSet<Position>();
+        var reachable = FloodFillWithUnlockedDoors(world, data.PlayerSpawn, unlockedDoors);
+
+        while (true)
+        {
+            // Nullable results distinguish a missing candidate from the valid (0,0) position.
+            var availableKey = keys
+                .Where(key => reachable.Contains(key) && !consumedKeys.Contains(key))
+                .OrderBy(key => key.Y)
+                .ThenBy(key => key.X)
+                .Select(key => (Position?)key)
+                .FirstOrDefault();
+            var door = lockedDoors
+                .Where(candidate =>
+                !unlockedDoors.Contains(candidate) &&
+                Position.AllDirections.Any(delta => reachable.Contains(candidate + delta)))
+                .OrderBy(candidate => candidate.Y)
+                .ThenBy(candidate => candidate.X)
+                .Select(candidate => (Position?)candidate)
+                .FirstOrDefault();
+            if (!availableKey.HasValue || !door.HasValue)
+            {
+                break;
+            }
+
+            consumedKeys.Add(availableKey.Value);
+            unlockedDoors.Add(door.Value);
+            reachable = FloodFillWithUnlockedDoors(world, data.PlayerSpawn, unlockedDoors);
+        }
+
+        if (unlockedDoors.Count != lockedDoors.Count)
+        {
+            errors.Add("Locked doors cannot all be opened with reachable key spawns.");
+        }
+
+        var objectives = new List<Position> { data.StairsDown };
+        objectives.AddRange(data.EnemySpawns);
+        objectives.AddRange(data.ItemSpawns);
+        objectives.AddRange(data.EnemySpawnDetails?.Select(spawn => spawn.Position) ?? System.Array.Empty<Position>());
+        objectives.AddRange(data.ItemSpawnDetails?.Select(spawn => spawn.Position) ?? System.Array.Empty<Position>());
+        objectives.AddRange(data.ChestSpawnDetails?.Select(spawn => spawn.Position) ?? System.Array.Empty<Position>());
+        objectives.AddRange(data.NpcSpawns?.Select(spawn => spawn.Position) ?? System.Array.Empty<Position>());
+        objectives.AddRange(data.TrapSpawnDetails?.Select(spawn => spawn.Position) ?? System.Array.Empty<Position>());
+        objectives.AddRange(data.ShrineSpawns?.Select(spawn => spawn.Position) ?? System.Array.Empty<Position>());
+        objectives.AddRange(data.LandmarkSpawns?.Select(spawn => spawn.Position) ?? System.Array.Empty<Position>());
+        if (objectives.Any(position => !reachable.Contains(position)))
+        {
+            errors.Add("A generated objective is unreachable after legal key consumption.");
+        }
+    }
+
+    private static HashSet<Position> FloodFillWithUnlockedDoors(
+        IWorldState world,
+        Position start,
+        ISet<Position> unlockedDoors)
+    {
+        var reachable = new HashSet<Position>();
+        if (!world.InBounds(start) || !IsTraversable(world.GetTile(start)))
+        {
+            return reachable;
+        }
+
+        var queue = new Queue<Position>();
+        queue.Enqueue(start);
+        reachable.Add(start);
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            foreach (var delta in Position.Cardinals)
+            {
+                var next = current + delta;
+                if (!world.InBounds(next) || reachable.Contains(next))
+                {
+                    continue;
+                }
+
+                var tile = world.GetTile(next);
+                if (!IsTraversable(tile) && !(tile == TileType.LockedDoor && unlockedDoors.Contains(next)))
+                {
+                    continue;
+                }
+
+                reachable.Add(next);
+                queue.Enqueue(next);
+            }
+        }
+
+        return reachable;
     }
 
     public static HashSet<Position> FloodFill(IWorldState world, Position start, bool includeLockedDoors = false)

@@ -1,6 +1,6 @@
 # Progression
 
-This document defines the next progression pass for the project.
+This document defines the current progression contract and the next progression pass for the project.
 
 The current game already supports:
 
@@ -14,12 +14,30 @@ The current game already supports:
 - a first-pass Echo-based meta-progression store with upgrade levels and recent run history persisted to `user://meta_progress.json`
 - schema-versioned meta progression with corruption recovery and rich build snapshots
 - once-only floor-clear reward history persisted in version 18 run saves
+- deterministic three-option perk drafts persisted through save/load, with a legacy full-list fallback
+- live heal-on-kill and flat damage-bonus synergy effects; `echo_bonus` remains unsupported
+- a nine-floor final-run contract with canonical `Victory` completion and idempotent first-clear ascension unlock
+- retryable daily challenges with persisted attempts/best scores and Thursday's authored speed-score modifier
 
 Loading a run replaces its floor-clear reward history rather than retaining the previous session's history. Legacy versions 1-17 treat saved floors without living hostiles as already rewarded; this avoids duplicate gold but can forfeit an unpaid reward on an empty legacy floor. New runs reset their turn counter, while floor travel carries it forward. Lethal status ticks and reflection deaths cannot be undone by subsequent regeneration or ability self-healing.
 
-That is a workable foundation, but it is still a narrow "kill things, get bigger numbers" model. The next pass should make progression shape playstyle, recovery, and decision-making across a run without collapsing the tension that makes a dungeon crawler work.
+That is a workable foundation. Remaining progression work should make progression shape playstyle, recovery, and decision-making without claiming unsupported daily/ascension effects or adding permanent stat inflation.
 
 ## Design Goals
+
+Current NPC recovery is an in-run gold sink, not a permanent upgrade: Vale and Ilex sell field dressing through a normal action with enemy responses. Sen's expedition assessment and conditional advice are free read-only queries of existing progression, HP, inventory, and reputation. No quest/reward memory or new save fields are introduced. Orin provides deep-floor supplies through existing finite merchant stock.
+
+Placed shrines form a second in-run decision layer. The player sacrifices current HP for exactly one authored stat point, perk choice, or deterministic relic offer. The cost is immediate and can make nearby combat dangerous; relic choices are derived from stable shrine position/world data and survive save/load while unclaimed. Safe floors supply recovery without granting permanent power, while floor-clear gold remains a separate reward for full hostile elimination.
+
+Archetypes and races now create techniques, not more permanent stat packages. A Vanguard/Human starts with Shield Bash plus War Cry; a Ranger/Elf gets ranged technique plus Phase Shift; a Trickster/Dwarf gets backstab plus Ground Slam; an Arcanist/Orc gets spell techniques plus Heavy Slam. The player chooses when to use the two independent verbs through the ability palette, then handles range, cooldown, energy, and targeting consequences normally. This is intended to make combinations feel different without creating a new mana resource or silently changing saved builds.
+
+### Current Replayability Contract - 2026-09-08
+
+The authored run is nine floors long. Boss and act feedback identifies the run arc, and the final completion uses the canonical `Victory` result. A first clear unlocks Ascension once; repeated completion handling and retries do not duplicate the unlock. Only currently wired Ascension effects are active, not every modifier in the ten-level catalog.
+
+Daily challenges can be retried. The challenge manager persists attempts and best scores, and Thursday's authored speed-score modifier is active. Other daily modifiers remain unsupported/upcoming. Friendly Merchants' Guild reputation discounts shop prices, while Orin provides the corrected deep-floor dialogue/service.
+
+Waiting is a limited recovery tool: `WaitAction` restores 1 HP when safe, but dangerous statuses suppress recovery. First-delve guidance, stairs reminders, death lessons, and `Retry Seed`/`New Build` actions make the run loop and retry path explicit.
 
 - Keep runs tactically dangerous even after repeated play.
 - Make level-ups feel like build choices, not only math increments.
@@ -178,9 +196,9 @@ Phase 1 target:
   - apply automatic rewards
   - create pending level-up choices
 
-### Phase 2: Add Perk Choices
+### Phase 2: Add Perk Choices (implemented)
 
-Add a content-driven perk system.
+The content-driven perk system is implemented. Each level creates one deterministic three-option draft, persists it until selection, and applies the selected perk through the existing progression path.
 
 Suggested content file:
 
@@ -209,9 +227,9 @@ Suggested rules:
 
 Keep the initial perk set small. Around 12 to 20 perks is enough for the first meaningful pass.
 
-### Phase 3: Add Progression Events And UI
+### Phase 3: Progression Events And UI (implemented for the current contract)
 
-The current event bus already exposes XP and level-up hooks. Expand that into a real progression UI flow.
+The event bus exposes XP and level-up hooks, and the current progression UI presents the pending draft and its explicit limited-offer wording.
 
 Needed surfaces:
 
@@ -232,7 +250,7 @@ Recommended interaction model:
 - perk choices become pending
 - player can resolve them immediately or on the next safe turn
 
-Current implementation note: pending perk choices are persisted and the level-up overlay is reopened after load when choices are available. The future three-option offer draft described above is still roadmap work; current choices are drawn from the unlocked, unselected perk list.
+Current implementation note: pending perk choices and their deterministic three-option draft IDs are persisted and the level-up overlay is reopened after load. Legacy saves without draft IDs use the available unlocked, unselected list as a compatibility fallback. The overlay labels the limited set as draft options.
 
 ### Phase 4: Rework Stat Points
 
@@ -259,7 +277,7 @@ Progression should not stop at the level-up screen.
 
 Use existing NPC and shop infrastructure to support build shaping.
 
-Current reputation integration awards Warriors' Order reputation for normal kills, larger Warriors' and Thieves' gains plus a Merchants' loss for boss kills, Merchants' reputation for purchases, and Thieves' Compact reputation for shrine use.
+Current reputation integration awards Warriors' Order reputation for normal kills, larger Warriors' and Thieves' gains plus a Merchants' loss for boss kills, Merchants' reputation for purchases, and Thieves' Compact reputation for shrine use. Friendly Merchants' Guild reputation discounts purchases. Orin's corrected deep-floor dialogue and service are part of the same in-run correction layer.
 
 Examples:
 

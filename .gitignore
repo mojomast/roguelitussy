@@ -2,6 +2,7 @@
 .mono/
 bin/
 obj/
+build/
 .vs/
 .nexdev/
 TestResults/

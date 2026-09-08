@@ -488,6 +488,24 @@ public sealed class DialogueOptionDefinition
 
     [JsonPropertyName("action")]
     public string? Action { get; set; }
+
+    [JsonPropertyName("condition")]
+    public DialogueConditionDefinition? Condition { get; set; }
+}
+
+public sealed class DialogueConditionDefinition
+{
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = string.Empty;
+
+    [JsonPropertyName("item_id")]
+    public string? ItemId { get; set; }
+
+    [JsonPropertyName("faction_id")]
+    public string? FactionId { get; set; }
+
+    [JsonPropertyName("value")]
+    public int? Value { get; set; }
 }
 
 public sealed class NpcDefinition
@@ -530,6 +548,21 @@ public sealed class NpcDefinition
 
     [JsonPropertyName("stock")]
     public List<MerchantStockDefinition> Stock { get; set; } = new();
+
+    [JsonPropertyName("services")]
+    public List<NpcServiceDefinition> Services { get; set; } = new();
+}
+
+public sealed class NpcServiceDefinition
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = string.Empty;
+
+    [JsonPropertyName("cost")]
+    public int Cost { get; set; }
+
+    [JsonPropertyName("heal_amount")]
+    public int HealAmount { get; set; }
 }
 
 public sealed class MerchantStockDefinition

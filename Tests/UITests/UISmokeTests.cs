@@ -36,6 +36,9 @@ public sealed class UISmokeTests : ITestSuite
         registry.Add("UI.Rest stops immediately at full HP or visible hostile", RestStopsImmediatelyAtFullHpOrVisibleHostile);
         registry.Add("UI.Minimap reflects explored tiles and gameplay toggles", MinimapReflectsExplorationAndToggles);
         registry.Add("UI.MainMenu character creation affects the starting run", MainMenuCharacterCreationAffectsStartingRun);
+        registry.Add("UI.GameOverScreen new build opens character creation", GameOverNewBuildOpensCharacterCreation);
+        registry.Add("UI.GameManager creates each archetype package once", ArchetypePackagesAreNotDuplicated);
+        registry.Add("UI.GameManager gives first-delve guidance once per run", GameManagerEmitsFirstDelveGuidanceOnce);
         registry.Add("UI.GameManager enemy turns resolve after player action", GameManagerEnemyTurnsResolveAfterPlayerAction);
         registry.Add("UI.Inventory keyboard navigation emits concrete actions", InventoryEmitsConcreteActions);
         registry.Add("UI.Inventory exposes auto-equip toggle state", InventoryExposesAutoEquipToggleState);
@@ -57,7 +60,7 @@ public sealed class UISmokeTests : ITestSuite
         registry.Add("UI.Overlays clamp to the viewport", OverlaysClampToViewport);
         registry.Add("UI.Workbench windows content for small viewports", WorkbenchWindowsContentForSmallViewports);
         registry.Add("UI.MainMenu scrolls option list within the viewport", MainMenuScrollsOptionListWithinViewport);
-        registry.Add("UI.MainMenu fits all choices at normal viewport", MainMenuFitsAllChoicesAtNormalViewport);
+        registry.Add("UI.MainMenu renders selected choices at normal viewport", MainMenuFitsAllChoicesAtNormalViewport);
         registry.Add("UI.MainMenu visual option rows fit their card", MainMenuVisualOptionRowsFitTheirCard);
         registry.Add("UI.Dialog and shop overlays route interaction flow", DialogAndShopOverlaysRouteInteractionFlow);
         registry.Add("UI.Shop applies perk-based merchant discounts", ShopAppliesPerkDiscounts);
@@ -234,13 +237,15 @@ public sealed class UISmokeTests : ITestSuite
         Expect.NotNull(hpLabel, "HUD should dedicate a primary label to HP.");
         Expect.NotNull(hpBar, "HUD should dedicate a progress bar to HP.");
         Expect.NotNull(headerLabel, "HUD should keep non-HP status in its own label.");
-        Expect.Equal("HP: 25/100", hpLabel!.Text, "Dedicated HP label should mirror the HP snapshot text.");
+        Expect.Equal("HP", hpLabel!.Text, "HP caption should not duplicate values over the bar.");
+        Expect.Equal("25/100", FindChild<Label>(panel, "HPValueLabel")!.Text, "HP values should occupy their own bounded region.");
         Expect.Equal(100d, hpBar!.MaxValue, "HP bar should use max HP as its range.");
         Expect.Equal(25d, hpBar.Value, "HP bar should use current HP as its value.");
         Expect.False(headerLabel!.Text.Contains("HP:"), "Energy/Floor/Turn label should not duplicate HP text.");
         AssertColor(UiStyle.BloodRed(), hud.HPColor, "Low HP should use the gothic blood-red HUD danger tint.");
         AssertColor(UiStyle.Parchment(), headerLabel.Modulate, "Energy/Floor/Turn label should keep the parchment tint instead of inheriting HP danger color.");
-        AssertColor(UiStyle.GoldTrim(), panel.Modulate, "HUD panel should use the shared gold-trim chrome.");
+        AssertColor(UiStyle.GoldTrim(), panel.SelfModulate, "HUD panel should use the shared gold-trim chrome.");
+        AssertColor(Colors.White, panel.Modulate, "HUD chrome must not tint descendant text or HP bars.");
 
         var before = hud.MinimapText;
         hud.ToggleMinimap();
@@ -258,6 +263,54 @@ public sealed class UISmokeTests : ITestSuite
 
         Expect.True(feedback.Any(item => item.WasBlocked && item.Message.Contains("Blocked", System.StringComparison.Ordinal)), "Blocked validation failures should emit clear action feedback.");
         Expect.True(feedback.Any(item => !item.WasBlocked && item.Result == ActionResult.Success && item.Message.Contains("Waiting", System.StringComparison.Ordinal)), "Successful player actions should emit action feedback from outcome log data.");
+    }
+
+    private static void GameManagerEmitsFirstDelveGuidanceOnce()
+    {
+        var saveManager = new StubSaveManager();
+        var bus = new EventBus();
+        var guidance = new List<string>();
+        bus.LogMessage += (message, _) =>
+        {
+            if (message.StartsWith("Tip:", System.StringComparison.Ordinal)
+                || message.StartsWith("Objective:", System.StringComparison.Ordinal)
+                || message.StartsWith("Stairs found:", System.StringComparison.Ordinal))
+            {
+                guidance.Add(message);
+            }
+        };
+
+        var gameManager = new GameManager();
+        gameManager.AttachServices(new WorldState(), new TurnScheduler(), new StubGenerator(), new FOVCalculator(), new StubContentDatabase(), saveManager, bus);
+        gameManager.StartNewGame(1776);
+
+        Expect.True(guidance.Any(message => message.Contains("Move", System.StringComparison.Ordinal) && message.Contains("attack", System.StringComparison.Ordinal)), "A new run should explain movement and bump attacks.");
+        Expect.True(guidance.Any(message => message.Contains("G", System.StringComparison.Ordinal) && message.Contains("pick up", System.StringComparison.Ordinal)), "A new run should explain pickup input.");
+        Expect.True(guidance.Any(message => message.Contains("F", System.StringComparison.Ordinal) && message.Contains("interact", System.StringComparison.Ordinal)), "A new run should explain interaction input.");
+        Expect.True(guidance.Any(message => message.StartsWith("Objective:", System.StringComparison.Ordinal)), "A new run should state the stairs objective.");
+        var guidanceAfterStart = guidance.Count;
+
+        gameManager.World!.MoveEntity(gameManager.World.Player.Id, new Position(8, 8));
+        Expect.Equal(ActionResult.Success, gameManager.ProcessPlayerAction(new DescendAction(gameManager.World.Player.Id)).Result, "The test run should descend through the known stub stairs.");
+        Expect.True(guidance.Count <= guidanceAfterStart + 1, "Stair guidance should be emitted at most once during floor travel.");
+        Expect.True(guidance.Count(message => message.StartsWith("Stairs found:", System.StringComparison.Ordinal)) <= 1, "Stair guidance should be one-shot.");
+
+        Expect.True(gameManager.SaveToSlot(1), "The run should save before the load guidance check.");
+        var loadedGuidance = new List<string>();
+        var loadedBus = new EventBus();
+        loadedBus.LogMessage += (message, _) =>
+        {
+            if (message.StartsWith("Tip:", System.StringComparison.Ordinal)
+                || message.StartsWith("Objective:", System.StringComparison.Ordinal)
+                || message.StartsWith("Stairs found:", System.StringComparison.Ordinal))
+            {
+                loadedGuidance.Add(message);
+            }
+        };
+        var loaded = new GameManager();
+        loaded.AttachServices(new WorldState(), new TurnScheduler(), new StubGenerator(), new FOVCalculator(), new StubContentDatabase(), saveManager, loadedBus);
+        Expect.True(loaded.LoadFromSlot(1), "The saved run should load successfully.");
+        Expect.Equal(0, loadedGuidance.Count, "Loading a run should not replay first-delve guidance.");
     }
 
     private static void HudStatusIconsAppearWhenPlayerHasEffects()
@@ -517,7 +570,8 @@ public sealed class UISmokeTests : ITestSuite
 
         Expect.True(input.HandleKey(Key.Z), "Z should start rest-until-healed during gameplay.");
 
-        Expect.Equal(64, turnsStarted, "Rest should process each wait through GameManager.ProcessPlayerAction until the safety cap when no passive healing exists.");
+        Expect.Equal(10, turnsStarted, "Rest should process 1-HP recovery waits through GameManager.ProcessPlayerAction until the player reaches full HP.");
+        Expect.Equal(context.Player.Stats.MaxHP, context.Player.Stats.HP, "Rest should stop after recovery reaches full HP.");
         Expect.Equal(new Position(3, 2), context.Player.Position, "Rest should wait in place.");
     }
 
@@ -813,6 +867,10 @@ public sealed class UISmokeTests : ITestSuite
             Expect.True(inventory.GridMarkup.Contains("[lb]R[rb]"), "Inventory grid markup should include a BBCode-safe rarity marker.");
             Expect.True(inventory.GridMarkup.Contains(UiStyle.LegendaryHex), "Inventory grid should use the shared gold accent for selected slots and headers.");
             Expect.True(inventory.GridText.Contains("▤"), "Scrolls should use a stable category glyph instead of a display-name initial.");
+            Expect.False(tooltip.Visible, "Inventory details should not open a duplicate tooltip over the modal.");
+            context.Content.TryGetItemTemplate("scroll_fireball", out var tooltipTemplate);
+            tooltip.ShowItemTooltip(tooltipTemplate, new ItemInstance { TemplateId = "scroll_fireball", IsIdentified = true },
+                tooltip.ResolveBottomRightPosition(viewportSize));
             Expect.True(tooltip.TitleText.Contains("[R]"), "Item tooltip title text should expose a non-color rarity marker.");
             Expect.True(tooltip.TitleMarkup.Contains("[lb]R[rb]"), "Item tooltip title markup should include a BBCode-safe rarity marker.");
             Expect.True(tooltip.BodyText.Contains("Rarity: [R] Rare"), "Item tooltips should expose rarity details with a non-color marker.");
@@ -820,7 +878,8 @@ public sealed class UISmokeTests : ITestSuite
             Expect.True(tooltip.TitleMarkup.Contains("[color="), "Item tooltip titles should be colorized by rarity.");
             Expect.True(tooltip.TitleMarkup.Contains(UiStyle.RareHex), "Rare item tooltip titles should use the Diablo-style rare blue.");
             Expect.Equal("[C]", ItemRarityPresentation.ResolveBracketedAbbreviation("common"), "Common rarity should use the stable [C] marker.");
-            AssertColor(UiStyle.GoldTrim(), ((Panel)tooltip.Children[0]).Modulate, "Tooltip panel should use the shared carved gold trim.");
+            AssertColor(UiStyle.GoldTrim(), ((Panel)tooltip.Children[0]).SelfModulate, "Tooltip panel should use the shared carved gold trim.");
+            AssertColor(Colors.White, ((Panel)tooltip.Children[0]).Modulate, "Tooltip chrome must preserve authored rarity and text colors.");
             Expect.Equal(new Vector2(viewportSize.X - tooltip.Size.X - 24f, viewportSize.Y - tooltip.Size.Y - 24f), tooltip.ScreenPosition,
                 "Inventory comparison and detail tooltips should anchor to the bottom-right corner of the viewport.");
         });
@@ -909,10 +968,11 @@ public sealed class UISmokeTests : ITestSuite
             Expect.True(ApproxTextWidth(headerStats!.Text) <= headerStats.Size.X + 0.1f, "Inventory header stats should fit their allocated width.");
             Expect.True(ApproxTextWidth(sortLabel!.Text) <= sortLabel.Size.X + 0.1f, "Inventory sort label should fit its allocated width.");
 
-            foreach (var line in inventory.DescriptionText.Split('\n'))
-            {
-                Expect.True(line.Length <= 46, "Inventory description lines should be clipped before they can overlap adjacent UI.");
-            }
+            var detail = FindChild<RichTextLabel>(panel!, "DescriptionLabel")!;
+            Expect.False(detail.FitContent, "Inventory detail must not grow to its content minimum height.");
+            Expect.True(detail.ScrollActive, "Full item descriptions must remain readable through scrolling.");
+            var header = FindChild<ColorRect>(panel!, "HeaderBar")!;
+            Expect.True(detail.Position.Y >= header.Position.Y + header.Size.Y, "Details must start below the inventory header.");
 
             foreach (var plainLine in StripBbcode(inventory.GridMarkup).Split('\n'))
             {
@@ -985,6 +1045,43 @@ public sealed class UISmokeTests : ITestSuite
         Expect.True(inventory?.Items.Any(item => item.TemplateId == "item_arrows_bundle") == true, "Ranger should start with arrows in the pack.");
     }
 
+    private static void ArchetypePackagesAreNotDuplicated()
+    {
+        var expectedPackages = new[]
+        {
+            new[] { "potion_health", "potion_health", "potion_health", "potion_health", "item_shield_basic" },
+            new[] { "potion_health", "potion_health", "potion_health", "item_arrows_bundle" },
+            new[] { "potion_health", "potion_health", "potion_health", "item_smoke_bomb" },
+            new[] { "potion_health", "potion_health", "scroll_fireball", "scroll_frost_nova", "potion_mana" },
+        };
+
+        for (var index = 0; index < expectedPackages.Length; index++)
+        {
+            var manager = new GameManager();
+            var bus = new EventBus();
+            manager.AttachServices(new WorldState(), new TurnScheduler(), new StubGenerator(), new FOVCalculator(), new StubContentDatabase(), new StubSaveManager(), bus);
+            var menu = new MainMenu();
+            menu.Bind(manager, bus);
+            menu.HandleKey(Key.Down);
+            menu.HandleKey(Key.Down);
+            for (var selection = 0; selection < index; selection++)
+            {
+                menu.HandleKey(Key.Right);
+            }
+
+            menu.HandleKey(Key.Up);
+            menu.HandleKey(Key.Up);
+            menu.HandleKey(Key.Enter);
+            var inventory = manager.World!.Player.GetComponent<InventoryComponent>()!;
+            foreach (var itemId in expectedPackages[index])
+            {
+                var expectedCount = expectedPackages[index].Count(candidate => candidate == itemId);
+                var actualCount = inventory.Items.Where(item => item.TemplateId == itemId).Sum(item => item.StackCount);
+                Expect.Equal(expectedCount, actualCount, $"{itemId} should appear once per authored archetype package.");
+            }
+        }
+    }
+
     private static void HelpOverlayOpensFromMenuAndGameplay()
     {
         var context = CreateContext();
@@ -1010,7 +1107,7 @@ public sealed class UISmokeTests : ITestSuite
 
         Expect.True(menu.MenuText.Contains("Resume Run"), "Pause menu should label the primary return action clearly.");
         Expect.True(menu.MenuText.Contains("Save: Slot 1"), "Pause menu should group save choices with explicit labels.");
-        Expect.True(menu.MenuText.Contains("Review Character"), "Pause menu should identify review tools separately from save actions.");
+        Expect.True(menu.Options.Any(option => option.Contains("Review Character")), "Pause menu should retain review tools even when its first visible window contains save actions.");
         Expect.True(menu.MenuText.Contains("Expedition command is paused"), "Pause menu body should explain the current modal state.");
     }
 
@@ -1073,7 +1170,8 @@ public sealed class UISmokeTests : ITestSuite
 
         Expect.True(log.Children.Count > 0 && log.Children[0] is Control, "Combat log should create a visible console panel.");
         Expect.True(log.RenderedText.Contains("Console live."), "Combat log should keep rendering live updates from the event stream.");
-        AssertColor(UiStyle.GoldTrim(0.88f), ((Panel)log.Children[0]).Modulate, "Combat log should use muted gold chrome.");
+        AssertColor(UiStyle.GoldTrim(0.88f), ((Panel)log.Children[0]).SelfModulate, "Combat log should use muted gold chrome.");
+        AssertColor(Colors.White, ((Panel)log.Children[0]).Modulate, "Combat log chrome must preserve category colors.");
     }
 
     private static void ChestInteractionsReportLootToCombatLog()
@@ -1306,6 +1404,12 @@ public sealed class UISmokeTests : ITestSuite
             root.AddChild(help);
             help.OpenGameplayHelp();
             AssertOverlayFits(help, viewportSize, "Help overlay");
+            var helpPanel = FindChild<Panel>(help, "Panel");
+            Expect.NotNull(helpPanel, "Help should expose its containment panel.");
+            Expect.True(helpPanel!.Position.X >= 0f && helpPanel.Position.Y >= 0f
+                && helpPanel.Position.X + helpPanel.Size.X <= viewportSize.X + 0.1f
+                && helpPanel.Position.Y + helpPanel.Size.Y <= viewportSize.Y + 0.1f,
+                "Help panel should remain contained on compact screens.");
         });
     }
 
@@ -1359,8 +1463,10 @@ public sealed class UISmokeTests : ITestSuite
                 menu.HandleKey(Key.Down);
             }
 
-            Expect.True(menu.MenuText.Contains("Start Game", System.StringComparison.Ordinal), "Normal-sized main menu should keep the first choice visible instead of scrolling on selection changes.");
             Expect.True(menu.MenuText.Contains("> Quit", System.StringComparison.Ordinal), "Normal-sized main menu should keep the bottom choice visible at the same time.");
+            var options = FindChild<ColorRect>(FindChild<Panel>(menu, "Panel")!, "OptionsCard")!;
+            Expect.True(options.Children.OfType<Panel>().Any(row => row.Children.OfType<Label>().Any(label => label.Text.Contains("▶ Quit"))),
+                "Selected Quit must have a rendered row, not merely appear in the snapshot.");
             var panel = FindChild<Panel>(menu, "Panel");
             Expect.NotNull(panel, "Main menu should still create a panel at normal viewport size.");
             Expect.True(panel!.Size.Y > 600f, "Normal-sized main menu should use available height to fit all choices.");
@@ -1394,6 +1500,8 @@ public sealed class UISmokeTests : ITestSuite
                 var label = FindChild<Label>(row, "RowLabel");
                 Expect.NotNull(label, $"{row.Name} should include a text label.");
                 Expect.True(label!.Position.X + label.Size.X <= row.Size.X + 0.1f, $"{row.Name} label should fit inside its row.");
+                Expect.True(label.Position.Y + label.Size.Y <= row.Size.Y + 0.1f, $"{row.Name} label should fit vertically inside its row.");
+                Expect.True(label.ClipText, "Rows must constrain real Godot text minimum width.");
             }
         });
     }
@@ -1738,6 +1846,23 @@ public sealed class UISmokeTests : ITestSuite
         context.GameManager.World!.Player.Stats.HP = 0;
         context.Bus.EmitTurnCompleted();
         Expect.True(root.GameOverScreen.Visible, "A dead player should open the game over overlay on the next turn update");
+    }
+
+    private static void GameOverNewBuildOpensCharacterCreation()
+    {
+        var context = CreateContext();
+        context.GameManager.LoadWorld(context.World);
+        var root = new UIRoot();
+        root.BindServices(context.GameManager, context.Bus, context.Content);
+        root.MainMenu.Close();
+        root.GameOverScreen.Open(new RunStats("Rook", 1, 10, 1, 0, 1, 0, 1337, "Goblin", string.Empty, 0));
+
+        root._UnhandledInput(new InputEventKey { Pressed = true, PhysicalKeycode = Key.Down });
+        root._UnhandledInput(new InputEventKey { Pressed = true, PhysicalKeycode = Key.Enter });
+
+        Expect.True(root.MainMenu.Visible, "New Build should return to the character build menu.");
+        Expect.False(root.GameOverScreen.Visible, "New Build should close the game-over overlay.");
+        Expect.Equal(GameManager.GameState.Playing, context.GameManager.CurrentState, "New Build should not use the retry or main-menu state transition.");
     }
 
     private static void DialogAndShopOverlaysRouteInteractionFlow()

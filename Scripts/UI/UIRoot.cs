@@ -73,6 +73,8 @@ public partial class UIRoot : CanvasLayer
 
     public TargetingOverlay TargetingOverlay { get; } = new();
 
+    public AbilityPalette AbilityPalette { get; } = new();
+
     public ExaminePanel ExaminePanel { get; } = new();
 
     public InputHandler InputHandler { get; } = new();
@@ -110,6 +112,7 @@ public partial class UIRoot : CanvasLayer
         Inventory.OpenStateChanged += RefreshInputGate;
         CharacterSheet.Bind(_gameManager, _eventBus, _content);
         LevelUpOverlay.Bind(_gameManager);
+        DialogUI.Bind(_gameManager, _eventBus);
         DialogUI.ShopRequested -= OpenShopFromDialog;
         DialogUI.ShopRequested += OpenShopFromDialog;
         ShopUI.Bind(_gameManager, _eventBus, _content);
@@ -128,6 +131,7 @@ public partial class UIRoot : CanvasLayer
         DebugConsole.Bind(_gameManager, _eventBus, _content);
         DebugOverlay.Bind(_gameManager, _eventBus);
         TargetingOverlay.Bind(_gameManager, _eventBus, _content);
+        AbilityPalette.Bind(_gameManager, _eventBus, _content, TargetingOverlay);
         ExaminePanel.Bind(_gameManager, _content);
         InputHandler.Bind(_gameManager, _eventBus);
         CombatLog.RefreshConsole();
@@ -154,6 +158,8 @@ public partial class UIRoot : CanvasLayer
 
         GameOverScreen.RetryRequested -= RetryCurrentSeed;
         GameOverScreen.RetryRequested += RetryCurrentSeed;
+        GameOverScreen.NewBuildRequested -= OpenNewBuild;
+        GameOverScreen.NewBuildRequested += OpenNewBuild;
         GameOverScreen.MainMenuRequested -= OpenMainMenu;
         GameOverScreen.MainMenuRequested += OpenMainMenu;
 
@@ -175,6 +181,8 @@ public partial class UIRoot : CanvasLayer
         InputHandler.ToolsRequested += ToggleDevTools;
         InputHandler.ExamineRequested -= ToggleExamine;
         InputHandler.ExamineRequested += ToggleExamine;
+        InputHandler.AbilitiesRequested -= OpenAbilityPalette;
+        InputHandler.AbilitiesRequested += OpenAbilityPalette;
         InputHandler.CombatLogFilterCycleRequested -= CombatLog.CycleFilter;
         InputHandler.CombatLogFilterCycleRequested += CombatLog.CycleFilter;
 
@@ -257,6 +265,7 @@ public partial class UIRoot : CanvasLayer
         AddIfMissing(DebugConsole);
         AddIfMissing(DebugOverlay);
         AddIfMissing(TargetingOverlay);
+        AddIfMissing(AbilityPalette);
         AddIfMissing(ExaminePanel);
         AddIfMissing(InputHandler);
     }
@@ -333,6 +342,17 @@ public partial class UIRoot : CanvasLayer
             }
 
             return handledByTargeting;
+        }
+
+        if (AbilityPalette.Visible)
+        {
+            var handledByPalette = AbilityPalette.HandleKey(key);
+            if (handledByPalette)
+            {
+                RefreshInputGate();
+            }
+
+            return handledByPalette;
         }
 
         if (ExaminePanel.IsActive)
@@ -577,6 +597,7 @@ public partial class UIRoot : CanvasLayer
         Inventory.Close();
         CharacterSheet.Close();
         LevelUpOverlay.Close();
+        AbilityPalette.Close();
         DialogUI.Close();
         ShopUI.Close();
         ChestUI.Close();
@@ -592,6 +613,7 @@ public partial class UIRoot : CanvasLayer
     {
         GameOverScreen.Close();
         ChestUI.Close();
+        AbilityPalette.Close();
         ExaminePanel.Close();
         CombatLog.RefreshConsole();
         RefreshInputGate();
@@ -623,6 +645,7 @@ public partial class UIRoot : CanvasLayer
         Inventory.Close();
         CharacterSheet.Close();
         LevelUpOverlay.Close();
+        AbilityPalette.Close();
         DialogUI.Close();
         ShopUI.Close();
         ChestUI.Close();
@@ -662,6 +685,7 @@ public partial class UIRoot : CanvasLayer
         PauseMenu.Close();
         CharacterSheet.Close();
         LevelUpOverlay.Close();
+        AbilityPalette.Close();
         DialogUI.Close();
         ShopUI.Close();
         ChestUI.Close();
@@ -685,6 +709,7 @@ public partial class UIRoot : CanvasLayer
         PauseMenu.Close();
         Inventory.Close();
         LevelUpOverlay.Close();
+        AbilityPalette.Close();
         DialogUI.Close();
         ShopUI.Close();
         ChestUI.Close();
@@ -729,6 +754,7 @@ public partial class UIRoot : CanvasLayer
         }
         else
         {
+            AbilityPalette.Close();
             TargetingOverlay.Cancel();
             ExaminePanel.Close();
             PauseMenu.Open();
@@ -759,6 +785,7 @@ public partial class UIRoot : CanvasLayer
         Inventory.Close();
         CharacterSheet.Close();
         LevelUpOverlay.Close();
+        AbilityPalette.Close();
         DialogUI.Close();
         ShopUI.Close();
         ChestUI.Close();
@@ -771,6 +798,21 @@ public partial class UIRoot : CanvasLayer
     private void ToggleHelp()
     {
         HelpOverlay.ToggleForContext(MainMenu.Visible);
+        RefreshInputGate();
+    }
+
+    private void OpenAbilityPalette()
+    {
+        if (_gameManager?.CurrentState != GameManager.GameState.Playing || TargetingOverlay.IsActive)
+        {
+            return;
+        }
+
+        Inventory.Close();
+        CharacterSheet.Close();
+        LevelUpOverlay.Close();
+        ExaminePanel.Close();
+        AbilityPalette.OpenForPlayer();
         RefreshInputGate();
     }
 
@@ -813,6 +855,7 @@ public partial class UIRoot : CanvasLayer
         Inventory.Close();
         CharacterSheet.Close();
         LevelUpOverlay.Close();
+        AbilityPalette.Close();
         DialogUI.Close();
         ShopUI.Close();
         ChestUI.Close();
@@ -880,6 +923,7 @@ public partial class UIRoot : CanvasLayer
         Inventory.Close();
         CharacterSheet.Close();
         LevelUpOverlay.Close();
+        AbilityPalette.Close();
         DialogUI.Close();
         ShopUI.Close();
         ChestUI.Close();
@@ -890,6 +934,7 @@ public partial class UIRoot : CanvasLayer
         MetaShopUI.Close();
         HelpOverlay.Close();
         DevToolsWorkbench.Close();
+        AbilityPalette.Close();
         TargetingOverlay.Cancel();
         ExaminePanel.Close();
         Tooltip.Hide();
@@ -925,6 +970,11 @@ public partial class UIRoot : CanvasLayer
         }
 
         MainMenu.Open();
+    }
+
+    private void OpenNewBuild()
+    {
+        OpenMainMenu();
     }
 
     private void OpenGameOver()
@@ -995,6 +1045,7 @@ public partial class UIRoot : CanvasLayer
             && !HelpOverlay.Visible
             && !DevToolsWorkbench.Visible
             && !DebugConsole.Visible
+            && !AbilityPalette.Visible
             && !TargetingOverlay.IsActive);
         RefreshInteractionPrompt();
     }
@@ -1017,8 +1068,10 @@ public partial class UIRoot : CanvasLayer
             || FloorSummaryUI.Visible
             || HelpOverlay.Visible
             || DevToolsWorkbench.Visible
-            || DebugConsole.Visible;
+            || DebugConsole.Visible
+            || AbilityPalette.Visible;
 
+        HUD.Visible = !suppressGameplayChrome;
         Minimap.SetSuppressed(suppressGameplayChrome);
         QuickSlotHotbar.SetSuppressed(suppressGameplayChrome || TargetingOverlay.IsActive);
         CombatLog.SetSuppressed(suppressGameplayChrome);
@@ -1044,6 +1097,7 @@ public partial class UIRoot : CanvasLayer
             || HelpOverlay.Visible
             || DevToolsWorkbench.Visible
             || DebugConsole.Visible
+            || AbilityPalette.Visible
             || TargetingOverlay.IsActive)
         {
             _currentPromptAction = InteractionPromptAction.None;

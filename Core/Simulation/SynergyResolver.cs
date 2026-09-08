@@ -75,6 +75,63 @@ public static class SynergyResolver
         }
     }
 
+    public static int ProcessOutgoingDamage(
+        IEntity attacker,
+        IContentDatabase? content,
+        int damage,
+        ICollection<string>? logMessages = null)
+    {
+        if (content is null || damage <= 0)
+        {
+            return damage;
+        }
+
+        var result = damage;
+        foreach (var synergy in GetActiveSynergies(attacker, content))
+        {
+            if (!string.Equals(synergy.BonusEffectType, "damage_bonus", StringComparison.Ordinal)
+                || synergy.BonusValue <= 0)
+            {
+                continue;
+            }
+
+            result += synergy.BonusValue;
+            logMessages?.Add($"{synergy.DisplayName} adds {synergy.BonusValue} damage.");
+        }
+
+        return result;
+    }
+
+    public static void ProcessEnemyKill(
+        IEntity killer,
+        IEntity victim,
+        IContentDatabase? content,
+        ICollection<string>? logMessages = null)
+    {
+        if (content is null || victim.GetComponent<EnemyComponent>() is null)
+        {
+            return;
+        }
+
+        foreach (var synergy in GetActiveSynergies(killer, content))
+        {
+            if (!string.Equals(synergy.BonusEffectType, "heal", StringComparison.Ordinal)
+                || synergy.BonusValue <= 0)
+            {
+                continue;
+            }
+
+            var healed = Math.Min(synergy.BonusValue, Math.Max(0, killer.Stats.MaxHP - killer.Stats.HP));
+            if (healed <= 0)
+            {
+                continue;
+            }
+
+            killer.Stats.HP += healed;
+            logMessages?.Add($"{synergy.DisplayName} restores {healed} HP.");
+        }
+    }
+
     private static void ApplyPassive(SynergyDefinition synergy, IEntity player)
     {
         if (!string.Equals(synergy.BonusEffectType, "stat_mod", StringComparison.Ordinal))

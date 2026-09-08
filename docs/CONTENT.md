@@ -25,6 +25,12 @@ The project uses flat JSON documents under `Content/` as the source of truth for
 
 `ContentLoader` expects the runtime gameplay files to exist and will fail loading if any are missing. `meta_upgrades.json` is loaded by the Godot-side `MetaProgressionManager` because it belongs to between-run state rather than deterministic floor simulation.
 
+### Replayability Status - 2026-09-08
+
+- Perk levels create deterministic three-option drafts. Draft IDs are save-facing; legacy saves without them use the available full-list fallback. The runtime applies the `heal_on_kill` and flat `damage_bonus` synergy effects. `echo_bonus` is recognized metadata but remains unsupported.
+- `daily_modifiers.json` currently has one authored modifier with live scoring behavior: Thursday's speed-score modifier. Other declared daily modifiers are validated content but remain unsupported/upcoming. Daily attempts and best scores are persisted by the Godot-side challenge manager.
+- `ascension_modifiers.json` defines the 0-10 ladder, but only effects wired by runtime are active. The first-clear gate and unlock are idempotent; do not describe the catalog as ten implemented modifiers.
+
 ## File Roles
 
 - `items.json` defines item metadata, stats, use effects, rarity, requirements, stacking, and visuals.
@@ -37,7 +43,7 @@ The project uses flat JSON documents under `Content/` as the source of truth for
 - `perks.json` defines progression perk metadata and effects.
 - `relics.json` defines passive relic templates and hook metadata used by the relic processor.
 - `floor_events.json` defines safe-floor, boss-floor, shrine, curse-room, and vault event metadata.
-- `synergies.json` defines build-combination hints and passive effects from relics, perks, archetypes, and item tags.
+- `synergies.json` defines build-combination hints and passive effects from relics, perks, archetypes, and item tags. Heal-on-kill and flat damage-bonus effects are live; `echo_bonus` remains unsupported.
 - `ascension_modifiers.json` defines the 0-10 challenge ladder modifiers available after the first full clear.
 - `daily_modifiers.json` defines the weekday-specific daily challenge modifiers layered over the deterministic daily seed.
 - `narrative_templates.json` defines deterministic epitaph sentence templates for run history and death screens.
@@ -98,6 +104,8 @@ Item `tags` are projected into runtime templates and are used by synergy detecti
 
 Item `stats` must map to runtime-supported equipment or item-use behavior. Supported authored keys are `damage_min`, `damage_max`, `accuracy`, `speed_modifier`, `crit_chance`, `defense`, `evasion`, `fov_bonus`, `attack`, `hp`, and `max_hp`. Passive item effects are not currently supported by runtime simulation and should not be authored until their action is implemented.
 
+Every item `sprite_path` is projected into `ItemTemplate.SpritePath`, then used by inventory and visible ground-pile rendering. Paths resolve through cached Godot texture loading with source-image fallback; a missing/blank/unloadable path falls back to the existing category glyph. This is presentation metadata only and is not duplicated into item-instance saves.
+
 Consumable authoring rules:
 
 - `on_use` healing effects should use the supported heal shape/amount expected by `ContentLoader` so runtime item templates receive a concrete heal value.
@@ -139,6 +147,8 @@ Enemy speed values should stay on the engine's current 100-based scale.
 
 The `boss` tag controls random spawn eligibility: boss markers use only boss-tagged templates at the actual depth, while ordinary markers exclude them. A valid fixed spawn template ID remains an explicit override of both depth and marker restrictions. Unknown fixed IDs use the matching random pool, and empty pools produce no enemy rather than a deeper/ordinary fallback.
 
+Selected established enemy roles remain eligible after their original depth bands to avoid a late-pool collapse: Orc Brute, Shadow Stalker, Flame Elemental, Cultist Healer, and Magma Wisp extend to depth 99. This is a role-diversity correction using existing content; starter rats/goblins and boss eligibility remain unchanged.
+
 Boss enemies may declare `boss_phase_data`. Each phase entry includes `phase`, `threshold` as an HP fraction, optional `ability_id`, `stat_boost`, `status_effect`, and `message`. Referenced abilities and statuses must exist; triggered phase state persists in save version 16. The current catalog includes the phased `boss_magma_titan`.
 
 ### Abilities And Status Effects
@@ -151,7 +161,7 @@ Status-effect runtime behavior currently includes authored corroded stacking up 
 
 Ability, consumable, and melee/ranged weapon status application all honor authored `stackable`, `max_stacks`, and `refresh_duration` rules. In particular, repeated poison applications do not add stacks when authored non-stackable, and stun/frozen applications do not extend duration when refresh is disabled. Content-free test worlds retain legacy fallbacks.
 
-Daily modifier `effect_type` values are validated against `shop_discount`, `elite_every_floor`, `curse_every_floor`, `speed_score`, `starting_relic`, `boss_hp_boost`, and `double_rewards`. Status tick effects may use `damage` or `heal`; only damage ticks require a valid damage type.
+Daily modifier `effect_type` values are validated against `shop_discount`, `elite_every_floor`, `curse_every_floor`, `speed_score`, `starting_relic`, `boss_hp_boost`, and `double_rewards`. Thursday's authored `speed_score` modifier is currently wired; the other validated modifier types remain unsupported/upcoming. Status tick effects may use `damage` or `heal`; only damage ticks require a valid damage type.
 
 `chain_lightning` is an authored lightning ability with a deterministic runtime special case: it starts from the authored AoE candidate set and resolves up to three nearest hostile targets to the selected tile.
 
@@ -162,6 +172,16 @@ Chest-specific loot tables should not contain no-drop entries. `chest_loot` and 
 Merchant stock is authored on NPC definitions in `npcs.json`. Stock entries must reference existing item IDs and use positive price/quantity values. Prefer a spread of recovery items, scrolls, armor, and weapons so vendors provide build correction rather than only one starter weapon and potion.
 
 ### NPC Dialogs
+
+The roster is depth-gated: Quartermaster Vale (0-2), Chronicler Sen (0-4), Sister Ilex (3-6), and Cinder Broker Orin (7-99). The existing two-NPC cap and placement safety rules still apply. New NPCs appear only on newly generated floors; cached floors are not repopulated.
+
+Every dialog option must specify exactly one `next` or `action`. Supported actions are `close`, `shop`, `report` (a read-only expedition assessment), and `service:<id>`. Shop actions require authored merchant stock; service references must be authorized by every NPC using the graph. Each authored node retains an unconditional exit.
+
+Options can have one optional `condition`: `{ "type": "injured" }`, `{ "type": "missing_item", "item_id": "potion_health" }`, or `{ "type": "reputation_at_least", "faction_id": "warriors_order", "value": 20 }`. References and fields are validated; unknown types are errors. Available option numbering is derived from the same filtered list used for activation. Conditions do not store hidden conversation state.
+
+NPC definitions may include `services`, currently supporting `{ "id": "field_dressing", "cost": 12, "heal_amount": 15 }`. Cost/healing must be positive. Treatment requires an injured living player beside the living neutral provider and sufficient gold, heals up to the authored amount, and consumes one normal action. Vale charges 12 gold for up to 15 HP; Ilex charges 18 for up to 25 HP; Orin charges 22 for up to 30 HP. It is not a pause or a cure for harmful statuses.
+
+Do not describe `potion_mana` as MP recovery: it applies its authored infusion/haste effect and the simulation has no MP resource.
 
 Dialog definitions require `start_node` for compatibility. They may also provide `start_nodes`, a list of valid node IDs that `DialogUI` rotates through on repeated openings for greeting variety. Every start node and option `next` target must exist in the same dialog graph. Keep shop-opening options authored with `action: "shop"` and close options with `action: "close"`.
 
@@ -196,9 +216,9 @@ When a floor has at least four theme-matching prefabs that fit the BSP leaves, t
 
 The run's initial depth (`0`) uses depth-one prefab eligibility. A fitting room tagged `start` is reserved for the first BSP leaf when available. Each generated attempt also derives one floor profile from its seed and reserves a non-start room carrying one of the existing `combat`, `loot`, `hazard`, `open`, or `ambush` tags when a fitting prefab exists. Within fitting theme/role pools, the placer uses every available prefab ID before repeating one. These rules make functional tags affect both coherent depth themes and seed-specific floor character without requiring seed-specific content files.
 
-When a room has `lock_doors_on_enter: true` (typically arenas, vaults, or boss rooms), the generator converts its connecting door tiles into locked doors and attempts to place one `dungeon_key` per locked room in reachable non-locked rooms. The player must pick up a key and use it via `OpenDoorAction` to unlock a door permanently. Candidate exhaustion remains a known generation validation gap.
+When a room has `lock_doors_on_enter: true` (typically arenas, vaults, or boss rooms), the generator converts its connecting door tiles into locked doors and places one `dungeon_key` per locked room in reachable non-locked rooms. Generation validation rejects under-provisioned reachable keys; candidate exhaustion remains a genuine risk when authored landmark/depth constraints leave too few valid candidates.
 
-Functional tags such as `boss`, `shrine`, and `curse` can be requested by floor-event planning and take priority over the seed-derived floor profile. Placement is currently best-effort, and shrine/curse spawn semantics are not yet fully projected into generated world entities.
+Functional tags such as `boss`, `shrine`, and `curse` can be requested by floor-event planning and take priority over the seed-derived floor profile. Landmark metadata carries the requested identity and deterministic fallback when a fitting prefab is unavailable; requested landmark depth semantics remain a follow-up where authored constraints exceed that fallback. Placed `shrine` points become entities using the resolved event ID and its authored `shrine_type`/`hp_cost`; `curse_chest` points become `curse_room_chest_loot` chests. These are transient level-population details, not save payloads: the resulting shrine/chest entities persist normally. Safe floors reserve one `potion_health` and one `safe_floor_merchant_stock` cache on distinct reachable nonstair tiles.
 
 ## Validation Workflow
 

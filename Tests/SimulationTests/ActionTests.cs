@@ -38,7 +38,86 @@ public sealed class ActionTests : ITestSuite
         registry.Add("Simulation.Actions open chest reports loot names in the log", OpenChestReportsLootNamesInLog);
         registry.Add("Simulation.Actions stairs validation requires matching tile", StairsValidationRequiresMatchingTile);
         registry.Add("Simulation.Actions ranged attack uses equipped ranged weapon", RangedAttackUsesEquippedRangedWeapon);
+        registry.Add("Simulation.Actions ranged attack rejects missing range and blocked line of sight", RangedAttackRejectsMissingRangeAndBlockedLineOfSight);
         registry.Add("Simulation.Actions shrine use raises thieves reputation", ShrineUseRaisesThievesReputation);
+        registry.Add("Simulation.Actions wait restores one HP when wounded", WaitRestoresOneHpWhenWounded);
+        registry.Add("Simulation.Actions wait does not heal full health", WaitDoesNotHealFullHealth);
+        registry.Add("Simulation.Actions wait does not heal through harmful status", WaitDoesNotHealThroughHarmfulStatus);
+        registry.Add("Simulation.Actions wait does not revive dead actor", WaitDoesNotReviveDeadActor);
+        registry.Add("Simulation.Actions wait preserves deterministic random state", WaitPreservesDeterministicRandomState);
+    }
+
+    private static void WaitRestoresOneHpWhenWounded()
+    {
+        var world = CreateWorld();
+        var actor = CreateActor("Player", new Position(1, 1), Faction.Player,
+            new Stats { HP = 4, MaxHP = 10, Attack = 4, Defense = 1, Accuracy = 0, Evasion = 0, Speed = 100 });
+        world.Player = actor;
+        world.AddEntity(actor);
+
+        var outcome = new WaitAction(actor.Id).Execute(world);
+
+        Expect.Equal(ActionResult.Success, outcome.Result, "Waiting should succeed for an existing actor.");
+        Expect.Equal(5, actor.Stats.HP, "An ordinary wait should restore one missing HP.");
+        Expect.True(outcome.LogMessages.Any(message => message.Contains("recovers 1 HP", System.StringComparison.Ordinal)), "Wait healing should be logged.");
+    }
+
+    private static void WaitDoesNotHealFullHealth()
+    {
+        var world = CreateWorld();
+        var actor = CreateActor("Player", new Position(1, 1), Faction.Player);
+        world.Player = actor;
+        world.AddEntity(actor);
+
+        var outcome = new WaitAction(actor.Id).Execute(world);
+
+        Expect.Equal(10, actor.Stats.HP, "Waiting at full health should be a no-op.");
+        Expect.True(outcome.LogMessages.Any(message => message == "Waiting..."), "A no-op wait should retain its normal feedback.");
+    }
+
+    private static void WaitDoesNotHealThroughHarmfulStatus()
+    {
+        var world = CreateWorld();
+        var actor = CreateActor("Player", new Position(1, 1), Faction.Player,
+            new Stats { HP = 4, MaxHP = 10, Attack = 4, Defense = 1, Accuracy = 0, Evasion = 0, Speed = 100 });
+        world.Player = actor;
+        world.AddEntity(actor);
+        StatusEffectProcessor.ApplyEffect(actor, StatusEffectType.Poisoned, 2);
+
+        new WaitAction(actor.Id).Execute(world);
+
+        Expect.Equal(4, actor.Stats.HP, "Waiting with poison must not pre-heal before the status tick.");
+    }
+
+    private static void WaitDoesNotReviveDeadActor()
+    {
+        var world = CreateWorld();
+        var actor = CreateActor("Player", new Position(1, 1), Faction.Player,
+            new Stats { HP = 0, MaxHP = 10, Attack = 4, Defense = 1, Accuracy = 0, Evasion = 0, Speed = 100 });
+        world.Player = actor;
+        world.AddEntity(actor);
+
+        var outcome = new WaitAction(actor.Id).Execute(world);
+
+        Expect.Equal(ActionResult.Success, outcome.Result, "Waiting should retain its existing validation for a dead entity.");
+        Expect.Equal(0, actor.Stats.HP, "Waiting must never revive a dead actor.");
+    }
+
+    private static void WaitPreservesDeterministicRandomState()
+    {
+        var world = CreateWorld(77);
+        var actor = CreateActor("Player", new Position(1, 1), Faction.Player,
+            new Stats { HP = 4, MaxHP = 10, Attack = 4, Defense = 1, Accuracy = 0, Evasion = 0, Speed = 100 });
+        world.Player = actor;
+        world.AddEntity(actor);
+        var combatState = world.CombatRandomState;
+        var itemState = world.ItemRandomState;
+
+        new WaitAction(actor.Id).Execute(world);
+
+        Expect.Equal(combatState, world.CombatRandomState, "Waiting must not consume combat RNG state.");
+        Expect.Equal(itemState, world.ItemRandomState, "Waiting must not consume item RNG state.");
+        Expect.Equal(5, actor.Stats.HP, "Deterministic wait recovery should still apply after state restoration.");
     }
 
     private static void RangedAttackUsesEquippedRangedWeapon()
@@ -86,6 +165,49 @@ public sealed class ActionTests : ITestSuite
         }
 
         Expect.True(false, "No seed produced a landed ranged attack within 100 attempts");
+    }
+
+    private static void RangedAttackRejectsMissingRangeAndBlockedLineOfSight()
+    {
+        var world = CreateRangedWorld();
+        var actor = world.Player;
+        var target = world.Entities.Single(entity => entity.Faction == Faction.Enemy);
+        var action = new RangedAttackAction(actor.Id, target.Id);
+
+        target.Position = new Position(2, 1);
+        Expect.Equal(ActionResult.Blocked, action.Validate(world), "A ranged shot must reject targets inside its minimum range.");
+
+        target.Position = new Position(5, 1);
+        world.SetVisible(target.Position, true);
+        world.SetTile(new Position(3, 1), TileType.Wall);
+        Expect.Equal(ActionResult.Blocked, action.Validate(world), "A ranged shot must reject a blocked line of sight.");
+    }
+
+    private static WorldState CreateRangedWorld()
+    {
+        var content = new StubContentDatabase();
+        var items = (Dictionary<string, ItemTemplate>)content.ItemTemplates;
+        items[RangedAttackAction.ArrowTemplateId] = new(
+            RangedAttackAction.ArrowTemplateId, "Arrows", "A bundle of arrows.",
+            ItemCategory.Consumable, EquipSlot.None, new Dictionary<string, int>(), null, 0, 20, "common");
+        var bow = new ItemTemplate("bow_test", "Test Bow", "A ranged test weapon.", ItemCategory.Weapon,
+            EquipSlot.MainHand, new Dictionary<string, int>(), null, 0, 1, "common", Tags: new[] { "ranged" });
+        items[bow.TemplateId] = bow;
+
+        var world = CreateWorld(17);
+        world.ContentDatabase = content;
+        var actor = CreateActor("Archer", new Position(1, 1), Faction.Player);
+        var target = CreateActor("Target", new Position(5, 1), Faction.Enemy);
+        world.Player = actor;
+        world.AddEntity(actor);
+        world.AddEntity(target);
+        world.SetVisible(target.Position, true);
+        var inventory = actor.GetComponent<InventoryComponent>()!;
+        inventory.Add(new ItemInstance { TemplateId = RangedAttackAction.ArrowTemplateId, StackCount = 5 });
+        var bowInstance = new ItemInstance { TemplateId = bow.TemplateId };
+        inventory.Add(bowInstance);
+        Expect.True(inventory.TryEquip(bowInstance, EquipSlot.MainHand, bow.StatModifiers, out _), "Test bow should equip.");
+        return world;
     }
 
     private static void ShrineUseRaisesThievesReputation()

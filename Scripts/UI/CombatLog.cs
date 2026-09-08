@@ -383,7 +383,7 @@ public partial class CombatLog : Control
         {
             Name = "Panel",
             Size = panelSize,
-            Modulate = UiStyle.GoldTrim(0.88f),
+            SelfModulate = UiStyle.GoldTrim(0.88f),
         };
         _background = new ColorRect { Name = "Background", Color = UiStyle.PanelBlack(0.78f) };
         _fade = new ColorRect { Name = "TopFade", Color = UiStyle.PanelBlack(0.55f) };
@@ -419,7 +419,9 @@ public partial class CombatLog : Control
 
         Size = viewportSize;
         _panel.Size = panelSize;
-        _panel.Position = new Vector2(OuterMargin, viewportSize.Y - panelSize.Y - OuterMargin);
+        _panel.Position = new Vector2(OuterMargin, viewportSize.Y < 600f
+            ? OuterMargin
+            : System.Math.Max(OuterMargin, viewportSize.Y - panelSize.Y - 156f));
         _background.Position = Vector2.Zero;
         _background.Size = panelSize;
         _fade.Position = Vector2.Zero;
@@ -439,7 +441,9 @@ public partial class CombatLog : Control
 
     private static Vector2 ResolvePanelSize(Vector2 viewportSize)
     {
-        return OverlayLayoutHelper.FitPanelSize(viewportSize, new Vector2(PanelWidth, PanelHeight), OuterMargin);
+        var width = System.Math.Min(PanelWidth, System.Math.Max(220f, (viewportSize.X - 640f) * 0.5f - OuterMargin * 2f));
+        var height = System.Math.Min(PanelHeight, viewportSize.Y * 0.25f);
+        return OverlayLayoutHelper.FitPanelSize(viewportSize, new Vector2(width, height), OuterMargin);
     }
 
     private Vector2 ResolveViewportSize()

@@ -4,6 +4,8 @@ namespace Roguelike.Core;
 
 public static class ReputationService
 {
+    public const int MerchantsGuildFriendlyDiscountPercent = 10;
+
     public static void OnEnemyKilled(IEntity player, string enemyTemplateId, IContentDatabase? content)
     {
         Adjust(player, "warriors_order", enemyTemplateId.StartsWith("boss_", StringComparison.Ordinal) ? 10 : 3);
@@ -19,6 +21,19 @@ public static class ReputationService
 
     public static void OnShrineUsed(IEntity player, IContentDatabase? content) =>
         Adjust(player, "thieves_compact", 5);
+
+    public static int ResolveMerchantDiscountPercent(IEntity player, IContentDatabase? content)
+    {
+        var faction = player.GetComponent<FactionComponent>();
+        if (faction is null || content is null || !content.TryGetFaction("merchants_guild", out var definition))
+        {
+            return 0;
+        }
+
+        return faction.Get("merchants_guild") >= definition.FriendlyThreshold
+            ? MerchantsGuildFriendlyDiscountPercent
+            : 0;
+    }
 
     public static void ApplyPassiveStats(IEntity player)
     {

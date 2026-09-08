@@ -36,9 +36,17 @@
 
 ## Purpose
 
+> Identity/item-art follow-up (2026-09-08): new runs now apply archetype packages once, every class/race has player-accessible existing techniques, and authored item art appears in inventory and visible ground piles. World-space 0x72 portraits retain their source palette. Future equipment overlays and broader portrait asset coverage are tracked in the live documents rather than this historical file.
+
+> Run-pacing follow-up (2026-09-08): placed shrine/curse rooms now create their authored runtime rewards, safe floors reserve recovery, shrine relic offers survive save/load, and late floors retain more existing encounter roles. Remaining pace work is documented in the maintained tracker; historical statements that shrines/curse rooms are decorative shells are superseded.
+
+> NPC/presentation follow-up (2026-09-08): current NPCs now include conditional branching, expedition review, normal-turn field dressing, and depth-specific Ilex/Orin roles. Arrow-centric players have explicit diagonal input without changing enemy AI. The existing 0x72 renderer uses tested prison/crypt/magma palettes rather than a risky atlas replacement, and real Godot screenshots now exercise bounded UI layout. See `docs/VISUAL_VALIDATION.md` and the resume report; historical claims that NPCs are static, arrow input is sufficient, or all floors share presentation are superseded.
+
 > Enemy wiring follow-up (2026-09-08): boss markers now select depth-eligible boss-tagged templates, ordinary random slots exclude bosses, and authored enemy sprite paths drive runtime bodies through persisted template identity. Historical claims that these paths remain unwired are superseded by the live systems/content docs.
 
 > Audit follow-up (2026-09-08): save version 18 persists floor-clear reward history. Wall-occupying actor restoration, loaded content binding, authored status application, lethal-healing ordering, inventory mouse input gating, and restarted-run turn counters are corrected. See the live tracker and resume report for verification and remaining gaps.
+
+> Replayability follow-up (2026-09-08): deterministic three-option perk drafts now persist with a legacy fallback; heal-on-kill and flat damage-bonus synergies are live while `echo_bonus` remains unsupported. The nine-floor Victory contract, retryable daily state with Thursday speed scoring, ranged weapon range/LOS input, landmark/key validation, friendly merchant discount, safe waiting, and first-delve/death retry guidance are implemented. Use `docs/IMPROVEMENT_SUGGESTIONS.md` for remaining challenge-modifier, targeting, class/resource, landmark-depth, relic, and visual-shutdown work.
 
 This document is an archived point-in-time improvement spec retained for historical context. It was written for parallel subagents, but current work must use `docs/IMPROVEMENT_SUGGESTIONS.md` and verify every claim against the live repository.
 

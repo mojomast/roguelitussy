@@ -14,6 +14,7 @@ public sealed class CharacterUXTests : ITestSuite
     {
         registry.Add("UX.Stat preview updates reactively in character creation", StatPreviewUpdatesReactively);
         registry.Add("UX.Stat preview matches expected base plus bonuses", StatPreviewMatchesExpected);
+        registry.Add("UX.Archetype previews and spawned base stats stay aligned", ArchetypePreviewMatchesSpawnedStats);
         registry.Add("UX.Identity preview tile updates with character choices", IdentityPreviewTileUpdates);
         registry.Add("UX.Graphical identity preview updates with character choices", GraphicalIdentityPreviewUpdates);
         registry.Add("UX.Main menu body stays compact when graphical preview is present", MainMenuBodyStaysCompact);
@@ -81,6 +82,47 @@ public sealed class CharacterUXTests : ITestSuite
         Expect.True(preview.Contains("EVA: 8"), $"Expected EVA 8 in preview. Got: {preview}");
         Expect.True(preview.Contains("SPD: 90"), $"Expected SPD 90 in preview. Got: {preview}");
         Expect.True(preview.Contains("VR: 7"), $"Expected VR 7 in preview. Got: {preview}");
+    }
+
+    private static void ArchetypePreviewMatchesSpawnedStats()
+    {
+        var expected = new[]
+        {
+            (Hp: 58, Attack: 8, Defense: 7, Accuracy: 75, Evasion: 8, Speed: 90, View: 7),
+            (Hp: 43, Attack: 10, Defense: 4, Accuracy: 95, Evasion: 18, Speed: 110, View: 10),
+            (Hp: 38, Attack: 9, Defense: 3, Accuracy: 85, Evasion: 22, Speed: 120, View: 9),
+            (Hp: 36, Attack: 6, Defense: 3, Accuracy: 90, Evasion: 12, Speed: 100, View: 9),
+        };
+
+        for (var index = 0; index < expected.Length; index++)
+        {
+            var gameManager = new GameManager();
+            var bus = new EventBus();
+            gameManager.AttachServices(new WorldState(), new TurnScheduler(), new StubGenerator(), new FOVCalculator(), new StubContentDatabase(), new StubSaveManager(), bus);
+            var menu = new MainMenu();
+            menu.Bind(gameManager, bus);
+            menu.HandleKey(Key.Down);
+            menu.HandleKey(Key.Down);
+            for (var selection = 0; selection < index; selection++)
+            {
+                menu.HandleKey(Key.Right);
+            }
+
+            var preview = menu.BuildStatPreview();
+            menu.HandleKey(Key.Up);
+            menu.HandleKey(Key.Up);
+            menu.HandleKey(Key.Enter);
+            var stats = gameManager.World!.Player.Stats;
+            var value = expected[index];
+            Expect.True(preview.Contains($"HP: {value.Hp}"), "Preview HP must use the Core archetype base once.");
+            Expect.Equal(value.Hp, stats.MaxHP, "Spawned HP must match the preview before equipment effects.");
+            Expect.Equal(value.Attack, stats.Attack, "Spawned attack must match the preview.");
+            Expect.Equal(value.Defense, stats.Defense, "Spawned base defense must match the preview before equipment effects.");
+            Expect.Equal(value.Accuracy, stats.Accuracy, "Spawned accuracy must match the preview.");
+            Expect.Equal(value.Evasion, stats.Evasion, "Spawned evasion must match the preview.");
+            Expect.Equal(value.Speed, stats.Speed, "Spawned speed must match the preview.");
+            Expect.Equal(value.View, stats.ViewRadius, "Spawned view radius must match the preview.");
+        }
     }
 
     private static void IdentityPreviewTileUpdates()
@@ -414,7 +456,7 @@ public sealed class CharacterUXTests : ITestSuite
         overlay.Open();
 
         Expect.True(overlay.SummaryText.Contains("LEVEL UP"), "Overlay should use a stronger title header.");
-        Expect.True(overlay.SummaryText.Contains("Available Perks"), "Overlay should separate the available perks list into its own section.");
+        Expect.True(overlay.SummaryText.Contains("Available Perks (Perk Draft)"), "Overlay should label the available perks section as both Available Perks and Perk Draft.");
         Expect.True(overlay.SummaryText.Contains("Selected Perk"), "Overlay should separate the selected perk details into their own section.");
         Expect.True(overlay.Children.Count > 0 && overlay.Children[0] is Panel, "Overlay should create a panel for the level-up card.");
 
@@ -470,6 +512,7 @@ public sealed class CharacterUXTests : ITestSuite
         var overlay = new HelpOverlay();
 
         overlay.OpenMainMenuHelp();
+        Expect.True(overlay.CurrentBodyText.Contains("FIRST RUN"), "Main menu help should include concise first-session guidance.");
         Expect.True(overlay.CurrentBodyText.Contains("Stat Preview"), "Main menu help should mention Stat Preview.");
         Expect.True(overlay.CurrentBodyText.Contains("Training"), "Main menu help should mention Training points.");
         Expect.True(overlay.CurrentBodyText.Contains("+3 Max HP"), "Main menu help should document exact training stat effects.");
@@ -478,6 +521,7 @@ public sealed class CharacterUXTests : ITestSuite
         Expect.True(overlay.CurrentBodyText.Contains("targeting"), "Main menu help should mention aimed scroll targeting.");
 
         overlay.OpenGameplayHelp();
+        Expect.True(overlay.CurrentBodyText.Contains("reach the stairs"), "Gameplay help should state the first objective.");
         Expect.True(overlay.CurrentBodyText.Contains("Level Up"), "Gameplay help should mention Level Up.");
         Expect.True(overlay.CurrentBodyText.Contains("Equipment comparison"), "Gameplay help should mention equipment comparison.");
     }

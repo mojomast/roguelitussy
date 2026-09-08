@@ -22,6 +22,7 @@ public sealed class SaveManagerTests : ITestSuite
         registry.Add("Persistence.SaveManager restores actors in walls after phasing expires", () => RoundTripRestoresActorsInWalls(expirePhasing: true));
         registry.Add("Persistence.WorldState spawning still rejects wall tiles", SpawningRejectsWallTiles);
         registry.Add("Persistence.SaveManager round-trips character options", RoundTripRestoresCharacterOptions);
+        registry.Add("Persistence.SaveManager preserves legacy duplicate starter packages", LegacyStarterPackageIsUntouched);
         registry.Add("Persistence.SaveValidator rejects v8 saves missing active floor", RejectsMissingActiveFloor);
         registry.Add("Persistence.SaveValidator rejects v8 saves with duplicate player across floors", RejectsDuplicatePlayerAcrossFloors);
         registry.Add("Persistence.SaveValidator rejects v8 saves with duplicate floor depths", RejectsDuplicateFloorDepths);
@@ -395,6 +396,21 @@ public sealed class SaveManagerTests : ITestSuite
         Expect.Equal(options.InventoryCapacityBonus, restoredOptions.InventoryCapacityBonus, "Loaded inventory capacity bonus should match");
         Expect.Equal(string.Join(",", options.StartingItemTemplateIds), string.Join(",", restoredOptions.StartingItemTemplateIds), "Loaded starting items should match");
         Expect.Equal(string.Join(",", options.EquippedItemTemplateIds), string.Join(",", restoredOptions.EquippedItemTemplateIds), "Loaded equipped items should match");
+    }
+
+    private static void LegacyStarterPackageIsUntouched()
+    {
+        using var sandbox = SaveSandbox.Create();
+        var manager = new SaveManager(sandbox.DirectoryPath, sandbox.Clock);
+        var world = CreateWorld();
+        var inventory = world.Player.GetComponent<InventoryComponent>()!;
+        inventory.Add(new ItemInstance { InstanceId = EntityId.NewSeeded(new Random(1)), TemplateId = "potion_health", StackCount = 4, IsIdentified = true });
+        inventory.Add(new ItemInstance { InstanceId = EntityId.NewSeeded(new Random(2)), TemplateId = "potion_health", StackCount = 2, IsIdentified = true });
+
+        Expect.True(manager.SaveGame(world, SaveSlots.Slot1).GetAwaiter().GetResult(), "Legacy package fixture should save.");
+        var restored = manager.LoadGame(SaveSlots.Slot1).GetAwaiter().GetResult();
+        var restoredPotions = restored!.Player.GetComponent<InventoryComponent>()!.Items.Where(item => item.TemplateId == "potion_health").Sum(item => item.StackCount);
+        Expect.Equal(6, restoredPotions, "Loading a legacy save must not remove duplicated starter supplies.");
     }
 
     private static void RejectsMissingActiveFloor()

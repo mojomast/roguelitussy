@@ -381,11 +381,36 @@ public sealed class EntityRenderer
     {
         EnsureBodyVisual(entity, spriteRoot);
 
+        if (entity.GetComponent<ShrineComponent>() is { } shrine)
+        {
+            RemoveChild(spriteRoot, "ChestBand");
+            RemoveChild(spriteRoot, "ChestLatch");
+            RemoveChild(spriteRoot, "AccentBand");
+            RemoveChild(spriteRoot, "VariantSigil");
+            RemoveChild(spriteRoot, "VariantDetail");
+
+            var rune = GetOrCreateChild<ColorRect>(spriteRoot, "ShrineRune");
+            rune.Position = new Vector2(11f, 4f);
+            rune.Size = new Vector2(10f, 5f);
+            rune.Color = RenderPalette.ShrineRune;
+
+            var label = GetOrCreateChild<Label>(spriteRoot, "ShrineLabel");
+            label.Position = new Vector2(4f, 15f);
+            label.Text = shrine.IsUsed ? "spent" : shrine.ShrineType;
+            label.Modulate = shrine.IsUsed ? RenderPalette.ShrineSpentLabel : RenderPalette.ShrineLabel;
+            return;
+        }
+
+        RemoveChild(spriteRoot, "ShrineRune");
+        RemoveChild(spriteRoot, "ShrineLabel");
+
         if (FindChild<Sprite2D>(spriteRoot, "Body") is { } spriteBody)
         {
-            spriteBody.Modulate = entity.Faction is Faction.Player or Faction.Neutral
-                ? PlayerVisualCatalog.Resolve(entity).BodyTint
-                : ResolveTextureTint(entity);
+            spriteBody.Modulate = entity.Faction == Faction.Player
+                ? Colors.White
+                : entity.Faction == Faction.Neutral
+                    ? PlayerVisualCatalog.Resolve(entity).BodyTint
+                    : ResolveTextureTint(entity);
         }
 
         if (FindChild<ColorRect>(spriteRoot, "Body") is { } rectBody)
@@ -429,6 +454,16 @@ public sealed class EntityRenderer
 
     private void EnsureBodyVisual(IEntity entity, Node2D spriteRoot)
     {
+        if (entity.GetComponent<ShrineComponent>() is not null)
+        {
+            RemoveChild(spriteRoot, "Body", typeof(Sprite2D));
+            var shrineBody = FindChild<ColorRect>(spriteRoot, "Body") ?? GetOrCreateChild<ColorRect>(spriteRoot, "Body");
+            shrineBody.Position = new Vector2(6f, 9f);
+            shrineBody.Size = new Vector2(WorldView.TileSize - 12f, WorldView.TileSize - 14f);
+            shrineBody.Color = RenderPalette.ShrineBody;
+            return;
+        }
+
         var texture = WorldArtCatalog.GetEntityTexture(entity, _content);
         if (texture is not null)
         {
@@ -534,7 +569,12 @@ public sealed class EntityRenderer
             return RenderPalette.ChestBody;
         }
 
-        if (entity.Faction is Faction.Player or Faction.Neutral)
+        if (entity.Faction == Faction.Player)
+        {
+            return Colors.White;
+        }
+
+        if (entity.Faction == Faction.Neutral)
         {
             return PlayerVisualCatalog.Resolve(entity).BodyTint;
         }

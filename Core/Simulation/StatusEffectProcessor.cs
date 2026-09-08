@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Roguelike.Core;
 
@@ -40,6 +41,26 @@ public static class StatusEffectProcessor
     }
 
     public static int GetMagnitude(IEntity entity, StatusEffectType type) => GetEffect(entity, type)?.Magnitude ?? 0;
+
+    public static bool HasHarmfulTickingEffect(IEntity entity, IContentDatabase? db = null)
+    {
+        foreach (var effect in GetEffects(entity))
+        {
+            if (effect.Type is StatusEffectType.Poisoned or StatusEffectType.Burning or StatusEffectType.Corroded)
+            {
+                return true;
+            }
+
+            if (db is not null
+                && TryGetDefinition(effect.Type, db, out var definition)
+                && definition!.TickEffects.Any(tickEffect => string.Equals(tickEffect.Type, "damage", StringComparison.OrdinalIgnoreCase)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     public static int GetEffectiveSpeed(IEntity entity)
     {

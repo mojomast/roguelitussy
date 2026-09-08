@@ -22,7 +22,11 @@ public partial class ShopUI : Control
     private EventBus? _eventBus;
     private IContentDatabase? _content;
     private Panel? _panel;
-    private RichTextLabel? _label;
+    private ColorRect? _background;
+    private Label? _header;
+    private Label? _balance;
+    private Label? _footer;
+    private Control? _list;
     private EntityId _merchantId = EntityId.Invalid;
     private int _selectedIndex;
     private ShopMode _mode;
@@ -218,7 +222,7 @@ public partial class ShopUI : Control
 
     private void EnsureVisuals()
     {
-        if (_panel is not null && _label is not null)
+        if (_panel is not null)
         {
             return;
         }
@@ -233,13 +237,19 @@ public partial class ShopUI : Control
             Name = "Panel",
             Size = panelSize,
         };
-        _label = new RichTextLabel
-        {
-            Name = "Label",
-            Position = new Vector2(PanelPadding, PanelPadding),
-            BbcodeEnabled = true,
-        };
-        _panel.AddChild(_label);
+        _background = new ColorRect { Name = "Background", Color = UiStyle.PanelBlack() };
+        _header = new Label { Name = "Header", Modulate = UiStyle.BrightGold() };
+        _balance = new Label { Name = "Balance", Modulate = UiStyle.Parchment() };
+        _footer = new Label { Name = "Footer", Modulate = UiStyle.MutedText() };
+        _list = new Control { Name = "Entries" };
+        UiStyle.ConfigureSingleLineLabel(_header, 18);
+        UiStyle.ConfigureSingleLineLabel(_balance);
+        UiStyle.ConfigureSingleLineLabel(_footer);
+        _panel.AddChild(_background);
+        _panel.AddChild(_header);
+        _panel.AddChild(_balance);
+        _panel.AddChild(_list);
+        _panel.AddChild(_footer);
         AddChild(_panel);
     }
 
@@ -247,7 +257,7 @@ public partial class ShopUI : Control
     {
         EnsureVisuals();
 
-        if (_panel is null || _label is null)
+        if (_panel is null || _background is null || _header is null || _balance is null || _footer is null || _list is null)
         {
             return;
         }
@@ -258,13 +268,73 @@ public partial class ShopUI : Control
         _panel.Size = panelSize;
         _panel.Position = OverlayLayoutHelper.CenterInViewport(viewportSize, panelSize);
         _panel.Visible = Visible;
-        _label.Visible = Visible;
-        _label.Position = new Vector2(PanelPadding, PanelPadding);
-        _label.Size = new Vector2(
-            System.Math.Max(0f, panelSize.X - (PanelPadding * 2f)),
-            System.Math.Max(0f, panelSize.Y - (PanelPadding * 2f)));
-        _label.Clear();
-        _label.AppendText(BuildBodyMarkup());
+        _background.Size = panelSize;
+        var width = System.Math.Max(0f, panelSize.X - PanelPadding * 2f);
+        _header.Position = new Vector2(PanelPadding, 12f);
+        _header.Size = new Vector2(width, 28f);
+        _header.Text = _gameManager?.World?.GetEntity(_merchantId)?.Name ?? "Trade unavailable";
+        _balance.Position = new Vector2(PanelPadding, 42f);
+        _balance.Size = new Vector2(width, 22f);
+        _balance.Text = $"Gold: {_gameManager?.World?.Player?.GetComponent<WalletComponent>()?.Gold ?? 0}    Mode: {_mode}";
+        _footer.Position = new Vector2(PanelPadding, panelSize.Y - 38f);
+        _footer.Size = new Vector2(width, 22f);
+        _footer.Text = "Up/Down choose  Enter trade  Tab buy/sell  Esc/F close";
+        _list.Position = new Vector2(PanelPadding, 76f);
+        _list.Size = new Vector2(width, System.Math.Max(0f, _footer.Position.Y - 12f - _list.Position.Y));
+        foreach (var child in _list.GetChildren().ToArray())
+        {
+            _list.RemoveChild(child);
+            child.QueueFree();
+        }
+        var window = ResolveVisibleWindow(ResolveEntryCount());
+        for (var index = window.Start; index < window.End; index++)
+        {
+            var entry = ResolveEntryText(index);
+            var row = new ColorRect
+            {
+                Name = $"Entry_{index}",
+                Position = new Vector2(0f, (index - window.Start) * 28f),
+                Size = new Vector2(width, 28f),
+                Color = index == _selectedIndex ? UiStyle.SlotSelected() : UiStyle.PanelInner(),
+            };
+            var text = new Label
+            {
+                Name = "EntryText",
+                Position = new Vector2(8f, 3f),
+                Size = new Vector2(System.Math.Max(0f, width - 178f), 22f),
+                Text = entry.Name,
+                Modulate = index == _selectedIndex ? UiStyle.BrightGold() : UiStyle.Parchment(),
+            };
+            UiStyle.ConfigureSingleLineLabel(text);
+            row.AddChild(text);
+            var price = new Label
+            {
+                Name = "PriceText",
+                Position = new Vector2(System.Math.Max(8f, width - 162f), 3f),
+                Size = new Vector2(154f, 22f),
+                Text = entry.Price,
+                Modulate = entry.Color,
+            };
+            UiStyle.ConfigureSingleLineLabel(price);
+            row.AddChild(price);
+            _list.AddChild(row);
+        }
+    }
+
+    private (string Name, string Price, Color Color) ResolveEntryText(int index)
+    {
+        var world = _gameManager!.World!;
+        var merchant = world.GetEntity(_merchantId)!.GetComponent<MerchantComponent>()!;
+        var item = _mode == ShopMode.Sell ? world.Player!.GetComponent<InventoryComponent>()!.Items[index] : null;
+        var id = item?.TemplateId ?? merchant.Offers[index].ItemTemplateId;
+        var template = _content is not null && _content.TryGetItemTemplate(id, out var resolved) ? resolved : null;
+        var name = template is null ? id : ItemRarityPresentation.ResolveDecoratedName(template.DisplayName, template.Rarity);
+        var price = item is null ? _gameManager!.ResolveMerchantBuyPrice(merchant.Offers[index].Price) : System.Math.Max(1, (template?.Value ?? 2) / 2);
+        var soldOut = item is null && merchant.Offers[index].Quantity <= 0;
+        var quantity = item is null ? (soldOut ? "sold out" : $"qty {merchant.Offers[index].Quantity}") : $"x{item.StackCount}";
+        var color = soldOut ? UiStyle.FaintText()
+            : item is null && (world.Player!.GetComponent<WalletComponent>()?.Gold ?? 0) < price ? UiStyle.DangerRed() : UiStyle.BrightGold();
+        return ($"{(index == _selectedIndex ? ">" : " ")} {index + 1}. {name}", $"{price}g  {quantity}", color);
     }
 
     private string BuildBodyMarkup()
@@ -348,13 +418,15 @@ public partial class ShopUI : Control
 
     private (int Start, int End) ResolveVisibleWindow(int count)
     {
-        if (count <= VisibleEntryRows)
+        var rows = System.Math.Max(1, System.Math.Min(VisibleEntryRows,
+            (int)System.Math.Floor((ResolvePanelSize(ResolveViewportSize()).Y - 126f) / 28f)));
+        if (count <= rows)
         {
             return (0, count);
         }
 
-        var start = System.Math.Clamp(_selectedIndex - (VisibleEntryRows / 2), 0, count - VisibleEntryRows);
-        return (start, start + VisibleEntryRows);
+        var start = System.Math.Clamp(_selectedIndex - (rows / 2), 0, count - rows);
+        return (start, start + rows);
     }
 
     private static void AppendWindowPrefix(StringBuilder builder, int start)

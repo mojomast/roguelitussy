@@ -83,7 +83,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p build/windows
+           rm -rf build/windows build/roguelitussy-windows.zip bin obj Tests/bin Tests/obj Build/WindowsSingleFileLauncher/bin Build/WindowsSingleFileLauncher/obj
+           mkdir -p build/windows
           TEMPLATES_DIR="$RUNNER_TEMP/templates/templates"
           {
             echo '[preset.0]'
@@ -95,8 +96,8 @@ jobs:
             echo 'dedicated_server=false'
             echo 'custom_features=""'
             echo 'export_filter="all_resources"'
-            echo 'include_filter=""'
-            echo 'exclude_filter=""'
+             echo 'include_filter=""'
+             echo 'exclude_filter="bin/*,obj/*,Tests/bin/*,Tests/obj/*,Build/WindowsSingleFileLauncher/bin/*,Build/WindowsSingleFileLauncher/obj/*,build/*"'
             echo 'export_path="build/windows/Roguelitussy.exe"'
             echo 'encryption_include_filters=""'
             echo 'encryption_exclude_filters=""'
@@ -110,7 +111,7 @@ jobs:
             echo "custom_template/debug=\"$TEMPLATES_DIR/windows_debug_x86_64.exe\""
             echo "custom_template/release=\"$TEMPLATES_DIR/windows_release_x86_64.exe\""
             echo 'debug/export_console_wrapper=1'
-            echo 'binary_format/embed_pck=false'
+           echo 'binary_format/embed_pck=true'
             echo 'texture_format/s3tc_bptc=true'
             echo 'texture_format/etc2_astc=false'
             echo 'binary_format/architecture="x86_64"'
@@ -137,13 +138,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf .godot/mono/temp/bin .godot/mono/temp/obj bin obj
+           rm -rf .godot/mono/temp/bin .godot/mono/temp/obj bin obj Tests/bin Tests/obj Build/WindowsSingleFileLauncher/bin Build/WindowsSingleFileLauncher/obj
           Godot_v${GODOT_VERSION}_mono_linux.x86_64 --headless --build-solutions --quit --path .
 
       - name: Export Windows binary
         shell: bash
         run: |
           set -euo pipefail
+          rm -f build/windows/Roguelitussy.pck
           Godot_v${GODOT_VERSION}_mono_linux.x86_64 --headless --export-release "Windows Desktop" build/windows/Roguelitussy.exe --path .
 
       - name: Validate C# export payload
@@ -162,7 +164,6 @@ jobs:
           data_dir = data_dirs[0]
           required = [
               root / "Roguelitussy.exe",
-              root / "Roguelitussy.pck",
               data_dir / "godotussy.dll",
               data_dir / "godotussy.deps.json",
               data_dir / "hostfxr.dll",
@@ -172,6 +173,9 @@ jobs:
           missing = [str(path) for path in required if not path.exists()]
           if missing:
               raise SystemExit("Missing Windows export files: " + ", ".join(missing))
+
+          if (root / "Roguelitussy.pck").exists():
+              raise SystemExit("Embedded-PCK export unexpectedly produced a separate Roguelitussy.pck")
 
           deps = json.loads((data_dir / "godotussy.deps.json").read_text())
           if "GodotSharp" not in json.dumps(deps):
@@ -186,10 +190,11 @@ jobs:
         run: |
           set -euo pipefail
           cat > build/windows/README.txt <<'EOF'
-          Run Roguelitussy.exe from this extracted folder.
+          Run Roguelitussy.exe from this extracted folder. Roguelitussy-single.exe is
+          published as a separate one-file launcher artifact.
 
-          Keep Roguelitussy.exe, Roguelitussy.pck, and the data_godotussy_windows_x86_64 folder together.
-          The game is a Godot C# export and will close at startup if the data folder is missing.
+          Keep Roguelitussy.exe and the data_godotussy_windows_x86_64 folder together.
+          This is a Godot C# export with an embedded PCK and will close at startup if the data folder is missing.
 
           If the game closes after the splash screen, run Run_With_Logs.bat instead.
           It writes roguelitussy.log, roguelitussy.stdout.log, and roguelitussy.stderr.log next to the executable.
@@ -221,11 +226,41 @@ jobs:
           pause
           exit /b %EXITCODE%
           EOF
-          (cd build/windows && zip -r ../roguelitussy-windows.zip .)
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZIP_DEFLATED, ZipFile
+
+          source = Path("build/windows")
+          destination = Path("build/roguelitussy-windows.zip")
+          with ZipFile(destination, "w", ZIP_DEFLATED) as archive:
+              for path in sorted(source.rglob("*")):
+                  if path.is_file():
+                      archive.write(path, path.relative_to(source).as_posix())
+          PY
+
+      - name: Publish one-file Windows launcher
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf build/windows/launcher-publish
+          dotnet publish Build/WindowsSingleFileLauncher/WindowsSingleFileLauncher.csproj \
+            --configuration Release \
+            --runtime win-x64 \
+            --self-contained true \
+            --output build/windows/launcher-publish \
+            -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=true \
+            -p:PayloadZip="$PWD/build/roguelitussy-windows.zip" \
+            -p:PayloadVersion="${GITHUB_SHA:-local}"
+          test -f build/windows/launcher-publish/WindowsSingleFileLauncher.exe
+          cp build/windows/launcher-publish/WindowsSingleFileLauncher.exe build/windows/Roguelitussy-single.exe
+          rm -rf build/windows/launcher-publish
 
       - name: Upload Windows build
         uses: actions/upload-artifact@v4
         with:
           name: roguelitussy-windows
-          path: build/roguelitussy-windows.zip
+          path: |
+            build/roguelitussy-windows.zip
+            build/windows/Roguelitussy-single.exe
           if-no-files-found: error

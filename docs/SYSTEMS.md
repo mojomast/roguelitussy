@@ -67,7 +67,33 @@ Run history entries can store richer narrative fields and a generated epitaph. `
 
 The planned expansion path for progression is documented in `docs/PROGRESSION.md`.
 
+### Replayability Contract
+
+- Level-up drafts contain three deterministic perk IDs. The draft is persisted and reused until chosen; legacy saves without draft IDs fall back to the available full list rather than losing a pending choice. The overlay calls them `Draft Options` so the limited offer is clear.
+- Implemented synergy effects include heal-on-kill and flat damage bonuses. `echo_bonus` is content-recognized but not currently applied by runtime simulation.
+- A run has nine floors. Boss and act/depth feedback is presented during the run, and reaching the final exit completes through the canonical `Victory` path. First-clear unlock state is applied once and remains idempotent on retries or repeated completion handling.
+- Ascension selection is unlocked after the first clear. Only the Ascension effects currently wired by runtime should be treated as real; the catalog's ten-level ladder is not a claim that all ten modifiers are implemented.
+- Daily challenges can be retried. Attempts, completion, and best score persist in `user://daily_challenge.json`; Thursday applies the authored speed-score modifier. Other authored daily modifiers remain unsupported/upcoming.
+
 ## AI
+
+### Player Directional Access
+
+The simulation already supports eight-direction movement/melee. Arrow/WASD input remains cardinal; `V` then two perpendicular arrow/WASD directions selects a single diagonal action without spending time on the prefix/first axis. `Escape`/`V` cancels, same-axis input replaces the partial direction, and opening another command/modal clears it. `Home`/`Page Up`/`End`/`Page Down` and numpad diagonals provide direct alternatives; numpad 5 waits. Existing corner restrictions and AI roles are unchanged; run-prefix autoplay remains cardinal.
+
+### Archetypes And Heritage
+
+Archetype definitions are the single source for new-run base stats, starter items/equipment, signature abilities, and identity. Character creation applies origin, trait, and training adjustments on top; it no longer carries a duplicate archetype package. Existing saves retain their historical stats/items rather than deleting already-owned equipment.
+
+Every player uses `B` to open an owned-technique palette. Slots are stable, deduplicated, and show targeting shape, range, energy cost, and active cooldown. `1`-`4` select; self techniques submit a regular `CastAbilityAction`, while aimed shapes enter the existing targeting overlay. This keeps ability use on the normal action/EventBus/GameManager route and never binds casting to movement keys.
+
+Each persisted race supplies one existing heritage technique without permanent stat inflation: Human `War Cry`, Elf `Phase Shift`, Dwarf `Ground Slam`, and Orc `Heavy Slam`. New players receive class slots first and heritage second; load reconciliation adds only a missing heritage slot while preserving existing cooldowns, items, and slot order. Racial technique selection uses `IdentityComponent.RaceId` as authority and normalizes blank/unknown values to Human.
+
+### NPC Conversations And Services
+
+Dialog conditions read current HP, inventory, and faction reputation. Sen's expedition review reads only player facts; it does not reveal hidden enemies, cost a turn, or mutate RNG. Cosmetic greetings rotate per NPC and reset on world replacement/bind, not persisted relationship memory. Dialogs have bounded prose, separately windowed choices, and a fixed footer.
+
+`NpcServiceAction` owns paid field dressing in Core. It revalidates the registered player, cardinal adjacency, living neutral provider, authorized authored service, wounds, and funds before healing/payment. The dialog closes before submitting the normal turn, so enemies can respond and normal HP/currency notifications apply. Existing stats/wallet/NPC identity persist the result; save version stays 18. Ilex supports crypt recovery, while Orin keeps deep floors supplied through the existing merchant system.
 
 Enemy decision-making lives in `Core/AI/`.
 
@@ -119,7 +145,7 @@ Synergies are content-authored build identities in `Content/synergies.json`. `Sy
 
 Boss phase data can be authored on enemy templates through `boss_phase_data`. `BossPhaseResolver` runs after melee and ability damage, adds phase abilities/status/stat boosts when HP thresholds are crossed, and records triggered phases on `BossPhaseComponent` so each transition fires once.
 
-Faction reputation is stored on the player through `FactionComponent` and adjusted by `ReputationService`. Enemy kills award Warriors' Order reputation, boss kills also affect Thieves' Compact and Merchants' Guild reputation, shop purchases increase Merchants' Guild reputation, and GameManager emits reputation deltas for HUD/combat-log feedback.
+Faction reputation is stored on the player through `FactionComponent` and adjusted by `ReputationService`. Enemy kills award Warriors' Order reputation, boss kills also affect Thieves' Compact and Merchants' Guild reputation, shop purchases increase Merchants' Guild reputation, and Friendly Merchants' Guild reputation grants a purchase discount. GameManager emits reputation deltas for HUD/combat-log feedback.
 
 Critical hits now use a clearer 1.5x damage multiplier. If the attacker's accuracy exceeds defender evasion by more than 40, baseline crit chance is at least 15%; equipped weapon crit chance can still exceed that. Critical hits emit both `DamageDealt` and `CriticalHitDealt` presentation events.
 
@@ -147,11 +173,13 @@ Depth zero is normalized to authored depth one for prefab eligibility, so a new 
 
 Traps are walkable but hazardous stationary features. Authored trap definitions live in `Content/traps.json`; each room `trap_id` must reference a known trap. `LevelData` exposes `TrapSpawnDetails` so `GameManager.PopulateWorld` can instantiate trap entities.
 
-Floor-event planning lives in `Core/Generation/FloorEventResolver.cs`. Boss floors take precedence at depths divisible by both 3 and 5; other fifth floors are safe, and standard floors can request shrine or curse rooms. Safe floors suppress enemy spawn output. Requested special-room tags are preferred during BSP placement, boss floors receive a fallback boss-marked spawn, deep-floor spawn caps scale with map area, random enemies avoid the start room, and exits use carved traversal distance. Bare trap tiles receive deterministic theme-specific trap IDs. Connectivity validation can treat locked doors as passable while still treating water as non-traversable, and ragged prefab rows read as walls.
+Floor-event planning lives in `Core/Generation/FloorEventResolver.cs`. Boss floors take precedence at depths divisible by both 3 and 5; other fifth floors are safe, and standard floors can request shrine or curse rooms. Safe floors suppress enemy spawn output. Requested special-room tags are preferred during BSP placement, landmark metadata has deterministic fallbacks when a requested prefab does not fit, boss floors receive a fallback boss-marked spawn, deep-floor spawn caps scale with map area, random enemies avoid the start room, and exits use carved traversal distance. Bare trap tiles receive deterministic theme-specific trap IDs. Connectivity validation can treat locked doors as passable while still treating water as non-traversable, and lock/key validation rejects under-provisioned reachable keys. Requested landmark depth semantics remain a generation follow-up where authored constraints are stronger than the fallback contract.
 
 Enemy population honors the generated boss marker: random boss slots select only `boss`-tagged templates eligible at the actual floor depth, and ordinary random slots exclude boss templates. The existing weighted selection and stable candidate ordering remain in use. Valid explicit template IDs override depth and marker restrictions; unknown IDs fall through to the matching random pool. An empty matching pool skips the spawn rather than borrowing deeper or ordinary enemies. This intentionally changes newly generated population relative to earlier builds; cached/saved enemies keep their identities.
 
-Special-room integration remains partial. Shrine/curse event metadata is not carried into `LevelData`, requested rooms are best-effort, and key placement can still under-provision a floor when key candidates are exhausted.
+Special-room placement remains best-effort, but placed authored rewards now reach runtime. A requested shrine room carries its resolved `floor_events.json` ID through transient `LevelData` metadata and spawns a matching shrine entity; cursed-chest points use `curse_room_chest_loot`. Shrine offers cost authored HP and consume one normal turn. Stat shrines grant one stat point, perk shrines grant one perk choice, and relic shrines display three deterministic unowned offers derived from seed/depth/shrine position. The relic choice remains pending in the persisted shrine component until it is claimed and reopens after load without rerolling. Safe floors guarantee a distinct health-potion drop plus a sanctuary cache using `safe_floor_merchant_stock`; they still suppress hostile enemies. Requested landmarks can still fail when no fitting prefab exists, and key placement can still under-provision a floor when key candidates are exhausted.
+
+Late ordinary encounter pools retain selected existing roles through depth 99: Orc Brute (melee), Shadow Stalker (ambush), Flame Elemental (area fire), Cultist Healer (support), and Magma Wisp (ranged fire). This preserves boss eligibility and avoids depth 11+ collapsing to four persistent ordinary templates. Orin complements his deep-floor stock with 22-gold, 30-HP field dressing; Ilex remains the cheaper 18-gold, 25-HP crypt specialist.
 
 ### Dungeon Survey Export
 
@@ -169,15 +197,24 @@ The rendering layer is event-driven.
 - `Scripts/UI/UIRoot.cs` binds the HUD, menus, overlays, combat log, tooltip, debug console, and input handler to the current runtime services.
 - `FloorSummaryUI` listens for `FloorSummaryReady`, opens as a modal summary during floor travel, blocks gameplay input while visible through `UIRoot`, and auto-dismisses after six seconds unless the player presses a key.
 - `UIRoot` also owns modal interaction surfaces such as dialog, shop, meta shop, relic choice, shrine confirmation, inventory, targeting, and the chest loot panel. Pressing `F` near an NPC opens dialog; pressing `F` near a chest, or bumping into a chest, rolls its contents through `OpenChestAction` and then opens `ChestUI` so individual rolled items can be selected or taken all at once through `TakeChestLootAction`. Pressing `F` near a shrine opens an HP-cost confirmation before `InteractShrineAction` executes. The meta shop routes above the title menu while open; `Escape` or its Back row returns to the title menu.
+- Shrine stat/perk rewards resolve through existing progression state. A relic shrine opens the existing choice overlay after turn resolution; only the deterministic offers for that pending shrine are valid, and loading a pending shrine reopens those same offers. This uses no new save shape.
 - The title flow now exposes an explicit `Start Game` action and a typed seed entry field. Typed seeds feed the normal deterministic new-run path, while leaving the field empty keeps the default generated-seed behavior.
 - `ExaminePanel` is a `MenuBase` modal opened with `X` during gameplay. It routes through `UIRoot` before normal gameplay input, moves a cursor with `WASD`/arrow keys, and closes with `X` or `Escape`. It reads only visible/explored nearby cells from the current `WorldState`; visible cells may show entities, items, chests, doors, and revealed traps, while explored-but-not-visible cells show remembered tile information only. It does not emit `PlayerActionSubmitted` or mutate simulation state.
 - `HUD` derives a nearby interaction prompt from current world state on turn/UI refresh (`[F] Talk`, `[F] Open Chest`, `[Enter] Descend/Ascend`) and exposes it as a clickable shortcut without changing the underlying keyboard actions.
 - `HUD` also derives a runtime-only quick-use hotbar from the first five usable non-equipment inventory entries. Number keys `1`-`5` are routed only during normal gameplay, submit regular `UseItemAction` instances for self/no-target consumables, and log a warning instead of consuming aimed items that require the inventory targeting overlay. HUD text also surfaces active/potential synergies, faction reputation labels, boss phase callouts, and floor-clear action feedback.
+- Equipped ranged weapons can be submitted from player directional input. The action checks the weapon's authored range and line of sight before resolving damage; ordinary weapons retain adjacency requirements.
 - Run movement uses a prefix key because the current input path routes only key codes, not modifier state. Press `R`, then a cardinal direction to repeatedly process normal `MoveAction` turns through `GameManager.ProcessPlayerAction`; `Escape` cancels the prefix. The run stops before blockers, doors, occupants, nearby points of interest, low HP, damage taken, game over, visible/adjacent hostiles, or a fixed safety cap.
 - Autoexplore uses `O` to repeatedly recompute deterministic BFS from the current player position, preferring visible points of interest and then the nearest reachable unexplored frontier. Every step is submitted as a normal `MoveAction` through `GameManager.ProcessPlayerAction`; it stops for visible/adjacent hostiles, damage taken, low HP, reached points of interest, no reachable target, game over, invalid movement, or a fixed safety cap.
 - Rest-until-healed uses `Z` to repeatedly process normal `WaitAction` turns through `GameManager.ProcessPlayerAction`. It preserves single waits on `Space` and `.`, stops immediately at full HP or visible/adjacent hostiles, also stops for low HP, poison/burning/corrosion, damage taken, game over, invalid waits, or a fixed safety cap, and does not add UI-side passive healing. Enemy interruptions now log the spotted enemy name explicitly.
+- A valid `WaitAction` recovers 1 HP when the player is below maximum health. Recovery is suppressed by dangerous statuses, including poison, burning, and corrosion, so waiting does not erase an active hazard.
+
+Rest-until-healed remains an interruption-aware waiting tool rather than base passive healing; current recovery comes from items, NPC services, relic hooks, and safe-floor caches. Base rest healing and per-tick relic semantics remain a separate balance follow-up.
 
 Current presentation-specific behavior worth knowing:
+
+- Real-renderer containment fixes use engine ellipsis for single-line labels, bounded scrollable prose, actual-height menu windows, separate inventory/header/footer regions, and native-size-independent status badges. Panel trim uses `SelfModulate`, preserving descendant colors. Modal screens suppress gameplay HUD chrome; compact logical viewports keep bottom HP/XP and collapse duplicate upper stats, with the combat log above action feedback.
+- Terrain palettes now match prison (0-3), crypt (4-6), and magma (7+) depth bands, with depth-salted floor cracks. This uses the installed 0x72 art rather than replacement tilesets, retaining all tile positions/scales, corner strips, and Z ordering. Locked doors use closed-door art and a `LOCK` marker. See `docs/VISUAL_VALIDATION.md` for provenance and alignment safeguards.
+- Ground items use a dedicated layer above terrain and below entities/wall covers. Only visible item piles render; the first item uses its authored path and a compact `+N` marker represents the rest. Inventory slots use the same authored icons with category-glyph fallback for missing art. In-world player portraits render at their authored 0x72 colors rather than a full-body race tint; character-creation preview remains the identity-color surface.
 
 - `WorldArtCatalog` now resolves world and entity art from the imported CC0 0x72 tileset subset under `Assets/Tilesets/0x72/` and `Assets/Sprites/0x72/`.
 - Enemy bodies prefer the authored `EnemyTemplate.SpritePath`, looked up through `EnemyComponent.TemplateId`. The renderer uses bound-world content, or injected content when the world has none, and clears stale world bindings on rebind. Existing cached texture loading supports source-image fallback when imports are unavailable; missing metadata or unloadable art retains name-based/procedural fallbacks. Player, neutral, and chest visuals are unchanged.

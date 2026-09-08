@@ -35,15 +35,16 @@ public static class WorldArtCatalog
         switch (tileType)
         {
             case TileType.Floor:
-                AppendIfLoaded(layers, ResolveFloorPath(position, allowCracks: true));
+                AppendIfLoaded(layers, ResolveFloorPath(position, world?.Depth ?? 0, allowCracks: true));
                 break;
             case TileType.StairsUp:
             case TileType.StairsDown:
-                AppendIfLoaded(layers, ResolveFloorPath(position, allowCracks: false));
+                AppendIfLoaded(layers, ResolveFloorPath(position, world?.Depth ?? 0, allowCracks: false));
                 AppendIfLoaded(layers, TileBasePath + "Floor_Ladder.png");
                 break;
             case TileType.Door:
-                AppendIfLoaded(layers, ResolveFloorPath(position, allowCracks: false));
+            case TileType.LockedDoor:
+                AppendIfLoaded(layers, ResolveFloorPath(position, world?.Depth ?? 0, allowCracks: false));
                 AppendIfLoaded(layers, TileBasePath + "Door_Frame_Top.png");
                 AppendIfLoaded(layers, TileBasePath + "Door_Frame_Left.png");
                 AppendIfLoaded(layers, TileBasePath + "Door_Frame_Right.png");
@@ -58,7 +59,7 @@ public static class WorldArtCatalog
                 }
                 break;
             case TileType.Trap:
-                AppendIfLoaded(layers, ResolveFloorPath(position, allowCracks: true));
+                AppendIfLoaded(layers, ResolveFloorPath(position, world?.Depth ?? 0, allowCracks: true));
                 break;
         }
 
@@ -79,6 +80,7 @@ public static class WorldArtCatalog
             TileType.Wall => Load(TileBasePath + "Wall_Mid.png"),
             TileType.Door when isDoorOpen => Load(TileBasePath + "Door_Open.png"),
             TileType.Door => Load(TileBasePath + "Door_Closed.png"),
+            TileType.LockedDoor => Load(TileBasePath + "Door_Closed.png"),
             TileType.StairsUp => Load(TileBasePath + "Floor_Ladder.png"),
             TileType.StairsDown => Load(TileBasePath + "Floor_Ladder.png"),
             _ => null,
@@ -93,6 +95,7 @@ public static class WorldArtCatalog
             TileType.StairsDown => "DN",
             TileType.Door when isDoorOpen => "//",
             TileType.Door => "[]",
+            TileType.LockedDoor => "LOCK",
             TileType.Trap => "^",
             _ => null,
         };
@@ -259,14 +262,15 @@ public static class WorldArtCatalog
         }
     }
 
-    private static string ResolveFloorPath(Position position, bool allowCracks)
+    private static string ResolveFloorPath(Position position, int depth, bool allowCracks)
     {
         if (!allowCracks)
         {
             return TileBasePath + "Floor_Clean.png";
         }
 
-        var hash = PositiveModulo((position.X * 73856093) ^ (position.Y * 19349663), 12);
+        // Presentation-only salt; never advance a world RNG during redraws.
+        var hash = PositiveModulo(unchecked((position.X * 73856093) ^ (position.Y * 19349663) ^ (depth * 83492791)), 12);
         return hash < FloorVariantPaths.Length
             ? FloorVariantPaths[hash]
             : TileBasePath + "Floor_Clean.png";
@@ -406,7 +410,7 @@ public static class WorldArtCatalog
         }
 
         var tile = world.GetTile(position);
-        if (tile == TileType.Wall)
+        if (tile is TileType.Wall or TileType.LockedDoor)
         {
             return true;
         }
@@ -422,7 +426,7 @@ public static class WorldArtCatalog
         }
 
         var tile = world.GetTile(position);
-        if (tile == TileType.Wall)
+        if (tile is TileType.Wall or TileType.LockedDoor)
         {
             return false;
         }

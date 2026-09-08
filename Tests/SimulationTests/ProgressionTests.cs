@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Roguelike.Core;
 using Roguelike.Tests.Stubs;
 using Roguelike.Tests.TestFramework;
@@ -21,6 +22,9 @@ public sealed class ProgressionTests : ITestSuite
         registry.Add("Simulation.Progression melee kill without XP increments kills", MeleeKillWithoutXpIncrementsKills);
         registry.Add("Simulation.Progression no crash when attacker has no ProgressionComponent", NoCrashWithoutProgression);
         registry.Add("Simulation.Progression no crash when target has no XpValueComponent", NoCrashWithoutXpValue);
+        registry.Add("Simulation.Progression level-up draft is deterministic and contains three options", PerkDraftIsDeterministic);
+        registry.Add("Simulation.Progression legacy progression retains full-list perk behavior", LegacyProgressionRetainsFullList);
+        registry.Add("Simulation.Progression cannot select a perk outside the draft", CannotSelectOutsideDraft);
     }
 
     private static void XpThresholdCalculation()
@@ -226,6 +230,42 @@ public sealed class ProgressionTests : ITestSuite
         var outcome = new AttackAction(attacker.Id, defender.Id).Execute(world);
         Expect.Equal(ActionResult.Success, outcome.Result, "Attack should succeed even without XpValueComponent on target");
         Expect.Equal(0, attacker.GetComponent<ProgressionComponent>()!.Experience, "No XP should be awarded without XpValueComponent");
+    }
+
+    private static void PerkDraftIsDeterministic()
+    {
+        var content = new StubContentDatabase();
+        var first = CreateActor("Player", new Position(1, 1), Faction.Player, new Stats { HP = 10, MaxHP = 10, Attack = 4, Defense = 1, Accuracy = 0, Evasion = 0, Speed = 100 });
+        var second = new StubEntity("Player", new Position(1, 1), Faction.Player, stats: new Stats { HP = 10, MaxHP = 10, Attack = 4, Defense = 1, Accuracy = 0, Evasion = 0, Speed = 100 }, id: first.Id);
+        first.SetComponent(new ProgressionComponent { Level = 2, UnspentPerkChoices = 1, PerkDraftsGenerated = true });
+        second.SetComponent(new ProgressionComponent { Level = 2, UnspentPerkChoices = 1, PerkDraftsGenerated = true });
+
+        var firstDraft = ProgressionService.GetAvailablePerkChoices(first, content).Select(perk => perk.TemplateId).ToArray();
+        var secondDraft = ProgressionService.GetAvailablePerkChoices(second, content).Select(perk => perk.TemplateId).ToArray();
+
+        Expect.Equal(2, firstDraft.Length, "The draft should offer all available perks when the test catalogue has fewer than three");
+        Expect.True(firstDraft.SequenceEqual(secondDraft), "The same entity id and build should produce the same draft");
+    }
+
+    private static void LegacyProgressionRetainsFullList()
+    {
+        var player = CreateActor("Player", new Position(1, 1), Faction.Player);
+        player.SetComponent(new ProgressionComponent { Level = 2, UnspentPerkChoices = 1 });
+
+        var choices = ProgressionService.GetAvailablePerkChoices(player, new StubContentDatabase());
+
+        Expect.Equal(2, choices.Count, "Legacy progression without draft state should retain full-list behavior");
+    }
+
+    private static void CannotSelectOutsideDraft()
+    {
+        var player = CreateActor("Player", new Position(1, 1), Faction.Player);
+        player.SetComponent(new ProgressionComponent { Level = 2, UnspentPerkChoices = 1, PerkDraftsGenerated = true });
+        var content = new StubContentDatabase();
+        var offered = ProgressionService.GetAvailablePerkChoices(player, content).Select(perk => perk.TemplateId).ToArray();
+        var outside = content.PerkTemplates.Keys.First(id => !offered.Contains(id, StringComparer.Ordinal));
+
+        Expect.False(ProgressionService.TrySelectPerk(player, content, outside, out _), "A perk outside the current draft must be rejected");
     }
 
     private static WorldState CreateWorld(int seed = 123)

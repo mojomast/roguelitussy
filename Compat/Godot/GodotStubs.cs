@@ -55,6 +55,20 @@ public enum Key
     Nine,
     Backspace,
     Delete,
+    V,
+    Home,
+    Pageup,
+    End,
+    Pagedown,
+    Kp1,
+    Kp2,
+    Kp3,
+    Kp4,
+    Kp5,
+    Kp6,
+    Kp7,
+    Kp8,
+    Kp9,
     Key0 = Zero,
     Key1 = One,
     Key2 = Two,
@@ -215,6 +229,7 @@ public class CanvasLayer : Node
 
 public class Control : Node
 {
+    private readonly Dictionary<string, int> _fontSizeOverrides = new();
     public Vector2 Position { get; set; }
 
     public Vector2 Size { get; set; } = new(200f, 80f);
@@ -224,6 +239,8 @@ public class Control : Node
     public bool Visible { get; set; } = true;
 
     public Color Modulate { get; set; } = Colors.White;
+
+    public Color SelfModulate { get; set; } = Colors.White;
 
     public int ZIndex { get; set; }
 
@@ -237,7 +254,10 @@ public class Control : Node
 
     public void AddThemeFontSizeOverride(string name, int fontSize)
     {
+        _fontSizeOverrides[name] = fontSize;
     }
+
+    public int GetThemeFontSize(string name, string themeType = "") => _fontSizeOverrides.GetValueOrDefault(name, 16);
 
     public void QueueRedraw()
     {
@@ -307,7 +327,17 @@ public class GridContainer : Control
 
 public class Label : Control
 {
+    public bool ClipText { get; set; }
+
+    public TextServer.OverrunBehavior TextOverrunBehavior { get; set; }
+
     public string Text { get; set; } = string.Empty;
+}
+
+public static class TextServer
+{
+    public enum OverrunBehavior { NoTrimming, TrimChar, TrimWord, TrimEllipsis, TrimWordEllipsis }
+    public enum AutowrapMode { Off, Arbitrary, Word, WordSmart }
 }
 
 public class Button : Control
@@ -393,6 +423,12 @@ public class ProgressBar : Control
 
 public class RichTextLabel : Control
 {
+    public bool FitContent { get; set; }
+
+    public bool ScrollActive { get; set; } = true;
+
+    public TextServer.AutowrapMode AutowrapMode { get; set; } = TextServer.AutowrapMode.WordSmart;
+
     public bool BbcodeEnabled { get; set; }
 
     public bool ScrollFollowing { get; set; }

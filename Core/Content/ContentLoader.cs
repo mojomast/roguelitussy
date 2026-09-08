@@ -666,7 +666,8 @@ public sealed class ContentLoader : IContentDatabase
             requiresTargetSelection,
             item.Tags.Count > 0
                 ? item.Tags.Distinct(StringComparer.Ordinal).OrderBy(tag => tag, StringComparer.Ordinal).ToArray()
-                : null);
+                : null,
+            item.SpritePath);
     }
 
     private static DialogueTemplate BuildDialogueTemplate(DialogueDefinition dialogue)
@@ -677,7 +678,9 @@ public sealed class ContentLoader : IContentDatabase
             nodes[node.Id] = new DialogueNode(
                 node.Id,
                 node.Text,
-                node.Options.Select(option => new DialogueOption(option.Text, option.Next, option.Action)).ToArray());
+                node.Options.Select(option => new DialogueOption(option.Text, option.Next, option.Action,
+                    option.Condition is null ? null : new DialogueCondition(option.Condition.Type,
+                        option.Condition.ItemId, option.Condition.FactionId, option.Condition.Value))).ToArray());
         }
 
         var startNodes = dialogue.StartNodes.Count > 0
@@ -709,7 +712,8 @@ public sealed class ContentLoader : IContentDatabase
             string.IsNullOrWhiteSpace(npc.AppearanceId) ? "default" : npc.AppearanceId,
             string.IsNullOrWhiteSpace(npc.ArchetypeId) ? "adventurer" : npc.ArchetypeId,
             string.IsNullOrWhiteSpace(npc.FactionId) ? "merchants_guild" : npc.FactionId,
-            merchantOffers);
+            merchantOffers,
+            npc.Services.Select(service => new NpcServiceTemplate(service.Id, service.Cost, service.HealAmount)).ToArray());
     }
 
     private static TrapTemplate BuildTrapTemplate(TrapDefinition trap)
@@ -1181,7 +1185,7 @@ public sealed class ContentLoader : IContentDatabase
         ValidateEnemies(enemyDefinitions, abilityDefinitions, lootDefinitions, statusDefinitions, errors);
         ValidateAbilities(abilityDefinitions, statusDefinitions, errors);
         ValidatePerks(perkDefinitions, errors);
-        ValidateDialogs(dialogueDefinitions, errors);
+        ValidateDialogs(dialogueDefinitions, itemDefinitions, factionDefinitions, errors);
         ValidateNpcs(npcDefinitions, dialogueDefinitions, itemDefinitions, factionDefinitions, errors);
         ValidateStatusEffects(statusDefinitions, errors);
         ValidateRooms(roomDefinitions, enemyDefinitions, itemDefinitions, npcDefinitions, lootDefinitions, trapDefinitions, tileLegend, errors);
@@ -1865,6 +1869,8 @@ public sealed class ContentLoader : IContentDatabase
 
     private static void ValidateDialogs(
         IReadOnlyDictionary<string, DialogueDefinition> dialogs,
+        IReadOnlyDictionary<string, ItemDefinition> items,
+        IReadOnlyDictionary<string, FactionDefinition> factions,
         ICollection<string> errors)
     {
         foreach (var (id, dialog) in dialogs)
@@ -1898,9 +1904,32 @@ public sealed class ContentLoader : IContentDatabase
                 {
                     ValidateRequiredText(option.Text, $"Dialog '{id}' node '{node.Id}' option text", errors);
 
-                    if (!string.IsNullOrWhiteSpace(option.Action) && !IsAllowedValue(option.Action, "close", "shop"))
+                    if (string.IsNullOrWhiteSpace(option.Next) == string.IsNullOrWhiteSpace(option.Action))
+                    {
+                        errors.Add($"Dialog '{id}' node '{node.Id}' option must define exactly one of next or action.");
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(option.Action)
+                        && !IsAllowedValue(option.Action, "close", "shop", "report", "service:field_dressing"))
                     {
                         errors.Add($"Dialog '{id}' node '{node.Id}' option has unknown action '{option.Action}'.");
+                    }
+
+                    if (option.Condition is { } condition)
+                    {
+                        var valid = condition.Type switch
+                        {
+                            "injured" => condition.ItemId is null && condition.FactionId is null && condition.Value is null,
+                            "missing_item" => condition.ItemId is not null && items.ContainsKey(condition.ItemId)
+                                && condition.FactionId is null && condition.Value is null,
+                            "reputation_at_least" => condition.FactionId is not null && factions.ContainsKey(condition.FactionId)
+                                && condition.Value is not null && condition.ItemId is null,
+                            _ => false,
+                        };
+                        if (!valid)
+                        {
+                            errors.Add($"Dialog '{id}' node '{node.Id}' option has invalid condition '{condition.Type}' or references.");
+                        }
                     }
                 }
             }
@@ -1963,6 +1992,32 @@ public sealed class ContentLoader : IContentDatabase
             if (!string.IsNullOrWhiteSpace(npc.FactionId) && !factions.ContainsKey(npc.FactionId))
             {
                 errors.Add($"Npc '{id}' references unknown faction '{npc.FactionId}'.");
+            }
+
+            var serviceIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var service in npc.Services)
+            {
+                if (!serviceIds.Add(service.Id) || service.Id != "field_dressing" || service.Cost <= 0 || service.HealAmount <= 0)
+                {
+                    errors.Add($"Npc '{id}' has an invalid or duplicate service '{service.Id}'; field_dressing requires positive cost and heal_amount.");
+                }
+            }
+
+            if (dialogs.TryGetValue(npc.DialogueId, out var dialogue))
+            {
+                foreach (var option in dialogue.Nodes.SelectMany(node => node.Options))
+                {
+                    if (string.Equals(option.Action, "shop", StringComparison.OrdinalIgnoreCase) && npc.Stock.Count == 0)
+                    {
+                        errors.Add($"Npc '{id}' dialog requests shop but has no stock.");
+                    }
+
+                    if (option.Action?.StartsWith("service:", StringComparison.OrdinalIgnoreCase) == true
+                        && !serviceIds.Contains(option.Action[8..]))
+                    {
+                        errors.Add($"Npc '{id}' dialog requests unauthorized service '{option.Action}'.");
+                    }
+                }
             }
 
             foreach (var stock in npc.Stock)

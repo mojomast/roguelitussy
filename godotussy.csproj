@@ -23,6 +23,7 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(UseGodotStubs)' == 'true'">
+    <Compile Remove="Scripts\Tools\VisualCapture.cs" />
     <Compile Include="Addons\roguelike_tools\RoguelikeToolsPlugin.cs" />
     <Compile Include="Compat\Godot\GodotStubs.cs" />
   </ItemGroup>

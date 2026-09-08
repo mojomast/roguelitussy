@@ -6,7 +6,14 @@ namespace Roguelike.Core;
 public sealed record DialogueOption(
     string Text,
     string? NextNodeId,
-    string? ActionId);
+    string? ActionId,
+    DialogueCondition? Condition = null);
+
+public sealed record DialogueCondition(
+    string Type,
+    string? ItemId = null,
+    string? FactionId = null,
+    int? Value = null);
 
 public sealed record DialogueNode(
     string NodeId,

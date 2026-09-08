@@ -8,9 +8,15 @@ namespace Godotussy;
 
 public sealed class DailyChallengeData
 {
+    public string Schema { get; set; } = DailyChallengeManager.CurrentSchema;
+
+    public int Version { get; set; } = DailyChallengeManager.CurrentVersion;
+
     public string LastAttemptDate { get; set; } = string.Empty;
 
     public bool TodayAttempted { get; set; }
+
+    public int TodayAttemptCount { get; set; }
 
     public bool TodayCompleted { get; set; }
 
@@ -22,6 +28,8 @@ public sealed class DailyChallengeData
 public partial class DailyChallengeManager : Node
 {
     public const string DailyChallengeUserPath = "user://daily_challenge.json";
+    public const string CurrentSchema = "roguelike-daily-challenge-v1";
+    public const int CurrentVersion = 2;
 
     private DailyChallengeData _data = new();
 
@@ -31,9 +39,13 @@ public partial class DailyChallengeManager : Node
 
     public bool TodayCompleted => IsToday() && _data.TodayCompleted;
 
+    public int TodayAttemptCount => IsToday() ? _data.TodayAttemptCount : 0;
+
     public int TodayBestFloor => IsToday() ? _data.TodayBestFloor : 0;
 
     public int TodayBestScore => IsToday() ? _data.TodayBestScore : 0;
+
+    public DailyModifierInfo TodaysModifier => DailySeedGenerator.GetModifierForDate(DateTime.UtcNow);
 
     public override void _Ready()
     {
@@ -58,6 +70,17 @@ public partial class DailyChallengeManager : Node
         try
         {
             _data = JsonSerializer.Deserialize<DailyChallengeData>(File.ReadAllText(path)) ?? new DailyChallengeData();
+            if ((!string.IsNullOrEmpty(_data.Schema) && _data.Schema != CurrentSchema)
+                || _data.Version > CurrentVersion)
+            {
+                _data = new DailyChallengeData();
+            }
+
+            _data.Schema = CurrentSchema;
+            _data.Version = CurrentVersion;
+            _data.TodayAttemptCount = Math.Max(0, _data.TodayAttemptCount);
+            _data.TodayAttempted |= _data.TodayAttemptCount > 0;
+            _data.TodayCompleted = false;
         }
         catch
         {
@@ -101,9 +124,14 @@ public partial class DailyChallengeManager : Node
         ResetIfNewDay();
         _data.LastAttemptDate = DailySeedGenerator.GetTodaysDateString();
         _data.TodayAttempted = true;
-        _data.TodayCompleted = true;
+        _data.TodayAttemptCount++;
         _data.TodayBestFloor = Math.Max(_data.TodayBestFloor, stats.FloorReached);
-        var score = DailySeedGenerator.CalculateScore(stats.FloorReached, stats.EnemiesKilled, stats.TotalTurns, stats.GoldCollected);
+        var score = DailySeedGenerator.CalculateScore(
+            stats.FloorReached,
+            stats.EnemiesKilled,
+            stats.TotalTurns,
+            stats.GoldCollected,
+            TodaysModifier);
         _data.TodayBestScore = Math.Max(_data.TodayBestScore, score);
         Save();
     }
@@ -118,7 +146,10 @@ public partial class DailyChallengeManager : Node
         }
 
         _data.LastAttemptDate = DailySeedGenerator.GetTodaysDateString();
+        _data.Schema = CurrentSchema;
+        _data.Version = CurrentVersion;
         _data.TodayAttempted = false;
+        _data.TodayAttemptCount = 0;
         _data.TodayCompleted = false;
         _data.TodayBestFloor = 0;
         _data.TodayBestScore = 0;

@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>12</LangVersion>
+    <AssemblyName>WindowsSingleFileLauncher</AssemblyName>
+    <RootNamespace>Roguelitussy.WindowsSingleFileLauncher</RootNamespace>
+    <PayloadVersion Condition="'$(PayloadVersion)' == ''">local</PayloadVersion>
+    <AssemblyInformationalVersion>$(PayloadVersion)</AssemblyInformationalVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="$(PayloadZip)" LogicalName="Roguelitussy.Payload.zip" Condition="'$(PayloadZip)' != ''" />
+  </ItemGroup>
+
+  <Target Name="RequirePayloadZip" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(PayloadZip)' == ''" Text="PayloadZip must identify the built Windows game ZIP." />
+    <Error Condition="'$(PayloadZip)' != '' and !Exists('$(PayloadZip)')" Text="PayloadZip does not exist: $(PayloadZip)" />
+  </Target>
+</Project>

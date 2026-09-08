@@ -31,8 +31,8 @@ public sealed class ContentValidationTests : ITestSuite
         Expect.Equal(28, content.EnemyDefinitions.Count, "Expected the full enemy set to load");
         Expect.Equal(30, content.AbilityDefinitions.Count, "Expected the full ability set to load");
         Expect.Equal(20, content.PerkDefinitions.Count, "Expected the initial perk set to load");
-        Expect.Equal(2, content.DialogueDefinitions.Count, "Expected the full dialog set to load");
-        Expect.Equal(2, content.NpcDefinitions.Count, "Expected the full NPC set to load");
+        Expect.Equal(4, content.DialogueDefinitions.Count, "Expected the full dialog set to load");
+        Expect.Equal(4, content.NpcDefinitions.Count, "Expected the full NPC set to load");
         Expect.Equal(13, content.StatusEffects.Count, "Expected the full status effect set to load");
         Expect.True(content.RoomPrefabs.Count >= 10, "Expected at least the baseline room prefab set to load");
         Expect.Equal(33, content.LootTables.Count, "Expected the full loot table set to load");

@@ -129,7 +129,7 @@
       },
       "faction": "Enemy",
       "min_depth": 3,
-      "max_depth": 8,
+      "max_depth": 99,
       "spawn_weight": 6,
       "abilities": [
         {
@@ -411,7 +411,7 @@
       },
       "faction": "Enemy",
       "min_depth": 4,
-      "max_depth": 7,
+      "max_depth": 99,
       "spawn_weight": 4,
       "abilities": [
         {
@@ -498,7 +498,7 @@
       },
       "faction": "Enemy",
       "min_depth": 6,
-      "max_depth": 9,
+      "max_depth": 99,
       "spawn_weight": 3,
       "abilities": [
         {
@@ -726,7 +726,7 @@
       "ai_params": { "flee_hp_pct": 40, "aggro_range": 9, "support_range": 5, "group_aggro_range": 7, "wander_when_idle": true },
       "faction": "Enemy",
       "min_depth": 2,
-      "max_depth": 7,
+      "max_depth": 99,
       "spawn_weight": 5,
       "abilities": [
         { "ability_id": "healing_pulse", "cooldown": 3, "priority": 1 },
@@ -813,7 +813,7 @@
       "ai_params": { "preferred_range": 5, "flee_hp_pct": 15, "min_range": 3, "aggro_range": 9, "wander_when_idle": true },
       "faction": "Enemy",
       "min_depth": 4,
-      "max_depth": 10,
+      "max_depth": 99,
       "spawn_weight": 4,
       "abilities": [
         { "ability_id": "fireball", "cooldown": 4, "priority": 1 },

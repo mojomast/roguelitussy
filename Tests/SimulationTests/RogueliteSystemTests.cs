@@ -13,6 +13,7 @@ public sealed class RogueliteSystemTests : ITestSuite
     {
         registry.Add("Simulation.Daily seed is deterministic for same date", DailySeedIsDeterministic);
         registry.Add("Simulation.Daily score uses authored formula", DailyScoreUsesFormula);
+        registry.Add("Simulation.Daily modifier selection and speed score are deterministic", DailyModifierSelectionAndSpeedScoreAreDeterministic);
         registry.Add("Simulation.Ascension modifiers include lower levels", AscensionModifiersIncludeLowerLevels);
         registry.Add("Simulation.RunNarrator is deterministic for same seed", RunNarratorIsDeterministic);
         registry.Add("Simulation.RunNarrator templates use allowed placeholders", RunNarratorPlaceholdersAreAllowed);
@@ -29,6 +30,22 @@ public sealed class RogueliteSystemTests : ITestSuite
     private static void DailyScoreUsesFormula()
     {
         Expect.Equal(345, DailySeedGenerator.CalculateScore(3, 10, 110, 0), "Score should be floor*100 + kills*10 - turns/2 + gold.");
+    }
+
+    private static void DailyModifierSelectionAndSpeedScoreAreDeterministic()
+    {
+        var thursday = new DateTime(2026, 7, 2, 12, 0, 0, DateTimeKind.Utc);
+        var speedRun = DailySeedGenerator.GetModifierForDate(thursday);
+        var otherDay = DailySeedGenerator.GetModifierForDate(thursday.AddDays(1));
+
+        Expect.Equal("speed_score", speedRun.EffectType, "Thursday should select the authored speed score modifier.");
+        Expect.True(speedRun.IsSupported, "Speed score should be the only active daily modifier.");
+        Expect.False(otherDay.IsSupported, "Other authored daily modifiers should remain unsupported.");
+        Expect.Equal(
+            DailySeedGenerator.CalculateScore(3, 10, 110, 0, speedRun),
+            DailySeedGenerator.CalculateScore(3, 10, 110, 0, speedRun),
+            "Daily score should be deterministic for the same modifier and run stats.");
+        Expect.Equal(1235, DailySeedGenerator.CalculateScore(3, 10, 110, 0, speedRun), "Speed score should add the authored fast-clear bonus.");
     }
 
     private static void AscensionModifiersIncludeLowerLevels()

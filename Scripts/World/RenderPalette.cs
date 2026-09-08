@@ -8,6 +8,24 @@ namespace Godotussy;
 /// </summary>
 public static class RenderPalette
 {
+    public readonly record struct FloorTheme(
+        string Name, Color FloorTint, Color WallTint, Color Trim, Color Face,
+        Color FloorFallback, Color WallFallback);
+
+    // Boost selected channels: multiplying this dark source art only by values
+    // below one loses the cracks and brick detail before the theme reads clearly.
+    public static FloorTheme ForDepth(int depth) => depth switch
+    {
+        <= 3 => new("Prison", new Color(0.96f, 1.14f, 1.35f), new Color(0.9f, 1.04f, 1.22f),
+            BoundaryTrim, WallCoverFace, TileFloor, TileWall),
+        <= 6 => new("Crypt", new Color(1.12f, 1.45f, 1.46f), new Color(1.13f, 1.27f, 1.23f),
+            new Color(0.72f, 0.86f, 0.81f, 0.95f), new Color(0.15f, 0.21f, 0.2f, 0.96f),
+            new Color(0.2f, 0.28f, 0.27f), new Color(0.08f, 0.12f, 0.11f)),
+        _ => new("Magma", new Color(1.55f, 1.05f, 0.86f), new Color(1.35f, 1f, 0.8f),
+            new Color(0.94f, 0.61f, 0.36f, 0.95f), new Color(0.25f, 0.14f, 0.1f, 0.96f),
+            new Color(0.3f, 0.19f, 0.15f), new Color(0.14f, 0.08f, 0.06f)),
+    };
+
     // Popups
     /// <summary>Gold tint used for item pickup text popups.</summary>
     public static readonly Color PickupPopup = new(0.98f, 0.87f, 0.42f, 1f);
@@ -40,6 +58,12 @@ public static class RenderPalette
     public static readonly Color ChestBody = new(0.67f, 0.46f, 0.19f, 1f);
     public static readonly Color ChestBand = new(0.35f, 0.2f, 0.08f, 1f);
     public static readonly Color ChestLatch = new(0.98f, 0.87f, 0.48f, 1f);
+
+    // Shrine altar and rune accents remain readable against every floor theme.
+    public static readonly Color ShrineBody = new(0.35f, 0.27f, 0.48f, 1f);
+    public static readonly Color ShrineRune = new(0.52f, 0.94f, 0.9f, 1f);
+    public static readonly Color ShrineLabel = new(0.86f, 0.78f, 1f, 1f);
+    public static readonly Color ShrineSpentLabel = new(0.48f, 0.44f, 0.52f, 1f);
 
     // Fallback entity tints (untextured bodies)
     public static readonly Color FallbackRat = new(0.62f, 0.55f, 0.48f, 1f);
