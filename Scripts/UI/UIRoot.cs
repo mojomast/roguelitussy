@@ -11,6 +11,7 @@ public partial class UIRoot : CanvasLayer
         Talk,
         OpenChest,
         Stairs,
+        Pickup,
     }
 
     private EventBus? _eventBus;
@@ -1142,6 +1143,13 @@ public partial class UIRoot : CanvasLayer
                     HUD.SetInteractionPrompt("[Enter] Ascend");
                     return;
             }
+
+            if (world.HasGroundItems(player.Position))
+            {
+                _currentPromptAction = InteractionPromptAction.Pickup;
+                HUD.SetInteractionPrompt("[F] Pick Up");
+                return;
+            }
         }
 
         _currentPromptAction = InteractionPromptAction.None;
@@ -1163,6 +1171,21 @@ public partial class UIRoot : CanvasLayer
                 if (action is not null)
                 {
                     _eventBus?.EmitPlayerActionSubmitted(action);
+                }
+                break;
+            case InteractionPromptAction.Pickup:
+                var pickupWorld = _gameManager?.World;
+                var pickupPlayer = pickupWorld?.Player;
+                var pickup = pickupPlayer is null
+                    ? null
+                    : UIActionFactory.CreatePickupAction(
+                        pickupWorld,
+                        _content ?? _gameManager?.Content,
+                        pickupPlayer.Id,
+                        _gameManager?.AutoEquipUpgradesEnabled == true);
+                if (pickup is not null)
+                {
+                    _eventBus?.EmitPlayerActionSubmitted(pickup);
                 }
                 break;
         }
@@ -1217,6 +1240,24 @@ public partial class UIRoot : CanvasLayer
             if (shrine is not null && shrineComponent is not null && player is not null)
             {
                 _eventBus?.EmitShrineConfirmationRequested(new ShrineConfirmationRequest(player.Id, shrine.Id, shrineComponent.ShrineType, shrineComponent.HPCost));
+                RefreshInputGate();
+                return;
+            }
+
+            var groundWorld = _gameManager?.World;
+            var groundPlayer = groundWorld?.Player;
+            if (groundWorld is not null && groundPlayer is not null && groundWorld.HasGroundItems(groundPlayer.Position))
+            {
+                var pickup = UIActionFactory.CreatePickupAction(
+                    groundWorld,
+                    _content ?? _gameManager?.Content,
+                    groundPlayer.Id,
+                    _gameManager?.AutoEquipUpgradesEnabled == true);
+                if (pickup is not null)
+                {
+                    _eventBus?.EmitPlayerActionSubmitted(pickup);
+                }
+
                 RefreshInputGate();
                 return;
             }

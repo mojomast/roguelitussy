@@ -28,7 +28,7 @@ This page reflects the current repository wiring in `InputHandler` and the activ
 | Rest until healed | `Z` | Repeats waits until healed, unsafe, interrupted, or safety-capped. |
 | Autoexplore | `O` | Repeats movement toward points of interest or frontier tiles until interrupted. |
 | Quick-use item | `1`-`5` | Implemented. Uses the first five derived usable inventory entries shown by the quick-slot hotbar when safe. Aimed items must be targeted from inventory. |
-| Pick up | `G` | Picks up items from the current tile. |
+| Pick up | `G` | Picks up the item under the player. |
 | Use stairs | `Enter`, `KpEnter` | Uses stairs at the player position. |
 | Combat log filter | `L` | Cycles visible log categories: All, Combat, Loot, System. Stored messages are preserved. |
 | Inventory | `I` | Opens inventory. |
@@ -37,7 +37,7 @@ This page reflects the current repository wiring in `InputHandler` and the activ
 | Minimap | `M`, `Tab` | Toggles minimap visibility. |
 | Minimap legend | `U` | Toggles the minimap legend independently while normal gameplay input is active. |
 | Examine | `X` | Enters examine mode at the player position. |
-| Interact | `F` | Interacts with nearby NPCs, chests, or contextual objects. `E` is not a normal-gameplay interact key. |
+| Interact / pick up | `F` | Interacts with a nearby NPC, chest, or shrine when one has priority; otherwise, with `[F] Pick Up` shown in the HUD, submits the same pickup action as `G` for the item under the player. `E` is not a normal-gameplay interact key. |
 | Help | `H` | Opens help. |
 | Dev tools | `T` | Opens the development tools workbench. |
 | Debug console | `` ` `` | Opens the debug console in `DEBUG` builds only. |

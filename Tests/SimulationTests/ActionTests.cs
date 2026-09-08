@@ -21,6 +21,7 @@ public sealed class ActionTests : ITestSuite
         registry.Add("Simulation.Actions pickup action rejects full inventory", PickupActionRejectsFullInventory);
         registry.Add("Simulation.Actions pickup action merges stacks when bag is full", PickupActionMergesStacksWhenFull);
         registry.Add("Simulation.Actions pickup action resolves stack template from content", PickupActionResolvesStackTemplateFromContent);
+        registry.Add("Simulation.Actions pickup action recovers unresolved ground items", PickupActionRecoversUnresolvedGroundItems);
         registry.Add("Simulation.Actions pickup auto-equips strict upgrades only when enabled", PickupAutoEquipsStrictUpgradesOnlyWhenEnabled);
         registry.Add("Simulation.Actions pickup auto-equip respects requirements", PickupAutoEquipRespectsRequirements);
         registry.Add("Simulation.Actions use item heals and consumes potion", UseItemHealsAndConsumes);
@@ -429,6 +430,34 @@ public sealed class ActionTests : ITestSuite
         Expect.Equal(1, inventory.Items.Count, "Resolved stack pickups should avoid creating a second stack.");
         Expect.Equal(3, inventory.Items[0].StackCount, "Resolved stack pickups should merge into the carried stack.");
         Expect.False(world.HasGroundItems(actor.Position), "Merged content-resolved pickups should remove the source ground item.");
+    }
+
+    private static void PickupActionRecoversUnresolvedGroundItems()
+    {
+        var world = CreateWorld();
+        var actor = CreateActor("Player", new Position(1, 1), Faction.Player);
+        actor.SetComponent(new InventoryComponent(1));
+        world.Player = actor;
+        world.AddEntity(actor);
+
+        var staleItem = new ItemInstance
+        {
+            TemplateId = "removed_artifact",
+            StackCount = 4,
+            CurrentCharges = 7,
+            IsIdentified = true,
+        };
+        world.DropItem(actor.Position, staleItem);
+
+        var outcome = new PickupAction(actor.Id).Execute(world);
+
+        Expect.Equal(ActionResult.Success, outcome.Result, "An unresolved ground item should be recoverable when inventory has space.");
+        Expect.Equal(1, actor.GetComponent<InventoryComponent>()!.Items.Count, "The unresolved item should occupy one inventory slot.");
+        var recovered = actor.GetComponent<InventoryComponent>()!.Items[0];
+        Expect.Equal(staleItem.InstanceId, recovered.InstanceId, "Pickup should preserve the unresolved item instance.");
+        Expect.Equal(4, recovered.StackCount, "Pickup should preserve the unresolved item stack count.");
+        Expect.Equal(7, recovered.CurrentCharges, "Pickup should preserve the unresolved item charges.");
+        Expect.False(world.HasGroundItems(actor.Position), "A recovered unresolved item should leave the ground pile.");
     }
 
     private static void UseItemHealsAndConsumes()

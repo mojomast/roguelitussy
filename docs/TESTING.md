@@ -31,10 +31,12 @@ The harness prints the current test count at runtime; avoid hardcoding exact cou
 
 ## Latest Verification - 2026-09-08
 
-- Full strict suite: 734/734 passed.
-- Rendering validation: 663/663 passed.
+- Full strict suite: 736/736 passed.
+- Rendering validation: 665/665 passed.
 - Real Godot 4.5.2 API build: zero warnings/errors.
 - `dotnet format --verify-no-changes` and `git diff --check`: passed.
+
+The pickup regression coverage verifies `G`, the HUD `[F] Pick Up` fallback, and preservation of unresolved item instances under the established stacking and capacity rules.
 
 The replayability coverage includes save/load-stable perk drafts, synergy trigger behavior, landmark/key validation, nine-floor completion and first-clear unlock idempotence, ranged weapon range/LOS input, retryable daily state and Thursday speed scoring, merchant reputation discounts, dangerous-status wait suppression, and onboarding/game-over actions.
 

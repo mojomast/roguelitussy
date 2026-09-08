@@ -8,7 +8,7 @@ The July 2026 stabilization checkpoint advances saves to version 17, persists be
 
 ## Quick Start
 
-The September 2026 audit advances saves to version 18 and fixes wall-occupying actor restoration, Core load content binding, floor-clear reward persistence, authored status application, lethal-healing ordering, mouse inventory input gating, and new-run turn reset. Migration policy and verification details are in `docs/SYSTEMS.md` and `DEVELOPMENT_RESUME_REPORT.md`.
+The September 2026 audit advances saves to version 18 and fixes wall-occupying actor restoration, Core load content binding, floor-clear reward persistence, authored status application, lethal-healing ordering, mouse inventory input gating, new-run turn reset, and floor-item pickup fallback routing. `G` picks up the item under the player; the HUD shows `[F] Pick Up`, and `F` submits the same action when no higher-priority NPC, chest, or shrine interaction exists. Migration policy and verification details are in `docs/SYSTEMS.md` and `DEVELOPMENT_RESUME_REPORT.md`.
 
 The follow-up wires authored enemy sprites through saved template identity and restricts random boss markers to eligible boss-tagged enemies at the actual floor depth. Ordinary random slots exclude bosses; explicit template overrides and missing-art fallbacks remain supported.
 
@@ -20,7 +20,7 @@ The identity/art follow-up gives every class a usable native technique and every
 
 The replayability follow-up completes the live run contract: deterministic three-option perk drafts persist through save/load with a legacy full-list fallback, and the level-up UI labels drafts clearly. Heal-on-kill and flat damage-bonus synergies now affect play; `echo_bonus` remains unsupported. Landmark metadata/fallbacks and lock/key solvability validation are reliable, ranged weapon input enforces range and line of sight, and runs use a nine-floor contract with boss/act feedback and canonical `Victory` completion. First-clear ascension unlocks are idempotent, with only the currently implemented Ascension effects active. Daily challenges are retryable with persisted attempts and best scores; Thursday supplies the authored speed-score modifier, while other daily modifiers remain unsupported/upcoming. Friendly Merchants' Guild reputation discounts purchases, and Orin's dialogue is corrected.
 
-The same pass adds 1 HP `WaitAction` recovery with dangerous-status suppression, first-delve/stairs/death guidance, and `Retry Seed`/`New Build` game-over actions. Latest verification is 734/734 in the full strict suite, 663/663 in rendering validation, a real Godot 4.5.2 API build with zero warnings/errors, and passing format/diff checks.
+The same pass adds 1 HP `WaitAction` recovery with dangerous-status suppression, first-delve/stairs/death guidance, and `Retry Seed`/`New Build` game-over actions. Latest verification is 736/736 in the full strict suite, 665/665 in rendering validation, a real Godot 4.5.2 API build with zero warnings/errors, and passing format/diff checks.
 
 1. Install .NET 8 SDK.
    If a system package is unavailable, the Microsoft user-local installer works for this repo; set `DOTNET_ROOT=$HOME/.dotnet` and put `$HOME/.dotnet` on `PATH` before running the commands below.

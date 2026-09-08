@@ -26,6 +26,7 @@ public sealed class UISmokeTests : ITestSuite
         registry.Add("UI.Quick-use number key submits potion action", QuickUseNumberKeySubmitsPotionAction);
         registry.Add("UI.Quick-use rejects aimed and empty slots safely", QuickUseRejectsAimedAndEmptySlotsSafely);
         registry.Add("UI.InputHandler uses F only for interact", InputHandlerUsesFOnlyForInteract);
+        registry.Add("UI.UIRoot keyboard F picks up known and unresolved ground items", UIRootKeyboardPicksUpKnownAndUnresolvedItems);
         registry.Add("UI.Run prefix enters and cancels without submitting movement", RunPrefixEntersAndCancels);
         registry.Add("UI.Run moves through normal action processing until blocked", RunMovesThroughNormalActionProcessingUntilBlocked);
         registry.Add("UI.Run stops when a hostile becomes visible or adjacent", RunStopsWhenHostileBecomesVisibleOrAdjacent);
@@ -456,6 +457,42 @@ public sealed class UISmokeTests : ITestSuite
 
         Expect.True(input.HandleKey(Key.F), "F should remain the dedicated interact key.");
         Expect.Equal(1, interactRequests, "Pressing F should fire InteractRequested once.");
+    }
+
+    private static void UIRootKeyboardPicksUpKnownAndUnresolvedItems()
+    {
+        var context = CreateContext();
+        context.GameManager.LoadWorld(context.World);
+        var knownItem = new ItemInstance { TemplateId = "potion_health", StackCount = 2 };
+        context.World.DropItem(context.Player.Position, knownItem);
+        var root = new UIRoot();
+        root.BindServices(context.GameManager, context.Bus, context.Content);
+
+        IAction? submitted = null;
+        context.Bus.PlayerActionSubmitted += action => submitted = action;
+
+        Expect.Equal("[F] Pick Up", root.HUD.InteractionPromptText, "A ground pile should expose the pickup prompt.");
+        root._UnhandledInput(new InputEventKey { Pressed = true, PhysicalKeycode = Key.F });
+        Expect.True(submitted is PickupAction, "Activating the pickup prompt should submit PickupAction.");
+        Expect.False(context.World.HasGroundItems(context.Player.Position), "Keyboard F should remove a known item from the ground.");
+        Expect.True(context.Player.GetComponent<InventoryComponent>()!.Items.Any(item => item.InstanceId == knownItem.InstanceId), "Keyboard F should add the known item to inventory.");
+
+        submitted = null;
+        var unresolvedItem = new ItemInstance { TemplateId = "removed_artifact", StackCount = 3 };
+        context.World.DropItem(context.Player.Position, unresolvedItem);
+        context.Bus.EmitTurnCompleted();
+        Expect.Equal("[F] Pick Up", root.HUD.InteractionPromptText, "An unresolved ground item should still expose the pickup prompt.");
+        root._UnhandledInput(new InputEventKey { Pressed = true, PhysicalKeycode = Key.F });
+        Expect.True(submitted is PickupAction, "Keyboard F should route unresolved items through PickupAction.");
+        Expect.False(context.World.HasGroundItems(context.Player.Position), "Keyboard F should remove an unresolved item from the ground.");
+        var recovered = context.Player.GetComponent<InventoryComponent>()!.Items.Single(item => item.InstanceId == unresolvedItem.InstanceId);
+        Expect.Equal(3, recovered.StackCount, "Keyboard F should preserve an unresolved item's stack count.");
+
+        var chest = new StubEntity("Chest", context.Player.Position + new Position(1, 0), Faction.Neutral);
+        chest.SetComponent(new ChestComponent { LootTableId = "starter_chest" });
+        context.World.AddEntity(chest);
+        context.Bus.EmitTurnCompleted();
+        Expect.Equal("[F] Open Chest", root.HUD.InteractionPromptText, "A chest prompt should outrank a ground pickup prompt.");
     }
 
     private static void RunPrefixEntersAndCancels()

@@ -84,14 +84,26 @@ public sealed class PickupAction : IAction
     private bool CanAccept(WorldState world, InventoryComponent inventory, ItemInstance item)
     {
         var template = ResolveTemplate(world, item);
-        return template is not null && template.MaxStack > 1
+        if (template is null)
+        {
+            // Unknown artifacts cannot be merged safely, but remain recoverable as one inventory entry.
+            return inventory.HasSpace;
+        }
+
+        return template.MaxStack > 1
             ? inventory.CanAccept(item, template.MaxStack)
             : inventory.HasSpace;
     }
 
     private bool AddItem(WorldState world, InventoryComponent inventory, ItemInstance item, ItemTemplate? template)
     {
-        return template is not null && template.MaxStack > 1
+        if (template is null)
+        {
+            // Preserve the stale instance verbatim; without metadata it is intentionally non-stack-aware.
+            return inventory.Add(item);
+        }
+
+        return template.MaxStack > 1
             ? inventory.AddWithStacking(item, template.MaxStack, world.AllocateItemInstanceId)
             : inventory.Add(item);
     }

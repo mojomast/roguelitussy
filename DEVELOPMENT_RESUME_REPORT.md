@@ -10,6 +10,12 @@ Development should resume by stabilizing correctness and verification before add
 
 ## Verification Status
 
+### Floor Item Pickup Fix - 2026-09-08
+
+- Completed: `G` picks up the item under the player. The HUD now shows `[F] Pick Up`, and keyboard `F` submits the same pickup action when no higher-priority NPC, chest, or shrine interaction exists.
+- Preserved: established item stacking and inventory-capacity rules remain unchanged. Unresolved or stale item instances are retained as non-stack-aware fallback items when inventory has space.
+- Verification: full strict suite 736/736; rendering validation 665/665; real Godot 4.5.2 API build with zero warnings/errors; format and diff checks passed.
+
 ### Replayability Wave - 2026-09-08
 
 - Completed: level-up perk drafts are deterministic three-option offers persisted through save/load. Legacy saves without draft IDs use a full-list fallback, and the UI uses explicit draft wording.
